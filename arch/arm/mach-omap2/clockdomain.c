@@ -587,6 +587,8 @@ int omap2_clkdm_clk_enable(struct clockdomain *clkdm, struct clk *clk)
 	pwrdm_wait_transition(clkdm->pwrdm.ptr);
 	pwrdm_clkdm_state_switch(clkdm);
 
+	pwrdm_wait_transition(clkdm->pwrdm.ptr);
+
 	return 0;
 }
 
