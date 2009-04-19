@@ -1203,7 +1203,9 @@ CLEAN_FILES +=	vmlinux System.map \
 MRPROPER_DIRS  += include/config include2 usr/include include/generated
 MRPROPER_FILES += .config .config.old include/asm .version .old_version \
                   include/linux/autoconf.h include/linux/version.h      \
-                  include/linux/bounds.h include/asm*/asm-offsets.h     \
+                  include/asm*/asm-offsets.h   				\
+
+>>>>>>> 01fc0ac... kbuild: move bounds.h to include/generated
 		  Module.symvers Module.markers tags TAGS cscope*
 
 # clean - Delete most, but leave enough to build external modules
