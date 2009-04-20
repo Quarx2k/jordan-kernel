@@ -239,15 +239,8 @@ all:	$(KBUILD_IMAGE) dtbs
 
 boot := arch/arm/boot
 
-#	Update machine arch and proc symlinks if something which affects
-#	them changed.  We use .arch to indicate when they were updated
-#	last, otherwise make uses the target directory mtime.
-
-archprepare: maketools
-
-PHONY += maketools FORCE
-maketools: include/linux/version.h FORCE
-	$(Q)$(MAKE) $(build)=arch/arm/tools include/asm-arm/mach-types.h
+archprepare:
+	$(Q)$(MAKE) $(build)=arch/arm/tools include/generated/mach-types.h
 
 # Convert bzImage to zImage
 bzImage: zImage
@@ -263,9 +256,6 @@ zinstall install: vmlinux
 
 dtbs: scripts
 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
-
-CLEAN_FILES += include/asm-arm/mach-types.h \
-	       include/asm-arm/arch include/asm-arm/.arch
 
 # We use MRPROPER_FILES and CLEAN_FILES now
 archclean:
