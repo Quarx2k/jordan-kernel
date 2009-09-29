@@ -677,7 +677,6 @@ irda_irnet_destroy(irnet_socket *	self)
   self->stsap_sel = 0;
 
   DEXIT(IRDA_SOCK_TRACE, "\n");
-  return;
 }
 
 
@@ -927,7 +926,6 @@ irnet_disconnect_server(irnet_socket *	self,
   irttp_listen(self->tsap);
 
   DEXIT(IRDA_SERV_TRACE, "\n");
-  return;
 }
 
 /*------------------------------------------------------------------*/
@@ -1012,7 +1010,6 @@ irnet_destroy_server(void)
   irda_irnet_destroy(&irnet_server.s);
 
   DEXIT(IRDA_SERV_TRACE, "\n");
-  return;
 }
 
 
@@ -1403,8 +1400,8 @@ irnet_connect_indication(void *		instance,
   /* Socket already connecting ? On primary ? */
   if(0
 #ifdef ALLOW_SIMULT_CONNECT
-     || ((irttp_is_primary(server->tsap) == 1)	/* primary */
-	 && (test_and_clear_bit(0, &new->ttp_connect)))
+     || ((irttp_is_primary(server->tsap) == 1) &&	/* primary */
+	 (test_and_clear_bit(0, &new->ttp_connect)))
 #endif /* ALLOW_SIMULT_CONNECT */
      )
     {

@@ -79,7 +79,6 @@ static inline void sctp_outq_head_data(struct sctp_outq *q,
 {
 	list_add(&ch->list, &q->out_chunk_list);
 	q->out_qlen += ch->skb->len;
-	return;
 }
 
 /* Take data from the front of the queue. */
@@ -102,7 +101,6 @@ static inline void sctp_outq_tail_data(struct sctp_outq *q,
 {
 	list_add_tail(&ch->list, &q->out_chunk_list);
 	q->out_qlen += ch->skb->len;
-	return;
 }
 
 /*
@@ -191,8 +189,8 @@ static inline int sctp_cacc_skip(struct sctp_transport *primary,
 				 __u32 tsn)
 {
 	if (primary->cacc.changeover_active &&
-	    (sctp_cacc_skip_3_1(primary, transport, count_of_newacks)
-	     || sctp_cacc_skip_3_2(primary, tsn)))
+	    (sctp_cacc_skip_3_1(primary, transport, count_of_newacks) ||
+	     sctp_cacc_skip_3_2(primary, tsn)))
 		return 1;
 	return 0;
 }

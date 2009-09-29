@@ -1313,7 +1313,6 @@ static void ipmr_queue_xmit(struct sk_buff *skb, struct mfc_cache *c, int vifi)
 
 out_free:
 	kfree_skb(skb);
-	return;
 }
 
 static int ipmr_find_vif(struct net_device *dev)

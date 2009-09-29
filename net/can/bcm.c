@@ -712,8 +712,6 @@ static void bcm_remove_op(struct bcm_op *op)
 		kfree(op->last_frames);
 
 	kfree(op);
-
-	return;
 }
 
 static void bcm_rx_unreg(struct net_device *dev, struct bcm_op *op)
@@ -1478,6 +1476,9 @@ static int bcm_connect(struct socket *sock, struct sockaddr *uaddr, int len,
 	struct sock *sk = sock->sk;
 	struct bcm_sock *bo = bcm_sk(sk);
 
+	if (len < sizeof(*addr))
+		return -EINVAL;
+
 	if (bo->bound)
 		return -EISCONN;
 
@@ -1539,7 +1540,7 @@ static int bcm_recvmsg(struct kiocb *iocb, struct socket *sock,
 		return err;
 	}
 
-	sock_recv_timestamp(msg, sk, skb);
+	sock_recv_ts_and_drops(msg, sk, skb);
 
 	if (msg->msg_name) {
 		msg->msg_namelen = sizeof(struct sockaddr_can);

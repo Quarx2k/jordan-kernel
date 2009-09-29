@@ -831,7 +831,7 @@ static int dn_confirm_accept(struct sock *sk, long *timeo, gfp_t allocation)
 	scp->segsize_loc = dst_metric(__sk_dst_get(sk), RTAX_ADVMSS);
 	dn_send_conn_conf(sk, allocation);
 
-	prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
+	prepare_to_wait(sk_sleep(sk), &wait, TASK_INTERRUPTIBLE);
 	for(;;) {
 		release_sock(sk);
 		if (scp->state == DN_CC)
@@ -849,9 +849,9 @@ static int dn_confirm_accept(struct sock *sk, long *timeo, gfp_t allocation)
 		err = -EAGAIN;
 		if (!*timeo)
 			break;
-		prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
+		prepare_to_wait(sk_sleep(sk), &wait, TASK_INTERRUPTIBLE);
 	}
-	finish_wait(sk->sk_sleep, &wait);
+	finish_wait(sk_sleep(sk), &wait);
 	if (err == 0) {
 		sk->sk_socket->state = SS_CONNECTED;
 	} else if (scp->state != DN_CC) {
@@ -872,7 +872,7 @@ static int dn_wait_run(struct sock *sk, long *timeo)
 	if (!*timeo)
 		return -EALREADY;
 
-	prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
+	prepare_to_wait(sk_sleep(sk), &wait, TASK_INTERRUPTIBLE);
 	for(;;) {
 		release_sock(sk);
 		if (scp->state == DN_CI || scp->state == DN_CC)
@@ -890,9 +890,9 @@ static int dn_wait_run(struct sock *sk, long *timeo)
 		err = -ETIMEDOUT;
 		if (!*timeo)
 			break;
-		prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
+		prepare_to_wait(sk_sleep(sk), &wait, TASK_INTERRUPTIBLE);
 	}
-	finish_wait(sk->sk_sleep, &wait);
+	finish_wait(sk_sleep(sk), &wait);
 out:
 	if (err == 0) {
 		sk->sk_socket->state = SS_CONNECTED;
@@ -1039,7 +1039,7 @@ static struct sk_buff *dn_wait_for_connect(struct sock *sk, long *timeo)
 	struct sk_buff *skb = NULL;
 	int err = 0;
 
-	prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
+	prepare_to_wait(sk_sleep(sk), &wait, TASK_INTERRUPTIBLE);
 	for(;;) {
 		release_sock(sk);
 		skb = skb_dequeue(&sk->sk_receive_queue);
@@ -1059,9 +1059,9 @@ static struct sk_buff *dn_wait_for_connect(struct sock *sk, long *timeo)
 		err = -EAGAIN;
 		if (!*timeo)
 			break;
-		prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
+		prepare_to_wait(sk_sleep(sk), &wait, TASK_INTERRUPTIBLE);
 	}
-	finish_wait(sk->sk_sleep, &wait);
+	finish_wait(sk_sleep(sk), &wait);
 
 	return skb == NULL ? ERR_PTR(err) : skb;
 }
@@ -1745,11 +1745,11 @@ static int dn_recvmsg(struct kiocb *iocb, struct socket *sock,
 			goto out;
 		}
 
-		prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
+		prepare_to_wait(sk_sleep(sk), &wait, TASK_INTERRUPTIBLE);
 		set_bit(SOCK_ASYNC_WAITDATA, &sk->sk_socket->flags);
 		sk_wait_event(sk, &timeo, dn_data_ready(sk, queue, flags, target));
 		clear_bit(SOCK_ASYNC_WAITDATA, &sk->sk_socket->flags);
-		finish_wait(sk->sk_sleep, &wait);
+		finish_wait(sk_sleep(sk), &wait);
 	}
 
 	skb_queue_walk_safe(queue, skb, n) {
@@ -2002,12 +2002,12 @@ static int dn_sendmsg(struct kiocb *iocb, struct socket *sock,
 				goto out;
 			}
 
-			prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
+			prepare_to_wait(sk_sleep(sk), &wait, TASK_INTERRUPTIBLE);
 			set_bit(SOCK_ASYNC_WAITDATA, &sk->sk_socket->flags);
 			sk_wait_event(sk, &timeo,
 				      !dn_queue_too_long(scp, queue, flags));
 			clear_bit(SOCK_ASYNC_WAITDATA, &sk->sk_socket->flags);
-			finish_wait(sk->sk_sleep, &wait);
+			finish_wait(sk_sleep(sk), &wait);
 			continue;
 		}
 
@@ -2325,7 +2325,7 @@ static const struct file_operations dn_socket_seq_fops = {
 };
 #endif
 
-static struct net_proto_family	dn_family_ops = {
+static const struct net_proto_family	dn_family_ops = {
 	.family =	AF_DECnet,
 	.create =	dn_create,
 	.owner	=	THIS_MODULE,

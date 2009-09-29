@@ -107,6 +107,7 @@ struct net;
  *	@skc_node: main hash linkage for various protocol lookup tables
  *	@skc_nulls_node: main hash linkage for UDP/UDP-Lite protocol
  *	@skc_refcnt: reference count
+ *	@skc_tx_queue_mapping: tx queue number for this connection
  *	@skc_hash: hash value used with various protocol lookup tables
  *	@skc_family: network address family
  *	@skc_state: Connection state
@@ -128,6 +129,7 @@ struct sock_common {
 		struct hlist_nulls_node skc_nulls_node;
 	};
 	atomic_t		skc_refcnt;
+	int			skc_tx_queue_mapping;
 
 	unsigned int		skc_hash;
 	unsigned short		skc_family;
@@ -215,6 +217,7 @@ struct sock {
 #define sk_node			__sk_common.skc_node
 #define sk_nulls_node		__sk_common.skc_nulls_node
 #define sk_refcnt		__sk_common.skc_refcnt
+#define sk_tx_queue_mapping	__sk_common.skc_tx_queue_mapping
 
 #define sk_copy_start		__sk_common.skc_hash
 #define sk_hash			__sk_common.skc_hash
@@ -306,6 +309,11 @@ struct sock {
 /*
  * Hashed lists helper routines
  */
+static inline struct sock *sk_entry(const struct hlist_node *node)
+{
+	return hlist_entry(node, struct sock, sk_node);
+}
+
 static inline struct sock *__sk_head(const struct hlist_head *head)
 {
 	return hlist_entry(head->first, struct sock, sk_node);
@@ -504,6 +512,8 @@ enum sock_flags {
 	SOCK_TIMESTAMPING_SOFTWARE,     /* %SOF_TIMESTAMPING_SOFTWARE */
 	SOCK_TIMESTAMPING_RAW_HARDWARE, /* %SOF_TIMESTAMPING_RAW_HARDWARE */
 	SOCK_TIMESTAMPING_SYS_HARDWARE, /* %SOF_TIMESTAMPING_SYS_HARDWARE */
+	SOCK_FASYNC, /* fasync() active */
+	SOCK_RXQ_OVFL,
 };
 
 static inline void sock_copy_flags(struct sock *nsk, struct sock *osk)
@@ -1092,11 +1102,36 @@ static inline void sock_put(struct sock *sk)
 extern int sk_receive_skb(struct sock *sk, struct sk_buff *skb,
 			  const int nested);
 
+static inline void sk_tx_queue_set(struct sock *sk, int tx_queue)
+{
+	sk->sk_tx_queue_mapping = tx_queue;
+}
+
+static inline void sk_tx_queue_clear(struct sock *sk)
+{
+	sk->sk_tx_queue_mapping = -1;
+}
+
+static inline int sk_tx_queue_get(const struct sock *sk)
+{
+	return sk->sk_tx_queue_mapping;
+}
+
+static inline bool sk_tx_queue_recorded(const struct sock *sk)
+{
+	return (sk && sk->sk_tx_queue_mapping >= 0);
+}
+
 static inline void sk_set_socket(struct sock *sk, struct socket *sock)
 {
+	sk_tx_queue_clear(sk);
 	sk->sk_socket = sock;
 }
 
+static inline wait_queue_head_t *sk_sleep(struct sock *sk)
+{
+	return sk->sk_sleep;
+}
 /* Detach socket from process context.
  * Announce socket dead, detach it from wait queue and inode.
  * Note that parent inode held reference count on this struct sock,
@@ -1150,6 +1185,7 @@ __sk_dst_set(struct sock *sk, struct dst_entry *dst)
 {
 	struct dst_entry *old_dst;
 
+	sk_tx_queue_clear(sk);
 	old_dst = sk->sk_dst_cache;
 	sk->sk_dst_cache = dst;
 	dst_release(old_dst);
@@ -1168,6 +1204,7 @@ __sk_dst_reset(struct sock *sk)
 {
 	struct dst_entry *old_dst;
 
+	sk_tx_queue_clear(sk);
 	old_dst = sk->sk_dst_cache;
 	sk->sk_dst_cache = NULL;
 	dst_release(old_dst);
@@ -1268,8 +1305,8 @@ static inline int sk_has_allocations(const struct sock *sk)
  *   tp->rcv_nxt check   sock_def_readable
  *   ...                 {
  *   schedule               ...
- *                          if (sk->sk_sleep && waitqueue_active(sk->sk_sleep))
- *                              wake_up_interruptible(sk->sk_sleep)
+ *                          if (sk_sleep(sk) && waitqueue_active(sk_sleep(sk)))
+ *                              wake_up_interruptible(sk_sleep(sk))
  *                          ...
  *                       }
  *
@@ -1290,7 +1327,7 @@ static inline int sk_has_sleeper(struct sock *sk)
 	 * This memory barrier is paired in the sock_poll_wait.
 	 */
 	smp_mb__after_lock();
-	return sk->sk_sleep && waitqueue_active(sk->sk_sleep);
+	return sk_sleep(sk) && waitqueue_active(sk_sleep(sk));
 }
 
 /**
@@ -1491,6 +1528,8 @@ sock_recv_timestamp(struct msghdr *msg, struct sock *sk, struct sk_buff *skb)
 	else
 		sk->sk_stamp = kt;
 }
+
+extern void sock_recv_ts_and_drops(struct msghdr *msg, struct sock *sk, struct sk_buff *skb);
 
 /**
  * sock_tx_timestamp - checks whether the outgoing packet is to be time stamped

@@ -306,7 +306,6 @@ handle_recv(struct p9_client *client, struct p9_trans_rdma *rdma,
 		   req, err, status);
 	rdma->state = P9_RDMA_FLUSHING;
 	client->status = Disconnected;
-	return;
 }
 
 static void

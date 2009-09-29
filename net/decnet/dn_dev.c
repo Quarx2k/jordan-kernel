@@ -1268,17 +1268,14 @@ void dn_dev_down(struct net_device *dev)
 
 void dn_dev_init_pkt(struct sk_buff *skb)
 {
-	return;
 }
 
 void dn_dev_veri_pkt(struct sk_buff *skb)
 {
-	return;
 }
 
 void dn_dev_hello(struct sk_buff *skb)
 {
-	return;
 }
 
 void dn_dev_devices_off(void)

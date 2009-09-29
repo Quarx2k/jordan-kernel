@@ -205,8 +205,8 @@ int mesh_rmc_check(u8 *sa, struct ieee80211s_hdr *mesh_hdr,
 			list_del(&p->list);
 			kmem_cache_free(rm_cache, p);
 			--entries;
-		} else if ((seqnum == p->seqnum)
-				&& (memcmp(sa, p->sa, ETH_ALEN) == 0))
+		} else if ((seqnum == p->seqnum) &&
+			   (memcmp(sa, p->sa, ETH_ALEN) == 0))
 			return -1;
 	}
 
@@ -292,8 +292,6 @@ void mesh_mgmt_ies_add(struct sk_buff *skb, struct ieee80211_sub_if_data *sdata)
 	*pos = CAPAB_FORWARDING;
 	*pos++ |= sdata->u.mesh.accepting_plinks ? CAPAB_ACCEPT_PLINKS : 0x00;
 	*pos++ = 0x00;
-
-	return;
 }
 
 u32 mesh_table_hash(u8 *addr, struct ieee80211_sub_if_data *sdata, struct mesh_table *tbl)

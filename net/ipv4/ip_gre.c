@@ -494,8 +494,7 @@ static void ipgre_err(struct sk_buff *skb, u32 info)
 		t->err_count = 1;
 	t->err_time = jiffies;
 out:
-	read_unlock(&ipgre_lock);
-	return;
+	read_unlock(&ipgre_lock);ss
 }
 
 static inline void ipgre_ecn_decapsulate(struct iphdr *iph, struct sk_buff *skb)

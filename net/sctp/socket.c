@@ -1968,7 +1968,7 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk,
 	if (err)
 		goto out_free;
 
-	sock_recv_timestamp(msg, sk, skb);
+	sock_recv_ts_and_drops(msg, sk, skb);
 	if (sctp_ulpevent_is_notification(event)) {
 		msg->msg_flags |= MSG_NOTIFICATION;
 		sp->pf->event_msgname(event, msg->msg_name, addr_len);
@@ -2354,8 +2354,8 @@ static int sctp_setsockopt_peer_addr_params(struct sock *sk,
 	    pmtud_change     == SPP_PMTUD ||
 	    sackdelay_change == SPP_SACKDELAY ||
 	    params.spp_sackdelay > 500 ||
-	    (params.spp_pathmtu
-	    && params.spp_pathmtu < SCTP_DEFAULT_MINSEGMENT))
+	    (params.spp_pathmtu &&
+	     params.spp_pathmtu < SCTP_DEFAULT_MINSEGMENT))
 		return -EINVAL;
 
 	/* If an address other than INADDR_ANY is specified, and
@@ -6023,7 +6023,7 @@ unsigned int sctp_poll(struct file *file, struct socket *sock, poll_table *wait)
 	struct sctp_sock *sp = sctp_sk(sk);
 	unsigned int mask;
 
-	poll_wait(file, sk->sk_sleep, wait);
+	poll_wait(file, sk_sleep(sk), wait);
 
 	/* A TCP-style listening socket becomes readable when the accept queue
 	 * is not empty.
@@ -6264,7 +6264,7 @@ static int sctp_wait_for_packet(struct sock * sk, int *err, long *timeo_p)
 	int error;
 	DEFINE_WAIT(wait);
 
-	prepare_to_wait_exclusive(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
+	prepare_to_wait_exclusive(sk_sleep(sk), &wait, TASK_INTERRUPTIBLE);
 
 	/* Socket errors? */
 	error = sock_error(sk);
@@ -6301,14 +6301,14 @@ static int sctp_wait_for_packet(struct sock * sk, int *err, long *timeo_p)
 	sctp_lock_sock(sk);
 
 ready:
-	finish_wait(sk->sk_sleep, &wait);
+	finish_wait(sk_sleep(sk), &wait);
 	return 0;
 
 interrupted:
 	error = sock_intr_errno(*timeo_p);
 
 out:
-	finish_wait(sk->sk_sleep, &wait);
+	finish_wait(sk_sleep(sk), &wait);
 	*err = error;
 	return error;
 }
@@ -6382,8 +6382,8 @@ static void __sctp_write_space(struct sctp_association *asoc)
 			wake_up_interruptible(&asoc->wait);
 
 		if (sctp_writeable(sk)) {
-			if (sk->sk_sleep && waitqueue_active(sk->sk_sleep))
-				wake_up_interruptible(sk->sk_sleep);
+			if (sk_sleep(sk) && waitqueue_active(sk_sleep(sk)))
+				wake_up_interruptible(sk_sleep(sk));
 
 			/* Note that we try to include the Async I/O support
 			 * here by modeling from the current TCP/UDP code.
@@ -6617,7 +6617,7 @@ static int sctp_wait_for_accept(struct sock *sk, long timeo)
 
 
 	for (;;) {
-		prepare_to_wait_exclusive(sk->sk_sleep, &wait,
+		prepare_to_wait_exclusive(sk_sleep(sk), &wait,
 					  TASK_INTERRUPTIBLE);
 
 		if (list_empty(&ep->asocs)) {
@@ -6643,7 +6643,7 @@ static int sctp_wait_for_accept(struct sock *sk, long timeo)
 			break;
 	}
 
-	finish_wait(sk->sk_sleep, &wait);
+	finish_wait(sk_sleep(sk), &wait);
 
 	return err;
 }
@@ -6653,7 +6653,7 @@ static void sctp_wait_for_close(struct sock *sk, long timeout)
 	DEFINE_WAIT(wait);
 
 	do {
-		prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
+		prepare_to_wait(sk_sleep(sk), &wait, TASK_INTERRUPTIBLE);
 		if (list_empty(&sctp_sk(sk)->ep->asocs))
 			break;
 		sctp_release_sock(sk);
@@ -6661,7 +6661,7 @@ static void sctp_wait_for_close(struct sock *sk, long timeout)
 		sctp_lock_sock(sk);
 	} while (!signal_pending(current) && timeout);
 
-	finish_wait(sk->sk_sleep, &wait);
+	finish_wait(sk_sleep(sk), &wait);
 }
 
 static void sctp_skb_set_owner_r_frag(struct sk_buff *skb, struct sock *sk)

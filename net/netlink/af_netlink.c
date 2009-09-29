@@ -677,6 +677,9 @@ static int netlink_connect(struct socket *sock, struct sockaddr *addr,
 	struct netlink_sock *nlk = nlk_sk(sk);
 	struct sockaddr_nl *nladdr = (struct sockaddr_nl *)addr;
 
+	if (alen < sizeof(addr->sa_family))
+		return -EINVAL;
+
 	if (addr->sa_family == AF_UNSPEC) {
 		sk->sk_state	= NETLINK_UNCONNECTED;
 		nlk->dst_pid	= 0;
@@ -2050,7 +2053,7 @@ static const struct proto_ops netlink_ops = {
 	.sendpage =	sock_no_sendpage,
 };
 
-static struct net_proto_family netlink_family_ops = {
+static const struct net_proto_family netlink_family_ops = {
 	.family = PF_NETLINK,
 	.create = netlink_create,
 	.owner	= THIS_MODULE,	/* for consistency 8) */

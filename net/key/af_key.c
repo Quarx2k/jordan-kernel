@@ -3606,7 +3606,7 @@ static int pfkey_recvmsg(struct kiocb *kiocb,
 	if (err)
 		goto out_free;
 
-	sock_recv_timestamp(msg, sk, skb);
+	sock_recv_ts_and_drops(msg, sk, skb);
 
 	err = (flags & MSG_TRUNC) ? skb->len : copied;
 
@@ -3644,7 +3644,7 @@ static const struct proto_ops pfkey_ops = {
 	.recvmsg	=	pfkey_recvmsg,
 };
 
-static struct net_proto_family pfkey_family_ops = {
+static const struct net_proto_family pfkey_family_ops = {
 	.family	=	PF_KEY,
 	.create	=	pfkey_create,
 	.owner	=	THIS_MODULE,

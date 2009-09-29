@@ -42,7 +42,6 @@ obj-$(CONFIG_VIB_GPIO)		+= vib-gpio.o
 obj-$(CONFIG_VIB_OMAP_PWM)	+= vib-omap-pwm.o
 obj-$(CONFIG_VIB_PWM)		+= vib-pwm.o
 obj-$(CONFIG_APANIC_MMC)	+= apanic_mmc.o
-obj-$(CONFIG_WL127X_TEST)	+= wl127x_test.o
 obj-$(CONFIG_MODEM_PM_DRIVER)   += modem_pm_driver/
 obj-$(CONFIG_SMC_DRIVER)        += smc/
 obj-$(CONFIG_SEC_DRIVER)        += sec/

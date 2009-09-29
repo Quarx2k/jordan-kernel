@@ -1297,7 +1297,9 @@ static void ib_ucm_remove_one(struct ib_device *device)
 	device_unregister(&ucm_dev->dev);
 }
 
-static ssize_t show_abi_version(struct class *class, char *buf)
+static ssize_t show_abi_version(struct class *class,
+				struct class_attribute *attr,
+				char *buf)
 {
 	return sprintf(buf, "%d\n", IB_USER_CM_ABI_VERSION);
 }

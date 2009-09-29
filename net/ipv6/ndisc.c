@@ -888,8 +888,6 @@ out:
 		in6_ifa_put(ifp);
 	else
 		in6_dev_put(idev);
-
-	return;
 }
 
 static void ndisc_recv_na(struct sk_buff *skb)

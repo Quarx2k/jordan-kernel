@@ -546,6 +546,8 @@ int inet_dgram_connect(struct socket *sock, struct sockaddr * uaddr,
 {
 	struct sock *sk = sock->sk;
 
+	if (addr_len < sizeof(uaddr->sa_family))
+		return -EINVAL;
 	if (uaddr->sa_family == AF_UNSPEC)
 		return sk->sk_prot->disconnect(sk, flags);
 
@@ -559,7 +561,7 @@ static long inet_wait_for_connect(struct sock *sk, long timeo)
 {
 	DEFINE_WAIT(wait);
 
-	prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
+	prepare_to_wait(sk_sleep(sk), &wait, TASK_INTERRUPTIBLE);
 
 	/* Basic assumption: if someone sets sk->sk_err, he _must_
 	 * change state of the socket from TCP_SYN_*.
@@ -572,9 +574,9 @@ static long inet_wait_for_connect(struct sock *sk, long timeo)
 		lock_sock(sk);
 		if (signal_pending(current) || !timeo)
 			break;
-		prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
+		prepare_to_wait(sk_sleep(sk), &wait, TASK_INTERRUPTIBLE);
 	}
-	finish_wait(sk->sk_sleep, &wait);
+	finish_wait(sk_sleep(sk), &wait);
 	return timeo;
 }
 
@@ -588,6 +590,9 @@ int inet_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 	struct sock *sk = sock->sk;
 	int err;
 	long timeo;
+
+	if (addr_len < sizeof(uaddr->sa_family))
+		return -EINVAL;
 
 	lock_sock(sk);
 
@@ -949,7 +954,7 @@ static const struct proto_ops inet_sockraw_ops = {
 #endif
 };
 
-static struct net_proto_family inet_family_ops = {
+static const struct net_proto_family inet_family_ops = {
 	.family = PF_INET,
 	.create = inet_create,
 	.owner	= THIS_MODULE,

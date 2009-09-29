@@ -171,8 +171,6 @@ static void in_cache_put(in_cache_entry *entry)
 		memset(entry, 0, sizeof(in_cache_entry));
 		kfree(entry);
 	}
-
-	return;
 }
 
 /*
@@ -209,8 +207,6 @@ static void in_cache_remove_entry(in_cache_entry *entry,
 		}
 		vcc_release_async(vcc, -EPIPE);
 	}
-
-	return;
 }
 
 
@@ -237,8 +233,6 @@ static void clear_count_and_expired(struct mpoa_client *client)
 		entry = next_entry;
 	}
 	write_unlock_bh(&client->ingress_lock);
-
-	return;
 }
 
 /* Call this every MPC-p4 seconds. */
@@ -317,8 +311,6 @@ static void in_destroy_cache(struct mpoa_client *mpc)
 	while(mpc->in_cache != NULL)
 		mpc->in_ops->remove_entry(mpc->in_cache, mpc);
 	write_unlock_irq(&mpc->ingress_lock);
-
-	return;
 }
 
 static eg_cache_entry *eg_cache_get_by_cache_id(__be32 cache_id, struct mpoa_client *mpc)
@@ -407,8 +399,6 @@ static void eg_cache_put(eg_cache_entry *entry)
 		memset(entry, 0, sizeof(eg_cache_entry));
 		kfree(entry);
 	}
-
-	return;
 }
 
 /*
@@ -443,8 +433,6 @@ static void eg_cache_remove_entry(eg_cache_entry *entry,
 		}
 		vcc_release_async(vcc, -EPIPE);
 	}
-
-	return;
 }
 
 static eg_cache_entry *eg_cache_add_entry(struct k_message *msg, struct mpoa_client *client)
@@ -488,8 +476,6 @@ static void update_eg_cache_entry(eg_cache_entry * entry, uint16_t holding_time)
 	do_gettimeofday(&(entry->tv));
 	entry->entry_state = EGRESS_RESOLVED;
 	entry->ctrl_info.holding_time = holding_time;
-
-	return;
 }
 
 static void clear_expired(struct mpoa_client *client)
@@ -515,8 +501,6 @@ static void clear_expired(struct mpoa_client *client)
 		entry = next_entry;
 	}
 	write_unlock_irq(&client->egress_lock);
-
-	return;
 }
 
 static void eg_destroy_cache(struct mpoa_client *mpc)
@@ -525,8 +509,6 @@ static void eg_destroy_cache(struct mpoa_client *mpc)
 	while(mpc->eg_cache != NULL)
 		mpc->eg_ops->remove_entry(mpc->eg_cache, mpc);
 	write_unlock_irq(&mpc->egress_lock);
-
-	return;
 }
 
 
@@ -563,6 +545,4 @@ void atm_mpoa_init_cache(struct mpoa_client *mpc)
 {
 	mpc->in_ops = &ingress_ops;
 	mpc->eg_ops = &egress_ops;
-
-	return;
 }

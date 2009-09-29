@@ -391,13 +391,6 @@ config VIB_PWM_SWEEP
 	depends on VIB_PWM
 	default n
 
-config WL127X_TEST
-	tristate "TI wl127x Bluetooth GPIO test driver for board-sholes"
-	depends on (MACH_SHOLES || MACH_MAPPHONE) && WL127X_RFKILL && BT
-	default n
-	---help---
-	 Creates sysfs GPIO entries for testing TI wl127x BT on board-sholes.
-
 config SYSPANIC
 	tristate "SYSPANIC driver used to detect BP panics"
 	default n

@@ -311,7 +311,8 @@ static int block_size_init(void)
  */
 #ifdef CONFIG_ARCH_MEMORY_PROBE
 static ssize_t
-memory_probe_store(struct class *class, const char *buf, size_t count)
+memory_probe_store(struct class *class, struct class_attribute *attr,
+		   const char *buf, size_t count)
 {
 	u64 phys_addr;
 	int nid;
@@ -340,7 +341,6 @@ static inline int memory_probe_init(void)
 	return 0;
 }
 #endif
-
 /*
  * Note that phys_device is optional.  It is here to allow for
  * differentiation between which *physical* devices each
