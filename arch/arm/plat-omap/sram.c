@@ -46,6 +46,8 @@
 #define OMAP2_SRAM_PUB_VA	(OMAP2_SRAM_VA + 0x800)
 #define OMAP3_SRAM_PA           0x40200000
 #define OMAP3_SRAM_VA           0xfe400000
+#define OMAP3_SRAM_PUB_PA       0x40208000
+#define OMAP3_SRAM_PUB_VA       (OMAP3_SRAM_VA + 0x8000)
 #define OMAP4_SRAM_PA		0x40200000		/*0x402f0000*/
 #define OMAP4_SRAM_VA		0xfe400000		/*0xfe4f0000*/
 
