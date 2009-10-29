@@ -367,7 +367,8 @@ static struct pcpu_chunk *pcpu_chunk_addr_search(void *addr)
  * New target map allocation length if extension is necessary, 0
  * otherwise.
  */
-static int pcpu_need_to_extend(struct pcpu_chunk *chunk)
+static int pcpu_extend_area_map(struct pcpu_chunk *chunk)
+	__releases(lock) __acquires(lock)
 {
 	int new_alloc;
 
