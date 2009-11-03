@@ -1154,6 +1154,7 @@ __blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
 	retval = -ENOMEM;
 	if (!dio)
 		goto out;
+
 	/*
 	 * Believe it or not, zeroing out the page array caused a .5%
 	 * performance regression in a database benchmark.  So, we take
@@ -1209,7 +1210,7 @@ __blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
 	if (dio->flags & DIO_LOCKING) {
 		if (unlikely((rw & WRITE) && retval < 0)) {
 			loff_t isize = i_size_read(inode);
-			if (end > isize)
+			if (end > isize )
 				vmtruncate(inode, isize);
 		}
 	}
