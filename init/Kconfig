@@ -1338,3 +1338,4 @@ source "block/Kconfig"
 config PREEMPT_NOTIFIERS
 	bool
 
+source "kernel/Kconfig.locks"
