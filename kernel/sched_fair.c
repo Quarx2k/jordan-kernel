@@ -3008,7 +3008,7 @@ redo:
 			 */
 			if (!cpumask_test_cpu(this_cpu,
 					      &busiest->curr->cpus_allowed)) {
-				raw_spin_unlock_irqrestore(&busiest->lock,
+				raw_raw_spin_unlock_irqrestore(&busiest->lock,
 							    flags);
 				all_pinned = 1;
 				goto out_one_pinned;
@@ -3019,7 +3019,7 @@ redo:
 				busiest->push_cpu = this_cpu;
 				active_balance = 1;
 			}
-			raw_spin_unlock_irqrestore(&busiest->lock, flags);
+			raw_raw_spin_unlock_irqrestore(&busiest->lock, flags);
 			if (active_balance)
 				wake_up_process(busiest->migration_thread);
 
@@ -3201,7 +3201,7 @@ redo:
 		/*
 		 * Should not call ttwu while holding a rq->lock
 		 */
-		raw_spin_unlock(&this_rq->lock);
+		raw_raw_spin_unlock(&this_rq->lock);
 		if (active_balance)
 			wake_up_process(busiest->migration_thread);
 		raw_spin_lock(&this_rq->lock);
@@ -3584,7 +3584,7 @@ static void rebalance_domains(int cpu, enum cpu_idle_type idle)
 			sd->last_balance = jiffies;
 		}
 		if (need_serialize)
-			spin_unlock(&balancing);
+			raw_spin_unlock(&balancing);
 out:
 		if (time_after(next_balance, sd->last_balance + interval)) {
 			next_balance = sd->last_balance + interval;
@@ -3764,7 +3764,7 @@ static void task_fork_fair(struct task_struct *p)
 	struct rq *rq = this_rq();
 	unsigned long flags;
 
-	spin_lock_irqsave(&rq->lock, flags);
+	raw_spin_lock_irqsave(&rq->lock, flags);
 
 	if (unlikely(task_cpu(p) != this_cpu))
 		__set_task_cpu(p, this_cpu);
@@ -3786,7 +3786,7 @@ static void task_fork_fair(struct task_struct *p)
 
 	se->vruntime -= cfs_rq->min_vruntime;
 
-	spin_unlock_irqrestore(&rq->lock, flags);
+	raw_spin_unlock_irqrestore(&rq->lock, flags);
 }
 
 /*
