@@ -4151,7 +4151,7 @@ static int load_balance(int this_cpu, struct rq *this_rq,
 	unsigned long flags;
 	struct cpumask *cpus = __get_cpu_var(load_balance_tmpmask);
 
-	cpumask_copy(cpus, cpu_online_mask);
+	cpumask_copy(cpus, cpu_active_mask);
 
 	/*
 	 * When power savings policy is enabled for the parent domain, idle
@@ -4313,9 +4313,9 @@ load_balance_newidle(int this_cpu, struct rq *this_rq, struct sched_domain *sd)
 	int sd_idle = 0;
 	int all_pinned = 0;
 	struct cpumask *cpus = __get_cpu_var(load_balance_tmpmask);
-
 );
-	cpumask_copy(cpus, cpu_online_mask);
+
+	cpumask_copy(cpus, cpu_active_mask);
 
 	/*
 	 * When power savings policy is enabled for the parent domain, idle
@@ -9091,8 +9091,8 @@ match1:
 
 	if (doms_new == NULL) {
 		ndoms_cur = 0;
-		doms_new = fallback_doms;
-		cpumask_andnot(&doms_new[0], cpu_active_mask, cpu_isolated_map);
+		doms_new = &fallback_doms;
+		cpumask_andnot(doms_new[0], cpu_active_mask, cpu_isolated_map);
 		WARN_ON_ONCE(dattr_new);
 	}
 
