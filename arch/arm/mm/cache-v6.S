@@ -249,11 +249,6 @@ ENTRY(v6_dma_clean_range)
  *	- end     - virtual end address of region
  */
 ENTRY(v6_dma_flush_range)
-#ifdef CONFIG_CACHE_FLUSH_RANGE_LIMIT
-	sub	r2, r1, r0
-	cmp	r2, #CONFIG_CACHE_FLUSH_RANGE_LIMIT
-	bhi	v6_dma_flush_dcache_all
-#endif
 	bic	r0, r0, #D_CACHE_LINE_SIZE - 1
 1:
 #ifdef HARVARD_CACHE
@@ -268,18 +263,6 @@ ENTRY(v6_dma_flush_range)
 	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer
 	mov	pc, lr
 
-#ifdef CONFIG_CACHE_FLUSH_RANGE_LIMIT
-v6_dma_flush_dcache_all:
-	mov	r0, #0
-#ifdef HARVARD_CACHE
-	mcr	p15, 0, r0, c7, c14, 0		@ D cache clean+invalidate
-#else
-	mcr	p15, 0, r0, c7, c15, 0		@ Cache clean+invalidate
-#endif
-	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer
-	mov	pc, lr
-#endif
-
 	__INITDATA
 
 	.type	v6_cache_fns, #object
@@ -290,6 +273,8 @@ ENTRY(v6_cache_fns)
 	.long	v6_coherent_kern_range
 	.long	v6_coherent_user_range
 	.long	v6_flush_kern_dcache_area
+	.long	v6_dma_map_area
+	.long	v6_dma_unmap_area
 	.long	v6_dma_inv_range
 	.long	v6_dma_clean_range
 	.long	v6_dma_flush_range
