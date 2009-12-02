@@ -63,7 +63,7 @@ struct pm_save_count {
 	u32 ext_32k;
 	int refcount;
 	u32 init_clock;
-	raw_spinlock_t lock;		/* spinlock only sync the refcount */
+	arch_spinlock_t lock;		/* spinlock only sync the refcount */
 	/* cpufreq management */
 	u64 max_cpu_freq;		/* in khz */
 };
