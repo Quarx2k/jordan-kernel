@@ -648,7 +648,7 @@ static int write_protect_page(struct vm_area_struct *vma, struct page *page,
 		 * Check that no O_DIRECT or similar I/O is in progress on the
 		 * page
 		 */
-		if ((page_mapcount(page) + 2 + swapped) != page_count(page)) {
+		if (page_mapcount(page) + 1 + swapped != page_count(page)) {
 			set_pte_at_notify(mm, addr, ptep, entry);
 			goto out_unlock;
 		}
@@ -683,10 +683,7 @@ static int replace_page(struct vm_area_struct *vma, struct page *oldpage,
 	pte_t *ptep;
 	spinlock_t *ptl;
 	unsigned long addr;
-	pgprot_t prot;
 	int err = -EFAULT;
-
-	prot = vm_get_page_prot(vma->vm_flags & ~VM_WRITE);
 
 	addr = page_address_in_vma(oldpage, vma);
 	if (addr == -EFAULT)
@@ -715,7 +712,7 @@ static int replace_page(struct vm_area_struct *vma, struct page *oldpage,
 
 	flush_cache_page(vma, addr, pte_pfn(*ptep));
 	ptep_clear_flush(vma, addr, ptep);
-	set_pte_at_notify(mm, addr, ptep, mk_pte(newpage, prot));
+	set_pte_at_notify(mm, addr, ptep, mk_pte(newpage, vma->vm_page_prot));
 
 	page_remove_rmap(oldpage);
 	put_page(oldpage);
@@ -747,12 +744,8 @@ static int try_to_merge_one_page(struct vm_area_struct *vma,
 
 	if (!(vma->vm_flags & VM_MERGEABLE))
 		goto out;
-
 	if (!PageAnon(oldpage))
 		goto out;
-
-	get_page(newpage);
-	get_page(oldpage);
 
 	/*
 	 * We need the page lock to read a stable PageSwapCache in
@@ -762,7 +755,7 @@ static int try_to_merge_one_page(struct vm_area_struct *vma,
 	 * then come back to this page when it is unlocked.
 	 */
 	if (!trylock_page(oldpage))
-		goto out_putpage;
+		goto out;
 	/*
 	 * If this anonymous page is mapped only here, its pte may need
 	 * to be write-protected.  If it's mapped elsewhere, all of its
@@ -773,13 +766,7 @@ static int try_to_merge_one_page(struct vm_area_struct *vma,
 	    pages_identical(oldpage, newpage))
 		err = replace_page(vma, oldpage, newpage, orig_pte);
 
-	if ((vma->vm_flags & VM_LOCKED) && !err)
-		munlock_vma_page(oldpage);
-
 	unlock_page(oldpage);
-out_putpage:
-	put_page(oldpage);
-	put_page(newpage);
 out:
 	return err;
 }
