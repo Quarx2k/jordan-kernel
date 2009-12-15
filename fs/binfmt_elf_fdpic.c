@@ -391,8 +391,10 @@ static int load_elf_fdpic_binary(struct linux_binprm *bprm,
 		stack_prot |= PROT_EXEC;
 
 	down_write(&current->mm->mmap_sem);
-	current->mm->start_brk = do_mmap(NULL, 0, stack_size, stack_prot,
-					 MAP_PRIVATE | MAP_ANONYMOUS | MAP_GROWSDOWN,
+	current->mm->start_brk = do_mmap(NULL, 0, stack_size,
+					 PROT_READ | PROT_WRITE | PROT_EXEC,
+					 MAP_PRIVATE | MAP_ANONYMOUS |
+					 MAP_UNINITIALIZED | MAP_GROWSDOWN,
 					 0);
 
 	if (IS_ERR_VALUE(current->mm->start_brk)) {
