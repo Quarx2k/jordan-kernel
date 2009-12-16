@@ -1078,12 +1078,7 @@ out:
 	return error;
 }
 
-/*
- * Note that some platforms still use traditional core dumps and not
- * the ELF core dump.  Each platform can select it as appropriate.
- */
-#if defined(USE_ELF_CORE_DUMP) && defined(CONFIG_ELF_CORE)
-
+#ifdef CONFIG_ELF_CORE
 /*
  * ELF core dumper
  *
@@ -2042,7 +2037,7 @@ out:
 	return has_dumped;
 }
 
-#endif		/* USE_ELF_CORE_DUMP */
+#endif		/* CONFIG_ELF_CORE */
 
 static int __init init_elf_binfmt(void)
 {
