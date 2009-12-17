@@ -110,7 +110,7 @@ xfs_inode_alloc(
 #endif
 
 	/* prevent anyone from using this yet */
-	VFS_I(ip)->i_state = I_NEW|I_LOCK;
+	VFS_I(ip)->i_state = I_NEW;
 
 	return ip;
 }
@@ -253,7 +253,7 @@ xfs_iget_cache_hit(
 			__xfs_inode_set_reclaim_tag(pag, ip);
 			goto out_error;
 		}
-		inode->i_state = I_LOCK|I_NEW;
+		inode->i_state = I_NEW;
 	} else {
 		/* If the VFS inode is being torn down, pause and try again. */
 		if (!igrab(inode)) {
