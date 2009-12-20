@@ -99,10 +99,5 @@ static inline int rcu_preempt_depth(void)
 	return 0;
 }
 
-static inline int rcu_preempt_depth(void)
-{
-	return 0;
-}
-
 #endif /* __LINUX_RCUTINY_H */
 
