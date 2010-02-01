@@ -1704,16 +1704,6 @@ static void update_shares(struct sched_domain *sd)
 	}
 }
 
-static void update_shares_locked(struct rq *rq, struct sched_domain *sd)
-{
-	if (root_task_group_empty())
-		return;
-
-	spin_unlock(&rq->lock);
-	update_shares(sd);
-	spin_lock(&rq->lock);
-}
-
 static void update_h_load(long cpu)
 {
 	walk_tg_tree(tg_load_down, tg_nop, (void *)cpu);
@@ -1722,10 +1712,6 @@ static void update_h_load(long cpu)
 #else
 
 static inline void update_shares(struct sched_domain *sd)
-{
-}
-
-static inline void update_shares_locked(struct rq *rq, struct sched_domain *sd)
 {
 }
 
