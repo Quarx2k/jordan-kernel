@@ -84,6 +84,20 @@ static inline unsigned int sysfs_type(struct sysfs_dirent *sd)
 	return sd->s_flags & SYSFS_TYPE_MASK;
 }
 
+#ifdef CONFIG_DEBUG_LOCK_ALLOC
+#define sysfs_dirent_init_lockdep(sd)				\
+do {								\
+	struct attribute *attr = sd->s_attr.attr;		\
+	struct lock_class_key *key = attr->key;			\
+	if (!key)						\
+		key = &attr->skey;				\
+								\
+	lockdep_init_map(&sd->dep_map, "s_active", key, 0);	\
+} while(0)
+#else
+#define sysfs_dirent_init_lockdep(sd) do {} while(0)
+#endif
+
 /*
  * Context structure to be used while adding/removing nodes.
  */
