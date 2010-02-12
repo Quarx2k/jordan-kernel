@@ -1872,8 +1872,8 @@ static void __init mapphone_init(void)
 
 static void __init mapphone_reserve(void)
 {
-
-	omap2_map_common_io();
+	omap34xx_map_common_io();
+	//omap2_map_common_io();
 	omap2_ramconsole_reserve_sdram();
 #ifdef CONFIG_ION_OMAP
 	omap_ion_init();
@@ -1883,6 +1883,7 @@ static void __init mapphone_reserve(void)
 static void __init mapphone_map_io(void)
 {
 	omap2_set_globals_343x();
+
 }
 
 MACHINE_START(MAPPHONE, "mapphone_")
