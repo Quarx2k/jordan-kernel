@@ -2724,8 +2724,7 @@ ext4_mb_mark_diskspace_used(struct ext4_allocation_context *ac,
 
 	len = ac->ac_b_ex.fe_len;
 	if (!ext4_data_block_valid(sbi, block, len)) {
-		ext4_error(sb, __func__,
-			   "Allocating blocks %llu-%llu which overlap "
+		ext4_error(sb, "Allocating blocks %llu-%llu which overlap "
 			   "fs metadata\n", block, block+len);
 		/* File system mounted not to panic on error
 		 * Fix the bitmap and repeat the block allocation
@@ -3644,15 +3643,13 @@ ext4_mb_discard_group_preallocations(struct super_block *sb,
 
 	bitmap_bh = ext4_read_block_bitmap(sb, group);
 	if (bitmap_bh == NULL) {
-		ext4_error(sb, __func__, "Error in reading block "
-				"bitmap for %u", group);
+		ext4_error(sb, "Error reading block bitmap for %u", group);
 		return 0;
 	}
 
 	err = ext4_mb_load_buddy(sb, group, &e4b);
 	if (err) {
-		ext4_error(sb, __func__, "Error in loading buddy "
-				"information for %u", group);
+		ext4_error(sb, "Error loading buddy information for %u", group);
 		put_bh(bitmap_bh);
 		return 0;
 	}
@@ -3825,15 +3822,15 @@ repeat:
 
 		err = ext4_mb_load_buddy(sb, group, &e4b);
 		if (err) {
-			ext4_error(sb, __func__, "Error in loading buddy "
-					"information for %u", group);
+			ext4_error(sb, "Error loading buddy information for %u",
+					group);
 			continue;
 		}
 
 		bitmap_bh = ext4_read_block_bitmap(sb, group);
 		if (bitmap_bh == NULL) {
-			ext4_error(sb, __func__, "Error in reading block "
-					"bitmap for %u", group);
+			ext4_error(sb, "Error reading block bitmap for %u",
+					group);
 			ext4_mb_release_desc(&e4b);
 			continue;
 		}
@@ -4098,8 +4095,8 @@ ext4_mb_discard_lg_preallocations(struct super_block *sb,
 
 		ext4_get_group_no_and_offset(sb, pa->pa_pstart, &group, NULL);
 		if (ext4_mb_load_buddy(sb, group, &e4b)) {
-			ext4_error(sb, __func__, "Error in loading buddy "
-					"information for %u", group);
+			ext4_error(sb, "Error loading buddy information for %u",
+					group);
 			continue;
 		}
 		ext4_lock_group(sb, group);
@@ -4489,9 +4486,8 @@ void ext4_mb_free_blocks(handle_t *handle, struct inode *inode,
 	if (block < le32_to_cpu(es->s_first_data_block) ||
 	    block + count < block ||
 	    block + count > ext4_blocks_count(es)) {
-		ext4_error(sb, __func__,
-			    "Freeing blocks not in datazone - "
-			    "block = %llu, count = %lu", block, count);
+		ext4_error(sb, "Freeing blocks not in datazone - "
+			   "block = %llu, count = %lu", block, count);
 		goto error_return;
 	}
 
@@ -4534,8 +4530,7 @@ do_more:
 	    in_range(block + count - 1, ext4_inode_table(sb, gdp),
 		      EXT4_SB(sb)->s_itb_per_group)) {
 
-		ext4_error(sb, __func__,
-			   "Freeing blocks in system zone - "
+		ext4_error(sb, "Freeing blocks in system zone - "
 			   "Block = %llu, count = %lu", block, count);
 		/* err = 0. ext4_std_error should be a no op */
 		goto error_return;
@@ -4792,7 +4787,7 @@ int ext4_trim_fs(struct super_block *sb, struct fstrim_range *range)
 		ret = ext4_mb_load_buddy(sb, group, &e4b);
 		if (ret) {
 			ext4_error(sb, "Error in loading buddy "
-					"information for %u", NULL);
+					"information for %u", group);
 			break;
 		}
 

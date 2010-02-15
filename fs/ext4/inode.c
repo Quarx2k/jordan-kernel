@@ -246,7 +246,7 @@ void ext4_delete_inode(struct inode *inode)
 	inode->i_size = 0;
 	err = ext4_mark_inode_dirty(handle, inode);
 	if (err) {
-		ext4_warning(inode->i_sb, __func__,
+		ext4_warning(inode->i_sb,
 			     "couldn't mark inode dirty (err %d)", err);
 		goto stop_handle;
 	}
@@ -264,7 +264,7 @@ void ext4_delete_inode(struct inode *inode)
 		if (err > 0)
 			err = ext4_journal_restart(handle, 3);
 		if (err != 0) {
-			ext4_warning(inode->i_sb, __func__,
+			ext4_warning(inode->i_sb,
 				     "couldn't extend journal (err %d)", err);
 		stop_handle:
 			ext4_journal_stop(handle);
@@ -375,8 +375,7 @@ static int ext4_block_to_path(struct inode *inode,
 		offsets[n++] = i_block & (ptrs - 1);
 		final = ptrs;
 	} else {
-		ext4_warning(inode->i_sb, "ext4_block_to_path",
-			     "block %lu > max in inode %lu",
+		ext4_warning(inode->i_sb, "block %lu > max in inode %lu",
 			     i_block + direct_blocks +
 			     indirect_blocks + double_blocks, inode->i_ino);
 	}
@@ -396,7 +395,7 @@ static int __ext4_check_blockref(const char *function, struct inode *inode,
 		if (blk &&
 		    unlikely(!ext4_data_block_valid(EXT4_SB(inode->i_sb),
 						    blk, 1))) {
-			ext4_error(inode->i_sb, function,
+			__ext4_error(inode->i_sb, function,
 				   "invalid block reference %u "
 				   "in inode #%lu", blk, inode->i_ino);
 			return -EIO;
@@ -1133,7 +1132,7 @@ static int check_block_validity(struct inode *inode, const char *msg,
 				sector_t logical, sector_t phys, int len)
 {
 	if (!ext4_data_block_valid(EXT4_SB(inode->i_sb), phys, len)) {
-		ext4_error(inode->i_sb, msg,
+		__ext4_error(inode->i_sb, msg,
 			   "inode #%lu logical block %llu mapped to %llu "
 			   "(size %d)", inode->i_ino,
 			   (unsigned long long) logical,
@@ -4244,7 +4243,7 @@ static void ext4_free_data(handle_t *handle, struct inode *inode,
 		if ((EXT4_JOURNAL(inode) == NULL) || bh2jh(this_bh))
 			ext4_handle_dirty_metadata(handle, inode, this_bh);
 		else
-			ext4_error(inode->i_sb, __func__,
+			ext4_error(inode->i_sb,
 				   "circular indirect block detected, "
 				   "inode=%lu, block=%llu",
 				   inode->i_ino,
@@ -4292,7 +4291,7 @@ static void ext4_free_branches(handle_t *handle, struct inode *inode,
 			 * (should be rare).
 			 */
 			if (!bh) {
-				ext4_error(inode->i_sb, "ext4_free_branches",
+				ext4_error(inode->i_sb,
 					   "Read failure, inode=%lu, block=%llu",
 					   inode->i_ino, nr);
 				continue;
@@ -4606,9 +4605,8 @@ static int __ext4_get_inode_loc(struct inode *inode,
 
 	bh = sb_getblk(sb, block);
 	if (!bh) {
-		ext4_error(sb, "ext4_get_inode_loc", "unable to read "
-			   "inode block - inode=%lu, block=%llu",
-			   inode->i_ino, block);
+		ext4_error(sb, "unable to read inode block - "
+			   "inode=%lu, block=%llu", inode->i_ino, block);
 		return -EIO;
 	}
 	if (!buffer_uptodate(bh)) {
@@ -4706,9 +4704,8 @@ make_io:
 		submit_bh(READ_META, bh);
 		wait_on_buffer(bh);
 		if (!buffer_uptodate(bh)) {
-			ext4_error(sb, __func__,
-				   "unable to read inode block - inode=%lu, "
-				   "block=%llu", inode->i_ino, block);
+			ext4_error(sb, "unable to read inode block - inode=%lu,"
+				   " block=%llu", inode->i_ino, block);
 			brelse(bh);
 			return -EIO;
 		}
@@ -4919,8 +4916,7 @@ struct inode *ext4_iget(struct super_block *sb, unsigned long ino)
 	ret = 0;
 	if (ei->i_file_acl &&
 	    !ext4_data_block_valid(EXT4_SB(sb), ei->i_file_acl, 1)) {
-		ext4_error(sb, __func__,
-			   "bad extended attribute block %llu in inode #%lu",
+		ext4_error(sb, "bad extended attribute block %llu inode #%lu",
 			   ei->i_file_acl, inode->i_ino);
 		ret = -EIO;
 		goto bad_inode;
@@ -4966,8 +4962,7 @@ struct inode *ext4_iget(struct super_block *sb, unsigned long ino)
 			   new_decode_dev(le32_to_cpu(raw_inode->i_block[1])));
 	} else {
 		ret = -EIO;
-		ext4_error(inode->i_sb, __func__,
-			   "bogus i_mode (%o) for inode=%lu",
+		ext4_error(inode->i_sb, "bogus i_mode (%o) for inode=%lu",
 			   inode->i_mode, inode->i_ino);
 		goto bad_inode;
 	}
@@ -5206,10 +5201,8 @@ int ext4_write_inode(struct inode *inode, int wait)
 		if (wait)
 			sync_dirty_buffer(iloc.bh);
 		if (buffer_req(iloc.bh) && !buffer_uptodate(iloc.bh)) {
-			ext4_error(inode->i_sb, __func__,
-				   "IO error syncing inode, "
-				   "inode=%lu, block=%llu",
-				   inode->i_ino,
+			ext4_error(inode->i_sb, "IO error syncing inode, "
+				   "inode=%lu, block=%llu", inode->i_ino,
 				   (unsigned long long)iloc.bh->b_blocknr);
 			err = -EIO;
 		}
@@ -5625,7 +5618,7 @@ int ext4_mark_inode_dirty(handle_t *handle, struct inode *inode)
 				EXT4_I(inode)->i_state |= EXT4_STATE_NO_EXPAND;
 				if (mnt_count !=
 					le16_to_cpu(sbi->s_es->s_mnt_count)) {
-					ext4_warning(inode->i_sb, __func__,
+					ext4_warning(inode->i_sb,
 					"Unable to expand inode %lu. Delete"
 					" some EAs or run e2fsck.",
 					inode->i_ino);

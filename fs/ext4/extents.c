@@ -425,7 +425,7 @@ static int __ext4_ext_check(const char *function, struct inode *inode,
 	return 0;
 
 corrupted:
-	ext4_error(inode->i_sb, function,
+	__ext4_error(inode->i_sb, function,
 			"bad header/extent in inode #%lu: %s - magic %x, "
 			"entries %u, max %u(%u), depth %u(%u)",
 			inode->i_ino, error_msg, le16_to_cpu(eh->eh_magic),
@@ -1522,8 +1522,9 @@ int ext4_ext_try_to_merge(struct inode *inode,
 		merge_done = 1;
 		WARN_ON(eh->eh_entries == 0);
 		if (!eh->eh_entries)
-			ext4_error(inode->i_sb, "ext4_ext_try_to_merge",
-			   "inode#%lu, eh->eh_entries = 0!", inode->i_ino);
+			ext4_error(inode->i_sb,
+				   "inode#%lu, eh->eh_entries = 0!",
+				   inode->i_ino);
 	}
 
 	return merge_done;
@@ -3196,7 +3197,13 @@ int ext4_ext_get_blocks(handle_t *handle, struct inode *inode,
 	 * this situation is possible, though, _during_ tree modification;
 	 * this is why assert can't be put in ext4_ext_find_extent()
 	 */
-	BUG_ON(path[depth].p_ext == NULL && depth != 0);
+	if (path[depth].p_ext == NULL && depth != 0) {
+		ext4_error(inode->i_sb, "bad extent address "
+			   "inode: %lu, iblock: %d, depth: %d",
+			   inode->i_ino, iblock, depth);
+		err = -EIO;
+		goto out2;
+	}
 	eh = path[depth].p_hdr;
 
 	ex = path[depth].p_ext;
