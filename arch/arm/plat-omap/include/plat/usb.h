@@ -4,6 +4,7 @@
 #define	__ASM_ARCH_OMAP_USB_H
 
 #include <linux/platform_device.h>
+#include <linux/usb/musb.h>
 #include <plat/board.h>
 
 #define OMAP3_HS_USB_PORTS	3
@@ -106,7 +107,15 @@ struct omap_usb_config {
 #define UDC_BASE			OMAP2_UDC_BASE
 #define OMAP_OHCI_BASE			OMAP2_OHCI_BASE
 
-extern void usb_musb_init(void);
+struct omap_musb_board_data {
+	u8	interface_type;
+	u8	mode;
+	u8	power;
+};
+
+enum musb_interface    {MUSB_INTERFACE_ULPI, MUSB_INTERFACE_UTMI};
+
+extern void usb_musb_init(struct omap_musb_board_data *board_data);
 
 extern void usb_ehci_init(struct ehci_hcd_omap_platform_data *pdata);
 

@@ -1603,6 +1603,19 @@ static void __init mapphone_bt_init(void)
 
 #endif
 
+static struct omap_musb_board_data musb_board_data = {
+	.interface_type         = MUSB_INTERFACE_ULPI,
+#ifdef CONFIG_USB_MUSB_OTG
+	.mode                   = MUSB_OTG,
+#elif defined(CONFIG_USB_MUSB_HDRC_HCD)
+	.mode                   = MUSB_HOST,
+#elif defined(CONFIG_USB_GADGET_MUSB_HDRC)
+	.mode                   = MUSB_PERIPHERAL,
+#endif
+	.power                  = 100,
+};
+
+
 static struct platform_device mapphone_sgx_device = {
        .name                   = "pvrsrvkm",
        .id             = -1,
@@ -1700,7 +1713,7 @@ static void __init mapphone_init(void)
 	mapphone_panel_init();
 	mapphone_sensors_init();
 	mapphone_touch_init();
-	usb_musb_init();
+	usb_musb_init(&musb_board_data);
 	mapphone_ehci_init();
 	mapphone_pm_init();
 	omap_hdq_init();
