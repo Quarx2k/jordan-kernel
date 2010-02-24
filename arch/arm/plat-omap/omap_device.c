@@ -451,8 +451,8 @@ int omap_device_enable(struct platform_device *pdev)
 	od = _find_by_pdev(pdev);
 
 	if (od->_state == OMAP_DEVICE_STATE_ENABLED) {
-		WARN(1, "omap_device: %s.%d: omap_device_enable() called from "
-		     "invalid state\n", od->pdev.name, od->pdev.id);
+		WARN(1, "omap_device: %s.%d: %s() called from invalid state %d\n",
+		     od->pdev.name, od->pdev.id, __func__, od->_state);
 		return -EINVAL;
 	}
 
@@ -490,8 +490,8 @@ int omap_device_idle(struct platform_device *pdev)
 	od = _find_by_pdev(pdev);
 
 	if (od->_state != OMAP_DEVICE_STATE_ENABLED) {
-		WARN(1, "omap_device: %s.%d: omap_device_idle() called from "
-		     "invalid state\n", od->pdev.name, od->pdev.id);
+		WARN(1, "omap_device: %s.%d: %s() called from invalid state %d\n",
+		     od->pdev.name, od->pdev.id, __func__, od->_state);
 		return -EINVAL;
 	}
 
@@ -523,8 +523,8 @@ int omap_device_shutdown(struct platform_device *pdev)
 
 	if (od->_state != OMAP_DEVICE_STATE_ENABLED &&
 	    od->_state != OMAP_DEVICE_STATE_IDLE) {
-		WARN(1, "omap_device: %s.%d: omap_device_shutdown() called "
-		     "from invalid state\n", od->pdev.name, od->pdev.id);
+		WARN(1, "omap_device: %s.%d: %s() called from invalid state %d\n",
+		     od->pdev.name, od->pdev.id, __func__, od->_state);
 		return -EINVAL;
 	}
 
