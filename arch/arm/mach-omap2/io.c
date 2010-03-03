@@ -243,7 +243,7 @@ static void __init _omap2_map_common_io(void)
 }
 
 #ifdef CONFIG_ARCH_OMAP2420
-void __init omap242x_map_common_io()
+void __init omap242x_map_common_io(void)
 {
 	iotable_init(omap24xx_io_desc, ARRAY_SIZE(omap24xx_io_desc));
 	iotable_init(omap242x_io_desc, ARRAY_SIZE(omap242x_io_desc));
@@ -252,7 +252,7 @@ void __init omap242x_map_common_io()
 #endif
 
 #ifdef CONFIG_ARCH_OMAP2430
-void __init omap243x_map_common_io()
+void __init omap243x_map_common_io(void)
 {
 	iotable_init(omap24xx_io_desc, ARRAY_SIZE(omap24xx_io_desc));
 	iotable_init(omap243x_io_desc, ARRAY_SIZE(omap243x_io_desc));
@@ -260,7 +260,7 @@ void __init omap243x_map_common_io()
 }
 #endif
 
-#ifdef CONFIG_ARCH_OMAP34XX
+#ifdef CONFIG_ARCH_OMAP3
 void __init omap34xx_map_common_io(void)
 {
 	iotable_init(omap34xx_io_desc, ARRAY_SIZE(omap34xx_io_desc));
@@ -269,7 +269,7 @@ void __init omap34xx_map_common_io(void)
 #endif
 
 #ifdef CONFIG_ARCH_OMAP4
-void __init omap44xx_map_common_io()
+void __init omap44xx_map_common_io(void)
 {
 	iotable_init(omap44xx_io_desc, ARRAY_SIZE(omap44xx_io_desc));
 }
