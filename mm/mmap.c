@@ -1913,6 +1913,25 @@ int split_vma(struct mm_struct * mm, struct vm_area_struct * vma,
 	return err;
 }
 
+	/* Success. */
+	if (!err)
+		return 0;
+
+	/* Clean everything up if vma_adjust failed. */
+	new->vm_ops->close(new);
+	if (new->vm_file) {
+		if (vma->vm_flags & VM_EXECUTABLE)
+			removed_exe_file_vma(mm);
+		fput(new->vm_file);
+	}
+ out_free_mpol:
+	mpol_put(pol);
+ out_free_vma:
+	kmem_cache_free(vm_area_cachep, new);
+ out_err:
+	return err;
+}
+
 /* Munmap is split into 2 main parts -- this part which finds
  * what needs doing, and the areas themselves, which do the
  * work.  This now handles partial unmappings.
