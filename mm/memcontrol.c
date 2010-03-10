@@ -3624,7 +3624,6 @@ static void mem_cgroup_move_charge(struct mm_struct *mm)
 		if (is_vm_hugetlb_page(vma))
 			continue;
 		/* TODO: We don't move charges of shmem/tmpfs pages for now. */
-		if (vma->vm_flags & VM_SHARED)
 			continue;
 		ret = walk_page_range(vma->vm_start, vma->vm_end,
 						&mem_cgroup_move_charge_walk);
