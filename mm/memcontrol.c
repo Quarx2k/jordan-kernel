@@ -233,6 +233,24 @@ struct mem_cgroup {
 	struct mem_cgroup_stat stat;
 };
 
+/* Stuffs for move charges at task migration. */
+/*
+ * Types of charges to be moved. "move_charge_at_immitgrate" is treated as a
+ * left-shifted bitmap of these types.
+ */
+enum move_type {
+	MOVE_CHARGE_TYPE_ANON,	/* private anonymous page and swap of it */
+	NR_MOVE_TYPE,
+};
+
+/* "mc" and its members are protected by cgroup_mutex */
+static struct move_charge_struct {
+	struct mem_cgroup *from;
+	struct mem_cgroup *to;
+	unsigned long precharge;
+	unsigned long moved_charge;
+} mc;
+
 /*
  * Maximum loops in mem_cgroup_hierarchical_reclaim(), used for soft
  * limit reclaim to prevent infinite loops, if they ever occur.
@@ -1589,14 +1607,23 @@ bypass:
  * This function is for that and do uncharge, put css's refcnt.
  * gotten by try_charge().
  */
-static void mem_cgroup_cancel_charge(struct mem_cgroup *mem)
+static void __mem_cgroup_cancel_charge(struct mem_cgroup *mem,
+							unsigned long count)
 {
 	if (!mem_cgroup_is_root(mem)) {
-		res_counter_uncharge(&mem->res, PAGE_SIZE);
+		res_counter_uncharge(&mem->res, PAGE_SIZE * count);
 		if (do_swap_account)
-			res_counter_uncharge(&mem->memsw, PAGE_SIZE);
+			res_counter_uncharge(&mem->memsw, PAGE_SIZE * count);
+		VM_BUG_ON(test_bit(CSS_ROOT, &mem->css.flags));
+		WARN_ON_ONCE(count > INT_MAX);
+		__css_put(&mem->css, (int)count);
 	}
-	css_put(&mem->css);
+	/* we don't need css_put for root */
+}
+
+static void mem_cgroup_cancel_charge(struct mem_cgroup *mem)
+{
+	__mem_cgroup_cancel_charge(mem, 1);
 }
 
 /*
@@ -1702,17 +1729,20 @@ static void __mem_cgroup_commit_charge(struct mem_cgroup *mem,
  * @pc:	page_cgroup of the page.
  * @from: mem_cgroup which the page is moved from.
  * @to:	mem_cgroup which the page is moved to. @from != @to.
+ * @uncharge: whether we should call uncharge and css_put against @from.
  *
  * The caller must confirm following.
  * - page is not on LRU (isolate_page() is useful.)
  * - the pc is locked, used, and ->mem_cgroup points to @from.
  *
- * This function does "uncharge" from old cgroup but doesn't do "charge" to
- * new cgroup. It should be done by a caller.
+ * This function doesn't do "charge" nor css_get to new cgroup. It should be
+ * done by a caller(__mem_cgroup_try_charge would be usefull). If @uncharge is
+ * true, this function does "uncharge" from old cgroup, but it doesn't if
+ * @uncharge is false, so a caller should do "uncharge".
  */
 
 static void __mem_cgroup_move_account(struct page_cgroup *pc,
-	struct mem_cgroup *from, struct mem_cgroup *to)
+	struct mem_cgroup *from, struct mem_cgroup *to, bool uncharge)
 {
 	struct page *page;
 	int cpu;
@@ -1724,10 +1754,6 @@ static void __mem_cgroup_move_account(struct page_cgroup *pc,
 	VM_BUG_ON(!PageCgroupLocked(pc));
 	VM_BUG_ON(!PageCgroupUsed(pc));
 	VM_BUG_ON(pc->mem_cgroup != from);
-
-	if (!mem_cgroup_is_root(from))
-		res_counter_uncharge(&from->res, PAGE_SIZE);
-	mem_cgroup_charge_statistics(from, pc, false);
 
 	page = pc->page;
 	if (page_mapped(page) && !PageAnon(page)) {
@@ -1744,12 +1770,12 @@ static void __mem_cgroup_move_account(struct page_cgroup *pc,
 		__mem_cgroup_stat_add_safe(cpustat, MEM_CGROUP_STAT_FILE_MAPPED,
 						1);
 	}
+	mem_cgroup_charge_statistics(from, pc, false);
+	if (uncharge)
+		/* This is not "cancel", but cancel_charge does all we need. */
+		mem_cgroup_cancel_charge(from);
 
-	if (do_swap_account && !mem_cgroup_is_root(from))
-		res_counter_uncharge(&from->memsw, PAGE_SIZE);
-	css_put(&from->css);
-
-	css_get(&to->css);
+	/* caller should have done css_get */
 	pc->mem_cgroup = to;
 	mem_cgroup_charge_statistics(to, pc, true);
 	/*
@@ -1765,12 +1791,12 @@ static void __mem_cgroup_move_account(struct page_cgroup *pc,
  * __mem_cgroup_move_account()
  */
 static int mem_cgroup_move_account(struct page_cgroup *pc,
-				struct mem_cgroup *from, struct mem_cgroup *to)
+		struct mem_cgroup *from, struct mem_cgroup *to, bool uncharge)
 {
 	int ret = -EINVAL;
 	lock_page_cgroup(pc);
 	if (PageCgroupUsed(pc) && pc->mem_cgroup == from) {
-		__mem_cgroup_move_account(pc, from, to);
+		__mem_cgroup_move_account(pc, from, to, uncharge);
 		ret = 0;
 	}
 	unlock_page_cgroup(pc);
@@ -1806,11 +1832,9 @@ static int mem_cgroup_move_parent(struct page_cgroup *pc,
 	if (ret || !parent)
 		goto put_back;
 
-	ret = mem_cgroup_move_account(pc, child, parent);
-	if (!ret)
-		css_put(&parent->css);	/* drop extra refcnt by try_charge() */
-	else
-		mem_cgroup_cancel_charge(parent);	/* does css_put */
+	ret = mem_cgroup_move_account(pc, child, parent, true);
+	if (ret)
+		mem_cgroup_cancel_charge(parent);
 put_back:
 	putback_lru_page(page);
 put:
@@ -3812,12 +3836,11 @@ static int mem_cgroup_can_attach(struct cgroup_subsys *ss,
 			VM_BUG_ON(mc.to);
 			VM_BUG_ON(mc.precharge);
 			VM_BUG_ON(mc.moved_charge);
-			VM_BUG_ON(mc.moving_task);
+
 			mc.from = from;
 			mc.to = mem;
 			mc.precharge = 0;
 			mc.moved_charge = 0;
-			mc.moving_task = current;
 
 			ret = mem_cgroup_precharge_mc(mm);
 			if (ret)
