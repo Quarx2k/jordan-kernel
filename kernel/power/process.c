@@ -96,14 +96,11 @@ static int try_to_freeze_tasks(bool sig_only)
 				"(%d tasks refusing to freeze):\n",
 				wakeup ? "aborted" : "failed",
 				elapsed_csecs / 100, elapsed_csecs % 100, todo);
-		if(!wakeup)
-			show_state();
 		read_lock(&tasklist_lock);
 		do_each_thread(g, p) {
 			task_lock(p);
-			if (freezing(p) && !freezer_should_skip(p) &&
-							elapsed_csecs > 100)
-				printk(KERN_ERR " %s\n", p->comm);
+			if (freezing(p) && !freezer_should_skip(p))
+				sched_show_task(p);
 			cancel_freezing(p);
 			task_unlock(p);
 		} while_each_thread(g, p);
