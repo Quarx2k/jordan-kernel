@@ -7321,7 +7321,7 @@ static int __migrate_task_irq(struct task_struct *p, int src_cpu, int dest_cpu)
 /*
  * Figure out where task on dead CPU should go, use force if necessary.
  */
-static void move_task_off_dead_cpu(int dead_cpu, struct task_struct *p)
+void move_task_off_dead_cpu(int dead_cpu, struct task_struct *p)
 {
 	int dest_cpu;
 	const struct cpumask *nodemask = cpumask_of_node(cpu_to_node(dead_cpu));
