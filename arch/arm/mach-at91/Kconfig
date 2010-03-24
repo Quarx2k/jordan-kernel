@@ -61,6 +61,7 @@ config ARCH_AT91CAP9
 
 config ARCH_AT91X40
 	bool "AT91x40"
+	select ARCH_USES_GETTIMEOFFSET
 
 endchoice
 
