@@ -483,6 +483,11 @@ static void __init build_mem_type_table(void)
 
 #define vectors_base()	(vectors_high() ? 0xffff0000 : 0)
 
+static void __init *early_alloc(unsigned long sz)
+{
+	return alloc_bootmem_low_pages(sz);
+}
+
 static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
 				  unsigned long end, unsigned long pfn,
 				  const struct mem_type *type)
@@ -490,7 +495,7 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
 	pte_t *pte;
 
 	if (pmd_none(*pmd)) {
-		pte = alloc_bootmem_low_pages(2 * PTRS_PER_PTE * sizeof(pte_t));
+		pte = early_alloc(2 * PTRS_PER_PTE * sizeof(pte_t));
 		__pmd_populate(pmd, __pa(pte) | type->prot_l1);
 	}
 
@@ -868,7 +873,7 @@ static void __init devicemaps_init(struct machine_desc *mdesc)
 	/*
 	 * Allocate the vector page early.
 	 */
-	vectors = alloc_bootmem_low_pages(PAGE_SIZE);
+	vectors = early_alloc(PAGE_SIZE);
 
 	for (addr = VMALLOC_END; addr; addr += PGDIR_SIZE)
 		pmd_clear(pmd_off_k(addr));
@@ -940,7 +945,7 @@ static void __init kmap_init(void)
 {
 #ifdef CONFIG_HIGHMEM
 	pmd_t *pmd = pmd_off_k(PKMAP_BASE);
-	pte_t *pte = alloc_bootmem_low_pages(2 * PTRS_PER_PTE * sizeof(pte_t));
+	pte_t *pte = early_alloc(2 * PTRS_PER_PTE * sizeof(pte_t));
 	BUG_ON(!pmd_none(*pmd) || !pte);
 	__pmd_populate(pmd, __pa(pte) | _PAGE_KERNEL_TABLE);
 	pkmap_page_table = pte + PTRS_PER_PTE;
@@ -1000,11 +1005,8 @@ void __init paging_init(struct machine_desc *mdesc)
 
 	top_pmd = pmd_off_k(0xffff0000);
 
-	/*
-	 * allocate the zero page.  Note that this always succeeds and
-	 * returns a zeroed result.
-	 */
-	zero_page = alloc_bootmem_low_pages(PAGE_SIZE);
+	/* allocate the zero page. */
+	zero_page = early_alloc(PAGE_SIZE);
 	empty_zero_page = virt_to_page(zero_page);
 	__flush_dcache_page(NULL, empty_zero_page);
 }
