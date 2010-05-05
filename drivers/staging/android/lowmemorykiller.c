@@ -34,8 +34,8 @@
 #include <linux/mm.h>
 #include <linux/oom.h>
 #include <linux/sched.h>
+#include <linux/profile.h>
 #include <linux/notifier.h>
-#include <linux/memcontrol.h>
 
 static uint32_t lowmem_debug_level = 2;
 static int lowmem_adj[6] = {
@@ -65,6 +65,8 @@ static int lowmem_order_size = 6;
 static struct task_struct *lowmem_deathpending;
 static unsigned long lowmem_deathpending_timeout;
 
+static struct task_struct *lowmem_deathpending;
+
 #define lowmem_print(level, x...)			\
 	do {						\
 		if (lowmem_debug_level >= (level))	\
@@ -78,37 +80,16 @@ static struct notifier_block task_nb = {
 	.notifier_call	= task_notify_func,
 };
 
-static int max_free_order(void)
-{
-	struct zone *zone;
-	int order, max = 0;
-
-	for_each_zone(zone)
-		for (order = MAX_ORDER-1; order >= max; order--)
-			if (zone->free_area[order].nr_free) {
-				max = order;
-				break;
-			}
-	return max;
-}
-
 static int
 task_notify_func(struct notifier_block *self, unsigned long val, void *data)
 {
 	struct task_struct *task = data;
 	if (task == lowmem_deathpending) {
 		lowmem_deathpending = NULL;
-		task_free_unregister(&task_nb);
+		task_handoff_unregister(&task_nb);
 	}
 	return NOTIFY_OK;
 }
-
-#ifdef CONFIG_DUMP_TASKS_ON_NOPAGE
-extern int sysctl_oom_dump_tasks;
-extern void dump_tasks(const struct mem_cgroup *mem);
-static int selected_oom_adj_array[OOM_ADJUST_MAX - OOM_ADJUST_MIN + 1];
-static unsigned long timeout;
-#endif
 
 static int lowmem_shrink(int nr_to_scan, gfp_t gfp_mask)
 {
@@ -124,8 +105,6 @@ static int lowmem_shrink(int nr_to_scan, gfp_t gfp_mask)
 	int other_free = global_page_state(NR_FREE_PAGES);
 	int other_file = global_page_state(NR_FILE_PAGES) -
 						global_page_state(NR_SHMEM);
-	int free_order = max_free_order();
-
 	/*
 	 * If we already have a death outstanding, then
 	 * bail out right away; indicating to vmscan
@@ -137,6 +116,18 @@ static int lowmem_shrink(int nr_to_scan, gfp_t gfp_mask)
 	    time_before_eq(jiffies, lowmem_deathpending_timeout))
 		return 0;
 
+	/*
+	 * If we already have a death outstanding, then
+	 * bail out right away; indicating to vmscan
+	 * that we have nothing further to offer on
+	 * this pass.
+	 *
+	 * Note: Currently you need CONFIG_PROFILING
+	 * for this to work correctly.
+	 */
+	if (lowmem_deathpending)
+		return 0;
+
 	if (lowmem_adj_size < array_size)
 		array_size = lowmem_adj_size;
 	if (lowmem_minfree_size < array_size)
@@ -144,8 +135,7 @@ static int lowmem_shrink(int nr_to_scan, gfp_t gfp_mask)
 	if (lowmem_order_size < array_size)
 		array_size = lowmem_order_size;
 	for (i = 0; i < array_size; i++) {
-		if ((free_order < lowmem_order[i] ||
-		    other_free < lowmem_minfree[i]) &&
+		if (other_free < lowmem_minfree[i] &&
 		    other_file < lowmem_minfree[i]) {
 			min_adj = lowmem_adj[i];
 			break;
@@ -212,20 +202,15 @@ static int lowmem_shrink(int nr_to_scan, gfp_t gfp_mask)
 			     selected->pid, selected->comm,
 			     selected_oom_adj, selected_tasksize);
 
-#ifdef CONFIG_DUMP_TASKS_ON_NOPAGE
-		if (sysctl_oom_dump_tasks &&
-			!selected_oom_adj_array[selected_oom_adj]) {
-			dump_tasks(NULL);
-			selected_oom_adj_array[selected_oom_adj] = 1;
-		}
-		if (time_after(jiffies, timeout)) {
-			memset(selected_oom_adj_array, 0,
-			(OOM_ADJUST_MAX - OOM_ADJUST_MIN + 1) * sizeof(int));
-			timeout = jiffies + 1200 * HZ;
-		}
-#endif
+		/*
+		 * If CONFIG_PROFILING is off, then task_handoff_register()
+		 * is a nop. In that case we don't want to stall the killer
+		 * by setting lowmem_deathpending.
+		 */
+#ifdef CONFIG_PROFILING
 		lowmem_deathpending = selected;
-		lowmem_deathpending_timeout = jiffies + HZ;
+		task_handoff_register(&task_nb);
+#endif
 		force_sig(SIGKILL, selected);
 		rem -= selected_tasksize;
 	}
