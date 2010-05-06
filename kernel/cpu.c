@@ -270,9 +270,6 @@ int __ref cpu_down(unsigned int cpu)
 {
 	int err;
 
-	err = stop_machine_create();
-	if (err)
-		return err;
 	cpu_maps_update_begin();
 
 	if (cpu_hotplug_disabled) {
@@ -296,7 +293,6 @@ int __ref cpu_down(unsigned int cpu)
 
 out:
 	cpu_maps_update_done();
-	stop_machine_destroy();
 	return err;
 }
 EXPORT_SYMBOL(cpu_down);
@@ -377,9 +373,6 @@ int disable_nonboot_cpus(void)
 {
 	int cpu, first_cpu, error;
 
-	error = stop_machine_create();
-	if (error)
-		return error;
 	cpu_maps_update_begin();
 	first_cpu = cpumask_first(cpu_online_mask);
 	/* We take down all of the non-boot CPUs in one shot to avoid races
@@ -417,7 +410,6 @@ int disable_nonboot_cpus(void)
 		printk(KERN_ERR "Non-boot CPUs are not disabled\n");
 	}
 	cpu_maps_update_done();
-	stop_machine_destroy();
 	return error;
 }
 
