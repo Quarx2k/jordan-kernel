@@ -26,7 +26,5 @@ const struct mem_type *get_mem_type(unsigned int type);
 
 #endif
 
-struct pglist_data;
-
 void __init bootmem_init(void);
-void reserve_node_zero(struct pglist_data *pgdat);
+void reserve_special_regions(void);

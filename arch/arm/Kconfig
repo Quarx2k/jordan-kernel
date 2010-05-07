@@ -676,7 +676,6 @@ config ARCH_SHARK
 config ARCH_LH7A40X
 	bool "Sharp LH7A40X"
 	select CPU_ARM922T
-	select ARCH_DISCONTIGMEM_ENABLE if !LH7A40X_CONTIGMEM
 	select ARCH_SPARSEMEM_ENABLE if !LH7A40X_CONTIGMEM
 	help
 	  Say Y here for systems based on one of the Sharp LH7A40X
@@ -1167,10 +1166,6 @@ config OABI_COMPAT
 config ARCH_HAS_HOLES_MEMORYMODEL
 	bool
 
-# Discontigmem is deprecated
-config ARCH_DISCONTIGMEM_ENABLE
-	bool
-
 config ARCH_SPARSEMEM_ENABLE
 	bool
 
@@ -1178,13 +1173,7 @@ config ARCH_SPARSEMEM_DEFAULT
 	def_bool ARCH_SPARSEMEM_ENABLE
 
 config ARCH_SELECT_MEMORY_MODEL
-	def_bool ARCH_DISCONTIGMEM_ENABLE && ARCH_SPARSEMEM_ENABLE
-
-config NODES_SHIFT
-	int
-	default "4" if ARCH_LH7A40X
-	default "2"
-	depends on NEED_MULTIPLE_NODES
+	def_bool ARCH_SPARSEMEM_ENABLE
 
 config HIGHMEM
 	bool "High Memory Support (EXPERIMENTAL)"
