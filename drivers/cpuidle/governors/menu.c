@@ -187,13 +187,13 @@ static int menu_select(struct cpuidle_device *dev)
 	int i;
 	int multiplier;
 
-	data->last_state_idx = 0;
-	data->exit_us = 0;
-
 	if (data->needs_update) {
 		menu_update(dev);
 		data->needs_update = 0;
 	}
+
+	data->last_state_idx = 0;
+	data->exit_us = 0;
 
 	/* Special case when user has set very strict latency requirement */
 	if (unlikely(latency_req == 0))
@@ -294,7 +294,7 @@ static void menu_update(struct cpuidle_device *dev)
 	new_factor = data->correction_factor[data->bucket]
 			* (DECAY - 1) / DECAY;
 
-	if (data->expected_us > 0 && data->measured_us < MAX_INTERESTING)
+	if (data->expected_us > 0 && measured_us < MAX_INTERESTING)
 		new_factor += RESOLUTION * measured_us / data->expected_us;
 	else
 		/*
