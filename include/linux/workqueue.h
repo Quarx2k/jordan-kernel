@@ -282,4 +282,8 @@ static inline long work_on_cpu(unsigned int cpu, long (*fn)(void *), void *arg)
 #else
 long work_on_cpu(unsigned int cpu, long (*fn)(void *), void *arg);
 #endif /* CONFIG_SMP */
+
+#ifdef CONFIG_LOCKDEP
+int in_workqueue_context(struct workqueue_struct *wq);
+#endif
 #endif

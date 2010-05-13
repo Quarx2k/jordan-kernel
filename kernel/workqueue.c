@@ -68,6 +68,131 @@ struct workqueue_struct {
 #endif
 };
 
+#ifdef CONFIG_LOCKDEP
+/**
+ * in_workqueue_context() - in context of specified workqueue?
+ * @wq: the workqueue of interest
+ *
+ * Checks lockdep state to see if the current task is executing from
+ * within a workqueue item.  This function exists only if lockdep is
+ * enabled.
+ */
+int in_workqueue_context(struct workqueue_struct *wq)
+{
+	return lock_is_held(&wq->lockdep_map);
+}
+#endif
+
+#ifdef CONFIG_DEBUG_OBJECTS_WORK
+
+static struct debug_obj_descr work_debug_descr;
+
+/*
+ * fixup_init is called when:
+ * - an active object is initialized
+ */
+static int work_fixup_init(void *addr, enum debug_obj_state state)
+{
+	struct work_struct *work = addr;
+
+	switch (state) {
+	case ODEBUG_STATE_ACTIVE:
+		cancel_work_sync(work);
+		debug_object_init(work, &work_debug_descr);
+		return 1;
+	default:
+		return 0;
+	}
+}
+
+/*
+ * fixup_activate is called when:
+ * - an active object is activated
+ * - an unknown object is activated (might be a statically initialized object)
+ */
+static int work_fixup_activate(void *addr, enum debug_obj_state state)
+{
+	struct work_struct *work = addr;
+
+	switch (state) {
+
+	case ODEBUG_STATE_NOTAVAILABLE:
+		/*
+		 * This is not really a fixup. The work struct was
+		 * statically initialized. We just make sure that it
+		 * is tracked in the object tracker.
+		 */
+		if (test_bit(WORK_STRUCT_STATIC, work_data_bits(work))) {
+			debug_object_init(work, &work_debug_descr);
+			debug_object_activate(work, &work_debug_descr);
+			return 0;
+		}
+		WARN_ON_ONCE(1);
+		return 0;
+
+	case ODEBUG_STATE_ACTIVE:
+		WARN_ON(1);
+
+	default:
+		return 0;
+	}
+}
+
+/*
+ * fixup_free is called when:
+ * - an active object is freed
+ */
+static int work_fixup_free(void *addr, enum debug_obj_state state)
+{
+	struct work_struct *work = addr;
+
+	switch (state) {
+	case ODEBUG_STATE_ACTIVE:
+		cancel_work_sync(work);
+		debug_object_free(work, &work_debug_descr);
+		return 1;
+	default:
+		return 0;
+	}
+}
+
+static struct debug_obj_descr work_debug_descr = {
+	.name		= "work_struct",
+	.fixup_init	= work_fixup_init,
+	.fixup_activate	= work_fixup_activate,
+	.fixup_free	= work_fixup_free,
+};
+
+static inline void debug_work_activate(struct work_struct *work)
+{
+	debug_object_activate(work, &work_debug_descr);
+}
+
+static inline void debug_work_deactivate(struct work_struct *work)
+{
+	debug_object_deactivate(work, &work_debug_descr);
+}
+
+void __init_work(struct work_struct *work, int onstack)
+{
+	if (onstack)
+		debug_object_init_on_stack(work, &work_debug_descr);
+	else
+		debug_object_init(work, &work_debug_descr);
+}
+EXPORT_SYMBOL_GPL(__init_work);
+
+void destroy_work_on_stack(struct work_struct *work)
+{
+	debug_object_free(work, &work_debug_descr);
+}
+EXPORT_SYMBOL_GPL(destroy_work_on_stack);
+
+#else
+static inline void debug_work_activate(struct work_struct *work) { }
+static inline void debug_work_deactivate(struct work_struct *work) { }
+#endif
+
 /* Serializes the accesses to the list of workqueues. */
 static DEFINE_SPINLOCK(workqueue_lock);
 static LIST_HEAD(workqueues);
