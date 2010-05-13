@@ -401,7 +401,7 @@ efivar_unregister(struct efivar_entry *var)
 }
 
 
-static ssize_t efivar_create(struct kobject *kobj,
+static ssize_t efivar_create(struct file *filp, struct kobject *kobj,
 			     struct bin_attribute *bin_attr,
 			     char *buf, loff_t pos, size_t count)
 {
@@ -460,7 +460,7 @@ static ssize_t efivar_create(struct kobject *kobj,
 	return count;
 }
 
-static ssize_t efivar_delete(struct kobject *kobj,
+static ssize_t efivar_delete(struct file *filp, struct kobject *kobj,
 			     struct bin_attribute *bin_attr,
 			     char *buf, loff_t pos, size_t count)
 {

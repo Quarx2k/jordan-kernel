@@ -521,7 +521,7 @@ static ssize_t read_rbu_mono_data(char *buffer, loff_t pos, size_t count)
 			rbu_data.image_update_buffer, rbu_data.bios_image_size);
 }
 
-static ssize_t read_rbu_data(struct kobject *kobj,
+static ssize_t read_rbu_data(struct file *filp, struct kobject *kobj,
 			     struct bin_attribute *bin_attr,
 			     char *buffer, loff_t pos, size_t count)
 {
@@ -575,7 +575,7 @@ static void callbackfn_rbu(const struct firmware *fw, void *context)
 	release_firmware(fw);
 }
 
-static ssize_t read_rbu_image_type(struct kobject *kobj,
+static ssize_t read_rbu_image_type(struct file *filp, struct kobject *kobj,
 				   struct bin_attribute *bin_attr,
 				   char *buffer, loff_t pos, size_t count)
 {
@@ -585,7 +585,7 @@ static ssize_t read_rbu_image_type(struct kobject *kobj,
 	return size;
 }
 
-static ssize_t write_rbu_image_type(struct kobject *kobj,
+static ssize_t write_rbu_image_type(struct file *filp, struct kobject *kobj,
 				    struct bin_attribute *bin_attr,
 				    char *buffer, loff_t pos, size_t count)
 {
@@ -646,7 +646,7 @@ static ssize_t write_rbu_image_type(struct kobject *kobj,
 	return rc;
 }
 
-static ssize_t read_rbu_packet_size(struct kobject *kobj,
+static ssize_t read_rbu_packet_size(struct file *filp, struct kobject *kobj,
 				    struct bin_attribute *bin_attr,
 				    char *buffer, loff_t pos, size_t count)
 {
@@ -659,7 +659,7 @@ static ssize_t read_rbu_packet_size(struct kobject *kobj,
 	return size;
 }
 
-static ssize_t write_rbu_packet_size(struct kobject *kobj,
+static ssize_t write_rbu_packet_size(struct file *filp, struct kobject *kobj,
 				     struct bin_attribute *bin_attr,
 				     char *buffer, loff_t pos, size_t count)
 {
