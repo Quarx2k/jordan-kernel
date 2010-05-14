@@ -510,7 +510,8 @@ void omap_set_dma_src_burst_mode(int lch, enum omap_dma_burst_mode burst_mode)
 			burst = 0x2;
 			break;
 		}
-		/* not supported by current hardware on OMAP1
+		/*
+		 * not supported by current hardware on OMAP1
 		 * w |= (0x03 << 7);
 		 * fall through
 		 */
@@ -519,7 +520,8 @@ void omap_set_dma_src_burst_mode(int lch, enum omap_dma_burst_mode burst_mode)
 			burst = 0x3;
 			break;
 		}
-		/* OMAP1 don't support burst 16
+		/*
+		 * OMAP1 don't support burst 16
 		 * fall through
 		 */
 	default:
@@ -621,7 +623,8 @@ void omap_set_dma_dest_burst_mode(int lch, enum omap_dma_burst_mode burst_mode)
 			burst = 0x3;
 			break;
 		}
-		/* OMAP1 don't support burst 16
+		/*
+		 * OMAP1 don't support burst 16
 		 * fall through
 		 */
 	default:
@@ -1311,8 +1314,10 @@ int omap_request_dma_chain(int dev_id, const char *dev_name,
 		return -EINVAL;
 	}
 
-	/* Allocate a queue to maintain the status of the channels
-	 * in the chain */
+	/*
+	 * Allocate a queue to maintain the status of the channels
+	 * in the chain
+	 */
 	channels = kmalloc(sizeof(*channels) * no_of_chans, GFP_KERNEL);
 	if (channels == NULL) {
 		printk(KERN_ERR "omap_dma: No memory for channel queue\n");
@@ -1942,7 +1947,8 @@ static int omap2_dma_handle_ch(int ch)
 		printk(KERN_INFO "DMA transaction error with device %d\n",
 		       dma_chan[ch].dev_id);
 		if (cpu_class_is_omap2()) {
-			/* Errata: sDMA Channel is not disabled
+			/*
+			 * Errata: sDMA Channel is not disabled
 			 * after a transaction error. So we explicitely
 			 * disable the channel
 			 */
