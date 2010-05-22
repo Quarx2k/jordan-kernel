@@ -21,6 +21,7 @@
 #include <linux/irq.h>
 #include <linux/gpio_keys.h>
 #include <linux/input.h>
+#include <linux/bootmem.h>
 #include <linux/pda_power.h>
 #include <linux/pwm_backlight.h>
 #include <linux/gpio.h>
@@ -415,6 +416,11 @@ static void __init palmt5_udc_init(void)
 	}
 }
 
+static void __init palmt5_reserve(void)
+{
+	reserve_bootmem(0xa0200000, 0x1000, BOOTMEM_EXCLUSIVE);
+}
+
 static void __init palmt5_init(void)
 {
 	pxa2xx_mfp_config(ARRAY_AND_SIZE(palmt5_pin_config));
@@ -436,6 +442,7 @@ MACHINE_START(PALMT5, "Palm Tungsten|T5")
 	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
 	.boot_params	= 0xa0000100,
 	.map_io		= pxa_map_io,
+	.reserve	= palmt5_reserve,
 	.init_irq	= pxa27x_init_irq,
 	.timer		= &pxa_timer,
 	.init_machine	= palmt5_init

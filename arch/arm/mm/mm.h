@@ -26,5 +26,6 @@ const struct mem_type *get_mem_type(unsigned int type);
 
 #endif
 
-void __init bootmem_init(void);
+struct machine_desc;
+void __init bootmem_init(struct machine_desc *);
 void reserve_special_regions(void);

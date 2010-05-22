@@ -14,6 +14,7 @@
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
+#include <linux/bootmem.h>
 #include <linux/sched.h>
 #include <linux/smp.h>
 #include <linux/termios.h>
@@ -30,6 +31,7 @@
 #include <asm/system.h>
 #include <asm/leds.h>
 #include <asm/mach/time.h>
+#include <asm/pgtable.h>
 
 #include "common.h"
 
