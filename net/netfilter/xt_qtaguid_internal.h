@@ -349,12 +349,6 @@ struct proc_qtu_data {
 /* internal functions */
 struct uid_tag_data *get_uid_data(uid_t uid, bool *found_res);
 
-/* From Linux 3 */
-static inline long __must_check IS_ERR_OR_NULL(const void *ptr)
-{
-	return !ptr || IS_ERR_VALUE((unsigned long)ptr);
-}
-
 /*----------------------------------------------*/
 
 #ifdef TAG

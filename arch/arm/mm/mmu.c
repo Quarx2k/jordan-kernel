@@ -842,6 +842,7 @@ void __init reserve_special_regions(void)
 	 */
 	reserve_bootmem(__pa(swapper_pg_dir),
 			PTRS_PER_PGD * sizeof(pgd_t), BOOTMEM_DEFAULT);
+#ifdef CONFIG_SA1111
 	/*
 	 * Because of the SA1111 DMA bug, we want to preserve our
 	 * precious DMA-able memory...

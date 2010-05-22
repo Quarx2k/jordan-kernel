@@ -75,6 +75,7 @@
 #include "prcm-common.h"
 #include "cm.h"
 #include "clock.h"
+#include "omap_ion.h"
 
 #ifdef CONFIG_VIDEO_OMAP3
 #include <media/v4l2-int-device.h>
@@ -1837,6 +1838,7 @@ static void __init mapphone_init(void)
 	if (!properties_kobj || ret)
 		pr_err("failed to create board_properties\n");
 
+	omap_register_ion();
 	mapphone_padconf_init();
 	mapphone_bp_model_init();
 #ifdef CONFIG_EMU_UART_DEBUG
@@ -1869,6 +1871,13 @@ static void __init mapphone_init(void)
 	mapphone_sim_init();
 }
 
+static void __init mapphone_reserve(void)
+{
+#ifdef CONFIG_ION_OMAP
+	omap_ion_init();
+#endif
+}
+
 static void __init mapphone_map_io(void)
 {
 	omap2_ramconsole_reserve_sdram();
@@ -1881,6 +1890,7 @@ MACHINE_START(MAPPHONE, "mapphone_")
 	.phys_io	= 0x48000000,
 	.io_pg_offst	= ((0xfa000000) >> 18) & 0xfffc,
 	.boot_params	= 0x80C00100,
+	.reserve	= mapphone_reserve,
 	.map_io		= mapphone_map_io,
 	.init_irq	= mapphone_init_irq,
 	.init_machine	= mapphone_init,

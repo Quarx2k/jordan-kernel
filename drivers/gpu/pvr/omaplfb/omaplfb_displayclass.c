@@ -1168,6 +1168,7 @@ static OMAPLFB_ERROR OMAPLFBInitFBDev(OMAPLFB_DEVINFO *psDevInfo)
 #if defined(CONFIG_ION_OMAP)
 	if (cpu_is_omap44xx())
 	{
+#if 0
 		/* for some reason we need at least 3 buffers in the swap chain */
 		int n = FBSize / RoundUpToMultiple(psLINFBInfo->fix.line_length * psLINFBInfo->var.yres, ulLCM);
 		int res;
@@ -1241,6 +1242,7 @@ static OMAPLFB_ERROR OMAPLFBInitFBDev(OMAPLFB_DEVINFO *psDevInfo)
 				}
 			}
 		}
+#endif
 	}
 	else
 #endif
