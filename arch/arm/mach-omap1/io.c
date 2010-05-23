@@ -21,7 +21,6 @@
 extern int omap1_clk_init(void);
 extern void omap_check_revision(void);
 extern void omap_sram_init(void);
-extern void omapfb_reserve_sdram(void);
 
 /*
  * The machine specific code may provide the extra mapping besides the
@@ -121,7 +120,6 @@ void __init omap1_map_common_io(void)
 #endif
 
 	omap_sram_init();
-	omapfb_reserve_sdram();
 }
 
 /*

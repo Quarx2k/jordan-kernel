@@ -22,6 +22,7 @@
 #include <linux/serial_reg.h>
 #include <linux/clk.h>
 #include <linux/io.h>
+#include <linux/omapfb.h>
 
 #include <mach/hardware.h>
 #include <asm/system.h>
@@ -34,9 +35,12 @@
 #include <plat/control.h>
 #include <plat/mux.h>
 #include <plat/fpga.h>
+#include <plat/serial.h>
+#include <plat/vram.h>
 
 #include <plat/clock.h>
 
+#include <dspbridge/host_os.h>
 #if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
 # include "../mach-omap2/sdrc.h"
 #endif
@@ -88,6 +92,13 @@ const void *omap_get_var_config(u16 tag, size_t *len)
         return get_config(tag, NO_LENGTH_CHECK, 0, len);
 }
 EXPORT_SYMBOL(omap_get_var_config);
+
+void __init omap_reserve(void)
+{
+	omapfb_reserve_sdram();
+	omap_vram_reserve_sdram();
+	dspbridge_reserve_sdram();
+}
 
 /*
  * 32KHz clocksource ... always available, on pretty most chips except

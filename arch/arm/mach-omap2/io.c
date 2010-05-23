@@ -33,7 +33,6 @@
 #include <plat/sdrc.h>
 #include <plat/gpmc.h>
 #include <plat/serial.h>
-#include <plat/vram.h>
 
 #ifndef CONFIG_ARCH_OMAP4	/* FIXME: Remove this once clkdev is ready */
 #include "clock.h"
@@ -49,8 +48,6 @@
 #include "omap_hwmod_2420.h"
 #include "omap_hwmod_2430.h"
 #include "omap_hwmod_34xx.h"
-
-#include <dspbridge/host_os.h>
 
 /*
  * The machine specific code may provide the extra mapping besides the
@@ -237,9 +234,6 @@ static void __init _omap2_map_common_io(void)
 
 	omap2_check_revision();
 	omap_sram_init();
-	omapfb_reserve_sdram();
-	omap_vram_reserve_sdram();
-	dspbridge_reserve_sdram();
 }
 
 #ifdef CONFIG_ARCH_OMAP2420

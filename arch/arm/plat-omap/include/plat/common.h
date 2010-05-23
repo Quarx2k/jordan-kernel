@@ -49,7 +49,13 @@ static inline int omap_register_i2c_bus(int bus_id, u32 clkrate,
 }
 #endif
 
-/* IO bases for various OMAP processors */
+extern void omap_reserve(void);
+
+/*
+ * IO bases for various OMAP processors
+ * Except the tap base, rest all the io bases
+ * listed are physical addresses.
+ */
 struct omap_globals {
 	u32		class;		/* OMAP class to detect */
 	void __iomem	*tap;		/* Control module ID code */
