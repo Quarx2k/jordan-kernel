@@ -249,9 +249,10 @@ static int __bprm_mm_init(struct linux_binprm *bprm)
 	 * use STACK_TOP because that can depend on attributes which aren't
 	 * configured yet.
 	 */
+	BUG_ON(VM_STACK_FLAGS & VM_STACK_INCOMPLETE_SETUP);
 	vma->vm_end = STACK_TOP_MAX;
 	vma->vm_start = vma->vm_end - PAGE_SIZE;
-	vma->vm_flags = VM_STACK_FLAGS;
+	vma->vm_flags = VM_STACK_FLAGS | VM_STACK_INCOMPLETE_SETUP;
 	vma->vm_page_prot = vm_get_page_prot(vma->vm_flags);
 	INIT_LIST_HEAD(&vma->anon_vma_chain);
 	err = insert_vm_struct(mm, vma);
@@ -625,6 +626,7 @@ int setup_arg_pages(struct linux_binprm *bprm,
 	else if (executable_stack == EXSTACK_DISABLE_X)
 		vm_flags &= ~VM_EXEC;
 	vm_flags |= mm->def_flags;
+	vm_flags |= VM_STACK_INCOMPLETE_SETUP;
 
 	ret = mprotect_fixup(vma, &prev, vma->vm_start, vma->vm_end,
 			vm_flags);
@@ -639,7 +641,10 @@ int setup_arg_pages(struct linux_binprm *bprm,
 			goto out_unlock;
 	}
 
-	stack_expand = EXTRA_STACK_VM_PAGES * PAGE_SIZE;
+	/* mprotect_fixup is overkill to remove the temporary stack flags */
+	vma->vm_flags &= ~VM_STACK_INCOMPLETE_SETUP;
+
+	stack_expand = 131072UL; /* randomly 32*4k (or 2*64k) pages */
 	stack_size = vma->vm_end - vma->vm_start;
 	/*
 	 * Align this down to a page boundary as expand_stack
