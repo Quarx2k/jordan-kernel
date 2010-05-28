@@ -485,7 +485,7 @@ static int acpi_hibernation_begin(void)
 {
 	int error;
 
-	error = s4_no_nvs ? 0 : hibernate_nvs_alloc();
+	error = s4_no_nvs ? 0 : suspend_nvs_alloc();
 	if (!error) {
 		acpi_target_sleep_state = ACPI_STATE_S4;
 		acpi_sleep_tts_switch(acpi_target_sleep_state);
@@ -499,7 +499,7 @@ static int acpi_hibernation_pre_snapshot(void)
 	int error = acpi_pm_prepare();
 
 	if (!error)
-		hibernate_nvs_save();
+		suspend_nvs_save();
 
 	return error;
 }
@@ -524,7 +524,7 @@ static int acpi_hibernation_enter(void)
 
 static void acpi_hibernation_finish(void)
 {
-	hibernate_nvs_free();
+	suspend_nvs_free();
 	acpi_pm_finish();
 }
 
@@ -544,7 +544,7 @@ static void acpi_hibernation_leave(void)
 		panic("ACPI S4 hardware signature mismatch");
 	}
 	/* Restore the NVS memory area */
-	hibernate_nvs_restore();
+	suspend_nvs_restore();
 }
 
 static void acpi_pm_enable_gpes(void)
@@ -584,7 +584,7 @@ static int acpi_hibernation_begin_old(void)
 
 	if (!error) {
 		if (!s4_no_nvs)
-			error = hibernate_nvs_alloc();
+			error = suspend_nvs_alloc();
 		if (!error)
 			acpi_target_sleep_state = ACPI_STATE_S4;
 	}
@@ -596,7 +596,7 @@ static int acpi_hibernation_pre_snapshot_old(void)
 	int error = acpi_pm_disable_gpes();
 
 	if (!error)
-		hibernate_nvs_save();
+		suspend_nvs_save();
 
 	return error;
 }
