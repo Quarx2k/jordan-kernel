@@ -589,12 +589,9 @@ config ARCH_W90X900
 config ARCH_PNX4008
 	bool "Philips Nexperia PNX4008 Mobile"
 	select CPU_ARM926T
-<<<<<<< HEAD
 	select HAVE_CLK
-=======
 	select COMMON_CLKDEV
 	select ARCH_USES_GETTIMEOFFSET
->>>>>>> 5cfc8ee... ARM: convert arm to arch_gettimeoffset()
 	help
 	  This enables support for Philips PNX4008 mobile platform.
 
@@ -671,11 +668,8 @@ config ARCH_S3C64XX
 	bool "Samsung S3C64XX"
 	select GENERIC_GPIO
 	select HAVE_CLK
-<<<<<<< HEAD
-=======
 	select NO_IOPORT
 	select ARCH_USES_GETTIMEOFFSET
->>>>>>> 5cfc8ee... ARM: convert arm to arch_gettimeoffset()
 	select ARCH_HAS_CPUFREQ
 	help
 	  Samsung S3C64XX series based systems
