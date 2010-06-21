@@ -24,15 +24,6 @@
 #include <asm/tlbflush.h>
 #include <asm/sizes.h>
 
-/* Sanity check size */
-#if (CONSISTENT_DMA_SIZE % SZ_2M)
-#error "CONSISTENT_DMA_SIZE must be multiple of 2MiB"
-#endif
-
-#define CONSISTENT_OFFSET(x)	(((unsigned long)(x) - CONSISTENT_BASE) >> PAGE_SHIFT)
-#define CONSISTENT_PTE_INDEX(x) (((unsigned long)(x) - CONSISTENT_BASE) >> PGDIR_SHIFT)
-#define NUM_CONSISTENT_PTES (CONSISTENT_DMA_SIZE >> PGDIR_SHIFT)
-
 static u64 get_coherent_dma_mask(struct device *dev)
 {
 	u64 mask = ISA_DMA_THRESHOLD;
@@ -164,6 +155,30 @@ static struct arm_vm_region *arm_vm_region_find(struct arm_vm_region *head, unsi
  out:
 	return c;
 }
+
+#ifdef CONFIG_MMU
+/* Sanity check size */
+#if (CONSISTENT_DMA_SIZE % SZ_2M)
+#error "CONSISTENT_DMA_SIZE must be multiple of 2MiB"
+#endif
+
+#define CONSISTENT_OFFSET(x)	(((unsigned long)(x) - CONSISTENT_BASE) >> PAGE_SHIFT)
+#define CONSISTENT_PTE_INDEX(x) (((unsigned long)(x) - CONSISTENT_BASE) >> PGDIR_SHIFT)
+#define NUM_CONSISTENT_PTES (CONSISTENT_DMA_SIZE >> PGDIR_SHIFT)
+
+/*
+ * These are the page tables (2MB each) covering uncached, DMA consistent allocations
+ */
+static pte_t *consistent_pte[NUM_CONSISTENT_PTES];
+
+#include "vmregion.h"
+
+static struct arm_vmregion_head consistent_head = {
+	.vm_lock	= __SPIN_LOCK_UNLOCKED(&consistent_head.vm_lock),
+	.vm_list	= LIST_HEAD_INIT(consistent_head.vm_list),
+	.vm_start	= CONSISTENT_BASE,
+	.vm_end		= CONSISTENT_END,
+};
 
 #ifdef CONFIG_HUGETLB_PAGE
 #error ARM Coherent DMA allocator does not (yet) support huge TLB
