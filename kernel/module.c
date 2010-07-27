@@ -1666,6 +1666,9 @@ static void free_module(struct module *mod)
 	/* Remove dynamic debug info */
 	ddebug_remove_module(mod->name);
 
+	/* Remove dynamic debug info */
+	ddebug_remove_module(mod->name);
+
 	/* Arch-specific cleanup. */
 	module_arch_cleanup(mod);
 
