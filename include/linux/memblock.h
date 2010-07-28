@@ -27,13 +27,13 @@ struct memblock_region {
 
 struct memblock_type {
 	unsigned long cnt;
-	phys_addr_t size;
 	struct memblock_region regions[MAX_MEMBLOCK_REGIONS+1];
 };
 
 struct memblock {
 	unsigned long debug;
 	phys_addr_t current_limit;
+	phys_addr_t memory_size;	/* Updated by memblock_analyze() */
 	struct memblock_type memory;
 	struct memblock_type reserved;
 };
