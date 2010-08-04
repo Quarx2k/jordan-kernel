@@ -23,6 +23,7 @@
 
 #include "sdram-hynix-h8mbx00u0mer-0em.h"
 
+<<<<<<< HEAD
 static void __init omap_zoom_map_io(void)
 {
 <<<<<<< HEAD
@@ -34,6 +35,8 @@ static void __init omap_zoom_map_io(void)
 >>>>>>> c573bcf... omap3: Unify omap2_set_globals_3[43,6x]x functions
 }
 
+=======
+>>>>>>> 869fef4... omap3: introduce omap3_map_io
 static struct omap_board_config_kernel zoom_config[] __initdata = {
 };
 
@@ -58,7 +61,7 @@ MACHINE_START(OMAP_ZOOM3, "OMAP Zoom3 board")
 	.phys_io	= 0x48000000,
 	.io_pg_offst	= ((0xfa000000) >> 18) & 0xfffc,
 	.boot_params	= 0x80000100,
-	.map_io		= omap_zoom_map_io,
+	.map_io		= omap3_map_io,
 	.reserve	= omap_reserve,
 	.init_irq	= omap_zoom_init_irq,
 	.init_machine	= omap_zoom_init,

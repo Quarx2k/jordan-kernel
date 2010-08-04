@@ -1884,19 +1884,13 @@ static void __init mapphone_reserve(void)
 #endif
 }
 
-static void __init mapphone_map_io(void)
-{
-	omap2_set_globals_3xxx();
-	omap34xx_map_common_io();
-}
-
 MACHINE_START(MAPPHONE, "mapphone_")
 	/* Maintainer: Motorola, Inc. */
 	.phys_io	= 0x48000000,
 	.io_pg_offst	= ((0xfa000000) >> 18) & 0xfffc,
 	.boot_params	= 0x80C00100,
 	.reserve	= mapphone_reserve,
-	.map_io		= mapphone_map_io,
+	.map_io		= omap3_map_io,
 	.init_irq	= mapphone_init_irq,
 	.init_machine	= mapphone_init,
 	.timer		= &omap_timer,
