@@ -320,7 +320,7 @@ void __init omap2_set_globals_243x(void)
 
 #if defined(CONFIG_ARCH_OMAP3430)
 
-static struct omap_globals omap343x_globals = {
+static struct omap_globals omap3_globals = {
 	.class	= OMAP343X_CLASS,
 	.tap	= OMAP2_L4_IO_ADDRESS(0x4830A000),
 	.sdrc	= OMAP2_L3_IO_ADDRESS(OMAP343X_SDRC_BASE),
@@ -330,9 +330,9 @@ static struct omap_globals omap343x_globals = {
 	.cm	= OMAP2_L4_IO_ADDRESS(OMAP3430_CM_BASE),
 };
 
-void __init omap2_set_globals_343x(void)
+void __init omap2_set_globals_3xxx(void)
 {
-	__omap2_set_globals(&omap343x_globals);
+	__omap2_set_globals(&omap3_globals);
 }
 #endif
 
