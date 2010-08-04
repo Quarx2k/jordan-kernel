@@ -169,8 +169,12 @@ static int check_fbmem_region(int region_idx, struct omapfb_mem_region *rg,
 
 static int valid_sdram(unsigned long addr, unsigned long size)
 {
+<<<<<<< HEAD
 	struct bootmem_data *bdata = NODE_DATA(0)->bdata;
 	unsigned long sdram_start, sdram_end;
+=======
+	struct memblock_region res;
+>>>>>>> e3239ff... memblock: Rename memblock_region to memblock_type and memblock_property to memblock_region
 
 	sdram_start = bdata->node_min_pfn << PAGE_SHIFT;
 	sdram_end = bdata->node_low_pfn << PAGE_SHIFT;

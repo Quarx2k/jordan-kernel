@@ -83,10 +83,17 @@ int page_is_ram(unsigned long pfn)
 	for (i=0; i < lmb.memory.cnt; i++) {
 		unsigned long base;
 
+<<<<<<< HEAD
 		base = lmb.memory.region[i].base;
 
 		if ((paddr >= base) &&
 			(paddr < (base + lmb.memory.region[i].size))) {
+=======
+		base = memblock.memory.regions[i].base;
+
+		if ((paddr >= base) &&
+			(paddr < (base + memblock.memory.regions[i].size))) {
+>>>>>>> e3239ff... memblock: Rename memblock_region to memblock_type and memblock_property to memblock_region
 			return 1;
 		}
 	}
@@ -146,7 +153,11 @@ int
 walk_system_ram_range(unsigned long start_pfn, unsigned long nr_pages,
 		void *arg, int (*func)(unsigned long, unsigned long, void *))
 {
+<<<<<<< HEAD
 	struct lmb_property res;
+=======
+	struct memblock_region res;
+>>>>>>> e3239ff... memblock: Rename memblock_region to memblock_type and memblock_property to memblock_region
 	unsigned long pfn, len;
 	u64 end;
 	int ret = -1;
@@ -203,8 +214,13 @@ void __init do_init_bootmem(void)
 	/* Add active regions with valid PFNs */
 	for (i = 0; i < lmb.memory.cnt; i++) {
 		unsigned long start_pfn, end_pfn;
+<<<<<<< HEAD
 		start_pfn = lmb.memory.region[i].base >> PAGE_SHIFT;
 		end_pfn = start_pfn + lmb_size_pages(&lmb.memory, i);
+=======
+		start_pfn = memblock.memory.regions[i].base >> PAGE_SHIFT;
+		end_pfn = start_pfn + memblock_size_pages(&memblock.memory, i);
+>>>>>>> e3239ff... memblock: Rename memblock_region to memblock_type and memblock_property to memblock_region
 		add_active_range(0, start_pfn, end_pfn);
 	}
 
@@ -215,6 +231,7 @@ void __init do_init_bootmem(void)
 	free_bootmem_with_active_regions(0, lowmem_end_addr >> PAGE_SHIFT);
 
 	/* reserve the sections we're already using */
+<<<<<<< HEAD
 	for (i = 0; i < lmb.reserved.cnt; i++) {
 		unsigned long addr = lmb.reserved.region[i].base +
 				     lmb_size_bytes(&lmb.reserved, i) - 1;
@@ -226,6 +243,19 @@ void __init do_init_bootmem(void)
 			unsigned long adjusted_size = lowmem_end_addr -
 				      lmb.reserved.region[i].base;
 			reserve_bootmem(lmb.reserved.region[i].base,
+=======
+	for (i = 0; i < memblock.reserved.cnt; i++) {
+		unsigned long addr = memblock.reserved.regions[i].base +
+				     memblock_size_bytes(&memblock.reserved, i) - 1;
+		if (addr < lowmem_end_addr)
+			reserve_bootmem(memblock.reserved.regions[i].base,
+					memblock_size_bytes(&memblock.reserved, i),
+					BOOTMEM_DEFAULT);
+		else if (memblock.reserved.regions[i].base < lowmem_end_addr) {
+			unsigned long adjusted_size = lowmem_end_addr -
+				      memblock.reserved.regions[i].base;
+			reserve_bootmem(memblock.reserved.regions[i].base,
+>>>>>>> e3239ff... memblock: Rename memblock_region to memblock_type and memblock_property to memblock_region
 					adjusted_size, BOOTMEM_DEFAULT);
 		}
 	}
@@ -233,9 +263,15 @@ void __init do_init_bootmem(void)
 	free_bootmem_with_active_regions(0, max_pfn);
 
 	/* reserve the sections we're already using */
+<<<<<<< HEAD
 	for (i = 0; i < lmb.reserved.cnt; i++)
 		reserve_bootmem(lmb.reserved.region[i].base,
 				lmb_size_bytes(&lmb.reserved, i),
+=======
+	for (i = 0; i < memblock.reserved.cnt; i++)
+		reserve_bootmem(memblock.reserved.regions[i].base,
+				memblock_size_bytes(&memblock.reserved, i),
+>>>>>>> e3239ff... memblock: Rename memblock_region to memblock_type and memblock_property to memblock_region
 				BOOTMEM_DEFAULT);
 
 #endif
@@ -252,12 +288,21 @@ static int __init mark_nonram_nosave(void)
 		      lmb_region_max_pfn;
 	int i;
 
+<<<<<<< HEAD
 	for (i = 0; i < lmb.memory.cnt - 1; i++) {
 		lmb_region_max_pfn =
 			(lmb.memory.region[i].base >> PAGE_SHIFT) +
 			(lmb.memory.region[i].size >> PAGE_SHIFT);
 		lmb_next_region_start_pfn =
 			lmb.memory.region[i+1].base >> PAGE_SHIFT;
+=======
+	for (i = 0; i < memblock.memory.cnt - 1; i++) {
+		memblock_region_max_pfn =
+			(memblock.memory.regions[i].base >> PAGE_SHIFT) +
+			(memblock.memory.regions[i].size >> PAGE_SHIFT);
+		memblock_next_region_start_pfn =
+			memblock.memory.regions[i+1].base >> PAGE_SHIFT;
+>>>>>>> e3239ff... memblock: Rename memblock_region to memblock_type and memblock_property to memblock_region
 
 		if (lmb_region_max_pfn < lmb_next_region_start_pfn)
 			register_nosave_region(lmb_region_max_pfn,
