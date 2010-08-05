@@ -522,14 +522,8 @@ static char last_unloaded_module[MODULE_NAME_LEN+1];
 /* Init the unload section of the module. */
 static void module_unload_init(struct module *mod)
 {
-	int cpu;
-
 	INIT_LIST_HEAD(&mod->source_list);
 	INIT_LIST_HEAD(&mod->target_list);
-	for_each_possible_cpu(cpu) {
-		per_cpu_ptr(mod->refptr, cpu)->incs = 0;
-		per_cpu_ptr(mod->refptr, cpu)->decs = 0;
-	}
 
 	/* Hold reference count during initialization. */
 	__this_cpu_write(mod->refptr->count, 1);
