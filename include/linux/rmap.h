@@ -124,16 +124,6 @@ static inline void anon_vma_unlock(struct anon_vma *anon_vma)
 	spin_unlock(&anon_vma->root->lock);
 }
 
-static inline void anon_vma_lock(struct anon_vma *anon_vma)
-{
-	spin_lock(&anon_vma->lock);
-}
-
-static inline void anon_vma_unlock(struct anon_vma *anon_vma)
-{
-	spin_unlock(&anon_vma->lock);
-}
-
 /*
  * anon_vma helper functions.
  */
