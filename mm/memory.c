@@ -315,7 +315,6 @@ void free_pgd_range(struct mmu_gather *tlb,
 {
 	pgd_t *pgd;
 	unsigned long next;
-	unsigned long start;
 
 	/*
 	 * The next few lines have given us lots of grief...
@@ -359,7 +358,6 @@ void free_pgd_range(struct mmu_gather *tlb,
 	if (addr > end - 1)
 		return;
 
-	start = addr;
 	pgd = pgd_offset(tlb->mm, addr);
 	do {
 		next = pgd_addr_end(addr, end);
