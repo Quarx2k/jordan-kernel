@@ -322,7 +322,7 @@ static struct task_struct *select_bad_process(unsigned long *ppoints,
 
 /**
  * dump_tasks - dump current memory state of all system tasks
- * @mem: target memory controller
+ * @mem: current's memory controller, if constrained
  *
  * Dumps the current memory state of all system tasks, excluding kernel threads.
  * State information includes task's pid, uid, tgid, vm size, rss, cpu, oom_adj
@@ -344,11 +344,6 @@ void dump_tasks(const struct mem_cgroup *mem)
 	printk(KERN_INFO "[ pid ]   uid  tgid total_vm      rss cpu oom_adj "
 	       "name\n");
 	for_each_process(p) {
-		/*
-		 * We don't have is_global_init() check here, because the old
-		 * code do that. printing init process is not big matter. But
-		 * we don't hope to make unnecessary compatibility breaking.
-		 */
 		if (p->flags & PF_KTHREAD)
 			continue;
 		if (mem && !task_in_mem_cgroup(p, mem))
@@ -357,8 +352,8 @@ void dump_tasks(const struct mem_cgroup *mem)
 		task = find_lock_task_mm(p);
 		if (!task) {
 			/*
-			 * Probably oom vs task-exiting race was happen and ->mm
-			 * have been detached. thus there's no need to report
+			 * This is a kthread or all of p's threads have already
+			 * detached their mm's.  There's no need to report
 			 * them; they can't be oom killed anyway.
 			 */
 			continue;
