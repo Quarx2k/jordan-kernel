@@ -14,6 +14,8 @@
 
 struct zonelist;
 struct notifier_block;
+struct mem_cgroup;
+struct task_struct;
 
 /*
  * Types of limitations to the nodes from which allocations may occur
@@ -44,5 +46,15 @@ static inline void oom_killer_enable(void)
 {
 	oom_killer_disabled = false;
 }
+
+/* The badness from the OOM killer */
+extern unsigned long badness(struct task_struct *p, struct mem_cgroup *mem,
+		      const nodemask_t *nodemask, unsigned long uptime);
+
+/* sysctls */
+extern int sysctl_oom_dump_tasks;
+extern int sysctl_oom_kill_allocating_task;
+extern int sysctl_panic_on_oom;
+
 #endif /* __KERNEL__*/
 #endif /* _INCLUDE_LINUX_OOM_H */
