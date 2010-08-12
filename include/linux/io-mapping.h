@@ -21,7 +21,6 @@
 #include <linux/types.h>
 #include <asm/io.h>
 #include <asm/page.h>
-#include <asm/iomap.h>
 
 /*
  * The io_mapping mechanism provides an abstraction for mapping
@@ -31,6 +30,8 @@
  */
 
 #ifdef CONFIG_HAVE_ATOMIC_IOMAP
+
+#include <asm/iomap.h>
 
 struct io_mapping {
 	resource_size_t base;
