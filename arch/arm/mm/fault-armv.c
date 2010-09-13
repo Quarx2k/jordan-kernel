@@ -27,6 +27,7 @@
 
 static pteval_t shared_pte_mask = L_PTE_MT_BUFFERABLE;
 
+#if __LINUX_ARM_ARCH__ < 6
 /*
  * We take the easy way out of this problem - we make the
  * PTE uncacheable.  However, we leave the write buffer on.
@@ -193,10 +194,8 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr,
 		return;
 
 	mapping = page_mapping(page);
-#ifndef CONFIG_SMP
 	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
 		__flush_dcache_page(mapping, page);
-#endif
 	if (mapping) {
 		if (cache_is_vivt())
 			make_coherent(mapping, vma, addr, ptep, pfn);
@@ -204,6 +203,7 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr,
 			__flush_icache_all();
 	}
 }
+#endif	/* __LINUX_ARM_ARCH__ < 6 */
 
 /*
  * Check whether the write buffer has physical address aliasing
