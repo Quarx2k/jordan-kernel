@@ -266,10 +266,10 @@ static void arm_memory_present(void)
 static void arm_memory_present(void)
 {
 	struct memblock_region *reg;
-	int i;
-	for (i = 0; i < memblock.memory.cnt; i++)
-		memory_present(0, memblock_start_pfn(&memblock.memory, i),
-				  memblock_end_pfn(&memblock.memory, i));
+
+	for_each_memblock(memory, reg)
+		memory_present(0, memblock_region_memory_base_pfn(reg),
+			       memblock_region_memory_end_pfn(reg));
 }
 #endif
 
