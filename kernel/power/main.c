@@ -417,6 +417,7 @@ static int __init pm_init(void)
 	pm_deepsleep_enabled = 0;
 #endif
 
+	hibernate_image_size_init();
 	power_kobj = kobject_create_and_add("power", NULL);
 	if (!power_kobj)
 		return -ENOMEM;
