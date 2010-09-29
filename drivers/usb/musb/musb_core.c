@@ -2121,6 +2121,8 @@ static int __init musb_probe(struct platform_device *pdev)
 {
 	struct device	*dev = &pdev->dev;
 	int		irq = platform_get_irq(pdev, 0);
+	int		irq = platform_get_irq_byname(pdev, "mc");
+	int		status;
 	struct resource	*iomem;
 	void __iomem	*base;
 
