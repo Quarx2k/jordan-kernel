@@ -189,7 +189,7 @@ static inline int pmd_same(pmd_t pmd_a, pmd_t pmd_b)
 #endif
 
 #ifndef __HAVE_ARCH_PAGE_CLEAR_DIRTY
-#define page_clear_dirty(page)		do { } while (0)
+#define page_clear_dirty(page, mapped)	do { } while (0)
 #endif
 
 #ifndef __HAVE_ARCH_PAGE_TEST_DIRTY
