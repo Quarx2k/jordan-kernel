@@ -434,6 +434,7 @@ static void __init free_unused_memmap(struct meminfo *mi)
 void __init mem_init(void)
 {
 	unsigned long reserved_pages, free_pages;
+	struct memblock_region *reg;
 	int i;
 
 	max_mapnr   = pfn_to_page(max_pfn + PHYS_PFN_OFFSET) - mem_map;
@@ -488,9 +489,11 @@ void __init mem_init(void)
 	 */
 	printk(KERN_INFO "Memory:");
 	num_physpages = 0;
-	for (i = 0; i < meminfo.nr_banks; i++) {
-		num_physpages += bank_pfn_size(&meminfo.bank[i]);
-		printk(" %ldMB", bank_phys_size(&meminfo.bank[i]) >> 20);
+	for_each_memblock(memory, reg) {
+		unsigned long pages = memblock_region_memory_end_pfn(reg) -
+			memblock_region_memory_base_pfn(reg);
+		num_physpages += pages;
+		printk(" %ldMB", pages >> (20 - PAGE_SHIFT));
 	}
 	printk(" = %luMB total\n", num_physpages >> (20 - PAGE_SHIFT));
 
