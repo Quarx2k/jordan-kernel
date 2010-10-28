@@ -2518,6 +2518,23 @@ int ext4_mb_release(struct super_block *sb)
 	return 0;
 }
 
+static inline int ext4_issue_discard(struct super_block *sb,
+		ext4_group_t block_group, ext4_grpblk_t block, int count)
+{
+	int ret;
+	ext4_fsblk_t discard_block;
+
+	discard_block = block + ext4_group_first_block_no(sb, block_group);
+	trace_ext4_discard_blocks(sb,
+			(unsigned long long) discard_block, count);
+	ret = sb_issue_discard(sb, discard_block, count);
+	if (ret == -EOPNOTSUPP) {
+		ext4_warning(sb, "discard not supported, disabling", NULL);
+		clear_opt(EXT4_SB(sb)->s_mount_opt, DISCARD);
+	}
+	return ret;
+}
+
 /*
  * This function is called by the jbd2 layer once the commit has finished,
  * so we know we can free the blocks that were released with that commit.
@@ -2536,6 +2553,10 @@ static void release_blocks_on_commit(journal_t *journal, transaction_t *txn)
 
 		mb_debug(1, "gonna free %u blocks in group %u (0x%p):",
 			 entry->count, entry->group, entry);
+
+		if (test_opt(sb, DISCARD))
+			ext4_issue_discard(sb, entry->group,
+					entry->start_blk, entry->count);
 
 		err = ext4_mb_load_buddy(sb, entry->group, &e4b);
 		/* we expect to find existing buddy because it's pinned */
@@ -4581,6 +4602,8 @@ do_more:
 		mb_clear_bits(bitmap_bh->b_data, bit, count);
 		mb_free_blocks(inode, &e4b, bit, count);
 		ext4_mb_return_to_preallocation(inode, &e4b, block, count);
+		if (test_opt(sb, DISCARD))
+			ext4_issue_discard(sb, block_group, bit, count);
 	}
 
 	ret = ext4_free_blks_count(sb, gdp) + count;
@@ -4781,7 +4804,7 @@ int ext4_trim_fs(struct super_block *sb, struct fstrim_range *range)
 		ret = ext4_mb_load_buddy(sb, group, &e4b);
 		if (ret) {
 			ext4_error(sb, "Error in loading buddy "
-					"information for %u", group);
+					"information for %u", NULL);
 			break;
 		}
 
@@ -4795,11 +4818,11 @@ int ext4_trim_fs(struct super_block *sb, struct fstrim_range *range)
 						last_block, minlen);
 			if (cnt < 0) {
 				ret = cnt;
-				ext4_mb_unload_buddy(&e4b);
+				ext4_mb_release_desc(&e4b);
 				break;
 			}
 		}
-		ext4_mb_unload_buddy(&e4b);
+		ext4_mb_release_desc(&e4b);
 		trimmed += cnt;
 		first_block = 0;
 	}
