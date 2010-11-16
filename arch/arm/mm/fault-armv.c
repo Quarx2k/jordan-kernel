@@ -25,7 +25,7 @@
 
 #include "mm.h"
 
-static unsigned long shared_pte_mask = L_PTE_MT_BUFFERABLE;
+static pteval_t shared_pte_mask = L_PTE_MT_BUFFERABLE;
 
 /*
  * We take the easy way out of this problem - we make the
