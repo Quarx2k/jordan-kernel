@@ -235,6 +235,7 @@ static struct omap_mmc_platform_data mmc1_data __initdata = {
 						MMC_VDD_165_195,
 		/* we get car_detect_irq later */
 		.card_detect_irq	= 0,
+		.keep_power		= 0,
 		.card_detect            = hsmmc_card_detect,
 	},
 };
@@ -256,6 +257,7 @@ static struct omap_mmc_platform_data emmc_data __initdata = {
 		.name			= "first slot",
 		.internal_clock		= 1,
 		.card_detect_irq        = 0,
+		.keep_power		= 0,
 		.card_detect            = NULL,
 		/* define .set_sleep to cut Vcc and leave VccQ alone */
 	},
@@ -272,6 +274,7 @@ static struct omap_mmc_platform_data wifi_data __initdata = {
 		.name			= "first slot",
 		.internal_clock		= 1,
 		.card_detect_irq        = 0,
+		.keep_power		= 1, //MMC_PM_KEEP_POWER;
 	},
 };	
 

@@ -363,6 +363,8 @@ static int mmc_sdio_init_card(struct mmc_host *host, u32 ocr,
 	if (err)
 		goto remove;
 
+
+
 	if (!oldcard)
 		host->card = card;
 	return 0;
@@ -407,9 +409,11 @@ static void mmc_sdio_detect(struct mmc_host *host)
 	BUG_ON(!host->card);
 
 	/* Make sure card is powered before detecting it */
-	err = pm_runtime_get_sync(&host->card->dev);
-	if (err < 0)
-		goto out;
+	if (host->caps & MMC_CAP_POWER_OFF_CARD) {
+		err = pm_runtime_get_sync(&host->card->dev);
+		if (err < 0)
+			goto out;
+	}
 
 	mmc_claim_host(host);
 
@@ -419,6 +423,20 @@ static void mmc_sdio_detect(struct mmc_host *host)
 	err = mmc_select_card(host->card);
 
 	mmc_release_host(host);
+
+	/*
+	 * Tell PM core it's OK to power off the card now.
+	 *
+	 * The _sync variant is used in order to ensure that the card
+	 * is left powered off in case an error occurred, and the card
+	 * is going to be removed.
+	 *
+	 * Since there is no specific reason to believe a new user
+	 * is about to show up at this point, the _sync variant is
+	 * desirable anyway.
+	 */
+	if (host->caps & MMC_CAP_POWER_OFF_CARD)
+		pm_runtime_put_sync(&host->card->dev);
 
 out:
 	if (err) {
@@ -461,6 +479,12 @@ static int mmc_sdio_suspend(struct mmc_host *host)
 			const struct dev_pm_ops *pmops = func->dev.driver->pm;
 			pmops->resume(&func->dev);
 		}
+	}
+
+	if (!err && (host->pm_flags & MMC_PM_KEEP_POWER)) {
+		mmc_claim_host(host);
+		//sdio_disable_wide(host->card);
+		mmc_release_host(host);
 	}
 
 	return err;
@@ -576,10 +600,22 @@ int mmc_attach_sdio(struct mmc_host *host, u32 ocr)
 	 */
 	card->sdio_funcs = funcs = (ocr & 0x70000000) >> 28;
 
-#ifdef CONFIG_MMC_EMBEDDED_SDIO
-	if (host->embedded_sdio_data.funcs)
-		card->sdio_funcs = funcs = host->embedded_sdio_data.num_funcs;
-#endif
+	/*
+	 * Enable runtime PM only if supported by host+card+board
+	 */
+	if (host->caps & MMC_CAP_POWER_OFF_CARD) {
+		/*
+		 * Let runtime PM core know our card is active
+		 */
+		err = pm_runtime_set_active(&card->dev);
+		if (err)
+			goto remove;
+
+		/*
+		 * Enable runtime PM for this card
+		 */
+		pm_runtime_enable(&card->dev);
+	}
 
 	/*
 	 * If needed, disconnect card detection pull-up resistor.
@@ -591,28 +627,16 @@ int mmc_attach_sdio(struct mmc_host *host, u32 ocr)
 	/*
 	 * Initialize (but don't add) all present functions.
 	 */
-	for (i = 0;i < funcs;i++) {
-#ifdef CONFIG_MMC_EMBEDDED_SDIO
-		if (host->embedded_sdio_data.funcs) {
-			struct sdio_func *tmp;
+	for (i = 0; i < funcs; i++, card->sdio_funcs++) {
+		err = sdio_init_func(host->card, i + 1);
+		if (err)
+			goto remove;
 
-			tmp = sdio_alloc_func(host->card);
-			if (IS_ERR(tmp))
-				goto remove;
-			tmp->num = (i + 1);
-			card->sdio_func[i] = tmp;
-			tmp->class = host->embedded_sdio_data.funcs[i].f_class;
-			tmp->max_blksize = host->embedded_sdio_data.funcs[i].f_maxblksize;
-			tmp->vendor = card->cis.vendor;
-			tmp->device = card->cis.device;
-		} else {
-#endif
-			err = sdio_init_func(host->card, i + 1);
-			if (err)
-				goto remove;
-#ifdef CONFIG_MMC_EMBEDDED_SDIO
-		}
-#endif
+		/*
+		 * Enable Runtime PM for this func (if supported)
+		 */
+		if (host->caps & MMC_CAP_POWER_OFF_CARD)
+			pm_runtime_enable(&card->sdio_func[i]->dev);
 	}
 
 	mmc_release_host(host);
