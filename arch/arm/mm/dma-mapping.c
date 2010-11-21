@@ -79,6 +79,53 @@ static struct arm_vmregion_head consistent_head = {
 #error ARM Coherent DMA allocator does not (yet) support huge TLB
 #endif
 
+/*
+ * Initialise the consistent memory allocation.
+ */
+static int __init consistent_init(void)
+{
+	int ret = 0;
+	pgd_t *pgd;
+	pud_t *pud;
+	pmd_t *pmd;
+	pte_t *pte;
+	int i = 0;
+	u32 base = CONSISTENT_BASE;
+
+	do {
+		pgd = pgd_offset(&init_mm, base);
+
+		pud = pud_alloc(&init_mm, pgd, base);
+		if (!pud) {
+			printk(KERN_ERR "%s: no pud tables\n", __func__);
+			ret = -ENOMEM;
+			break;
+		}
+
+		pmd = pmd_alloc(&init_mm, pud, base);
+		if (!pmd) {
+			printk(KERN_ERR "%s: no pmd tables\n", __func__);
+			ret = -ENOMEM;
+			break;
+		}
+		WARN_ON(!pmd_none(*pmd));
+
+		pte = pte_alloc_kernel(pmd, base);
+		if (!pte) {
+			printk(KERN_ERR "%s: no pte tables\n", __func__);
+			ret = -ENOMEM;
+			break;
+		}
+
+		consistent_pte[i++] = pte;
+		base += (1 << PGDIR_SHIFT);
+	} while (base < CONSISTENT_END);
+
+	return ret;
+}
+
+core_initcall(consistent_init);
+
 static void *
 __dma_alloc(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp,
 	    pgprot_t prot)
@@ -396,46 +443,6 @@ void dma_free_coherent(struct device *dev, size_t size, void *cpu_addr, dma_addr
 }
 #endif	/* CONFIG_MMU */
 EXPORT_SYMBOL(dma_free_coherent);
-
-/*
- * Initialise the consistent memory allocation.
- */
-static int __init consistent_init(void)
-{
-	int ret = 0;
-#ifdef CONFIG_MMU
-	pgd_t *pgd;
-	pmd_t *pmd;
-	pte_t *pte;
-	int i = 0;
-	u32 base = CONSISTENT_BASE;
-
-	do {
-		pgd = pgd_offset(&init_mm, base);
-		pmd = pmd_alloc(&init_mm, pgd, base);
-		if (!pmd) {
-			printk(KERN_ERR "%s: no pmd tables\n", __func__);
-			ret = -ENOMEM;
-			break;
-		}
-		WARN_ON(!pmd_none(*pmd));
-
-		pte = pte_alloc_kernel(pmd, base);
-		if (!pte) {
-			printk(KERN_ERR "%s: no pte tables\n", __func__);
-			ret = -ENOMEM;
-			break;
-		}
-
-		consistent_pte[i++] = pte;
-		base += (1 << PGDIR_SHIFT);
-	} while (base < CONSISTENT_END);
-#endif	/* !CONFIG_MMU */
-
-	return ret;
-}
-
-core_initcall(consistent_init);
 
 /*
  * Make an area consistent for devices.

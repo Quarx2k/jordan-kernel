@@ -544,11 +544,11 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
 	} while (pte++, addr += PAGE_SIZE, addr != end);
 }
 
-static void __init alloc_init_section(pgd_t *pgd, unsigned long addr,
+static void __init alloc_init_section(pud_t *pud, unsigned long addr,
 				      unsigned long end, phys_addr_t phys,
 				      const struct mem_type *type)
 {
-	pmd_t *pmd = pmd_offset(pgd, addr);
+	pmd_t *pmd = pmd_offset(pud, addr);
 
 	/*
 	 * Try a section mapping - end, addr and phys must all be aligned
@@ -575,6 +575,19 @@ static void __init alloc_init_section(pgd_t *pgd, unsigned long addr,
 		 */
 		alloc_init_pte(pmd, addr, end, __phys_to_pfn(phys), type);
 	}
+}
+
+static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
+	unsigned long phys, const struct mem_type *type)
+{
+	pud_t *pud = pud_offset(pgd, addr);
+	unsigned long next;
+
+	do {
+		next = pud_addr_end(addr, end);
+		alloc_init_section(pud, addr, next, phys, type);
+		phys += next - addr;
+	} while (pud++, addr = next, addr != end);
 }
 
 static void __init create_36bit_mapping(struct map_desc *md,
@@ -624,7 +637,8 @@ static void __init create_36bit_mapping(struct map_desc *md,
 	pgd = pgd_offset_k(addr);
 	end = addr + length;
 	do {
-		pmd_t *pmd = pmd_offset(pgd, addr);
+		pud_t *pud = pud_offset(pgd, addr);
+		pmd_t *pmd = pmd_offset(pud, addr);
 		int i;
 
 		for (i = 0; i < 16; i++)
@@ -690,7 +704,7 @@ static void __init create_mapping(struct map_desc *md)
 	do {
 		unsigned long next = pgd_addr_end(addr, end);
 
-		alloc_init_section(pgd, addr, next, phys, type);
+		alloc_init_pud(pgd, addr, next, phys, type);
 
 		phys += next - addr;
 		addr = next;
