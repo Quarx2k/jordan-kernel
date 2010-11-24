@@ -63,9 +63,6 @@ static int lowmem_order[6] = {
 static int lowmem_order_size = 6;
 
 static struct task_struct *lowmem_deathpending;
-static unsigned long lowmem_deathpending_timeout;
-
-static struct task_struct *lowmem_deathpending;
 
 #define lowmem_print(level, x...)			\
 	do {						\
@@ -105,16 +102,6 @@ static int lowmem_shrink(struct shrinker *s, int nr_to_scan, gfp_t gfp_mask)
 	int other_free = global_page_state(NR_FREE_PAGES);
 	int other_file = global_page_state(NR_FILE_PAGES) -
 						global_page_state(NR_SHMEM);
-	/*
-	 * If we already have a death outstanding, then
-	 * bail out right away; indicating to vmscan
-	 * that we have nothing further to offer on
-	 * this pass.
-	 *
-	 */
-	if (lowmem_deathpending &&
-	    time_before_eq(jiffies, lowmem_deathpending_timeout))
-		return 0;
 
 	/*
 	 * If we already have a death outstanding, then
