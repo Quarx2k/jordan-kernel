@@ -727,7 +727,7 @@ static int rfcomm_tty_open(struct tty_struct *tty, struct file *filp)
 			break;
 		}
 
-		//tty_unlock();
+		//sstty_unlock();
 		schedule();
 		//tty_lock();
 	}
