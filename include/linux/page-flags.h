@@ -391,6 +391,39 @@ static inline void __ClearPageTail(struct page *page)
 
 #endif /* !PAGEFLAGS_EXTENDED */
 
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+/*
+ * PageHuge() only returns true for hugetlbfs pages, but not for
+ * normal or transparent huge pages.
+ *
+ * PageTransHuge() returns true for both transparent huge and
+ * hugetlbfs pages, but not normal pages. PageTransHuge() can only be
+ * called only in the core VM paths where hugetlbfs pages can't exist.
+ */
+static inline int PageTransHuge(struct page *page)
+{
+	VM_BUG_ON(PageTail(page));
+	return PageHead(page);
+}
+
+static inline int PageTransCompound(struct page *page)
+{
+	return PageCompound(page);
+}
+
+#else
+
+static inline int PageTransHuge(struct page *page)
+{
+	return 0;
+}
+
+static inline int PageTransCompound(struct page *page)
+{
+	return 0;
+}
+#endif
+
 #ifdef CONFIG_MMU
 #define __PG_MLOCKED		(1 << PG_mlocked)
 #else
