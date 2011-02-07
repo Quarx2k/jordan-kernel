@@ -45,3 +45,5 @@ obj-$(CONFIG_RAR_REGISTER)	+= rar/
 obj-$(CONFIG_DX_SEP)		+= sep/
 obj-$(CONFIG_IIO)		+= iio/
 obj-$(CONFIG_ZRAM)		+= zram/
+obj-$(CONFIG_ZCACHE)		+= zcache/
+
