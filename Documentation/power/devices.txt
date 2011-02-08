@@ -98,6 +98,7 @@ system out of a low power state.  These are initialized by bus or device
 driver code using device_init_wakeup(dev,can_wakeup).
 
 The "can_wakeup" flag just records whether the device (and its driver) can
+<<<<<<< HEAD
 physically support wakeup events.  When that flag is clear, the sysfs
 "wakeup" file is empty, and device_may_wakeup() returns false.
 
@@ -162,6 +163,63 @@ Calling Drivers to Enter System Sleep States
 ============================================
 When the system enters a low power state, each device's driver is asked
 to suspend the device by putting it into state compatible with the target
+=======
+physically support wakeup events.  The device_set_wakeup_capable() routine
+affects this flag.  The "should_wakeup" flag controls whether the device should
+try to use its wakeup mechanism.  device_set_wakeup_enable() affects this flag;
+for the most part drivers should not change its value.  The initial value of
+should_wakeup is supposed to be false for the majority of devices; the major
+exceptions are power buttons, keyboards, and Ethernet adapters whose WoL
+(wake-on-LAN) feature has been set up with ethtool.
+
+Whether or not a device is capable of issuing wakeup events is a hardware
+matter, and the kernel is responsible for keeping track of it.  By contrast,
+whether or not a wakeup-capable device should issue wakeup events is a policy
+decision, and it is managed by user space through a sysfs attribute: the
+power/wakeup file.  User space can write the strings "enabled" or "disabled" to
+set or clear the "should_wakeup" flag, respectively.  This file is only present
+for wakeup-capable devices (i.e. devices whose "can_wakeup" flags are set)
+and is created (or removed) by device_set_wakeup_capable().  Reads from the
+file will return the corresponding string.
+
+The device_may_wakeup() routine returns true only if both flags are set.
+This information is used by subsystems, like the PCI bus type code, to see
+whether or not to enable the devices' wakeup mechanisms.  If device wakeup
+mechanisms are enabled or disabled directly by drivers, they also should use
+device_may_wakeup() to decide what to do during a system sleep transition.
+However for runtime power management, wakeup events should be enabled whenever
+the device and driver both support them, regardless of the should_wakeup flag.
+
+
+/sys/devices/.../power/control files
+------------------------------------
+Each device in the driver model has a flag to control whether it is subject to
+runtime power management.  This flag, called runtime_auto, is initialized by the
+bus type (or generally subsystem) code using pm_runtime_allow() or
+pm_runtime_forbid(); the default is to allow runtime power management.
+
+The setting can be adjusted by user space by writing either "on" or "auto" to
+the device's power/control sysfs file.  Writing "auto" calls pm_runtime_allow(),
+setting the flag and allowing the device to be runtime power-managed by its
+driver.  Writing "on" calls pm_runtime_forbid(), clearing the flag, returning
+the device to full power if it was in a low-power state, and preventing the
+device from being runtime power-managed.  User space can check the current value
+of the runtime_auto flag by reading the file.
+
+The device's runtime_auto flag has no effect on the handling of system-wide
+power transitions.  In particular, the device can (and in the majority of cases
+should and will) be put into a low-power state during a system-wide transition
+to a sleep state even though its runtime_auto flag is clear.
+
+For more information about the runtime power management framework, refer to
+Documentation/power/runtime_pm.txt.
+
+
+Calling Drivers to Enter and Leave System Sleep States
+======================================================
+When the system goes into a sleep state, each device's driver is asked to
+suspend the device by putting it into a state compatible with the target
+>>>>>>> cb8f51b... PM: Do not create wakeup sysfs files for devices that cannot wake up
 system state.  That's usually some version of "off", but the details are
 system-specific.  Also, wakeup-enabled devices will usually stay partly
 functional in order to wake the system.
