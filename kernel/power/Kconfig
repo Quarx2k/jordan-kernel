@@ -312,10 +312,8 @@ config PM_RUNTIME
 	  responsible for the actual handling of the autosuspend requests and
 	  wake-up events.
 
-config PM_OPS
+config ARCH_HAS_OPP
 	bool
-	depends on PM_SLEEP || PM_RUNTIME
-	default y
 
 config PM_OPP
 	bool "Operating Performance Point (OPP) Layer library"
