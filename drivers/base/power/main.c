@@ -713,7 +713,6 @@ static void dpm_complete(pm_message_t state)
 		mutex_unlock(&dpm_list_mtx);
 
 		device_complete(dev, state);
-		pm_runtime_put_sync(dev);
 
 		mutex_lock(&dpm_list_mtx);
 		put_device(dev);
@@ -1048,12 +1047,9 @@ static int dpm_prepare(pm_message_t state)
 		if (pm_runtime_barrier(dev) && device_may_wakeup(dev))
 			pm_wakeup_event(dev, 0);
 
-		if (pm_wakeup_pending()) {
-			pm_runtime_put_sync(dev);
-			error = -EBUSY;
-		} else {
-			error = device_prepare(dev, state);
-		}
+		pm_runtime_put_sync(dev);
+		error = pm_wakeup_pending() ?
+				-EBUSY : device_prepare(dev, state);
 
 		mutex_lock(&dpm_list_mtx);
 		if (error) {
