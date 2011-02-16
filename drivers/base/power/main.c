@@ -428,6 +428,11 @@ static int device_resume_noirq(struct device *dev, pm_message_t state)
 	TRACE_DEVICE(dev);
 	TRACE_RESUME(0);
 
+	if (dev->pwr_domain) {
+		pm_dev_dbg(dev, state, "EARLY power domain ");
+		pm_noirq_op(dev, &dev->pwr_domain->ops, state);
+	}
+
 	if (dev->bus && dev->bus->pm) {
 		pm_dev_dbg(dev, state, "EARLY ");
 		error = pm_noirq_op(dev, dev->bus->pm, state);
@@ -522,6 +527,11 @@ static int device_resume(struct device *dev, pm_message_t state, bool async)
 	device_lock(dev);
 
 	dev->power.in_suspend = false;
+
+	if (dev->pwr_domain) {
+		pm_dev_dbg(dev, state, "power domain ");
+		pm_op(dev, &dev->pwr_domain->ops, state);
+	}
 
 	if (dev->bus) {
 		if (dev->bus->pm) {
@@ -673,6 +683,11 @@ static void device_complete(struct device *dev, pm_message_t state)
 {
 	device_lock(dev);
 
+	if (dev->pwr_domain && dev->pwr_domain->ops.complete) {
+		pm_dev_dbg(dev, state, "completing power domain ");
+		dev->pwr_domain->ops.complete(dev);
+	}
+
 	if (dev->class && dev->class->pm && dev->class->pm->complete) {
 		pm_dev_dbg(dev, state, "completing class ");
 		dev->class->pm->complete(dev);
@@ -789,6 +804,13 @@ static int device_suspend_noirq(struct device *dev, pm_message_t state)
 	if (dev->bus && dev->bus->pm) {
 		pm_dev_dbg(dev, state, "LATE ");
 		error = pm_noirq_op(dev, dev->bus->pm, state);
+		if (error)
+			goto End;
+	}
+
+	if (dev->pwr_domain) {
+		pm_dev_dbg(dev, state, "LATE power domain ");
+		pm_noirq_op(dev, &dev->pwr_domain->ops, state);
 	}
 
 End:
@@ -907,6 +929,13 @@ static int __device_suspend(struct device *dev, pm_message_t state, bool async)
 			pm_dev_dbg(dev, state, "legacy ");
 			error = legacy_suspend(dev, state, dev->bus->suspend);
 		}
+		if (error)
+			goto End;
+	}
+
+	if (dev->pwr_domain) {
+		pm_dev_dbg(dev, state, "power domain ");
+		pm_op(dev, &dev->pwr_domain->ops, state);
 	}
 
  End:
@@ -1019,7 +1048,15 @@ static int device_prepare(struct device *dev, pm_message_t state)
 		pm_dev_dbg(dev, state, "preparing class ");
 		error = dev->class->pm->prepare(dev);
 		suspend_report_result(dev->class->pm->prepare, error);
+		if (error)
+			goto End;
 	}
+
+	if (dev->pwr_domain && dev->pwr_domain->ops.prepare) {
+		pm_dev_dbg(dev, state, "preparing power domain ");
+		dev->pwr_domain->ops.prepare(dev);
+	}
+
  End:
 	device_unlock(dev);
 
