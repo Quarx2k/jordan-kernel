@@ -454,6 +454,7 @@ sched_find_first_bit(unsigned long b[3])
 	return __ffs(b0) + ofs;
 }
 
+#include <asm-generic/bitops/le.h>
 #include <asm-generic/bitops/ext2-non-atomic.h>
 
 #define ext2_set_bit_atomic(l,n,a)   test_and_set_bit(n,a)
