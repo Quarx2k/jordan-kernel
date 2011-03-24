@@ -2012,12 +2012,11 @@ nopage:
 			p->comm, order, gfp_mask);
 		dump_stack();
 
-#ifdef CONFIG_DUMP_TASKS_ON_NOPAGE
-		if (sysctl_oom_dump_tasks)
-			dump_tasks(NULL);
-#endif
+		unsigned int filter = SHOW_MEM_FILTER_NODES;
+	
 		if (!should_suppress_show_mem())
-			show_mem();
+			show_mem(filter);
+
 	}
 
 	return page;
