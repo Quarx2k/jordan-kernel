@@ -545,6 +545,17 @@ extern void __suspend_report_result(const char *function, void *fn, int ret);
 		__suspend_report_result(__func__, fn, ret);		\
 	} while (0)
 
+extern int device_pm_wait_for_dev(struct device *sub, struct device *dev);
+
+extern int pm_generic_prepare(struct device *dev);
+extern int pm_generic_suspend(struct device *dev);
+extern int pm_generic_resume(struct device *dev);
+extern int pm_generic_freeze(struct device *dev);
+extern int pm_generic_thaw(struct device *dev);
+extern int pm_generic_restore(struct device *dev);
+extern int pm_generic_poweroff(struct device *dev);
+extern void pm_generic_complete(struct device *dev);
+
 #else /* !CONFIG_PM_SLEEP */
 
 #define device_pm_lock() do {} while (0)
@@ -557,6 +568,19 @@ static inline int dpm_suspend_start(pm_message_t state)
 
 #define suspend_report_result(fn, ret)		do {} while (0)
 
+static inline int device_pm_wait_for_dev(struct device *a, struct device *b)
+{
+	return 0;
+}
+
+#define pm_generic_prepare	NULL
+#define pm_generic_suspend	NULL
+#define pm_generic_resume	NULL
+#define pm_generic_freeze	NULL
+#define pm_generic_thaw		NULL
+#define pm_generic_restore	NULL
+#define pm_generic_poweroff	NULL
+#define pm_generic_complete	NULL
 #endif /* !CONFIG_PM_SLEEP */
 
 /* How to reorder dpm_list after device_move() */
