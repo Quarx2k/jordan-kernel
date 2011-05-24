@@ -1161,7 +1161,6 @@ static void ext4_mb_release_desc(struct ext4_buddy *e4b)
 		up_read(e4b->alloc_semp);
 }
 
-
 static int mb_find_order_for_block(struct ext4_buddy *e4b, int block)
 {
 	int order = 1;
@@ -4687,19 +4686,26 @@ static void ext4_trim_extent(struct super_block *sb, int start, int count,
  * bitmap. Then issue a TRIM command on this extent and free the extent in
  * the group buddy bitmap. This is done until whole group is scanned.
  */
-ext4_grpblk_t ext4_trim_all_free(struct super_block *sb, struct ext4_buddy *e4b,
-		ext4_grpblk_t start, ext4_grpblk_t max, ext4_grpblk_t minblocks)
+static ext4_grpblk_t
+ext4_trim_all_free(struct super_block *sb, ext4_group_t group,
+		   ext4_grpblk_t start, ext4_grpblk_t max,
+		   ext4_grpblk_t minblocks)
 {
 	void *bitmap;
 	ext4_grpblk_t next, count = 0;
-	ext4_group_t group;
+	struct ext4_buddy e4b;
+	int ret;
 
-	BUG_ON(e4b == NULL);
+	ret = ext4_mb_load_buddy(sb, group, &e4b);
+	if (ret) {
+		ext4_error(sb, "Error in loading buddy "
+				"information for %u", group);
+		return ret;
+	}
 
-	bitmap = e4b->bd_bitmap;
-	group = e4b->bd_group;
-	start = (e4b->bd_info->bb_first_free > start) ?
-		e4b->bd_info->bb_first_free : start;
+	bitmap = e4b.bd_bitmap;
+	start = (e4b.bd_info->bb_first_free > start) ?
+		e4b.bd_info->bb_first_free : start;
 	ext4_lock_group(sb, group);
 
 	while (start < max) {
@@ -4710,7 +4716,7 @@ ext4_grpblk_t ext4_trim_all_free(struct super_block *sb, struct ext4_buddy *e4b,
 
 		if ((next - start) >= minblocks) {
 			ext4_trim_extent(sb, start,
-					 next - start, group, e4b);
+					 next - start, group, &e4b);
 			count += next - start;
 		}
 		start = next + 1;
@@ -4726,10 +4732,11 @@ ext4_grpblk_t ext4_trim_all_free(struct super_block *sb, struct ext4_buddy *e4b,
 			ext4_lock_group(sb, group);
 		}
 
-		if ((e4b->bd_info->bb_free - count) < minblocks)
+		if ((e4b.bd_info->bb_free - count) < minblocks)
 			break;
 	}
 	ext4_unlock_group(sb, group);
+	ext4_mb_release_desc(&e4b);
 
 	ext4_debug("trimmed %d blocks in the group %d\n",
 		count, group);
@@ -4751,11 +4758,11 @@ ext4_grpblk_t ext4_trim_all_free(struct super_block *sb, struct ext4_buddy *e4b,
  */
 int ext4_trim_fs(struct super_block *sb, struct fstrim_range *range)
 {
-	struct ext4_buddy e4b;
+	struct ext4_group_info *grp;
 	ext4_group_t first_group, last_group;
 	ext4_group_t group, ngroups = ext4_get_groups_count(sb);
 	ext4_grpblk_t cnt = 0, first_block, last_block;
-	uint64_t start, len, minlen, trimmed;
+	uint64_t start, len, minlen, trimmed = 0;
 	ext4_fsblk_t first_data_blk =
 			le32_to_cpu(EXT4_SB(sb)->s_es->s_first_data_block);
 	int ret = 0;
@@ -4763,7 +4770,6 @@ int ext4_trim_fs(struct super_block *sb, struct fstrim_range *range)
 	start = range->start >> sb->s_blocksize_bits;
 	len = range->len >> sb->s_blocksize_bits;
 	minlen = range->minlen >> sb->s_blocksize_bits;
-	trimmed = 0;
 
 	if (unlikely(minlen > EXT4_BLOCKS_PER_GROUP(sb)))
 		return -EINVAL;
@@ -4784,11 +4790,12 @@ int ext4_trim_fs(struct super_block *sb, struct fstrim_range *range)
 		return -EINVAL;
 
 	for (group = first_group; group <= last_group; group++) {
-		ret = ext4_mb_load_buddy(sb, group, &e4b);
-		if (ret) {
-			ext4_error(sb, "Error in loading buddy "
-					"information for %u", group);
-			break;
+		grp = ext4_get_group_info(sb, group);
+		/* We only do this if the grp has never been initialized */
+		if (unlikely(EXT4_MB_GRP_NEED_INIT(grp))) {
+			ret = ext4_mb_init_group(sb, group);
+			if (ret)
+				break;
 		}
 
 		if (len >= EXT4_BLOCKS_PER_GROUP(sb))
@@ -4796,16 +4803,14 @@ int ext4_trim_fs(struct super_block *sb, struct fstrim_range *range)
 		else
 			last_block = first_block + len;
 
-		if (e4b.bd_info->bb_free >= minlen) {
-			cnt = ext4_trim_all_free(sb, &e4b, first_block,
+		if (grp->bb_free >= minlen) {
+			cnt = ext4_trim_all_free(sb, group, first_block,
 						last_block, minlen);
 			if (cnt < 0) {
 				ret = cnt;
-				ext4_mb_release_desc(&e4b);
 				break;
 			}
 		}
-		ext4_mb_release_desc(&e4b);
 		trimmed += cnt;
 		first_block = 0;
 	}
