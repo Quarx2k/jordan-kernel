@@ -455,14 +455,14 @@ static int zbud_decompress(struct page *page, struct zbud_hdr *zh)
 	}
 	ASSERT_SENTINEL(zh, ZBH);
 	BUG_ON(zh->size == 0 || zh->size > zbud_max_buddy_size());
-	to_va = kmap_atomic(page, KM_USER0);
+	to_va = kmap_atomic(page);
 	size = zh->size;
 	from_va = zbud_data(zh, size);
 	ret = zcache_comp_op(ZCACHE_COMPOP_DECOMPRESS, from_va, size,
 				to_va, &out_len);
 	BUG_ON(ret);
 	BUG_ON(out_len != PAGE_SIZE);
-	kunmap_atomic(to_va, KM_USER0);
+	kunmap_atomic(to_va);
 out:
 	spin_unlock(&zbpg->lock);
 	return ret;
@@ -711,13 +711,13 @@ static struct zv_hdr *zv_create(struct xv_pool *xvpool, uint32_t pool_id,
 		goto out;
 	atomic_inc(&zv_curr_dist_counts[chunks]);
 	atomic_inc(&zv_cumul_dist_counts[chunks]);
-	zv = kmap_atomic(page, KM_USER0) + offset;
+	zv = kmap_atomic(page) + offset;
 	zv->index = index;
 	zv->oid = *oid;
 	zv->pool_id = pool_id;
 	SET_SENTINEL(zv, ZVH);
 	memcpy((char *)zv + sizeof(struct zv_hdr), cdata, clen);
-	kunmap_atomic(zv, KM_USER0);
+	kunmap_atomic(zv);
 out:
 	return zv;
 }
@@ -753,10 +753,10 @@ static void zv_decompress(struct page *page, struct zv_hdr *zv)
 	ASSERT_SENTINEL(zv, ZVH);
 	size = xv_get_object_size(zv) - sizeof(*zv);
 	BUG_ON(size == 0);
-	to_va = kmap_atomic(page, KM_USER0);
+	to_va = kmap_atomic(page);
 	ret = zcache_comp_op(ZCACHE_COMPOP_DECOMPRESS, (char *)zv + sizeof(*zv),
 				size, to_va, &clen);
-	kunmap_atomic(to_va, KM_USER0);
+	kunmap_atomic(to_va);
 	BUG_ON(ret);
 	BUG_ON(clen != PAGE_SIZE);
 }
@@ -1330,16 +1330,16 @@ static int zcache_compress(struct page *from, void **out_va, unsigned *out_len)
 	char *from_va;
 
 	BUG_ON(!irqs_disabled());
-	if (unlikely(dmem == NULL))
-		goto out;  /* no buffer or no compressor so can't compress */
+	if (unlikely(dmem == NULL || wmem == NULL))
+		goto out;   /* no buffer, so can't compress */
 	*out_len = PAGE_SIZE << ZCACHE_DSTMEM_ORDER;
-	from_va = kmap_atomic(from, KM_USER0);
+	from_va = kmap_atomic(from);
 	mb();
 	ret = zcache_comp_op(ZCACHE_COMPOP_COMPRESS, from_va, PAGE_SIZE, dmem,
 				out_len);
 	BUG_ON(ret);
 	*out_va = dmem;
-	kunmap_atomic(from_va, KM_USER0);
+	kunmap_atomic(from_va);
 	ret = 1;
 out:
 	return ret;
