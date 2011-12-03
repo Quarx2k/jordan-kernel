@@ -60,7 +60,7 @@ MODULE_DESCRIPTION("OMAP SAM IPC Test Module");
 MODULE_AUTHOR("Motorola");
 MODULE_LICENSE("GPL");
 
-#define DEBUG(args...) printk(args)
+#define DEBUG(args...) /*printk(args)*/
 
 /* #define USB_DATA_LOG */
 
@@ -180,8 +180,8 @@ static int ipc_data_read_buffer(unsigned char *buff, int size)
 static void ipc_data_read_callback(struct urb *urb)
 {
 	unsigned long flags;
-	//DEBUG("\n%s: received %d bytes @ jiffies = %lu\n", __func__,
-	//      urb->actual_length, jiffies);  // Make spam in dmesg
+	DEBUG("\n%s: received %d bytes @ jiffies = %lu\n", __func__,
+	      urb->actual_length, jiffies);
 
 #ifdef USB_DATA_LOG
 	int ret;

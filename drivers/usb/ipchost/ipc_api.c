@@ -49,7 +49,7 @@
 #include <linux/usb_ipc.h>
 #include <linux/ipc_api.h>
 #include <linux/slab.h>
-#define DEBUG(args...) printk(args)
+#define DEBUG(args...) /*printk(args)*/
 #define ENTER_FUNC() DEBUG("Enter %s\n", __func__)
 
 /* IPC API channels, define IPC APIs supported channels */
@@ -163,7 +163,7 @@ void usb_ipc_api_read_callback(USB_IPC_CHANNEL_INDEX ch_index,
 	int size, len, num;
 #endif
 
-//	ENTER_FUNC(); // Make spam in dmesg
+	ENTER_FUNC();
 
 	/* initialize notify callback argument */
 	ipc_notify_status.channel = &usb_ipc_channels[ch_index].ch;

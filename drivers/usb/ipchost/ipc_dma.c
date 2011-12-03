@@ -51,7 +51,7 @@
 
 #if defined(USE_OMAP_SDMA)
 
-#define DEBUG(args...) printk(args)
+#define DEBUG(args...) /*printk(args)*/
 
 struct IPC_DMA_MEMCPY ipc_memcpy_node2buf;
 struct IPC_DMA_MEMCPY ipc_memcpy_buf2node;
