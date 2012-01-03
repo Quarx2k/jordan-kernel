@@ -200,6 +200,10 @@
 #define STS_HW_CONDITIONS	0x21
 #define STS_USB_ID		(1 << 2)	/* Level status of USB ID */
 
+#define BAT_ID_CURRENT_SRC_7	(1000 / 7)	/* for 7 uA current source */
+#define BAT_ID_CURRENT_SRC_22	(1000 / 22)	/* for 22 uA current source */
+#define BAT_ID_RESISTANCE_THRESHOLD 7500
+
 /* To get VBUS input limit from twl6030_usb */
 #if CONFIG_TWL6030_USB
 extern unsigned int twl6030_get_usb_max_power(struct otg_transceiver *x);
@@ -266,6 +270,8 @@ struct twl6030_bci_device_info {
 	struct delayed_work	twl6030_bci_monitor_work;
 	struct delayed_work	twl6030_current_avg_work;
 };
+
+static int bat_id_source;
 
 static BLOCKING_NOTIFIER_HEAD(notifier_list);
 extern u32 wakeup_timer_seconds;
@@ -436,12 +442,9 @@ static int is_battery_present(void)
 {
 	int val;
 
-	/*
-	 * Prevent charging on batteries were id resistor is
-	 * less than 5K.
-	 */
-	val = twl6030_get_gpadc_conversion(0);
-	if (val < 5000)
+	/* convert milivolts to Ohms */
+	val = twl6030_get_gpadc_conversion(0) * bat_id_source;
+	if (val < BAT_ID_RESISTANCE_THRESHOLD)
 		return 0;
 	return 1;
 }
@@ -1873,6 +1876,7 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	u8 controller_stat = 0;
 	u8 chargerusb_ctrl1 = 0;
 	u8 hw_state = 0;
+	u8 reg = 0;
 
 	if (!pdata) {
 		dev_dbg(&pdev->dev, "platform_data not available\n");
@@ -2023,6 +2027,11 @@ static int __devinit twl6030_bci_battery_probe(struct platform_device *pdev)
 	di->voltage_uV = twl6030_get_gpadc_conversion(7);
 	dev_info(&pdev->dev, "Battery Voltage at Bootup is %d mV\n",
 							di->voltage_uV);
+	ret = twl_i2c_read_u8(TWL_MODULE_MADC, &reg, TWL6030_GPADC_CTRL);
+	if (ret)
+		goto bk_batt_failed;
+	bat_id_source = (reg & GPADC_CTRL_ISOURCE_EN) ?
+			BAT_ID_CURRENT_SRC_22 : BAT_ID_CURRENT_SRC_7;
 
 	INIT_WORK(&di->usb_work, twl6030_usb_charger_work);
 	di->nb.notifier_call = twl6030_usb_notifier_call;
