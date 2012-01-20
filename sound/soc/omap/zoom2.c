@@ -245,7 +245,7 @@ static int __init zoom2_soc_init(void)
 {
 	int ret;
 
-	if (!machine_is_omap_zoom2())
+	if (!machine_is_omap_zoom2() && !machine_is_omap_zoom3())
 		return -ENODEV;
 	printk(KERN_INFO "Zoom2 SoC init\n");
 
