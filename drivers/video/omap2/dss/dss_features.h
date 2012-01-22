@@ -20,8 +20,16 @@
 #ifndef __OMAP2_DSS_FEATURES_H
 #define __OMAP2_DSS_FEATURES_H
 
+#ifdef CONFIG_ARCH_OMAP4
 #define MAX_DSS_MANAGERS	3
 #define MAX_DSS_OVERLAYS	4
+#endif
+
+#ifdef CONFIG_ARCH_OMAP3
+#define MAX_DSS_MANAGERS	2
+#define MAX_DSS_OVERLAYS	3
+#endif
+
 #define MAX_DSS_LCD_MANAGERS	2
 #define MAX_NUM_DSI		2
 
