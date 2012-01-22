@@ -637,11 +637,14 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	if (dev == NULL)
 		return -EINVAL;
 
-	r = omap_i2c_hwspinlock_lock(dev);
-	/* To-Do: if we are unable to acquire the lock, we must
-	try to recover somehow */
-	if (r != 0)
-		return r;
+	/* Added to avoid I2C read/write error */
+	if (!cpu_is_omap34xx()) {
+		r = omap_i2c_hwspinlock_lock(dev);
+		/* To-Do: if we are unable to acquire the lock, we must
+		try to recover somehow */
+		if (r != 0)
+			return r;
+	}
 
 	/* We have the bus, enable IRQ */
 	enable_irq(dev->irq);
@@ -678,7 +681,9 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	omap_i2c_wait_for_bb(dev);
 out:
 	omap_i2c_idle(dev);
-	omap_i2c_hwspinlock_unlock(dev);
+	/* Added to avoid I2C read/write error */
+	if (!cpu_is_omap34xx())
+		omap_i2c_hwspinlock_unlock(dev);
 	disable_irq(dev->irq);
 	return r;
 }
