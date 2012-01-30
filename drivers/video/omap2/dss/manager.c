@@ -1764,7 +1764,7 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 
 	spin_lock_irqsave(&dss_cache.lock, flags);
 
-	if (!mgr->device || mgr->device->state != OMAP_DSS_DISPLAY_ACTIVE) {
+	if (!mgr->device) {
 		pr_info_ratelimited("cannot apply mgr(%s) on inactive device\n",
 								mgr->name);
 		r = -ENODEV;
