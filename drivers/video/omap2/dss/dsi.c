@@ -1,4 +1,4 @@
-/*
+*
  * linux/drivers/video/omap2/dss/dsi.c
  *
  * Copyright (C) 2009 Nokia Corporation
@@ -3061,6 +3061,9 @@ err1:
 err0:
 	return r;
 }
+
+
+
 EXPORT_SYMBOL(dsi_vc_send_bta_sync);
 
 static inline void dsi_vc_write_long_header(struct platform_device *dsidev,
@@ -4784,18 +4787,6 @@ int omapdss_dsi_display_enable(struct omap_dss_device *dssdev)
 
 	if(!dssdev->skip_init)
 		dsi_enable_pll_clock(dsidev, 1);
-
-	/* Soft reset */
-#ifndef CONFIG_FB_OMAP_BOOTLOADER_INIT
-	REG_FLD_MOD(dsidev, DSI_SYSCONFIG, 1, 1, 1);
-	_dsi_wait_reset(dsidev);
-#else
-	msleep(1); /* short delay for clk to be stable */
-	if (!dssdev->skip_init)
-		dsi_vc_enable(dsidev, 0, 0);
-	dsi_vc_enable(dsidev, 1, 0);
-#endif
-
 
 	_dsi_initialize_irq(dsidev);
 
