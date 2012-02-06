@@ -34,7 +34,7 @@
 
 #define MAILBOX_IRQ_NEWMSG(m)		(1 << (2 * (m)))
 #define MAILBOX_IRQ_NOTFULL(m)		(1 << (2 * (m) + 1))
-#define MAILBOX_SOFTRESET		1
+#define MAILBOX_SOFTRESET		    (1 << 1)
 
 #define MBOX_NUM_USER                  2
 #define OMAP4_MBOX_NUM_USER            3
