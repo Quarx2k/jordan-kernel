@@ -12,7 +12,7 @@ config ION_TEGRA
 
 config ION_OMAP
 	tristate "Ion for OMAP"
-	depends on ARCH_OMAP4 && ION && TI_TILER
+	depends on (ARCH_OMAP3 || ARCH_OMAP4) && ION
 	help
 	  Choose this option if you wish to use ion on OMAP4.
 
