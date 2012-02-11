@@ -1357,8 +1357,11 @@ void dispc_setup_plane_fifo(enum omap_plane plane, u32 low, u32 high)
 				hi_start, hi_end),
 			low, high);
 
-	/* preload to high threshold to avoid FIFO underflow */
-	dispc_write_reg(DISPC_OVL_PRELOAD(plane), min(high, 0xfffu));
+	/* To avoid SYNC LOST error on omap3 */
+	if (cpu_is_omap44xx()) {
+		/* preload to high threshold to avoid FIFO underflow */
+		dispc_write_reg(DISPC_OVL_PRELOAD(plane), min(high, 0xfffu));
+	}
 
 	dispc_write_reg(DISPC_OVL_FIFO_THRESHOLD(plane),
 			FLD_VAL(high, hi_start, hi_end) |
@@ -2239,8 +2242,12 @@ int dispc_setup_plane(enum omap_plane plane,
 	s32 pix_inc;
 	u16 frame_height = height;
 	unsigned int field_offset = 0;
-	int pixpg = (color_mode &
-		(OMAP_DSS_COLOR_YUV2 | OMAP_DSS_COLOR_UYVY)) ? 2 : 1;
+	int pixpg;
+	if (cpu_is_omap44xx()) {
+		pixpg = (color_mode &
+			(OMAP_DSS_COLOR_YUV2 | OMAP_DSS_COLOR_UYVY)) ? 2 : 1;
+	}
+
 	unsigned long tiler_width, tiler_height;
 	u32 fifo_high, fifo_low;
 
@@ -2268,6 +2275,13 @@ int dispc_setup_plane(enum omap_plane plane,
 				"out_height %d\n",
 				height, pos_y, out_height);
 	}
+	if (cpu_is_omap44xx()) {
+		pixpg = (color_mode &
+		(OMAP_DSS_COLOR_YUV2 | OMAP_DSS_COLOR_UYVY)) ? 2 : 1;
+	} else {
+		pixpg = 1;
+	}
+
 
 	if (!dss_feat_color_mode_supported(plane, color_mode))
 		return -EINVAL;
