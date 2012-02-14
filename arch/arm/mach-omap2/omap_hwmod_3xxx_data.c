@@ -89,6 +89,7 @@ static struct omap_hwmod omap34xx_usb_host_hs_hwmod;
 static struct omap_hwmod omap34xx_usbhs_ohci_hwmod;
 static struct omap_hwmod omap34xx_usbhs_ehci_hwmod;
 static struct omap_hwmod omap34xx_usb_tll_hs_hwmod;
+static struct omap_hwmod omap3xxx_gpu_hwmod;
 
 /* L3 -> L4_CORE interface */
 static struct omap_hwmod_ocp_if omap3xxx_l3_main__l4_core = {
@@ -143,6 +144,14 @@ static struct omap_hwmod_ocp_if omap3xxx_dss__l3 = {
 		}
 	},
 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+};
+
+/* GPU -> l3_main */
+static struct omap_hwmod_ocp_if omap3xxx_gpu__l3_main = {
+	.master         = &omap3xxx_gpu_hwmod,
+	.slave          = &omap3xxx_l3_main_hwmod,
+	.clk		= "core_l3_ick",
+	.user           = OCP_USER_MPU | OCP_USER_SDMA,
 };
 
 /* Master interfaces on the L3 interconnect */
@@ -1305,6 +1314,74 @@ static struct omap_hwmod omap3xxx_wd_timer2_hwmod = {
 	 */
 	.flags		= HWMOD_SWSUP_SIDLE,
 };
+
+/*
+ * 'gpu' class
+ * 2d/3d graphics accelerator
+ */
+
+static struct omap_hwmod_class_sysconfig omap3xxx_gpu_sysc = {
+	.rev_offs       = 0xfe00,
+	.sysc_offs      = 0xfe10,
+	.sysc_flags     = (SYSC_HAS_MIDLEMODE | SYSC_HAS_SIDLEMODE),
+	.idlemodes      = (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
+				MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART),
+	.sysc_fields    = &omap_hwmod_sysc_type2,
+};
+
+static struct omap_hwmod_class omap3xxx_gpu_hwmod_class = {
+	.name = "gpu",
+	.sysc = &omap3xxx_gpu_sysc,
+};
+
+
+/* gpu */
+static struct omap_hwmod_irq_info omap3xxx_gpu_irqs[] = {
+	{ .irq = INT_24XX_GPU_IRQ },
+};
+
+/* gpu master ports */
+static struct omap_hwmod_ocp_if *omap3xxx_gpu_masters[] = {
+	&omap3xxx_gpu__l3_main,
+};
+
+static struct omap_hwmod_addr_space omap3xxx_gpu_addrs[] = {
+	{
+		.pa_start       = 0x50000000,
+		.pa_end         = 0x5000ffff,
+		.flags          = ADDR_TYPE_RT
+	},
+};
+
+/* l3_main -> gpu */
+static struct omap_hwmod_ocp_if omap3xxx_l3_main__gpu = {
+	.master         = &omap3xxx_l3_main_hwmod,
+	.slave          = &omap3xxx_gpu_hwmod,
+	.clk            = "sgx_ick",
+	.addr           = omap3xxx_gpu_addrs,
+	.addr_cnt       = ARRAY_SIZE(omap3xxx_gpu_addrs),
+	.user           = OCP_USER_MPU | OCP_USER_SDMA,
+};
+
+/* gpu slave ports */
+static struct omap_hwmod_ocp_if *omap3xxx_gpu_slaves[] = {
+	&omap3xxx_l3_main__gpu,
+};
+
+static struct omap_hwmod omap3xxx_gpu_hwmod = {
+	.name           = "gpu",
+	.class          = &omap3xxx_gpu_hwmod_class,
+	.mpu_irqs       = omap3xxx_gpu_irqs,
+	.mpu_irqs_cnt   = ARRAY_SIZE(omap3xxx_gpu_irqs),
+	.flags          = HWMOD_NO_IDLEST | HWMOD_NO_OCP_AUTOIDLE,
+	.main_clk       = "sgx_fck",
+	.slaves         = omap3xxx_gpu_slaves,
+	.slaves_cnt     = ARRAY_SIZE(omap3xxx_gpu_slaves),
+	.masters        = omap3xxx_gpu_masters,
+	.masters_cnt    = ARRAY_SIZE(omap3xxx_gpu_masters),
+	.omap_chip      = OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
+};
+
 
 /* UART common */
 
@@ -3967,6 +4044,9 @@ static __initdata struct omap_hwmod *omap3xxx_hwmods[] = {
 	&omap3xxx_gpio4_hwmod,
 	&omap3xxx_gpio5_hwmod,
 	&omap3xxx_gpio6_hwmod,
+
+	/* gpu class */
+	&omap3xxx_gpu_hwmod,
 
 	/* dma_system class*/
 	&omap3xxx_dma_system_hwmod,
