@@ -32,20 +32,20 @@ void set_close_on_exec(unsigned int fd, int flag)
 	spin_lock(&files->file_lock);
 	fdt = files_fdtable(files);
 	if (flag)
-		__set_close_on_exec(fd, fdt);
+		FD_SET(fd, fdt->close_on_exec);
 	else
-		__clear_close_on_exec(fd, fdt);
+		FD_CLR(fd, fdt->close_on_exec);
 	spin_unlock(&files->file_lock);
 }
 
-static bool get_close_on_exec(unsigned int fd)
+static int get_close_on_exec(unsigned int fd)
 {
 	struct files_struct *files = current->files;
 	struct fdtable *fdt;
-	bool res;
+	int res;
 	rcu_read_lock();
 	fdt = files_fdtable(files);
-	res = close_on_exec(fd, fdt);
+	res = FD_ISSET(fd, fdt->close_on_exec);
 	rcu_read_unlock();
 	return res;
 }
@@ -90,15 +90,15 @@ SYSCALL_DEFINE3(dup3, unsigned int, oldfd, unsigned int, newfd, int, flags)
 	err = -EBUSY;
 	fdt = files_fdtable(files);
 	tofree = fdt->fd[newfd];
-	if (!tofree && fd_is_open(newfd, fdt))
+	if (!tofree && FD_ISSET(newfd, fdt->open_fds))
 		goto out_unlock;
 	get_file(file);
 	rcu_assign_pointer(fdt->fd[newfd], file);
-	__set_open_fd(newfd, fdt);
+	FD_SET(newfd, fdt->open_fds);
 	if (flags & O_CLOEXEC)
-		__set_close_on_exec(newfd, fdt);
+		FD_SET(newfd, fdt->close_on_exec);
 	else
-		__clear_close_on_exec(newfd, fdt);
+		FD_CLR(newfd, fdt->close_on_exec);
 	spin_unlock(&files->file_lock);
 
 	if (tofree)

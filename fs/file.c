@@ -366,7 +366,7 @@ struct files_struct *dup_fd(struct files_struct *oldf, int *errorp)
 			 * is partway through open().  So make sure that this
 			 * fd is available to the new process.
 			 */
-			__clear_open_fd(open_files - i, new_fdt);
+			FD_CLR(open_files - i, new_fdt->open_fds);
 		}
 		rcu_assign_pointer(*new_fds++, f);
 	}
@@ -460,11 +460,11 @@ repeat:
 	if (start <= files->next_fd)
 		files->next_fd = fd + 1;
 
-	__set_open_fd(fd, fdt);
+	FD_SET(fd, fdt->open_fds);
 	if (flags & O_CLOEXEC)
-		__set_close_on_exec(fd, fdt);
+		FD_SET(fd, fdt->close_on_exec);
 	else
-		__clear_close_on_exec(fd, fdt);
+		FD_CLR(fd, fdt->close_on_exec);
 	error = fd;
 #if 1
 	/* Sanity check */
