@@ -112,6 +112,7 @@ int handle_hibernation_from_dsp(struct bridge_dev_context *dev_context)
 
 		/* Turn off DSP Peripheral clocks and DSP Load monitor timer */
 		status = dsp_clock_disable_all(dev_context->dsp_per_clks);
+		dsp_clk_disable(DSP_CLK_IVA2);
 
 		/* Disable wdt on hibernation. */
 		dsp_wdt_enable(false);
@@ -232,6 +233,7 @@ int sleep_dsp(struct bridge_dev_context *dev_context, u32 dw_cmd,
 
 		/* Turn off DSP Peripheral clocks */
 		status = dsp_clock_disable_all(dev_context->dsp_per_clks);
+		dsp_clk_disable(DSP_CLK_IVA2);
 		if (status)
 			return status;
 #ifdef CONFIG_TIDSPBRIDGE_DVFS

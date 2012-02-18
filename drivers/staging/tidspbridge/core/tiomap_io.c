@@ -413,6 +413,7 @@ int sm_interrupt_dsp(struct bridge_dev_context *dev_context, u16 mb_val)
 #endif
 		/* Restart the peripheral clocks */
 		dsp_clock_enable_all(dev_context->dsp_per_clks);
+		dsp_clk_enable(DSP_CLK_IVA2);
 		dsp_wdt_enable(true);
 
 		/*
@@ -443,6 +444,7 @@ int sm_interrupt_dsp(struct bridge_dev_context *dev_context, u16 mb_val)
 	} else if (dev_context->brd_state == BRD_RETENTION) {
 		/* Restart the peripheral clocks */
 		dsp_clock_enable_all(dev_context->dsp_per_clks);
+		dsp_clk_enable(DSP_CLK_IVA2);
 	}
 
 	status = omap_mbox_msg_send(dev_context->mbox, mb_val);
