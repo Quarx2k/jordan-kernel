@@ -1710,7 +1710,7 @@ int dsi_pll_init(struct platform_device *dsidev, bool enable_hsclk,
 		 * DSI complex IO should be gated" and that the setting 3
 		 * should not be used.
 		 */
-		if (enable_hsdiv && !cpu_is_omap34xx())
+		if (enable_hsdiv)
 			pwstate = DSI_PLL_POWER_ON_DIV;
 		else
 			pwstate = DSI_PLL_POWER_OFF;
