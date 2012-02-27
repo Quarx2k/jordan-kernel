@@ -749,6 +749,71 @@ static inline void omap34xx_mcbsp_free(struct omap_mcbsp *mcbsp)
 static inline void omap34xx_mcbsp_free(struct omap_mcbsp *mcbsp) {}
 #endif
 
+#ifdef CONFIG_ARCH_OMAP3
+/*
+ * OMAP36xx i539 errata work around.
+ */
+static struct clk *per_device_fclk;
+
+static int __init omap36xx_i539_errata_init(void)
+{
+	/*
+	 * Pick a device managed by the PER domain that uses the 32KHz clock
+	 * as its functional clock to minimize impact on power consumption.
+	 */
+	per_device_fclk = NULL;
+	if (cpu_is_omap3630()) {
+		per_device_fclk = omap_clk_get_by_name("gpio2_dbck");
+		if (per_device_fclk == NULL) {
+			printk(KERN_ERR "%s: Unable to find GPIO2 functional "
+				"clock. OMAP36xx i539 errata work around is "
+				"not enabled.\n",
+				__func__);
+			return -ENODEV;
+		}
+	}
+
+	return 0;
+}
+
+static void omap36xx_i539_errata_enable(int mcbsp_id)
+{
+	if (per_device_fclk) {
+		/* Work around is applicable only to McBSP modules in PER */
+		switch (mcbsp_id) {
+		case OMAP_MCBSP2:
+		case OMAP_MCBSP3:
+		case OMAP_MCBSP4:
+			clk_enable(per_device_fclk);
+			break;
+
+		default:
+			break;
+		}
+	}
+}
+
+static void omap36xx_i539_errata_disable(int mcbsp_id)
+{
+	if (per_device_fclk) {
+		switch (mcbsp_id) {
+		case OMAP_MCBSP2:
+		case OMAP_MCBSP3:
+		case OMAP_MCBSP4:
+			clk_disable(per_device_fclk);
+			break;
+
+		default:
+			break;
+		}
+	}
+}
+#else
+static inline int omap3_i539_errata_init(void) { return 0; }
+static inline void omap3_i539_errata_enable(int mcbsp_id)  {}
+static inline void omap3_i539_errata_disable(int mcbsp_id) {}
+#endif
+
 /*
  * We can choose between IRQ based or polled IO.
  * This needs to be called before omap_mcbsp_request().
@@ -814,6 +879,7 @@ int omap_mcbsp_request(unsigned int id)
 
 	pm_runtime_get_sync(mcbsp->dev);
 
+	omap36xx_i539_errata_enable(id);
 	/*
 	 * Make sure that transmitter, receiver and sample-rate generator are
 	 * not running before activating IRQs.
@@ -886,6 +952,7 @@ void omap_mcbsp_free(unsigned int id)
 
 	/* Do procedure specific to omap34xx arch, if applicable */
 	omap34xx_mcbsp_free(mcbsp);
+	omap36xx_i539_errata_disable(id);
 
 	pm_runtime_put_sync(mcbsp->dev);
 
@@ -1961,6 +2028,7 @@ static struct platform_driver omap_mcbsp_driver = {
 
 int __init omap_mcbsp_init(void)
 {
+	omap36xx_i539_errata_init();
 	/* Register the McBSP driver */
 	return platform_driver_register(&omap_mcbsp_driver);
 }
