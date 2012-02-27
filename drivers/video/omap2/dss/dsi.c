@@ -1702,10 +1702,19 @@ int dsi_pll_init(struct platform_device *dsidev, bool enable_hsclk,
 		pwstate = DSI_PLL_POWER_ON_ALL;
 	else if (enable_hsclk)
 		pwstate = DSI_PLL_POWER_ON_HSCLK;
-	else if (enable_hsdiv)
-		pwstate = DSI_PLL_POWER_ON_DIV;
-	else
-		pwstate = DSI_PLL_POWER_OFF;
+	else {
+		/*
+		 * The difference between 2 and 3 is that 3 also has "no clock
+		 * output to the DSI complex I/O".  However, errata i650 says,
+		 * "This not the normal behavior, only the clock supplied to
+		 * DSI complex IO should be gated" and that the setting 3
+		 * should not be used.
+		 */
+		if (enable_hsdiv && !cpu_is_omap34xx())
+			pwstate = DSI_PLL_POWER_ON_DIV;
+		else
+			pwstate = DSI_PLL_POWER_OFF;
+	}
 
 	r = dsi_pll_power(dsidev, pwstate);
 
