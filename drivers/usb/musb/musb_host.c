@@ -1714,7 +1714,8 @@ void musb_host_rx(struct musb *musb, u8 epnum)
 			val |= MUSB_RXCSR_DMAENAB;
 
 			/* autoclear shouldn't be set in high bandwidth */
-			if (qh->hb_mult == 1)
+			/* Also don't use for OMAP3 per errata i426 */
+			if (!cpu_is_omap34xx() && qh->hb_mult == 1)
 				val |= MUSB_RXCSR_AUTOCLEAR;
 
 			musb_writew(epio, MUSB_RXCSR,
