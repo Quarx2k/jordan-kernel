@@ -276,6 +276,7 @@ struct omap_vdd_dep_info {
 struct omap_vdd_info {
 	struct omap_volt_data *volt_data;
 	struct omap_vdd_dep_info *dep_vdd_info;
+	struct voltagedomain voltdm;
 };
 
 void omap_voltage_get_volttable(struct voltagedomain *voltdm,
@@ -289,6 +290,7 @@ int omap_voltage_register_pmic(struct voltagedomain *voltdm,
 void omap_change_voltscale_method(struct voltagedomain *voltdm,
 		int voltscale_method);
 int omap_voltage_late_init(void);
+void set_dpll3_volt_freq(bool dpll3_restore);
 #else
 static inline int omap_voltage_register_pmic(struct voltagedomain *voltdm,
 					     struct omap_voltdm_pmic *pmic)

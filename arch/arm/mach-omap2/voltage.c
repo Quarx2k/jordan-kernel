@@ -27,13 +27,18 @@
 #include <linux/slab.h>
 
 #include <plat/common.h>
+#include <plat/prcm.h>
 
+#include "cm.h"
+#include "cm2xxx_3xxx.h"
+#include "cm-regbits-34xx.h"
 #include "prm-regbits-34xx.h"
 #include "prm-regbits-44xx.h"
 #include "prm44xx.h"
 #include "prcm44xx.h"
 #include "prminst44xx.h"
 #include "control.h"
+#include "clock3xxx.h"
 
 #include "voltage.h"
 #include "powerdomain.h"
@@ -660,4 +665,64 @@ void voltdm_init(struct voltagedomain **voltdms)
 		for (v = voltdms; *v; v++)
 			_voltdm_register(*v);
 	}
+}
+
+#define OPP50RATE 100000000
+void set_dpll3_volt_freq(bool dpll3_restore)
+{
+	struct clk *dpll3_m2_ck = clk_get(NULL, "dpll3_m2_ck");
+	struct voltagedomain *voltdm = _voltdm_lookup("core");
+	struct omap_vdd_info *vdd;
+	int l3_div;
+	static struct omap_volt_data *vdd2_save_vdata;
+	static long dpll3_save_rate;
+
+	if (!dpll3_m2_ck || !voltdm)
+		return;
+
+	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
+
+	if (!dpll3_restore) {
+		/* Step 1, reduce DPLL3 to OPP50 */
+		dpll3_save_rate = clk_get_rate(dpll3_m2_ck);
+		l3_div = omap2_cm_read_mod_reg(CORE_MOD, CM_CLKSEL) &
+					OMAP3430_CLKSEL_L3_MASK;
+		/*
+		 * Using the direct call to the clock's set rate routine
+		 * rather than the clk_set_rate() infrastructure.  That is
+		 * because we don't want the normal notifications of clock
+		 * change sent out just because we are changing it for this
+		 * errata work around.  The old clock rate will be back as
+		 * soon as core (and anyone we would notify) turn back on.
+		 */
+		/* Is DPLL3 already at OPP50? */
+		if (dpll3_save_rate != OPP50RATE * l3_div)
+			omap3_core_dpll_m2_set_rate(dpll3_m2_ck,
+						OPP50RATE * l3_div);
+		else
+			dpll3_save_rate = 0;
+
+		/* Step 2, set VDD2 to OPP100 */
+		vdd2_save_vdata = omap_voltage_get_curr_vdata(voltdm);
+		/* vdd2 already at OPP100 ? */
+		if (vdd2_save_vdata->volt_nominal !=
+					vdd->volt_data[1].volt_nominal)
+			omap_vp_forceupdate_scale(voltdm, &(vdd->volt_data[1]));
+		else
+			vdd2_save_vdata = NULL;
+	} else {
+		/* Step 1, return VDD2 back to its previous value */
+		if (vdd2_save_vdata) {
+			omap_vp_forceupdate_scale(voltdm, vdd2_save_vdata);
+			vdd2_save_vdata = NULL;
+		}
+
+		/* Step 2, return DPLL3 back to its previous value */
+		if (dpll3_save_rate) {
+			omap3_core_dpll_m2_set_rate(dpll3_m2_ck,
+							dpll3_save_rate);
+			dpll3_save_rate = 0;
+		}
+	}
+
 }
