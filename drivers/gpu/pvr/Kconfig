@@ -10,8 +10,18 @@ config PVR_SGX
 	  this will generate two modules, called pvrsrvkm and omaplfb.
 
 choice
-	prompt "PowerVR SGX core"
-	depends on PVR_SGX
+	prompt "PowerVR SGX530 core"
+	depends on PVR_SGX && ARCH_OMAP3
+	default PVR_SGXCORE_530
+
+config PVR_SGXCORE_530
+	bool "SGX 530"
+
+endchoice
+
+choice
+	prompt "PowerVR SGX540 core"
+	depends on PVR_SGX && ARCH_OMAP4
 	default PVR_SGXCORE_540
 
 config PVR_SGXCORE_540

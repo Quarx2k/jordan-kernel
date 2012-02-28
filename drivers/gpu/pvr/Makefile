@@ -1,6 +1,6 @@
 ccflags-y = -DLINUX -D__linux__ -DANDROID -DPVR_BUILD_DIR="\"omap4430_android\""
-ccflags-y += -Idrivers/gpu/pvr -Idrivers/gpu/pvr/omap4 -Idrivers/video/omap2
-
+ccflags-$(CONFIG_PVR_SGXCORE_540) += -Idrivers/gpu/pvr -Idrivers/gpu/pvr/omap4 -Idrivers/video/omap2
+ccflags-$(CONFIG_PVR_SGXCORE_530) += -Idrivers/gpu/pvr -Idrivers/gpu/pvr/omap3 -Idrivers/video/omap2
 ccflags-y += \
 	-DSUPPORT_SGX \
 	-DTRANSFER_QUEUE \
@@ -27,6 +27,10 @@ ccflags-y += \
 ccflags-$(CONFIG_PVR_SGXCORE_540) += \
 	-DSGX540 -DSUPPORT_SGX540 \
 	-DSGX_CORE_REV=120
+
+ccflags-$(CONFIG_PVR_SGXCORE_530) += \
+	-DSGX530 -DSUPPORT_SGX530 \
+	-DSGX_CORE_REV=125
 
 ccflags-$(CONFIG_PVR_BUILD_RELEASE) += \
 	-DPVR_BUILD_TYPE="\"release\"" -DRELEASE
@@ -90,8 +94,6 @@ pvrsrvkm-y := \
 	lists.o \
 	refcount.o \
 	sysfs.o \
-	omap4/sysconfig.o \
-	omap4/sysutils.o \
 	sgx/bridged_sgx_bridge.o \
 	sgx/sgxinit.o \
 	sgx/sgxpower.o \
@@ -101,6 +103,12 @@ pvrsrvkm-y := \
 	sgx/sgxtransfer.o \
 	sgx/mmu.o \
 	sgx/pb.o
+
+pvrsrvkm-$(CONFIG_PVR_SGXCORE_530) += omap3/sysconfig.o
+pvrsrvkm-$(CONFIG_PVR_SGXCORE_530) += omap3/sysutils.o
+
+pvrsrvkm-$(CONFIG_PVR_SGXCORE_540) += omap4/sysconfig.o
+pvrsrvkm-$(CONFIG_PVR_SGXCORE_540) += omap4/sysutils.o
 
 pvrsrvkm-$(CONFIG_ION_OMAP) += ion.o
 
