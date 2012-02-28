@@ -162,4 +162,6 @@ struct musb_dma_controller {
 	u8				channel_count;
 	u8				used_channels;
 	u8				irq;
+	u8				tx_active;
+	u8				rx_active;
 };

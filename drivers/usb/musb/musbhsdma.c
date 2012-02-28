@@ -144,6 +144,11 @@ static void configure_channel(struct dma_channel *channel,
 				? (1 << MUSB_HSDMA_TRANSMIT_SHIFT)
 				: 0);
 
+	if (musb_channel->transmit)
+		controller->tx_active |= (1 << bchannel);
+	else
+		controller->rx_active |= (1 << bchannel);
+
 	/* address/count */
 	musb_write_hsdma_addr(mbase, bchannel, dma_addr);
 	musb_write_hsdma_count(mbase, bchannel, len);
@@ -189,6 +194,20 @@ static int dma_channel_program(struct dma_channel *channel,
 	 */
 	if ((musb->hwvers >= MUSB_HWVERS_1800) && (dma_addr % 4))
 		return false;
+
+	/* In version 1.4 and 1.8, if two DMA channels are simultaneously
+	 * enabled in opposite directions, there is a chance that
+	 * the DMA controller will hang. However, it is safe to
+	 * have multiple DMA channels enabled in the same direction
+	 * at the same time.
+	 */
+	if (musb->hwvers == MUSB_HWVERS_1400 ||
+		musb->hwvers == MUSB_HWVERS_1800) {
+		if (musb_channel->transmit && controller->rx_active)
+			return false;
+		else if (!musb_channel->transmit && controller->tx_active)
+			return false;
+	}
 
 	channel->actual_len = 0;
 	musb_channel->start_addr = dma_addr;
@@ -241,6 +260,11 @@ static int dma_channel_abort(struct dma_channel *channel)
 		musb_write_hsdma_addr(mbase, bchannel, 0);
 		musb_write_hsdma_count(mbase, bchannel, 0);
 		channel->status = MUSB_DMA_STATUS_FREE;
+
+		if (musb_channel->transmit)
+			musb_channel->controller->tx_active &= ~(1 << bchannel);
+		else
+			musb_channel->controller->rx_active &= ~(1 << bchannel);
 	}
 
 	return 0;
@@ -327,6 +351,13 @@ static irqreturn_t dma_controller_irq(int irq, void *private_data)
 				devctl = musb_readb(mbase, MUSB_DEVCTL);
 
 				channel->status = MUSB_DMA_STATUS_FREE;
+
+				if (musb_channel->transmit)
+					controller->tx_active &=
+							~(1 << bchannel);
+				else
+					controller->rx_active &=
+							~(1 << bchannel);
 
 				/* completed */
 				if ((devctl & MUSB_DEVCTL_HM)

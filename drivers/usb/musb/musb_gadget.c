@@ -765,6 +765,26 @@ static void rxstate(struct musb *musb, struct musb_request *req)
 
 				if (use_dma)
 					return;
+				else {
+					if (req->mapped) {
+						/* Unmap the buffer to use PIO*/
+					    dma_unmap_single(musb->controller,
+							req->request.dma,
+							req->request.length,
+							req->tx
+							 ? DMA_TO_DEVICE
+							: DMA_FROM_DEVICE);
+
+					    req->request.dma = DMA_ADDR_INVALID;
+					    req->mapped = 0;
+					}
+
+					/* Need to clear DMAENAB for the
+					 * backup PIO mode transfer to work
+					 */
+					csr &= ~MUSB_RXCSR_DMAENAB;
+					musb_writew(epio, MUSB_RXCSR, csr);
+				}
 			}
 #elif defined(CONFIG_USB_UX500_DMA)
 			if ((is_buffer_mapped(req)) &&
