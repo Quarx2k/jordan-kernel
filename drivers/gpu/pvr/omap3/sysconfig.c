@@ -24,6 +24,13 @@
  *
  ******************************************************************************/
 
+#include <linux/debugfs.h>
+#include <linux/hrtimer.h>
+#include <linux/ktime.h>
+#include <linux/seq_file.h>
+#include <linux/vmalloc.h>
+#include <linux/workqueue.h>
+
 #include "services_headers.h"
 #include "kerneldisplay.h"
 #include "oemfuncs.h"
@@ -361,15 +368,6 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 		return eError;
 	}
 
-	TimerRegPhysBase.uiAddr = SYS_OMAP3430_GP11TIMER_REGS_SYS_PHYS_BASE;
-	gpsSysData->pvSOCTimerRegisterKM = IMG_NULL;
-	gpsSysData->hSOCTimerRegisterOSMemHandle = 0;
-	OSReservePhys(TimerRegPhysBase,
-				  4,
-				  PVRSRV_HAP_MULTI_PROCESS|PVRSRV_HAP_UNCACHED,
-				  (IMG_VOID **)&gpsSysData->pvSOCTimerRegisterKM,
-				  &gpsSysData->hSOCTimerRegisterOSMemHandle);
-
 #if !defined(SGX_DYNAMIC_TIMING_INFO)
 
 	psTimingInfo = &gsSGXDeviceMap.sTimingInfo;
@@ -516,6 +514,24 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 
 	DisableSGXClocks(gpsSysData);
 #endif
+
+#if !defined(PVR_NO_OMAP_TIMER)
+#if defined(PVR_OMAP_TIMER_BASE_IN_SYS_SPEC_DATA)
+	TimerRegPhysBase = gsSysSpecificData.sTimerRegPhysBase;
+#else
+	TimerRegPhysBase.uiAddr = SYS_OMAP3430_GP11TIMER_REGS_SYS_PHYS_BASE;
+#endif
+	gpsSysData->pvSOCTimerRegisterKM = IMG_NULL;
+	gpsSysData->hSOCTimerRegisterOSMemHandle = 0;
+	if (TimerRegPhysBase.uiAddr != 0) {
+		OSReservePhys(TimerRegPhysBase,
+				4,
+				PVRSRV_HAP_MULTI_PROCESS|PVRSRV_HAP_UNCACHED,
+				(IMG_VOID **)&gpsSysData->pvSOCTimerRegisterKM,
+				&gpsSysData->hSOCTimerRegisterOSMemHandle);
+	}
+#endif
+
 
 	return PVRSRV_OK;
 }

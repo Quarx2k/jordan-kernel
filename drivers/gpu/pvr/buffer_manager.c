@@ -303,6 +303,8 @@ WrapMemory (BM_HEAP *psBMHeap,
 			pMapping->eCpuMemoryOrigin = hm_wrapped_virtaddr;
 			pMapping->CpuPAddr = SysSysPAddrToCpuPAddr(psAddr[0]);
 
+			pMapping->psSysAddr = psAddr;
+
 			if(OSRegisterMem(pMapping->CpuPAddr,
 							pMapping->CpuVAddr,
 							pMapping->uSize,
