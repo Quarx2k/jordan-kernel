@@ -345,6 +345,12 @@ int dsscomp_gralloc_queue(struct dsscomp_setup_dispc_data *d,
 		if (!pas[i] || !oi->cfg.enabled)
 			goto skip_map1d;
 
+		/* framebuffer is marked with uv = 0 and is contiguous */
+		if (cpu_is_omap34xx()) {
+			oi->ba = pas[i]->mem[0] + (oi->ba & ~PAGE_MASK);
+			goto skip_map1d;
+		}
+
 		if (!slot) {
 			if (down_timeout(&free_slots_sem,
 						msecs_to_jiffies(100))) {
@@ -561,7 +567,7 @@ void dsscomp_gralloc_init(struct dsscomp_dev *cdev_)
 #endif
 	}
 
-	if (!free_slots.next) {
+	if (!free_slots.next && !cpu_is_omap34xx()) {
 		INIT_LIST_HEAD(&free_slots);
 		for (i = 0; i < NUM_TILER1D_SLOTS; i++) {
 			u32 phys;
