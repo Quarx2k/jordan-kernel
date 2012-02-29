@@ -36,16 +36,25 @@
 
 #define PVRVERSION_FAMILY           "sgxddk"
 #define PVRVERSION_BRANCHNAME       "1.8"
+#if defined(CONFIG_ARCH_OMAP3)
+#define PVRVERSION_BUILD             550175
+#elif defined(CONFIG_ARCH_OMAP4)
 #define PVRVERSION_BUILD             785978
+#endif
 #define PVRVERSION_BSCONTROL        "CustomerGoogle_Android_ogles1_ogles2_GPL"
 
 #define PVRVERSION_STRING           "CustomerGoogle_Android_ogles1_ogles2_GPL sgxddk 18 1.8@" PVR_STR2(PVRVERSION_BUILD)
 #define PVRVERSION_STRING_SHORT     "1.8@" PVR_STR2(PVRVERSION_BUILD)
 
 #define COPYRIGHT_TXT               "Copyright (c) Imagination Technologies Ltd. All Rights Reserved."
-
+#if defined(CONFIG_ARCH_OMAP3)
+#define PVRVERSION_BUILD_HI          55
+#define PVRVERSION_BUILD_LO          175
+#elif defined(CONFIG_ARCH_OMAP4)
 #define PVRVERSION_BUILD_HI          78
 #define PVRVERSION_BUILD_LO          5978
+#endif
+
 #define PVRVERSION_STRING_NUMERIC    PVR_STR2(PVRVERSION_MAJ) "." PVR_STR2(PVRVERSION_MIN) "." PVR_STR2(PVRVERSION_BUILD_HI) "." PVR_STR2(PVRVERSION_BUILD_LO)
 
 #endif /* _PVRVERSION_H_ */
