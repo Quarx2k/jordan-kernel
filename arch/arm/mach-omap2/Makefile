@@ -247,18 +247,21 @@ obj-$(CONFIG_MACH_OMAP_ZOOM2)		+= board-zoom.o \
 					   board-zoom-display.o \
 					   board-flash.o \
 					   hsmmc.o \
-					   board-zoom-debugboard.o
+					   board-zoom-debugboard.o \
+					   omapxx_apps_brd_id.o
 obj-$(CONFIG_MACH_OMAP_ZOOM3)		+= board-zoom.o \
 					   board-zoom-peripherals.o \
 					   board-zoom-display.o \
 					   board-flash.o \
 					   hsmmc.o \
-					   board-zoom-debugboard.o
+					   board-zoom-debugboard.o \
+					   omapxx_apps_brd_id.o
 obj-$(CONFIG_MACH_OMAP_3630SDP)		+= board-3630sdp.o \
 					   board-zoom-peripherals.o \
 					   board-zoom-display.o \
 					   board-flash.o \
-					   hsmmc.o
+					   hsmmc.o \
+					   omapxx_apps_brd_id.o
 obj-$(CONFIG_MACH_CM_T35)		+= board-cm-t35.o \
 					   hsmmc.o
 obj-$(CONFIG_MACH_CM_T3517)		+= board-cm-t3517.o
