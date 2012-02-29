@@ -1132,7 +1132,7 @@ static OMAPLFB_ERROR OMAPLFBInitFBDev(OMAPLFB_DEVINFO *psDevInfo)
 
 	/* hijack LINFB */
 #if defined(CONFIG_ION_OMAP)
-	if(1)
+	if (cpu_is_omap44xx())
 	{
 		/* for some reason we need at least 3 buffers in the swap chain */
 		int n = FBSize / RoundUpToMultiple(psLINFBInfo->fix.line_length * psLINFBInfo->var.yres, ulLCM);
