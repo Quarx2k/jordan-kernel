@@ -17,6 +17,7 @@
 #include <linux/gpio.h>
 #include <linux/i2c/twl.h>
 #include <linux/mtd/nand.h>
+#include <linux/memblock.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -31,6 +32,7 @@
 #include "mux.h"
 #include "sdram-micron-mt46h32m32lf-6.h"
 #include "sdram-hynix-h8mbx00u0mer-0em.h"
+#include "omap_ion.h"
 
 #define ZOOM3_EHCI_RESET_GPIO		64
 
@@ -130,6 +132,18 @@ static void __init omap_zoom_init(void)
 	zoom_debugboard_init();
 	zoom_peripherals_init();
 	zoom_display_init();
+	omap_register_ion();
+}
+
+static void __init zoom_reserve(void)
+{
+	/* do the static reservations first */
+	memblock_remove(PHYS_ADDR_SMC_MEM, PHYS_ADDR_SMC_SIZE);
+
+#ifdef CONFIG_ION_OMAP
+	omap_ion_init();
+#endif
+	omap_reserve();
 }
 
 MACHINE_START(OMAP_ZOOM2, "OMAP Zoom2 board")
@@ -144,7 +158,7 @@ MACHINE_END
 
 MACHINE_START(OMAP_ZOOM3, "OMAP Zoom3 board")
 	.boot_params	= 0x80000100,
-	.reserve	= omap_reserve,
+	.reserve	= zoom_reserve,
 	.map_io		= omap3_map_io,
 	.init_early	= omap_zoom_init_early,
 	.init_irq	= omap_init_irq,
