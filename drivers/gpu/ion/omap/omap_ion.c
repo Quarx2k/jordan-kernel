@@ -149,7 +149,7 @@ int omap_ion_remove(struct platform_device *pdev)
 static struct platform_driver ion_driver = {
 	.probe = omap_ion_probe,
 	.remove = omap_ion_remove,
-	.driver = { .name = "ion-omap4" }
+	.driver = { .name = "ion-omap" }
 };
 
 static int __init ion_init(void)

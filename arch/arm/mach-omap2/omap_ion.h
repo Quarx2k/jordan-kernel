@@ -1,5 +1,5 @@
 /*
- * arch/arm/mach-omap2/board-blaze.h
+ * arch/arm/mach-omap2/omap_ion.h
  *
  * Copyright (C) 2011 Texas Instruments
  *
@@ -14,12 +14,14 @@
  *
  */
 
-#ifndef _OMAP4_ION_H
-#define _OMAP4_ION_H
+#ifndef _OMAP_ION_H
+#define _OMAP_ION_H
 
 #define OMAP4_ION_HEAP_SECURE_INPUT_SIZE	(SZ_1M * 90)
 #define OMAP4_ION_HEAP_TILER_SIZE		(SZ_128M - SZ_32M)
 #define OMAP4_ION_HEAP_NONSECURE_TILER_SIZE	SZ_32M
+
+#define OMAP3_ION_HEAP_CARVEOUT_INPUT_SIZE       (SZ_1M * 100)
 
 #define PHYS_ADDR_SMC_SIZE	(SZ_1M * 3)
 #define PHYS_ADDR_SMC_MEM	(0x80000000 + SZ_1G - PHYS_ADDR_SMC_SIZE)
@@ -29,10 +31,10 @@
 
 #ifdef CONFIG_ION_OMAP
 void omap_ion_init(void);
-void omap4_register_ion(void);
+void omap_register_ion(void);
 #else
 static inline void omap_ion_init(void) { return; }
-static inline void omap4_register_ion(void) { return; }
+static inline void omap_register_ion(void) { return; }
 #endif
 
 #endif
