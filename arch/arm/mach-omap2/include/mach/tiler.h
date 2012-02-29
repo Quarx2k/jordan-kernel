@@ -47,7 +47,14 @@
  */
 
 /* return true if physical address is in the tiler container */
+#if defined(CONFIG_TI_TILER)
 bool is_tiler_addr(u32 phys);
+#else
+static inline bool is_tiler_addr(u32 phys)
+{
+	return false;
+}
+#endif
 
 enum tiler_fmt {
 	TILFMT_MIN     = -2,
@@ -84,21 +91,43 @@ struct tiler_view_t {
 enum tiler_fmt tiler_fmt(u32 phys);
 
 /* get the modified (1 for page mode) bytes-per-pixel for a tiler block */
+#if defined(CONFIG_TI_TILER)
 u32 tiler_bpp(const struct tiler_block_t *b);
+#else
+static inline u32 tiler_bpp(const struct tiler_block_t *b)
+{
+	return -1;
+}
+#endif
 
 /* get tiler block physical stride */
+#if defined(CONFIG_TI_TILER)
 u32 tiler_pstride(const struct tiler_block_t *b);
+#else
+static inline u32 tiler_pstride(const struct tiler_block_t *b)
+{
+	return -1;
+}
+#endif
 
 /* get tiler block virtual stride */
 static inline u32 tiler_vstride(const struct tiler_block_t *b)
 {
+#if defined(CONFIG_TI_TILER)
 	return PAGE_ALIGN((b->phys & ~PAGE_MASK) + tiler_bpp(b) * b->width);
+#else
+	return -1;
+#endif
 }
 
 /* returns the virtual size of the block (for mmap) */
 static inline u32 tiler_size(const struct tiler_block_t *b)
 {
+#if defined(CONFIG_TI_TILER)
 	return b->height * tiler_vstride(b);
+#else
+	return -1;
+#endif
 }
 
 /* Event types */
@@ -111,7 +140,15 @@ static inline u32 tiler_size(const struct tiler_block_t *b)
  *
  * @return error status
  */
+
+#if defined(CONFIG_TI_TILER)
 s32 tiler_reg_notifier(struct notifier_block *nb);
+#else
+static inline s32 tiler_reg_notifier(struct notifier_block *nb)
+{
+	return -1;
+}
+#endif
 
 /**
  * Un-registers a notifier block with TILER driver.
@@ -120,7 +157,14 @@ s32 tiler_reg_notifier(struct notifier_block *nb);
  *
  * @return error status
  */
+#if defined(CONFIG_TI_TILER)
 s32 tiler_unreg_notifier(struct notifier_block *nb);
+#else
+static inline s32 tiler_unreg_notifier(struct notifier_block *nb)
+{
+	return -1;
+}
+#endif
 
 /**
  * Get the physical address for a given user va.
@@ -129,7 +173,14 @@ s32 tiler_unreg_notifier(struct notifier_block *nb);
  *
  * @return valid pa or 0 for error
  */
+#if defined(CONFIG_TI_TILER)
 u32 tiler_virt2phys(u32 usr);
+#else
+static inline u32 tiler_virt2phys(u32 usr)
+{
+	return -1;
+}
+#endif
 
 /**
  * Reserves a 1D or 2D TILER block area and memory for the
@@ -142,7 +193,14 @@ u32 tiler_virt2phys(u32 usr);
  *
  * @return error status
  */
+#if defined(CONFIG_TI_TILER)
 s32 tiler_alloc(struct tiler_block_t *blk, enum tiler_fmt fmt);
+#else
+static inline s32 tiler_alloc(struct tiler_block_t *blk, enum tiler_fmt fmt)
+{
+	return -1;
+}
+#endif
 
 /**
  * Reserves a 1D or 2D TILER block area and memory for a set process and group
@@ -157,8 +215,16 @@ s32 tiler_alloc(struct tiler_block_t *blk, enum tiler_fmt fmt);
  *
  * @return error status
  */
+#if defined(CONFIG_TI_TILER)
 s32 tiler_allocx(struct tiler_block_t *blk, enum tiler_fmt fmt,
 					u32 gid, pid_t pid);
+#else
+static inline s32 tiler_allocx(struct tiler_block_t *blk, enum tiler_fmt fmt,
+					u32 gid, pid_t pid)
+{
+	return -1;
+}
+#endif
 
 /**
  * Mmaps a portion of a tiler block to a virtual address.  Use this method in
@@ -174,8 +240,16 @@ s32 tiler_allocx(struct tiler_block_t *blk, enum tiler_fmt fmt,
  *
  * @return error status
  */
+#if defined(CONFIG_TI_TILER)
 s32 tiler_mmap_blk(struct tiler_block_t *blk, u32 offs, u32 size,
 				struct vm_area_struct *vma, u32 voffs);
+#else
+static inline s32 tiler_mmap_blk(struct tiler_block_t *blk, u32 offs, u32 size,
+				struct vm_area_struct *vma, u32 voffs)
+{
+	return -1;
+}
+#endif
 
 /**
  * Ioremaps a portion of a tiler block.  Use this method in your driver instead
@@ -190,8 +264,16 @@ s32 tiler_mmap_blk(struct tiler_block_t *blk, u32 offs, u32 size,
  *
  * @return error status
  */
+#if defined(CONFIG_TI_TILER)
 s32 tiler_ioremap_blk(struct tiler_block_t *blk, u32 offs, u32 size, u32 addr,
 							u32 mtype);
+#else
+static inline s32 tiler_ioremap_blk(struct tiler_block_t *blk, u32 offs,
+				u32 size, u32 addr, u32 mtype)
+{
+	return -1;
+}
+#endif
 
 /**
  * Maps an existing buffer to a 1D or 2D TILER area for the
@@ -210,7 +292,15 @@ s32 tiler_ioremap_blk(struct tiler_block_t *blk, u32 offs, u32 size, u32 addr,
  *
  * @return error status
  */
+#if defined(CONFIG_TI_TILER)
 s32 tiler_map(struct tiler_block_t *blk, enum tiler_fmt fmt, u32 usr_addr);
+#else
+static inline s32 tiler_map(struct tiler_block_t *blk, enum tiler_fmt fmt,
+				u32 usr_addr)
+{
+	return -1;
+}
+#endif
 
 /**
  * Maps an existing buffer to a 1D or 2D TILER area for a set process and group
@@ -231,8 +321,16 @@ s32 tiler_map(struct tiler_block_t *blk, enum tiler_fmt fmt, u32 usr_addr);
  *
  * @return error status
  */
+#if defined(CONFIG_TI_TILER)
 s32 tiler_mapx(struct tiler_block_t *blk, enum tiler_fmt fmt,
 					u32 gid, pid_t pid, u32 usr_addr);
+#else
+static inline s32 tiler_mapx(struct tiler_block_t *blk, enum tiler_fmt fmt,
+					u32 gid, pid_t pid, u32 usr_addr)
+{
+	return -1;
+}
+#endif
 
 /**
  * Frees TILER memory.  Since there may be multiple references for the same area
@@ -243,7 +341,14 @@ s32 tiler_mapx(struct tiler_block_t *blk, enum tiler_fmt fmt,
  *		tiler_map or tiler_dup.  'phys' and 'id' members will be set to
  *		0 on success.
  */
+#if defined(CONFIG_TI_TILER)
 void tiler_free(struct tiler_block_t *blk);
+#else
+static inline void tiler_free(struct tiler_block_t *blk)
+{
+	return ;
+}
+#endif
 
 /**
  * Reserves tiler area for n identical blocks for the current process.  Use this
@@ -255,7 +360,15 @@ void tiler_free(struct tiler_block_t *blk);
  * @param width		block width
  * @param height	block height (must be 1 for 1D)
  */
+#if defined(CONFIG_TI_TILER)
 void tiler_reserve(u32 n, enum tiler_fmt fmt, u32 width, u32 height);
+#else
+static inline void tiler_reserve(u32 n, enum tiler_fmt fmt,
+				u32 width, u32 height)
+{
+	return ;
+}
+#endif
 
 /**
  * Reserves tiler area for n identical blocks.  Use this method to get optimal
@@ -269,8 +382,16 @@ void tiler_reserve(u32 n, enum tiler_fmt fmt, u32 width, u32 height);
  * @param gid		group ID
  * @param pid		process ID
  */
+#if defined(CONFIG_TI_TILER)
 void tiler_reservex(u32 n, enum tiler_fmt fmt, u32 width, u32 height,
 				u32 gid, pid_t pid);
+#else
+static inline void tiler_reservex(u32 n, enum tiler_fmt fmt,
+				u32 width, u32 height, u32 gid, pid_t pid)
+{
+	return ;
+}
+#endif
 
 /**
  * Reserves tiler area for n identical NV12 blocks for the current process.  Use
@@ -281,7 +402,14 @@ void tiler_reservex(u32 n, enum tiler_fmt fmt, u32 width, u32 height,
  * @param width		block width (Y)
  * @param height	block height (Y)
  */
+#if defined(CONFIG_TI_TILER)
 void tiler_reserve_nv12(u32 n, u32 width, u32 height);
+#else
+static inline void tiler_reserve_nv12(u32 n, u32 width, u32 height)
+{
+	return ;
+}
+#endif
 
 /**
  * Reserves tiler area for n identical NV12 blocks.  Use this method to get
@@ -294,7 +422,15 @@ void tiler_reserve_nv12(u32 n, u32 width, u32 height);
  * @param gid		group ID
  * @param pid		process ID
  */
+#if defined(CONFIG_TI_TILER)
 void tiler_reservex_nv12(u32 n, u32 width, u32 height, u32 gid, pid_t pid);
+#else
+static inline void tiler_reservex_nv12(u32 n, u32 width, u32 height,
+				u32 gid, pid_t pid)
+{
+	return ;
+}
+#endif
 
 /**
  * Create a view based on a tiler address and width and height
@@ -308,7 +444,15 @@ void tiler_reservex_nv12(u32 n, u32 width, u32 height, u32 gid, pid_t pid);
  * @param width		view width
  * @param height	view height
  */
+#if defined(CONFIG_TI_TILER)
 void tilview_create(struct tiler_view_t *view, u32 phys, u32 width, u32 height);
+#else
+static inline void tilview_create(struct tiler_view_t *view, u32 phys,
+				u32 width, u32 height)
+{
+	return ;
+}
+#endif
 
 /**
  * Obtains the view information for a tiler block
@@ -316,7 +460,15 @@ void tilview_create(struct tiler_view_t *view, u32 phys, u32 width, u32 height);
  * @param view		Pointer to a view where the information will be stored
  * @param blk		Pointer to an existing allocated tiler block
  */
+#if defined(CONFIG_TI_TILER)
 void tilview_get(struct tiler_view_t *view, struct tiler_block_t *blk);
+#else
+static inline void tilview_get(struct tiler_view_t *view,
+				struct tiler_block_t *blk)
+{
+	return ;
+}
+#endif
 
 /**
  * Crops a tiler view to a rectangular portion. Crop area must be fully within
@@ -332,8 +484,16 @@ void tilview_get(struct tiler_view_t *view, struct tiler_block_t *blk);
  * @return error status.  The view will be reduced to the crop region if the
  *	   crop region is correct.  Otherwise, no modifications are made.
  */
+#if defined(CONFIG_TI_TILER)
 s32 tilview_crop(struct tiler_view_t *view, u32 left, u32 top, u32 width,
 								u32 height);
+#else
+static inline s32 tilview_crop(struct tiler_view_t *view, u32 left,
+				u32 top, u32 width, u32 height)
+{
+	return -1;
+}
+#endif
 
 /**
  * Rotates a tiler view clockwise by a specified degree.
@@ -344,7 +504,14 @@ s32 tilview_crop(struct tiler_view_t *view, u32 left, u32 top, u32 width,
  * @return error status.  View is not modified on error; otherwise, it is
  *	   updated in place.
  */
+#if defined(CONFIG_TI_TILER)
 s32 tilview_rotate(struct tiler_view_t *view, s32 rotation);
+#else
+static inline s32 tilview_rotate(struct tiler_view_t *view, s32 rotation)
+{
+	return -1;
+}
+#endif
 
 /**
  * Mirrors a tiler view horizontally and/or vertically.
@@ -356,7 +523,15 @@ s32 tilview_rotate(struct tiler_view_t *view, s32 rotation);
  * @return error status.  View is not modified on error; otherwise, it is
  *	   updated in place.
  */
+#if defined(CONFIG_TI_TILER)
 s32 tilview_flip(struct tiler_view_t *view, bool flip_x, bool flip_y);
+#else
+static inline s32 tilview_flip(struct tiler_view_t *view, bool flip_x,
+				bool flip_y)
+{
+	return -1;
+}
+#endif
 
 /*
  * -------------------- TILER hooks for ION/HWC migration --------------------
@@ -388,7 +563,14 @@ typedef struct mem_info *tiler_blk_handle;
  * NOTE: this will take ownership pa->mem (will free it)
  *
  */
+#if defined(CONFIG_TI_TILER)
 tiler_blk_handle tiler_map_1d_block(struct tiler_pa_info *pa);
+#else
+static inline tiler_blk_handle tiler_map_1d_block(struct tiler_pa_info *pa)
+{
+	return NULL;
+}
+#endif
 
 /**
  * Allocate an area of container space in the Tiler
@@ -405,9 +587,18 @@ tiler_blk_handle tiler_map_1d_block(struct tiler_pa_info *pa);
  * NOTE: For 1D allocations, specify the full size in the width field, and
  *       specify a height of 1.
  */
+#if defined(CONFIG_TI_TILER)
 tiler_blk_handle tiler_alloc_block_area(enum tiler_fmt fmt, u32 width,
 					u32 height, u32 *ssptr,
 					u32 *virt_array);
+#else
+static inline tiler_blk_handle tiler_alloc_block_area(enum tiler_fmt fmt,
+					u32 width, u32 height, u32 *ssptr,
+					u32 *virt_array)
+{
+	return NULL;
+}
+#endif
 
 /**
  * Free a reserved area in the Tiler
@@ -415,7 +606,14 @@ tiler_blk_handle tiler_alloc_block_area(enum tiler_fmt fmt, u32 width,
  * @param handle	Handle to tiler block information
  *
  */
+#if defined(CONFIG_TI_TILER)
 void tiler_free_block_area(tiler_blk_handle block);
+#else
+static inline void tiler_free_block_area(tiler_blk_handle block)
+{
+	return ;
+}
+#endif
 
 /**
  * Pins a set of physical pages into the Tiler using the area defined in a
@@ -427,7 +625,15 @@ void tiler_free_block_area(tiler_blk_handle block);
  *
  * @return error status.
  */
+#if defined(CONFIG_TI_TILER)
 s32 tiler_pin_block(tiler_blk_handle handle, u32 *addr_array, u32 nents);
+#else
+static inline s32 tiler_pin_block(tiler_blk_handle handle,
+					u32 *addr_array, u32 nents)
+{
+	return -1;
+}
+#endif
 
 /**
  * Unpins a set of physical pages from the Tiler
@@ -435,7 +641,14 @@ s32 tiler_pin_block(tiler_blk_handle handle, u32 *addr_array, u32 nents);
  * @param handle	Handle to tiler block information
  *
  */
+#if defined(CONFIG_TI_TILER)
 void tiler_unpin_block(tiler_blk_handle handle);
+#else
+static inline void tiler_unpin_block(tiler_blk_handle handle)
+{
+	return ;
+}
+#endif
 
 /**
  * Gives memory requirements for a given container allocation
@@ -448,8 +661,16 @@ void tiler_unpin_block(tiler_blk_handle handle);
  *
  * @return 0 for success.  Non zero for error
  */
+#if defined(CONFIG_TI_TILER)
 s32 tiler_memsize(enum tiler_fmt fmt, u32 width, u32 height, u32 *alloc_pages,
 		  u32 *virt_pages);
+#else
+static inline s32 tiler_memsize(enum tiler_fmt fmt, u32 width, u32 height,
+					u32 *alloc_pages, u32 *virt_pages)
+{
+	return -1;
+}
+#endif
 
 /**
  * Returns virtual stride of a tiler block
@@ -458,10 +679,26 @@ s32 tiler_memsize(enum tiler_fmt fmt, u32 width, u32 height, u32 *alloc_pages,
  *
  * @return Size of virtual stride
  */
+#if defined(CONFIG_TI_TILER)
 u32 tiler_block_vstride(tiler_blk_handle handle);
 
 struct tiler_pa_info *user_block_to_pa(u32 usr_addr, u32 num_pg);
 void tiler_pa_free(struct tiler_pa_info *pa);
+#else
+static inline u32 tiler_block_vstride(tiler_blk_handle handle)
+{
+	return -1;
+}
+static inline struct tiler_pa_info *user_block_to_pa(u32 usr_addr, u32 num_pg)
+{
+	return NULL;
+}
+static inline void tiler_pa_free(struct tiler_pa_info *pa)
+{
+	return ;
+}
+
+#endif
 
 /*
  * ---------------------------- IOCTL Definitions ----------------------------
