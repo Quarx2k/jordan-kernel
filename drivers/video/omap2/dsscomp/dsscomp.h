@@ -29,9 +29,18 @@
 #include <linux/hrtimer.h>
 #endif
 
+#if defined(CONFIG_ARCH_OMAP4)
 #define MAX_OVERLAYS	5
 #define MAX_MANAGERS	3
 #define MAX_DISPLAYS	4
+#elif defined(CONFIG_ARCH_OMAP3)
+#define MAX_MANAGERS	2
+#define MAX_OVERLAYS	3
+#define MAX_DISPLAYS	2
+#endif
+
+
+
 
 #define DEBUG_OVERLAYS		(1 << 0)
 #define DEBUG_COMPOSITIONS	(1 << 1)
