@@ -801,7 +801,9 @@ void sgx_idle_log_flip(void);
 
 static void dsscomp_proxy_cmdcomplete(void * cookie, int i)
 {
+#ifdef SYS_SUPPORTS_SGX_IDLE_CALLBACK
 	sgx_idle_log_flip();
+#endif
 	/* XXX: assumes that there is only one display */
 	gapsDevInfo[0]->sPVRJTable.pfnPVRSRVCmdComplete(cookie, i);
 }
