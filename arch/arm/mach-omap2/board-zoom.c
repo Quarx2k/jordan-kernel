@@ -18,6 +18,8 @@
 #include <linux/i2c/twl.h>
 #include <linux/mtd/nand.h>
 #include <linux/memblock.h>
+#include <linux/skbuff.h>
+#include <linux/ti_wilink_st.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -35,6 +37,10 @@
 #include "omap_ion.h"
 
 #define ZOOM3_EHCI_RESET_GPIO		64
+#define ZOOM3_McBSP3_BT_GPIO            164
+#define ZOOM3_BT_RESET_GPIO             109
+
+#define WILINK_UART_DEV_NAME            "/dev/ttyO1"
 
 static void __init omap_zoom_init_early(void)
 {
@@ -117,6 +123,64 @@ static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
 	.reset_gpio_port[2]	= -EINVAL,
 };
 
+static int plat_kim_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	/* TODO: wait for HCI-LL sleep */
+	return 0;
+}
+static int plat_kim_resume(struct platform_device *pdev)
+{
+	return 0;
+}
+
+/* wl127x BT, FM, GPS connectivity chip */
+struct ti_st_plat_data wilink_pdata = {
+	.nshutdown_gpio = 109,
+	.dev_name = WILINK_UART_DEV_NAME,
+	.flow_cntrl = 1,
+	.baud_rate = 3686400,
+	.suspend = plat_kim_suspend,
+	.resume = plat_kim_resume,
+};
+static struct platform_device wl127x_device = {
+	.name           = "kim",
+	.id             = -1,
+	.dev.platform_data = &wilink_pdata,
+};
+static struct platform_device btwilink_device = {
+	.name = "btwilink",
+	.id = -1,
+};
+
+static struct platform_device *zoom_devices[] __initdata = {
+	&wl127x_device,
+	&btwilink_device,
+};
+
+/* Fix to prevent VIO leakage on wl127x */
+static int wl127x_vio_leakage_fix(void)
+{
+	int ret = 0;
+
+	pr_info(" wl127x_vio_leakage_fix\n");
+
+	ret = gpio_request(ZOOM3_BT_RESET_GPIO, "wl127x_bten");
+	if (ret < 0) {
+		pr_err("wl127x_bten gpio_%d request fail",
+			ZOOM3_BT_RESET_GPIO);
+		goto fail;
+	}
+
+	gpio_direction_output(ZOOM3_BT_RESET_GPIO, 1);
+	mdelay(10);
+	gpio_direction_output(ZOOM3_BT_RESET_GPIO, 0);
+	udelay(64);
+
+	gpio_free(ZOOM3_BT_RESET_GPIO);
+fail:
+	return ret;
+}
+
 static void __init omap_zoom_init(void)
 {
 	if (machine_is_omap_zoom2()) {
@@ -124,6 +188,7 @@ static void __init omap_zoom_init(void)
 	} else if (machine_is_omap_zoom3()) {
 		omap3_mux_init(board_mux, OMAP_PACKAGE_CBP);
 		omap_mux_init_gpio(ZOOM3_EHCI_RESET_GPIO, OMAP_PIN_OUTPUT);
+		omap_mux_init_gpio(ZOOM3_McBSP3_BT_GPIO, OMAP_PIN_OUTPUT);
 		usbhs_init(&usbhs_bdata);
 	}
 
@@ -133,6 +198,9 @@ static void __init omap_zoom_init(void)
 	zoom_peripherals_init();
 	zoom_display_init();
 	omap_register_ion();
+	/* Added to register zoom devices */
+	platform_add_devices(zoom_devices, ARRAY_SIZE(zoom_devices));
+	wl127x_vio_leakage_fix();
 }
 
 static void __init zoom_reserve(void)
