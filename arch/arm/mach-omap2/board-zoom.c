@@ -99,12 +99,12 @@ static struct mtd_partition zoom_nand_partitions[] = {
 	{
 		.name		= "system",
 		.offset		= MTDPART_OFS_APPEND,	/* Offset = 0x2000000 */
-		.size		= 3328 * (64 * 2048),	/* 416M, 0x1A000000 */
+		.size		= 1440 * (64 * 2048),	/* 180M, 0x1A000000 */
 	},
 	{
 		.name		= "userdata",
 		.offset		= MTDPART_OFS_APPEND,	/* Offset = 0x1C000000*/
-		.size		= 256 * (64 * 2048),	/* 32M, 0x2000000 */
+		.size		= 512 * (64 * 2048),	/* 64M, 0x2000000 */
 	},
 	{
 		.name		= "cache",
