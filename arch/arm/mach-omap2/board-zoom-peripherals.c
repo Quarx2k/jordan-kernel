@@ -33,6 +33,7 @@
 #include "mux.h"
 #include "hsmmc.h"
 #include "common-board-devices.h"
+#include "twl4030.h"
 
 #define OMAP_ZOOM_WLAN_PMENA_GPIO	(101)
 #define OMAP_ZOOM_WLAN_IRQ_GPIO		(162)
@@ -106,6 +107,7 @@ static struct twl4030_keypad_data zoom_kp_twl4030_data = {
 	.cols		= 8,
 	.rep		= 1,
 };
+static struct __initdata twl4030_power_data zoom_t2scripts_data;
 
 static struct regulator_consumer_supply zoom_vmmc1_supply = {
 	.supply		= "vmmc",
@@ -342,6 +344,7 @@ static struct twl4030_platform_data zoom_twldata = {
 	.usb		= &zoom_usb_data,
 	.gpio		= &zoom_gpio_data,
 	.keypad		= &zoom_kp_twl4030_data,
+	.power		= &zoom_t2scripts_data,
 	.codec		= &zoom_codec_data,
 	.vmmc1          = &zoom_vmmc1,
 	.vmmc2          = &zoom_vmmc2,
@@ -411,6 +414,7 @@ void __init zoom_peripherals_init(void)
 	if (wl12xx_set_platform_data(&omap_zoom_wlan_data))
 		pr_err("error setting wl12xx data\n");
 
+	twl4030_get_scripts(&zoom_t2scripts_data);
 	omap_i2c_init();
 	synaptics_dev_init();
 	platform_device_register(&omap_vwlan_device);
