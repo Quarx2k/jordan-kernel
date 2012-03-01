@@ -730,6 +730,7 @@ struct twl4030_power_data {
 
 #ifdef CONFIG_TWL4030_POWER
 extern void twl4030_power_init(struct twl4030_power_data *triton2_scripts);
+extern void twl4030_power_sr_init(void);
 extern int twl4030_remove_script(u8 flags);
 #else
 static inline void twl4030_power_init(struct twl4030_power_data *triton2_scripts) { }

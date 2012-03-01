@@ -1331,8 +1331,10 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 
 	/* load power event scripts */
 	if (twl_has_power()) {
-		if (twl_class_is_4030() && pdata->power)
+		if (twl_class_is_4030() && pdata->power) {
+			twl4030_power_sr_init();
 			twl4030_power_init(pdata->power);
+		}
 		if (twl_class_is_6030())
 			twl6030_power_init(pdata->power);
 	}
