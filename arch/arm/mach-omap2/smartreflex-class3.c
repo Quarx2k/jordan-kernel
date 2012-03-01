@@ -53,8 +53,8 @@ static struct omap_sr_class_data class3_data = {
 /* Smartreflex Class3 init API to be called from board file */
 static int __init sr_class3_init(void)
 {
-	/* Enable this class only for OMAP343x */
-	if (!cpu_is_omap343x())
+	/* Enable this class only for OMAP3630 and above */
+	if (cpu_is_omap3630() || cpu_is_omap44xx())
 		return -EINVAL;
 
 	pr_info("SmartReflex Class3 initialized\n");
