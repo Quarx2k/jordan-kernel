@@ -31,6 +31,7 @@
 #include <linux/debugfs.h>
 
 #include "ion_priv.h"
+#include "../pvr/ion.h"
 #define DEBUG
 
 /**
@@ -915,6 +916,19 @@ err:
 	return ret;
 }
 
+static int ion_map_gralloc(struct ion_client *client, void *grallocHandle,
+			   struct ion_handle **handleY)
+{
+	struct ion_client *pvr_ion_client;
+	struct ion_buffer *ionbuff;
+	int fd = (int) grallocHandle;
+
+	*handleY = PVRSRVExportFDToIONHandle(fd, &pvr_ion_client);
+	ionbuff = ion_share(pvr_ion_client, *handleY);
+	*handleY = ion_import(client, ionbuff);
+	return 0;
+}
+
 static const struct file_operations ion_share_fops = {
 	.owner		= THIS_MODULE,
 	.release	= ion_share_release,
@@ -1023,6 +1037,22 @@ static long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 				sizeof(struct ion_custom_data)))
 			return -EFAULT;
 		return dev->custom_ioctl(client, data.cmd, data.arg);
+	}
+	case ION_IOC_MAP_GRALLOC:
+	{
+		struct ion_map_gralloc_to_ionhandle_data data;
+		int ret;
+
+		if (copy_from_user(&data, (void __user *)arg, sizeof(data)))
+			return -EFAULT;
+		ret = ion_map_gralloc(client, data.gralloc_handle,
+						&data.handleY);
+		if (ret)
+			return ret;
+		if (copy_to_user((void __user *)arg, &data,
+				 sizeof(data)))
+			return -EFAULT;
+		break;
 	}
 	default:
 		return -ENOTTY;

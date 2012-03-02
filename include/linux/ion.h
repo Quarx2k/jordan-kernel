@@ -285,6 +285,16 @@ struct ion_custom_data {
 	unsigned long arg;
 };
 
+/**
+ * struct ion_map_gralloc_to_ionhandle_data
+ * gralloc_handle:	a gralloc handle
+ * handleY:			a ion handle mapped to that gralloc handle
+ */
+struct ion_map_gralloc_to_ionhandle_data {
+	void *gralloc_handle;
+	struct ion_handle *handleY;
+};
+
 #define ION_IOC_MAGIC		'I'
 
 /**
@@ -340,5 +350,15 @@ struct ion_custom_data {
  * passes appropriate userdata for that ioctl
  */
 #define ION_IOC_CUSTOM		_IOWR(ION_IOC_MAGIC, 6, struct ion_custom_data)
+
+/**
+ * DOC: ION_IOC_MAP_GRALLOC - exports a mapped ion handle
+ *
+ * Takes an ion_map_gralloc_to_ionhandle_data struct with the gralloc_handle
+ * field populated with a valid gralloc handle. Returns the struct with the
+ * handleY field set to mapped ion_handle for the corresponding gralloc handle.
+ */
+#define ION_IOC_MAP_GRALLOC	_IOWR(ION_IOC_MAGIC, 7, \
+				struct ion_map_gralloc_to_ionhandle_data)
 
 #endif /* _LINUX_ION_H */
