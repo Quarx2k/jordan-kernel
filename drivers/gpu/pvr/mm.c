@@ -1090,74 +1090,97 @@ LinuxMemArea *
 NewIONLinuxMemArea(IMG_UINT32 ui32Bytes, IMG_UINT32 ui32AreaFlags,
                    IMG_PVOID pvPrivData, IMG_UINT32 ui32PrivDataLength)
 {
-    struct omap_ion_tiler_alloc_data sAllocData;
-    LinuxMemArea *psLinuxMemArea;
-    u32 *pu32PageAddrs;
-    int iNumPages;
+	struct omap_ion_tiler_alloc_data sAllocData;
+	LinuxMemArea *psLinuxMemArea;
+	u32 *pu32PageAddrs;
+	unsigned long ion_addr;
+	int iNumPages;
 
-    psLinuxMemArea = LinuxMemAreaStructAlloc();
-    if(!psLinuxMemArea)
-    {
-        PVR_DPF((PVR_DBG_ERROR, "%s: Failed to allocate LinuxMemArea struct", __func__));
-        goto err_out;
-    }
+	psLinuxMemArea = LinuxMemAreaStructAlloc();
+	if (!psLinuxMemArea) {
+		PVR_DPF((PVR_DBG_ERROR,
+		"%s: Failed to allocate LinuxMemArea struct", __func__));
+		goto err_out;
+	}
 
-    
-    BUG_ON(ui32PrivDataLength != offsetof(struct omap_ion_tiler_alloc_data, handle));
-    memcpy(&sAllocData, pvPrivData, offsetof(struct omap_ion_tiler_alloc_data, handle));
+	BUG_ON(ui32PrivDataLength !=
+			offsetof(struct omap_ion_tiler_alloc_data, handle));
+	memcpy(&sAllocData, pvPrivData,
+			offsetof(struct omap_ion_tiler_alloc_data, handle));
 
-    if(omap_ion_tiler_alloc(gpsIONClient, &sAllocData) < 0)
-    {
-        PVR_DPF((PVR_DBG_ERROR, "%s: Failed to allocate via ion_tiler", __func__));
-        goto err_free;
-    }
+	if (cpu_is_omap44xx()) {
+		if (omap_ion_tiler_alloc(gpsIONClient, &sAllocData) < 0) {
+			PVR_DPF((PVR_DBG_ERROR,
+			"%s: Failed to allocate via ion_tiler", __func__));
+			goto err_free;
+		}
 
-    if(omap_tiler_pages(gpsIONClient, sAllocData.handle, &iNumPages,
-						&pu32PageAddrs) < 0)
-    {
-      	PVR_DPF((PVR_DBG_ERROR, "%s: Failed to compute tiler pages", __func__));
-       	goto err_free;
-    }	
+		if (omap_tiler_pages(gpsIONClient, sAllocData.handle,
+					&iNumPages, &pu32PageAddrs) < 0) {
+			PVR_DPF((PVR_DBG_ERROR,
+			"%s: Failed to compute tiler pages", __func__));
+			goto err_free;
+		}
+	} else if (cpu_is_omap34xx()) {
+		if (omap_ion_mem_alloc(gpsIONClient, &sAllocData) < 0) {
+			PVR_DPF((PVR_DBG_ERROR,
+			"%s: Failed to allocate via ion_carevout", __func__));
+			goto err_free;
+		}
 
-    
-    BUG_ON(ui32Bytes != iNumPages * PAGE_SIZE);
+		if (omap_ion_get_pages(gpsIONClient, sAllocData.handle,
+				&iNumPages, &ion_addr, &sAllocData) < 0) {
+			PVR_DPF((PVR_DBG_ERROR,
+			"%s: Failed to compute ion pages", __func__));
+			goto err_free;
+		}
+	}
+
+	BUG_ON(ui32Bytes != iNumPages * PAGE_SIZE);
 
 #if defined(DEBUG_LINUX_MEMORY_ALLOCATIONS)
-    DebugMemAllocRecordAdd(DEBUG_MEM_ALLOC_TYPE_ION,
-                           sAllocData.handle,
-                           0,
-                           0,
-                           NULL,
-                           PAGE_ALIGN(ui32Bytes),
-                           "unknown",
-                           0
-                           );
+	DebugMemAllocRecordAdd(DEBUG_MEM_ALLOC_TYPE_ION,
+			sAllocData.handle,
+				0,
+				0,
+				NULL,
+				PAGE_ALIGN(ui32Bytes),
+				"unknown",
+				0
+			);
 #endif
 
-    psLinuxMemArea->eAreaType = LINUX_MEM_AREA_ION;
-    psLinuxMemArea->uData.sIONTilerAlloc.pCPUPhysAddrs = (IMG_CPU_PHYADDR *)pu32PageAddrs;
-    psLinuxMemArea->uData.sIONTilerAlloc.psIONHandle = sAllocData.handle;
-    psLinuxMemArea->ui32ByteSize = ui32Bytes;
-    psLinuxMemArea->ui32AreaFlags = ui32AreaFlags;
-    INIT_LIST_HEAD(&psLinuxMemArea->sMMapOffsetStructList);
+	psLinuxMemArea->eAreaType = LINUX_MEM_AREA_ION;
 
-    
-    if(ui32AreaFlags & (PVRSRV_HAP_WRITECOMBINE | PVRSRV_HAP_UNCACHED))
-    {
-        psLinuxMemArea->bNeedsCacheInvalidate = IMG_TRUE;
-    }
+	if (cpu_is_omap44xx()) {
+		psLinuxMemArea->uData.sIONTilerAlloc.pCPUPhysAddrs =
+				(IMG_CPU_PHYADDR *)pu32PageAddrs;
+	} else if (cpu_is_omap3630()) {
+		psLinuxMemArea->uData.sIONTilerAlloc.pCPUPhysAddrs =
+				kmalloc(sizeof(IMG_CPU_PHYADDR), GFP_KERNEL);
+		psLinuxMemArea->uData.sIONTilerAlloc.pCPUPhysAddrs->uiAddr =
+				(IMG_UINTPTR_T)ion_addr;
+	}
+	psLinuxMemArea->uData.sIONTilerAlloc.psIONHandle = sAllocData.handle;
+	psLinuxMemArea->ui32ByteSize = ui32Bytes;
+	psLinuxMemArea->ui32AreaFlags = ui32AreaFlags;
+	INIT_LIST_HEAD(&psLinuxMemArea->sMMapOffsetStructList);
+
+
+	if (ui32AreaFlags & (PVRSRV_HAP_WRITECOMBINE | PVRSRV_HAP_UNCACHED))
+		psLinuxMemArea->bNeedsCacheInvalidate = IMG_TRUE;
 
 #if defined(DEBUG_LINUX_MEM_AREAS)
-    DebugLinuxMemAreaRecordAdd(psLinuxMemArea, ui32AreaFlags);
+	DebugLinuxMemAreaRecordAdd(psLinuxMemArea, ui32AreaFlags);
 #endif
 
 err_out:
-    return psLinuxMemArea;
+	return psLinuxMemArea;
 
 err_free:
-    LinuxMemAreaStructFree(psLinuxMemArea);
-    psLinuxMemArea = IMG_NULL;
-    goto err_out;
+	LinuxMemAreaStructFree(psLinuxMemArea);
+	psLinuxMemArea = IMG_NULL;
+	goto err_out;
 }
 
 
@@ -1167,7 +1190,8 @@ FreeIONLinuxMemArea(LinuxMemArea *psLinuxMemArea)
 #if defined(DEBUG_LINUX_MEM_AREAS)
     DebugLinuxMemAreaRecordRemove(psLinuxMemArea);
 #endif
-
+	if (cpu_is_omap3630())
+		kfree(psLinuxMemArea->uData.sIONTilerAlloc.pCPUPhysAddrs);
     ion_free(gpsIONClient, psLinuxMemArea->uData.sIONTilerAlloc.psIONHandle);
 
 #if defined(DEBUG_LINUX_MEMORY_ALLOCATIONS)
@@ -1603,9 +1627,16 @@ LinuxMemAreaToCpuPAddr(LinuxMemArea *psLinuxMemArea, IMG_UINT32 ui32ByteOffset)
         }
         case LINUX_MEM_AREA_ION:
         {
-            IMG_UINT32 ui32PageIndex = PHYS_TO_PFN(ui32ByteOffset);
-            CpuPAddr = psLinuxMemArea->uData.sIONTilerAlloc.pCPUPhysAddrs[ui32PageIndex];
-            CpuPAddr.uiAddr += ADDR_TO_PAGE_OFFSET(ui32ByteOffset);
+		if (cpu_is_omap44xx()) {
+			IMG_UINT32 ui32PageIndex = PHYS_TO_PFN(ui32ByteOffset);
+			CpuPAddr = psLinuxMemArea->uData.sIONTilerAlloc.\
+					pCPUPhysAddrs[ui32PageIndex];
+			CpuPAddr.uiAddr += ADDR_TO_PAGE_OFFSET(ui32ByteOffset);
+		} else if (cpu_is_omap34xx()) {
+			CpuPAddr.uiAddr = psLinuxMemArea->uData.sIONTilerAlloc.\
+					pCPUPhysAddrs->uiAddr;
+			CpuPAddr.uiAddr += ui32ByteOffset;
+		}
             break;
         }
         case LINUX_MEM_AREA_ALLOC_PAGES:
