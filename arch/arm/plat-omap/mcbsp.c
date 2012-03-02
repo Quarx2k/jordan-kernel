@@ -809,9 +809,9 @@ static void omap36xx_i539_errata_disable(int mcbsp_id)
 	}
 }
 #else
-static inline int omap3_i539_errata_init(void) { return 0; }
-static inline void omap3_i539_errata_enable(int mcbsp_id)  {}
-static inline void omap3_i539_errata_disable(int mcbsp_id) {}
+static inline int omap36xx_i539_errata_init(void) { return 0; }
+static inline void omap36xx_i539_errata_enable(int mcbsp_id)  {}
+static inline void omap36xx_i539_errata_disable(int mcbsp_id) {}
 #endif
 
 /*
