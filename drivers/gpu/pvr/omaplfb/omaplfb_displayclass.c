@@ -912,7 +912,7 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 		psDevInfo->sPVRJTable.pfnPVRSRVDCMemInfoGetCpuPAddr(ppsMemInfos[i], 0, &phyAddr);
 
 		/* TILER buffers do not need meminfos */
-		if(is_tiler_addr((u32)phyAddr.uiAddr))
+		if (cpu_is_omap44xx() && is_tiler_addr((u32)phyAddr.uiAddr))
 		{
 			asMemInfo[k].uiAddr = phyAddr.uiAddr;
 			if (tiler_fmt((u32)phyAddr.uiAddr) == TILFMT_8BIT) {
@@ -922,6 +922,12 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 				psDevInfo->sPVRJTable.pfnPVRSRVDCMemInfoGetCpuPAddr(ppsMemInfos[i], 0, &phyAddr);
 				asMemInfo[k].uiUVAddr = phyAddr.uiAddr;
 			}
+			continue;
+		}
+
+		if (cpu_is_omap3630() && (psDssData->ovls[k].\
+				cfg.color_mode == OMAP_DSS_COLOR_YUV2)) {
+			asMemInfo[k].uiAddr = phyAddr.uiAddr;
 			continue;
 		}
 
@@ -988,7 +994,14 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 
 	for(i = 0; i < k; i++)
 	{
-		tiler_pa_free(apsTilerPAs[i]);
+		if (cpu_is_omap44xx()) {
+			tiler_pa_free(apsTilerPAs[i]);
+		} else if (cpu_is_omap3630()) {
+			if (apsTilerPAs[i])
+				kfree(apsTilerPAs[i]->mem);
+			kfree(apsTilerPAs[i]);
+		}
+
 	}
 
 	return IMG_TRUE;
