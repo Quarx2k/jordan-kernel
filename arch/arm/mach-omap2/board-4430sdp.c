@@ -60,7 +60,7 @@
 #include <plat/omap-pm.h>
 #include <linux/wakelock.h>
 #include "board-blaze.h"
-#include "omap4_ion.h"
+#include "omap_ion.h"
 #include "omap_ram_console.h"
 #include "mux.h"
 #include "hsmmc.h"
@@ -1403,7 +1403,7 @@ static void __init omap_4430sdp_init(void)
 	omap4_i2c_init();
 	blaze_sensor_init();
 	blaze_touch_init();
-	omap4_register_ion();
+	omap_register_ion();
 	platform_add_devices(sdp4430_devices, ARRAY_SIZE(sdp4430_devices));
 	wake_lock_init(&st_wk_lock, WAKE_LOCK_SUSPEND, "st_wake_lock");
 	board_serial_init();

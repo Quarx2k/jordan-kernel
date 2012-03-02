@@ -55,7 +55,7 @@
 #include "timer-gp.h"
 
 #include "board-panda.h"
-#include "omap4_ion.h"
+#include "omap_ion.h"
 #include "omap_ram_console.h"
 #include "hsmmc.h"
 #include "control.h"
@@ -778,7 +778,7 @@ static void __init omap4_panda_init(void)
 		pr_err("error setting wl12xx data\n");
 
 	omap4_panda_i2c_init();
-	omap4_register_ion();
+	omap_register_ion();
 	omap4_audio_conf();
 	platform_add_devices(panda_devices, ARRAY_SIZE(panda_devices));
 	platform_device_register(&omap_vwlan_device);

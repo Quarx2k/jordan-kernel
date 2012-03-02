@@ -63,7 +63,7 @@
 #include "prm-regbits-44xx.h"
 #include "prm44xx.h"
 #include "board-44xx-tablet.h"
-#include "omap4_ion.h"
+#include "omap_ion.h"
 #include "omap_ram_console.h"
 
 #define WILINK_UART_DEV_NAME	"/dev/ttyO1"
@@ -1121,7 +1121,7 @@ static void __init omap_tablet_init(void)
 	tablet_pmic_mux_init();
 	tablet_set_osc_timings();
 	tablet_button_init();
-	omap4_register_ion();
+	omap_register_ion();
 	board_serial_init();
 	omap4_tablet_wifi_init();
 	omap4_twl6030_hsmmc_init(mmc);
