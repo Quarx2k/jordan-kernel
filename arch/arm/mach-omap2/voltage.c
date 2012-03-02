@@ -667,6 +667,7 @@ void voltdm_init(struct voltagedomain **voltdms)
 	}
 }
 
+#if defined(CONFIG_ARCH_OMAP3)
 #define OPP50RATE 100000000
 void set_dpll3_volt_freq(bool dpll3_restore)
 {
@@ -726,3 +727,10 @@ void set_dpll3_volt_freq(bool dpll3_restore)
 	}
 
 }
+
+#else
+void set_dpll3_volt_freq(bool dpll3_restore)
+{
+	return;
+}
+#endif
