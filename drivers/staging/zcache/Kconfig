@@ -1,5 +1,5 @@
 config ZCACHE
-	tristate "Dynamic compression of swap pages and clean pagecache pages"
+	bool "Dynamic compression of swap pages and clean pagecache pages"
 	depends on (CLEANCACHE || FRONTSWAP) && CRYPTO
 	select XVMALLOC
 	select CRYPTO_LZO
@@ -9,4 +9,3 @@ config ZCACHE
 	  performance boosts on many workloads.  Zcache uses
 	  compression and an in-kernel implementation of transcendent
 	  memory to store clean page cache pages and swap in RAM,
-	  providing a noticeable reduction in disk I/O.
