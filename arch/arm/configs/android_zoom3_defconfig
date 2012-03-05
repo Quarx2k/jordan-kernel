@@ -2335,6 +2335,12 @@ CONFIG_MACH_OMAP3_WESTBRIDGE_AST_PNAND_HAL=y
 #
 # CONFIG_ALTERA_STAPL is not set
 # CONFIG_THERMAL_FRAMEWORK is not set
+
+#
+# Texas Instruments shared transport line discipline
+#
+CONFIG_ST_FM=m
+# CONFIG_ST_GPS is not set
 CONFIG_CLKDEV_LOOKUP=y
 # CONFIG_VIRTIO_BALLOON is not set
 
