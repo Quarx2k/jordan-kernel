@@ -20,6 +20,7 @@
 #include <linux/wl12xx.h>
 #include <linux/mmc/host.h>
 #include <linux/synaptics_i2c_rmi.h>
+#include <linux/leds-omap4430sdp-display.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -39,7 +40,21 @@
 #define OMAP_ZOOM_WLAN_IRQ_GPIO		(162)
 #define OMAP_SYNAPTICS_GPIO			(163)
 
-#define LCD_PANEL_ENABLE_GPIO		(7 + OMAP_MAX_GPIO_LINES)
+/* PWM output/clock enable for LCD backlight*/
+#define REG_INTBR_GPBR1				(0xc)
+#define REG_INTBR_GPBR1_PWM1_OUT_EN		(0x1 << 3)
+#define REG_INTBR_GPBR1_PWM1_OUT_EN_MASK	(0x1 << 3)
+#define REG_INTBR_GPBR1_PWM1_CLK_EN		(0x1 << 1)
+#define REG_INTBR_GPBR1_PWM1_CLK_EN_MASK	(0x1 << 1)
+
+/* pin mux for LCD backlight*/
+#define REG_INTBR_PMBR1				(0xd)
+#define REG_INTBR_PMBR1_PWM1_PIN_EN		(0x3 << 4)
+#define REG_INTBR_PMBR1_PWM1_PIN_MASK		(0x3 << 4)
+
+#define MAX_CYCLES				(0x7f)
+#define MIN_CYCLES				(75)
+#define LCD_PANEL_ENABLE_GPIO			(7 + OMAP_MAX_GPIO_LINES)
 
 /* Zoom2 has Qwerty keyboard*/
 static uint32_t board_keymap[] = {
@@ -201,6 +216,80 @@ static struct wl12xx_platform_data omap_zoom_wlan_data __initdata = {
 	.irq = OMAP_GPIO_IRQ(OMAP_ZOOM_WLAN_IRQ_GPIO),
 	/* ZOOM ref clock is 26 MHz */
 	.board_ref_clock = 1,
+};
+
+static void zoom_pwm_config(u8 brightness)
+{
+	u8 pwm_off = 0;
+
+	pwm_off = (MIN_CYCLES * (LED_FULL - brightness) +
+		   MAX_CYCLES * (brightness - LED_OFF)) /
+		(LED_FULL - LED_OFF);
+
+	pwm_off = clamp(pwm_off, (u8)MIN_CYCLES, (u8)MAX_CYCLES);
+
+	/* start at 0 */
+	twl_i2c_write_u8(TWL4030_MODULE_PWM1, 0, 0);
+	twl_i2c_write_u8(TWL4030_MODULE_PWM1, pwm_off, 1);
+}
+
+static void zoom_pwm_enable(int enable)
+{
+	u8 gpbr1;
+
+	twl_i2c_read_u8(TWL4030_MODULE_INTBR, &gpbr1, REG_INTBR_GPBR1);
+	gpbr1 &= ~REG_INTBR_GPBR1_PWM1_OUT_EN_MASK;
+	gpbr1 |= (enable ? REG_INTBR_GPBR1_PWM1_OUT_EN : 0);
+	twl_i2c_write_u8(TWL4030_MODULE_INTBR, gpbr1, REG_INTBR_GPBR1);
+
+	twl_i2c_read_u8(TWL4030_MODULE_INTBR, &gpbr1, REG_INTBR_GPBR1);
+	gpbr1 &= ~REG_INTBR_GPBR1_PWM1_CLK_EN_MASK;
+	gpbr1 |= (enable ? REG_INTBR_GPBR1_PWM1_CLK_EN : 0);
+	twl_i2c_write_u8(TWL4030_MODULE_INTBR, gpbr1, REG_INTBR_GPBR1);
+}
+
+static void zoom_set_primary_brightness(u8 brightness)
+{
+	u8 pmbr1;
+	static int zoom_pwm1_config;
+	static int zoom_pwm1_output_enabled;
+
+	if (zoom_pwm1_config == 0) {
+		twl_i2c_read_u8(TWL4030_MODULE_INTBR, &pmbr1, REG_INTBR_PMBR1);
+
+		pmbr1 &= ~REG_INTBR_PMBR1_PWM1_PIN_MASK;
+		pmbr1 |=  REG_INTBR_PMBR1_PWM1_PIN_EN;
+		twl_i2c_write_u8(TWL4030_MODULE_INTBR, pmbr1, REG_INTBR_PMBR1);
+
+		zoom_pwm1_config = 1;
+	}
+
+	if (!brightness) {
+		zoom_pwm_enable(0);
+		zoom_pwm1_output_enabled = 0;
+		return;
+	}
+
+	zoom_pwm_config(brightness);
+	if (zoom_pwm1_output_enabled == 0) {
+		zoom_pwm_enable(1);
+		zoom_pwm1_output_enabled = 1;
+	}
+}
+
+static struct omap4430_sdp_disp_led_platform_data zoom_disp_led_data = {
+	.flags = LEDS_CTRL_AS_ONE_DISPLAY,
+	.primary_display_set = zoom_set_primary_brightness,
+	.secondary_display_set = NULL,
+};
+
+
+static struct platform_device zoom_disp_led = {
+	.name   =       "display_led",
+	.id     =       -1,
+	.dev    = {
+		.platform_data = &zoom_disp_led_data,
+	},
 };
 
 static struct omap2_hsmmc_info mmc[] = {
@@ -418,6 +507,7 @@ void __init zoom_peripherals_init(void)
 	omap_i2c_init();
 	synaptics_dev_init();
 	platform_device_register(&omap_vwlan_device);
+	platform_device_register(&zoom_disp_led);
 	usb_musb_init(NULL);
 	enable_board_wakeup_source();
 	omap_serial_init();
