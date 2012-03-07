@@ -83,10 +83,10 @@ static int
 task_notify_func(struct notifier_block *self, unsigned long val, void *data)
 {
 	struct task_struct *task = data;
-	if (task == lowmem_deathpending) {
+
+	if (task == lowmem_deathpending)
 		lowmem_deathpending = NULL;
-		task_handoff_unregister(&task_nb);
-	}
+
 	return NOTIFY_OK;
 }
 
@@ -186,21 +186,19 @@ static int lowmem_shrink(struct shrinker *s, int nr_to_scan, gfp_t gfp_mask)
 			     selected_oom_adj, selected_tasksize);
 
 		/*
-		 * If CONFIG_PROFILING is off, then task_handoff_register()
-		 * is a nop. In that case we don't want to stall the killer
-		 * by setting lowmem_deathpending.
+		 * If CONFIG_PROFILING is off, then we don't want to stall
+		 * the killer by setting lowmem_deathpending.
 		 */
 #ifdef CONFIG_PROFILING
 		lowmem_deathpending = selected;
 		lowmem_deathpending_timeout = jiffies + HZ;
-		task_handoff_register(&task_nb);
 #endif
 		send_sig(SIGKILL, selected, 0);
 		rem -= selected_tasksize;
 	}
 	lowmem_print(4, "lowmem_shrink %d, %x, return %d\n",
 		     nr_to_scan, gfp_mask, rem);
-	read_unlock();
+	rcu_read_unlock();
 	return rem;
 }
 
@@ -211,9 +209,7 @@ static struct shrinker lowmem_shrinker = {
 
 static int __init lowmem_init(void)
 {
-#ifdef CONFIG_DUMP_TASKS_ON_NOPAGE
-	timeout = jiffies + 1200 * HZ;
-#endif
+	task_handoff_register(&task_nb);
 	register_shrinker(&lowmem_shrinker);
 	return 0;
 }
@@ -221,6 +217,7 @@ static int __init lowmem_init(void)
 static void __exit lowmem_exit(void)
 {
 	unregister_shrinker(&lowmem_shrinker);
+	task_handoff_unregister(&task_nb);
 }
 
 module_param_named(cost, lowmem_shrinker.seeks, int, S_IRUGO | S_IWUSR);

@@ -44,5 +44,8 @@ static inline void oom_killer_enable(void)
 {
 	oom_killer_disabled = false;
 }
+
+extern struct task_struct *find_lock_task_mm(struct task_struct *p);
+
 #endif /* __KERNEL__*/
 #endif /* _INCLUDE_LINUX_OOM_H */
