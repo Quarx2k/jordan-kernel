@@ -392,7 +392,7 @@ config OMAP_TPS6236X
 
 config OMAP_ALLOW_OSWR
 	bool  "Enable Open Switch Retention"
-	depends on ARCH_OMAP4
+	depends on ARCH_OMAP4 || ARCH_OMAP3
 	default n
 	help
 	  Select this option to enable OSWR support.
