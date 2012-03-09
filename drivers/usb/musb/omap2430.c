@@ -573,6 +573,28 @@ static int __exit omap2430_remove(struct platform_device *pdev)
 }
 
 #ifdef CONFIG_PM
+void musb_platform_save_context(struct musb *musb)
+{
+	void __iomem *musb_base = musb->mregs;
+	musb->context.otg_sysconfig = musb_readl(musb->mregs, OTG_SYSCONFIG);
+	musb->context.otg_interfsel = musb_readl(musb->mregs, OTG_INTERFSEL);
+	musb->context.otg_forcestandby = musb_readl(musb->mregs,
+							OTG_FORCESTDBY);
+	musb_writel(musb_base, OTG_FORCESTDBY, 1);
+}
+
+void musb_platform_restore_context(struct musb *musb)
+{
+	void __iomem *musb_base = musb->mregs;
+	u32 forcestandby = musb->context.otg_forcestandby;
+	musb_writel(musb->mregs, OTG_SYSCONFIG, musb->context.otg_sysconfig);
+
+	musb_writel(musb->mregs, OTG_INTERFSEL,
+					musb->context.otg_interfsel);
+	if (omap_rev() < OMAP3630_REV_ES1_2)
+		forcestandby = 0;
+	musb_writel(musb_base, OTG_FORCESTDBY, forcestandby);
+}
 
 static int omap2430_runtime_suspend(struct device *dev)
 {

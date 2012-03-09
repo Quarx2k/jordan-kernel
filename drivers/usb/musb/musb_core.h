@@ -390,6 +390,12 @@ struct musb_csr_regs {
 
 struct musb_context_registers {
 
+#if defined(CONFIG_ARCH_OMAP2430) || defined(CONFIG_ARCH_OMAP3) || \
+defined(CONFIG_ARCH_OMAP4)
+	u32 otg_sysconfig, otg_forcestandby;
+	u32 ctl_dev_conf;
+	u32 usbotg_control;
+#endif
 	u8 power;
 	u16 intrtxe, intrrxe;
 	u8 intrusbe;
@@ -401,6 +407,16 @@ struct musb_context_registers {
 
 	struct musb_csr_regs index_regs[MUSB_C_NUM_EPS];
 };
+
+#if defined(CONFIG_ARCH_OMAP2430) || defined(CONFIG_ARCH_OMAP3) || \
+defined(CONFIG_ARCH_OMAP4)
+extern void musb_platform_save_context(struct musb *musb);
+extern void musb_platform_restore_context(struct musb *musb);
+
+#else
+#define musb_platform_save_context(m)	do {} while (0)
+#define musb_platform_restore_context(m)	do {} while (0)
+#endif
 
 /*
  * struct musb - Driver instance data.
