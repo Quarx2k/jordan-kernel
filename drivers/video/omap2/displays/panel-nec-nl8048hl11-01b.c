@@ -129,6 +129,7 @@ static int nec_8048_panel_probe(struct omap_dss_device *dssdev)
 
 	memset(&props, 0, sizeof(struct backlight_properties));
 	props.max_brightness = 255;
+	props.type = BACKLIGHT_RAW;
 
 	bl = backlight_device_register("nec-8048", &dssdev->dev, dssdev,
 			&nec_8048_bl_ops, &props);
@@ -156,7 +157,6 @@ static void nec_8048_panel_remove(struct omap_dss_device *dssdev)
 	struct nec_8048_data *necd = dev_get_drvdata(&dssdev->dev);
 	struct backlight_device *bl = necd->bl;
 
-	bl->props.power = FB_BLANK_POWERDOWN;
 	nec_8048_bl_update_status(bl);
 	backlight_device_unregister(bl);
 
@@ -174,12 +174,13 @@ static int nec_8048_panel_enable(struct omap_dss_device *dssdev)
 		if (r)
 			return r;
 	}
-
+	bl->props.brightness = dssdev->max_backlight_level;
 	r = nec_8048_bl_update_status(bl);
 	if (r < 0)
 		dev_err(&dssdev->dev, "failed to set lcd brightness\n");
 
 	r = omapdss_dpi_display_enable(dssdev);
+	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
 
 	return r;
 }
@@ -190,7 +191,7 @@ static void nec_8048_panel_disable(struct omap_dss_device *dssdev)
 	struct backlight_device *bl = necd->bl;
 
 	omapdss_dpi_display_disable(dssdev);
-
+	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
 	bl->props.brightness = 0;
 	nec_8048_bl_update_status(bl);
 
@@ -201,11 +202,13 @@ static void nec_8048_panel_disable(struct omap_dss_device *dssdev)
 static int nec_8048_panel_suspend(struct omap_dss_device *dssdev)
 {
 	nec_8048_panel_disable(dssdev);
+	dssdev->state = OMAP_DSS_DISPLAY_SUSPENDED;
 	return 0;
 }
 
 static int nec_8048_panel_resume(struct omap_dss_device *dssdev)
 {
+	dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
 	return nec_8048_panel_enable(dssdev);
 }
 
