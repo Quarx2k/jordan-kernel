@@ -1231,12 +1231,18 @@ int twl6030_exit_irq(void);
 #ifdef CONFIG_PM
 static int twl_suspend(struct i2c_client *client, pm_message_t mesg)
 {
-	return irq_set_irq_wake(client->irq, 1);
+	if (!cpu_is_omap34xx())
+		return irq_set_irq_wake(client->irq, 1);
+	else
+		return 0;
 }
 
 static int twl_resume(struct i2c_client *client)
 {
-	return irq_set_irq_wake(client->irq, 0);
+	if (!cpu_is_omap34xx())
+		return irq_set_irq_wake(client->irq, 0);
+	else
+		return 0;
 }
 #else
 #define twl_suspend	NULL
