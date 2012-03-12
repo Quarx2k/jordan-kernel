@@ -251,6 +251,7 @@ obj-$(CONFIG_MACH_OMAP_ZOOM2)		+= board-zoom.o \
 					   omapxx_apps_brd_id.o
 obj-$(CONFIG_MACH_OMAP_ZOOM3)		+= board-zoom.o \
 					   board-zoom-peripherals.o \
+					   board-zoom2-camera.o \
 					   board-zoom-display.o \
 					   board-flash.o \
 					   hsmmc.o \
