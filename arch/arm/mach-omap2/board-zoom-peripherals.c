@@ -22,6 +22,8 @@
 #include <linux/synaptics_i2c_rmi.h>
 #include <linux/leds-omap4430sdp-display.h>
 
+#include <media/v4l2-int-device.h>
+
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
@@ -476,6 +478,28 @@ static struct i2c_board_info __initdata zoom2_i2c_bus2_info[] = {
 		.platform_data = &synaptics_platform_data,
 		.irq = OMAP_GPIO_IRQ(OMAP_SYNAPTICS_GPIO),
 	},
+#if (defined(CONFIG_VIDEO_IMX046) || defined(CONFIG_VIDEO_IMX046_MODULE)) && \
+	defined(CONFIG_VIDEO_OMAP3)
+	{
+		I2C_BOARD_INFO(IMX046_NAME, IMX046_I2C_ADDR),
+		.platform_data = &zoom2_imx046_platform_data,
+	},
+#endif
+#if (defined(CONFIG_VIDEO_LV8093) || defined(CONFIG_VIDEO_LV8093_MODULE)) && \
+	defined(CONFIG_VIDEO_OMAP3)
+	{
+		I2C_BOARD_INFO(LV8093_NAME,  LV8093_AF_I2C_ADDR),
+		.platform_data = &zoom2_lv8093_platform_data,
+	},
+#endif
+};
+
+static struct i2c_board_info __initdata zoom2_i2c_bus3_info[] = {
+#ifdef CONFIG_PANEL_SIL9022
+	{
+		I2C_BOARD_INFO(SIL9022_DRV_NAME, SI9022_I2CSLAVEADDRESS),
+	},
+#endif
 };
 static int __init omap_i2c_init(void)
 {
@@ -511,4 +535,5 @@ void __init zoom_peripherals_init(void)
 	usb_musb_init(NULL);
 	enable_board_wakeup_source();
 	omap_serial_init();
+	zoom2_cam_init();
 }

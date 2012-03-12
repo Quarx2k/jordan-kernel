@@ -135,6 +135,11 @@ static struct resource omap3isp_resources[] = {
 		.flags		= IORESOURCE_MEM,
 	},
 	{
+		.start		= OMAP3430_ISP_CBUFF_BASE,
+		.end		= OMAP3430_ISP_CBUFF_END,
+		.flags		= IORESOURCE_MEM,
+	},
+	{
 		.start		= OMAP3430_ISP_CCP2_BASE,
 		.end		= OMAP3430_ISP_CCP2_END,
 		.flags		= IORESOURCE_MEM,
@@ -224,6 +229,7 @@ static inline void omap_init_camera(void)
 	if (cpu_is_omap24xx())
 		platform_device_register(&omap2cam_device);
 #endif
+	platform_device_register(&omap3isp_device);
 }
 
 struct omap_device_pm_latency omap_keyboard_latency[] = {
