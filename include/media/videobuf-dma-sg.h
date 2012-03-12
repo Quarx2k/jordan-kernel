@@ -62,6 +62,7 @@ struct videobuf_dmabuf {
 	int                 sglen;
 	int                 nr_pages;
 	int                 direction;
+	int                 from_vmio;
 };
 
 struct videobuf_dma_sg_memory {
