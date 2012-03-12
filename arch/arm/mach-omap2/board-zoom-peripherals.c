@@ -524,9 +524,6 @@ static void enable_board_wakeup_source(void)
 
 void __init zoom_peripherals_init(void)
 {
-	if (wl12xx_set_platform_data(&omap_zoom_wlan_data))
-		pr_err("error setting wl12xx data\n");
-
 	twl4030_get_scripts(&zoom_t2scripts_data);
 	omap_i2c_init();
 	synaptics_dev_init();

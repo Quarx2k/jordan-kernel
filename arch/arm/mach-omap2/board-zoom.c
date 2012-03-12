@@ -20,6 +20,7 @@
 #include <linux/memblock.h>
 #include <linux/skbuff.h>
 #include <linux/ti_wilink_st.h>
+#include <linux/wl12xx.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -39,6 +40,8 @@
 #define ZOOM3_EHCI_RESET_GPIO		64
 #define ZOOM3_McBSP3_BT_GPIO            164
 #define ZOOM3_BT_RESET_GPIO             109
+#define ZOOM3_WIFI_PMENA_GPIO		101
+#define ZOOM3_WIFI_IRQ_GPIO		162
 
 #define WILINK_UART_DEV_NAME            "/dev/ttyO1"
 
@@ -181,6 +184,35 @@ fail:
 	return ret;
 }
 
+static void config_wlan_mux(void)
+{
+	/* WLAN PW_EN and IRQ */
+	omap_mux_init_gpio(ZOOM3_WIFI_PMENA_GPIO, OMAP_PIN_OUTPUT);
+	omap_mux_init_gpio(ZOOM3_WIFI_IRQ_GPIO, OMAP_PIN_INPUT |
+				OMAP_PIN_OFF_WAKEUPENABLE);
+
+	/* MMC3 */
+	omap_mux_init_signal("etk_clk.sdmmc3_clk", OMAP_PIN_INPUT_PULLUP);
+	omap_mux_init_signal("mcspi1_cs1.sdmmc3_cmd", OMAP_PIN_INPUT_PULLUP);
+	omap_mux_init_signal("etk_d4.sdmmc3_dat0", OMAP_PIN_INPUT_PULLUP);
+	omap_mux_init_signal("etk_d5.sdmmc3_dat1", OMAP_PIN_INPUT_PULLUP);
+	omap_mux_init_signal("etk_d6.sdmmc3_dat2", OMAP_PIN_INPUT_PULLUP);
+	omap_mux_init_signal("etk_d3.sdmmc3_dat3", OMAP_PIN_INPUT_PULLUP);
+}
+
+static struct wl12xx_platform_data zoom3_wlan_data __initdata = {
+	.irq = OMAP_GPIO_IRQ(ZOOM3_WIFI_IRQ_GPIO),
+	.board_ref_clock = WL12XX_REFCLOCK_26,
+	.board_tcxo_clock = WL12XX_TCXOCLOCK_26,
+};
+
+static void zoom3_wifi_init(void)
+{
+	config_wlan_mux();
+	if (wl12xx_set_platform_data(&zoom3_wlan_data))
+		pr_err("Error setting wl12xx data\n");
+}
+
 static void __init omap_zoom_init(void)
 {
 	if (machine_is_omap_zoom2()) {
@@ -194,6 +226,7 @@ static void __init omap_zoom_init(void)
 
 	board_nand_init(zoom_nand_partitions, ARRAY_SIZE(zoom_nand_partitions),
 						ZOOM_NAND_CS, NAND_BUSWIDTH_16);
+	zoom3_wifi_init();
 	zoom_debugboard_init();
 	zoom_peripherals_init();
 	zoom_display_init();
