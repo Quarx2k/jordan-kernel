@@ -633,6 +633,11 @@ static struct omap_hwmod_class omap3xxx_timer_hwmod_class = {
 	.rev =  OMAP_TIMER_IP_VERSION_1,
 };
 
+/* secure timer can assign this to .dev_attr field */
+static struct omap_secure_timer_dev_attr secure_timer_dev_attr = {
+	.is_secure_timer	= true,
+};
+
 /* timer1 */
 static struct omap_hwmod omap3xxx_timer1_hwmod;
 static struct omap_hwmod_irq_info omap3xxx_timer1_mpu_irqs[] = {
@@ -1230,6 +1235,7 @@ static struct omap_hwmod omap3xxx_timer12_hwmod = {
 	.slaves		= omap3xxx_timer12_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap3xxx_timer12_slaves),
 	.class		= &omap3xxx_timer_hwmod_class,
+	.dev_attr       = &secure_timer_dev_attr,
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430)
 };
 
