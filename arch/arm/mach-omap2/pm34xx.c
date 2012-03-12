@@ -487,14 +487,6 @@ void omap_sram_idle(bool suspend)
 	if (pwrdm_read_prev_pwrst(mpu_pwrdm) == PWRDM_POWER_OFF)
 		restore_table_entry();
 
-	/* CORE */
-	if (core_next_state <= PWRDM_POWER_RET) {
-		set_dpll3_volt_freq(0);
-		omap2_cm_write_mod_reg((1 << OMAP3430_AUTO_PERIPH_DPLL_SHIFT) |
-				(1 << OMAP3430_AUTO_CORE_DPLL_SHIFT),
-				PLL_MOD,
-				CM_AUTOIDLE);
-	}
 
 	if (core_next_state < PWRDM_POWER_ON) {
 		core_prev_state = pwrdm_read_prev_pwrst(core_pwrdm);
@@ -513,8 +505,6 @@ void omap_sram_idle(bool suspend)
 	omap2_cm_write_mod_reg(1 << OMAP3430_AUTO_PERIPH_DPLL_SHIFT, PLL_MOD,
 								CM_AUTOIDLE);
 
-	if (core_next_state <= PWRDM_POWER_RET)
-		set_dpll3_volt_freq(1);
 
 	omap3_intc_resume_idle();
 
