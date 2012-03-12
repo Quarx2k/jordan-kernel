@@ -36,6 +36,7 @@
 
 #define MAGIC_DMABUF 0x19721112
 #define MAGIC_SG_MEM 0x17890714
+#define PHYS_TO_PAGE(phys)	pfn_to_page((phys) >> PAGE_SHIFT)
 
 #define MAGIC_CHECK(is, should)						\
 	if (unlikely((is) != (should))) {				\
@@ -72,6 +73,7 @@ static struct scatterlist *videobuf_vmalloc_to_sg(unsigned char *virt,
 	sglist = vzalloc(nr_pages * sizeof(*sglist));
 	if (NULL == sglist)
 		return NULL;
+	memset(sglist, 0, nr_pages * sizeof(*sglist));
 	sg_init_table(sglist, nr_pages);
 	for (i = 0; i < nr_pages; i++, virt += PAGE_SIZE) {
 		pg = vmalloc_to_page(virt);
@@ -104,17 +106,20 @@ static struct scatterlist *videobuf_pages_to_sg(struct page **pages,
 	if (NULL == sglist)
 		return NULL;
 	sg_init_table(sglist, nr_pages);
-
+#if !defined(CONFIG_HIGHMEM)
 	if (PageHighMem(pages[0]))
 		/* DMA to highmem pages might not work */
 		goto highmem;
+#endif
 	sg_set_page(&sglist[0], pages[0], PAGE_SIZE - offset, offset);
 	size -= PAGE_SIZE - offset;
 	for (i = 1; i < nr_pages; i++) {
 		if (NULL == pages[i])
 			goto nopage;
+#if !defined(CONFIG_HIGHMEM)
 		if (PageHighMem(pages[i]))
 			goto highmem;
+#endif
 		sg_set_page(&sglist[i], pages[i], min_t(size_t, PAGE_SIZE, size), 0);
 		size -= min_t(size_t, PAGE_SIZE, size);
 	}
@@ -125,10 +130,12 @@ nopage:
 	vfree(sglist);
 	return NULL;
 
+#if !defined(CONFIG_HIGHMEM)
 highmem:
 	dprintk(2, "sgl: oops - highmem page\n");
 	vfree(sglist);
 	return NULL;
+#endif
 }
 
 /* --------------------------------------------------------------------- */
@@ -151,11 +158,75 @@ void videobuf_dma_init(struct videobuf_dmabuf *dma)
 }
 EXPORT_SYMBOL_GPL(videobuf_dma_init);
 
+/*
+ *  ======== user_va2_pa ========
+ *  Purpose:
+ *      This function walks through the page tables to convert a userland
+ *      virtual address to physical address
+ */
+static u32 user_va_to_pa(struct mm_struct *mm, u32 address)
+{
+	pgd_t *pgd;
+	pmd_t *pmd;
+	pte_t *ptep, pte;
+	pgd = pgd_offset(mm, address);
+	if (!(pgd_none(*pgd) || pgd_bad(*pgd))) {
+		pmd = pmd_offset(pgd, address);
+		if (!(pmd_none(*pmd) || pmd_bad(*pmd))) {
+			ptep = pte_offset_map(pmd, address);
+			if (ptep) {
+				pte = *ptep;
+				if (pte_present(pte))
+					return pte & PAGE_MASK;
+			}
+		}
+	}
+	return 0;
+}
+
+/* Memory region which falls in VM_IO region will not have
+   struct page* and hence pages[index] = physical address
+   is sufficient for normal sg operation
+   Since there are no pages associted with VM_IO region
+   it will not be swapped out and hence no requirement of
+   say get_page/put_page etc.
+*/
+
+unsigned get_vm_io_pages(u32 uva_start, u32 num_usr_pgs, struct page **pages)
+{
+	u32 mpu_addr = uva_start;
+	u32 status = 0;
+	struct mm_struct *mm = current->mm;
+	u32 pa = 0;
+	int pg_i ;
+	/* Get the physical addresses for user buffer */
+	for (pg_i = 0; pg_i < num_usr_pgs; pg_i++) {
+		pa = user_va_to_pa(mm, mpu_addr);
+		if (!pa) {
+			status = -EPERM;
+			goto pages_err;
+
+		}
+		mpu_addr += PAGE_SIZE; /* We may need to use more than
+					PAGE_SIZE, at present SG chain
+					is enabled */
+		pages[pg_i] = (void *)pa; /* Note, physical address and
+					not page */
+	}
+	return pg_i;
+pages_err:
+	return status;
+
+}
+
 static int videobuf_dma_init_user_locked(struct videobuf_dmabuf *dma,
 			int direction, unsigned long data, unsigned long size)
 {
 	unsigned long first, last;
 	int err, rw = 0;
+
+	struct vm_area_struct *vma;
+	struct mm_struct *mm;
 
 	dma->direction = direction;
 	switch (dma->direction) {
@@ -181,10 +252,23 @@ static int videobuf_dma_init_user_locked(struct videobuf_dmabuf *dma,
 	dprintk(1, "init user [0x%lx+0x%lx => %d pages]\n",
 		data, size, dma->nr_pages);
 
-	err = get_user_pages(current, current->mm,
-			     data & PAGE_MASK, dma->nr_pages,
-			     rw == READ, 1, /* force */
-			     dma->pages, NULL);
+	mm = current->mm;
+
+	vma = find_vma(mm, (data & PAGE_MASK));
+
+	if (vma->vm_flags & VM_IO) {
+		err = get_vm_io_pages(data & PAGE_MASK, dma->nr_pages,
+					dma->pages);
+		dma->from_vmio = 1;
+		dma->bus_addr = (unsigned)(dma->pages[0]);
+	} else {
+		down_read(&current->mm->mmap_sem);
+		err = get_user_pages(current, current->mm,
+				data & PAGE_MASK, dma->nr_pages,
+				rw == READ, 1, /* force */
+				dma->pages, NULL);
+		up_read(&current->mm->mmap_sem);
+	}
 
 	if (err != dma->nr_pages) {
 		dma->nr_pages = (err >= 0) ? err : 0;
@@ -247,6 +331,19 @@ int videobuf_dma_init_overlay(struct videobuf_dmabuf *dma, int direction,
 }
 EXPORT_SYMBOL_GPL(videobuf_dma_init_overlay);
 
+int dma_map_sg_vmio(struct device *dev, struct scatterlist *sg, int nents,
+			struct videobuf_dmabuf *dma)
+{
+	struct scatterlist *s;
+	int i;
+	for_each_sg(sg, s, nents, i) {
+		/* On OMAP architecture this is valid,
+		but not valid on architecure having iommu */
+		s->dma_address = (unsigned) dma->pages[i];
+	}
+	return nents;
+}
+
 int videobuf_dma_map(struct device *dev, struct videobuf_dmabuf *dma)
 {
 	MAGIC_CHECK(dma->magic, MAGIC_DMABUF);
@@ -254,20 +351,27 @@ int videobuf_dma_map(struct device *dev, struct videobuf_dmabuf *dma)
 
 	if (dma->pages) {
 		dma->sglist = videobuf_pages_to_sg(dma->pages, dma->nr_pages,
-						   dma->offset, dma->size);
+				dma->offset, dma->size);
 	}
 	if (dma->vaddr) {
 		dma->sglist = videobuf_vmalloc_to_sg(dma->vaddr,
-						     dma->nr_pages);
+				dma->nr_pages);
 	}
 	if (dma->bus_addr) {
-		dma->sglist = vmalloc(sizeof(*dma->sglist));
-		if (NULL != dma->sglist) {
-			dma->sglen = 1;
-			sg_dma_address(&dma->sglist[0])	= dma->bus_addr
-							& PAGE_MASK;
-			dma->sglist[0].offset = dma->bus_addr & ~PAGE_MASK;
-			sg_dma_len(&dma->sglist[0]) = dma->nr_pages * PAGE_SIZE;
+		if (!dma->from_vmio) {
+			dma->sglist = vmalloc(sizeof(*dma->sglist));
+			if (NULL != dma->sglist) {
+				dma->sglen = 1;
+				sg_dma_address(&dma->sglist[0])	= dma->bus_addr
+					& PAGE_MASK;
+				dma->sglist[0].offset =
+						dma->bus_addr & ~PAGE_MASK;
+				sg_dma_len(&dma->sglist[0]) =
+						dma->nr_pages * PAGE_SIZE;
+			}
+		} else {
+			dma->sglen = dma_map_sg_vmio(dev, dma->sglist,
+							dma->nr_pages, dma);
 		}
 	}
 	if (NULL == dma->sglist) {
@@ -276,10 +380,10 @@ int videobuf_dma_map(struct device *dev, struct videobuf_dmabuf *dma)
 	}
 	if (!dma->bus_addr) {
 		dma->sglen = dma_map_sg(dev, dma->sglist,
-					dma->nr_pages, dma->direction);
+				dma->nr_pages, dma->direction);
 		if (0 == dma->sglen) {
 			printk(KERN_WARNING
-			       "%s: videobuf_map_sg failed\n", __func__);
+				"%s: videobuf_map_sg failed\n", __func__);
 			vfree(dma->sglist);
 			dma->sglist = NULL;
 			dma->sglen = 0;
@@ -297,8 +401,8 @@ int videobuf_dma_unmap(struct device *dev, struct videobuf_dmabuf *dma)
 
 	if (!dma->sglen)
 		return 0;
-
-	dma_unmap_sg(dev, dma->sglist, dma->sglen, dma->direction);
+	if (!dma->from_vmio)
+		dma_unmap_sg(dev, dma->sglist, dma->sglen, dma->direction);
 
 	vfree(dma->sglist);
 	dma->sglist = NULL;
@@ -315,13 +419,18 @@ int videobuf_dma_free(struct videobuf_dmabuf *dma)
 	BUG_ON(dma->sglen);
 
 	if (dma->pages) {
-		for (i = 0; i < dma->nr_pages; i++)
-			page_cache_release(dma->pages[i]);
+		if (!dma->from_vmio) {
+			for (i = 0; i < dma->nr_pages; i++) {
+				if (!PageReserved(dma->pages[i]))
+					SetPageDirty(dma->pages[i]);
+				page_cache_release(dma->pages[i]);
+			}
+		}
 		kfree(dma->pages);
 		dma->pages = NULL;
 	}
-
-	vfree(dma->vaddr);
+	if (dma->vaddr)
+		vfree(dma->vaddr);
 	dma->vaddr = NULL;
 
 	if (dma->bus_addr)
@@ -526,8 +635,13 @@ static int __videobuf_sync(struct videobuf_queue *q,
 	MAGIC_CHECK(mem->magic, MAGIC_SG_MEM);
 	MAGIC_CHECK(mem->dma.magic, MAGIC_DMABUF);
 
-	dma_sync_sg_for_cpu(q->dev, mem->dma.sglist,
-			    mem->dma.sglen, mem->dma.direction);
+	/* if dma is directly from one src PA to dest PA
+	we do not require cpu sync
+	*/
+
+	if (!mem->dma.from_vmio)
+		dma_sync_sg_for_cpu(q->dev, mem->dma.sglist,
+				mem->dma.nr_pages, mem->dma.direction);
 
 	return 0;
 }
