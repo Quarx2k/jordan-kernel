@@ -451,8 +451,18 @@ void omap_sram_idle(bool suspend)
 	/* CORE */
 	if (core_next_state < PWRDM_POWER_ON) {
 		if (core_next_state == PWRDM_POWER_OFF) {
+			omap2_prm_set_mod_reg_bits(OMAP3430_AUTO_OFF_MASK,
+						OMAP3430_GR_MOD,
+						OMAP3_PRM_VOLTCTRL_OFFSET);
 			omap3_core_save_context();
 			omap3_cm_save_context();
+
+		} else {
+			omap2_prm_set_mod_reg_bits(OMAP3430_AUTO_RET_MASK,
+						OMAP3430_GR_MOD,
+						OMAP3_PRM_VOLTCTRL_OFFSET);
+
+
 		}
 	}
 
@@ -500,6 +510,10 @@ void omap_sram_idle(bool suspend)
 			omap2_prm_clear_mod_reg_bits(OMAP3430_AUTO_OFF_MASK,
 					       OMAP3430_GR_MOD,
 					       OMAP3_PRM_VOLTCTRL_OFFSET);
+		else
+			omap2_prm_clear_mod_reg_bits(OMAP3430_AUTO_RET_MASK,
+						OMAP3430_GR_MOD,
+						OMAP3_PRM_VOLTCTRL_OFFSET);
 	}
 
 	omap2_cm_write_mod_reg(1 << OMAP3430_AUTO_PERIPH_DPLL_SHIFT, PLL_MOD,
@@ -864,6 +878,16 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 
 	return omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
 }
+
+static int __init omap3_pm_early_init(void)
+{
+	/* set sys_off_mode active low */
+	omap2_prm_clear_mod_reg_bits(OMAP3430_OFFMODE_POL_MASK, OMAP3430_GR_MOD,
+				OMAP3_PRM_POLCTRL_OFFSET);
+	return 0;
+}
+
+arch_initcall(omap3_pm_early_init);
 
 /*
  * Enable hw supervised mode for all clockdomains if it's

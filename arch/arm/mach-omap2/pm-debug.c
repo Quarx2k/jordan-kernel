@@ -37,6 +37,7 @@
 #include "cm2xxx_3xxx.h"
 #include "prm2xxx_3xxx.h"
 #include "pm.h"
+#include "prm-regbits-34xx.h"
 
 #define PM_DEBUG_MAX_SAVED_REGS	64
 #define PM_DEBUG_PRM_MIN	0x4A306000
@@ -51,6 +52,7 @@ u32 enable_off_mode;
 u32 sleep_while_idle;
 u32 wakeup_timer_seconds;
 u32 wakeup_timer_milliseconds;
+u32 voltage_off_while_idle;
 u32 omap4_device_off_counter = 0;
 
 #ifdef CONFIG_PM_ADVANCED_DEBUG
@@ -750,6 +752,16 @@ static int option_set(void *data, u64 val)
 		if (cpu_is_omap34xx())
 			omap3_pm_off_mode_enable(val);
 	}
+	if (option == &voltage_off_while_idle) {
+		if (voltage_off_while_idle)
+			omap2_prm_set_mod_reg_bits(OMAP3430_SEL_OFF_MASK,
+						OMAP3430_GR_MOD,
+						OMAP3_PRM_VOLTCTRL_OFFSET);
+		else
+			omap2_prm_clear_mod_reg_bits(OMAP3430_SEL_OFF_MASK,
+						OMAP3430_GR_MOD,
+						OMAP3_PRM_VOLTCTRL_OFFSET);
+	}
 
 	return 0;
 }
@@ -820,6 +832,14 @@ skip_reg_debufs:
 	(void) debugfs_create_file("wakeup_timer_milliseconds",
 			S_IRUGO | S_IWUSR, d, &wakeup_timer_milliseconds,
 			&pm_dbg_option_fops);
+
+	/* Only enable for >= 3430 ES2.1 . Going to 0V on anything under
+	 * ES2.1 will eventually cause a crash */
+	if (omap_rev() > OMAP3430_REV_ES2_0)
+		(void) debugfs_create_file("voltage_off_while_idle",
+					   S_IRUGO | S_IWUGO, d,
+					   &voltage_off_while_idle,
+					   &pm_dbg_option_fops);
 
 #ifdef CONFIG_PM_ADVANCED_DEBUG
 	(void) debugfs_create_file("saved_reg_show",
