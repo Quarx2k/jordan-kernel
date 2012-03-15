@@ -3332,7 +3332,7 @@ int dsi_vc_dcs_read(struct omap_dss_device *dssdev, int channel, u8 dcs_cmd,
 	int r;
 
 	if (dsi->debug_read)
-		DSSDBG("dsi_vc_dcs_read(ch%d, dcs_cmd %x)\n", channel, dcs_cmd);
+		DSSDBG("%s(ch%d, dcs_cmd %x)\n", __func__, channel, dcs_cmd);
 
 	r = dsi_vc_send_short(dsidev, channel, DSI_DT_DCS_READ, dcs_cmd, 0);
 	if (r)
@@ -3426,8 +3426,8 @@ int dsi_vc_dcs_read(struct omap_dss_device *dssdev, int channel, u8 dcs_cmd,
 
 	BUG();
 err:
-	DSSERR("dsi_vc_dcs_read(ch %d, cmd 0x%02x) failed\n",
-			channel, dcs_cmd);
+	DSSERR("%s(ch %d, cmd 0x%02x) failed\n",
+			__func__, channel, dcs_cmd);
 	return r;
 
 }
@@ -3537,7 +3537,7 @@ int dsi_vc_gen_read_2(struct omap_dss_device *dssdev, int channel, u16 cmd,
 	int r;
 
 	if (dsi->debug_read)
-		DSSDBG("dsi_vc_dcs_read(ch%d, dcs_cmd %x)\n", channel, cmd);
+		DSSDBG("%s(ch%d, cmd %x)\n", __func__, channel, cmd);
 
 	r = dsi_vc_send_short(dsidev, channel, DSI_DT_GENERIC_READ_2, cmd, 0);
 	if (r)
@@ -3631,8 +3631,8 @@ int dsi_vc_gen_read_2(struct omap_dss_device *dssdev, int channel, u16 cmd,
 
 	BUG();
 err:
-	DSSERR("dsi_vc_dcs_read(ch %d, cmd 0x%02x) failed\n",
-			channel, cmd);
+	DSSERR("%s(ch %d, cmd 0x%02x) failed\n",
+			__func__, channel, cmd);
 	return r;
 
 }
