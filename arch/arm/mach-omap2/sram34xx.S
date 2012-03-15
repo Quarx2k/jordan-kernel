@@ -74,6 +74,14 @@
 /* CM_CLKSEL1_PLL bit settings */
 #define CORE_DPLL_CLKOUT_DIV_SHIFT	0x1b
 
+/* DSS registers */
+#define OMAP34XX_DISPC_BASE	0x48050400
+#define DISPC_CONTROL		OMAP2_L4_IO_ADDRESS(OMAP34XX_DISPC_BASE + 0x040)
+#define DISPC_IRQSTATUS		OMAP2_L4_IO_ADDRESS(OMAP34XX_DISPC_BASE + 0x018)
+#define DISPC_LCD_EN		(1 << 0)
+#define DISPC_VSYNC_ST		(1 << 1)
+#define CM_DSS_FCLK_ST		(1 << 0)
+
 /*
  * omap3_sram_configure_core_dpll - change DPLL3 M2 divider
  *
@@ -159,6 +167,27 @@ skip_cs1_params:
 	mcr	p15, 0, r10, c1, c0, 0	@ write ctrl register
 	dsb				@ flush buffered writes to interconnect
 	isb				@ prevent speculative exec past here
+
+	ldr	r11, omap3_cm_fclk_dss
+	ldr	r12, [r11]
+	and	r12, r12, #CM_DSS_FCLK_ST
+	cmp	r12, #CM_DSS_FCLK_ST	@ check if dss fclk is active
+	blne	configure_dpll
+	ldr	r11, omap3_dispc_ctrl
+	ldr	r12, [r11]
+	and	r12, r12, #DISPC_LCD_EN
+	cmp	r12, #DISPC_LCD_EN	@ check if lcd is enabled
+	blne	configure_dpll
+	ldr	r11, omap3_dispc_irq_st
+	ldr	r12, [r11]
+	and	r12, r12, #DISPC_VSYNC_ST	@ clear vsync
+	str	r12, [r11]
+wait_vsync_set:
+	ldr	r12, [r11]
+	and	r12, r12, #DISPC_VSYNC_ST
+	cmp	r12, #DISPC_VSYNC_ST
+	blne	wait_vsync_set		@ wait for vsync to be set.
+configure_dpll:
 	cmp	r3, #1			@ if increasing SDRC clk rate,
 	bleq	configure_sdrc		@ program the SDRC regs early (for RFR)
 	cmp	r1, #SDRC_UNLOCK_DLL	@ set the intended DLL state
@@ -340,6 +369,12 @@ omap3_sdrc_dlla_ctrl:
 core_m2_mask_val:
 	.word 0x07FFFFFF
 ENDPROC(omap3_sram_configure_core_dpll)
+omap3_cm_fclk_dss:
+	.word OMAP34XX_CM_REGADDR(OMAP3430_DSS_MOD, CM_FCLKEN)
+omap3_dispc_ctrl:
+	.word DISPC_CONTROL
+omap3_dispc_irq_st:
+	.word DISPC_IRQSTATUS
 
 ENTRY(omap3_sram_configure_core_dpll_sz)
 	.word	. - omap3_sram_configure_core_dpll
