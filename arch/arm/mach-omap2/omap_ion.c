@@ -51,7 +51,7 @@ static struct ion_platform_data omap_ion_data = {
 			.type = ION_HEAP_TYPE_CARVEOUT,
 			.id = OMAP_ION_HEAP_SECURE_INPUT,
 			.name = "omap3_carveout",
-			.base = PHYS_ADDR_SMC_MEM -
+			.base = OMAP3_PHYS_ADDR_SMC_MEM -
 					OMAP3_ION_HEAP_CARVEOUT_INPUT_SIZE,
 			.size = OMAP3_ION_HEAP_CARVEOUT_INPUT_SIZE,
 		},
