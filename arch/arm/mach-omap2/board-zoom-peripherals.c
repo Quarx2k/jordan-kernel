@@ -30,7 +30,7 @@
 
 #include <plat/common.h>
 #include <plat/usb.h>
-
+#include <linux/switch.h>
 #include <mach/board-zoom.h>
 
 #include "mux.h"
@@ -188,6 +188,19 @@ static struct regulator_init_data zoom_vsim = {
 	.consumer_supplies      = &zoom_vsim_supply,
 };
 
+static struct gpio_switch_platform_data headset_switch_data = {
+	.name		= "h2w",
+	.gpio		= OMAP_MAX_GPIO_LINES + 2, /* TWL4030 GPIO_2 */
+};
+
+static struct platform_device headset_switch_device = {
+	.name		= "switch-gpio",
+	.id		= -1,
+	.dev		= {
+		.platform_data = &headset_switch_data,
+	}
+};
+
 static struct regulator_init_data zoom_vmmc3 = {
 	.constraints = {
 		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
@@ -204,6 +217,10 @@ static struct fixed_voltage_config zoom_vwlan = {
 	.enable_high		= 1,
 	.enabled_at_boot	= 0,
 	.init_data		= &zoom_vmmc3,
+};
+
+static struct platform_device *zoom_board_devices[] __initdata = {
+	&headset_switch_device,
 };
 
 static struct platform_device omap_vwlan_device = {
@@ -524,6 +541,8 @@ static void enable_board_wakeup_source(void)
 
 void __init zoom_peripherals_init(void)
 {
+	platform_add_devices(zoom_board_devices,
+		ARRAY_SIZE(zoom_board_devices));
 	twl4030_get_scripts(&zoom_t2scripts_data);
 	omap_i2c_init();
 	synaptics_dev_init();
