@@ -33,11 +33,103 @@
 
 /* Register descriptions for twl4030 codec part */
 #include <linux/mfd/twl4030-codec.h>
-
+#include "../../../arch/arm/mach-omap2/mux.h"
 #include "omap-mcbsp.h"
 #include "omap-pcm.h"
 
+#define ZOOM2_BT_MCBSP_GPIO		164
 #define ZOOM2_HEADSET_MUX_GPIO		(OMAP_MAX_GPIO_LINES + 15)
+/* McBSP mux config group */
+enum {
+	ZOOM2_ASOC_MUX_MCBSP2_SLAVE = 0,
+	ZOOM2_ASOC_MUX_MCBSP2_MASTER,
+	ZOOM2_ASOC_MUX_MCBSP3_SLAVE,
+	ZOOM2_ASOC_MUX_MCBSP3_MASTER,
+	ZOOM2_ASOC_MUX_MCBSP3_TRISTATE,
+	ZOOM2_ASOC_MUX_MCBSP4_SLAVE,
+	ZOOM2_ASOC_MUX_MCBSP4_MASTER,
+};
+
+
+static int zoom2_asoc_mux_config(int group)
+{
+	switch (group) {
+	case ZOOM2_ASOC_MUX_MCBSP2_SLAVE:
+		omap_mux_init_signal("mcbsp2_fsx.mcbsp2_fsx",
+						OMAP_PIN_INPUT);
+		omap_mux_init_signal("mcbsp2_clkx.mcbsp2_clkx",
+						OMAP_PIN_INPUT);
+		omap_mux_init_signal("mcbsp2_dr.mcbsp2_dr",
+						OMAP_PIN_INPUT);
+		omap_mux_init_signal("mcbsp2_dx.mcbsp2_dx",
+						OMAP_PIN_OUTPUT);
+		break;
+
+	case ZOOM2_ASOC_MUX_MCBSP3_SLAVE:
+		omap_mux_init_signal("mcbsp3_fsx.mcbsp3_fsx",
+						OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("mcbsp3_clkx.mcbsp3_clkx",
+						OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("mcbsp3_dr.mcbsp3_dr",
+						OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("mcbsp3_dx.mcbsp3_dx",
+						OMAP_PIN_OUTPUT);
+		break;
+
+	case ZOOM2_ASOC_MUX_MCBSP3_MASTER:
+		omap_mux_init_signal("mcbsp_clks.mcbsp_clks",
+						OMAP_PIN_INPUT);
+		omap_mux_init_signal("mcbsp3_fsx.mcbsp3_fsx",
+						OMAP_PIN_OUTPUT);
+		omap_mux_init_signal("mcbsp3_clkx.mcbsp3_clkx",
+						OMAP_PIN_OUTPUT);
+		omap_mux_init_signal("mcbsp3_dr.mcbsp3_dr",
+						OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("mcbsp3_dx.mcbsp3_dx",
+						OMAP_PIN_OUTPUT);
+		break;
+
+	case ZOOM2_ASOC_MUX_MCBSP3_TRISTATE:
+		omap_mux_init_signal("mcbsp3_fsx.safe_mode",
+						OMAP_PIN_INPUT);
+		omap_mux_init_signal("mcbsp3_clkx.safe_mode",
+						OMAP_PIN_INPUT);
+		omap_mux_init_signal("mcbsp3_dr.safe_mode",
+						OMAP_PIN_INPUT);
+		omap_mux_init_signal("mcbsp3_dx.safe_mode",
+						OMAP_PIN_INPUT);
+		break;
+
+	case ZOOM2_ASOC_MUX_MCBSP4_MASTER:
+		omap_mux_init_signal("mcbsp_clks.mcbsp_clks",
+						OMAP_PIN_INPUT);
+		omap_mux_init_signal("mcbsp4_fsx.mcbsp4_fsx",
+						OMAP_PIN_OUTPUT);
+		omap_mux_init_signal("gpmc_ncs4.mcbsp4_clkx",
+						OMAP_PIN_OUTPUT);
+		omap_mux_init_signal("gpmc_ncs5.mcbsp4_dr",
+						OMAP_PIN_INPUT);
+		omap_mux_init_signal("gpmc_ncs6.mcbsp4_dx",
+						OMAP_PIN_OUTPUT);
+		break;
+
+	case ZOOM2_ASOC_MUX_MCBSP4_SLAVE:
+		omap_mux_init_signal("mcbsp4_fsx.mcbsp4_fsx",
+						OMAP_PIN_INPUT);
+		omap_mux_init_signal("gpmc_ncs4.mcbsp4_clkx",
+						OMAP_PIN_INPUT);
+		omap_mux_init_signal("gpmc_ncs5.mcbsp4_dr",
+						OMAP_PIN_INPUT);
+		omap_mux_init_signal("gpmc_ncs6.mcbsp4_dx",
+						OMAP_PIN_OUTPUT);
+		break;
+
+	default:
+		return -ENODEV;
+	}
+	return 0;
+}
+
 
 static int zoom2_hw_params(struct snd_pcm_substream *substream,
 				struct snd_pcm_hw_params *params)
@@ -75,10 +167,53 @@ static int zoom2_hw_params(struct snd_pcm_substream *substream,
 		return ret;
 	}
 
+	/* Enable the 256 FS clock for HDMI */
+	ret = twl4030_cpu_enable_ext_clock(codec_dai->codec, cpu_dai);
+	if (ret < 0) {
+		printk(KERN_ERR "can't set 256 FS clock\n");
+		return ret;
+	}
+
+	/* Use external clock for McBSP2 */
+	ret = snd_soc_dai_set_sysclk(cpu_dai, OMAP_MCBSP_SYSCLK_CLKS_EXT,
+					0, SND_SOC_CLOCK_OUT);
+	if (ret < 0) {
+		printk(KERN_ERR "can't set cpu_dai system clock\n");
+		return ret;
+	}
+
+	/*
+	 * Set headset EXTMUTE signal to ON to make sure we
+	 * get correct headset status
+	 */
+	gpio_direction_output(ZOOM2_HEADSET_EXTMUTE_GPIO, 1);
+
 	return 0;
 }
 
+static void zoom2_shutdown(struct snd_pcm_substream *substream)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+	int ret;
+
+	/* Use functional clock for McBSP2 */
+	ret = snd_soc_dai_set_sysclk(cpu_dai, OMAP_MCBSP_SYSCLK_CLKS_FCLK,
+					0, SND_SOC_CLOCK_OUT);
+	if (ret < 0) {
+		printk(KERN_ERR "can't set cpu_dai system clock\n");
+		/* Ignore error and follow through */
+	}
+
+	/* Disable the 256 FS clock used for HDMI */
+	ret = twl4030_cpu_disable_ext_clock(codec_dai->codec, cpu_dai);
+	if (ret < 0)
+		printk(KERN_ERR "can't disable 256 FS clock\n");
+}
+
 static struct snd_soc_ops zoom2_ops = {
+	.shutdown  = zoom2_shutdown,
 	.hw_params = zoom2_hw_params,
 };
 
@@ -110,6 +245,13 @@ static int zoom2_hw_voice_params(struct snd_pcm_substream *substream,
 		return ret;
 	}
 
+	/* set codec Voice IF to application mode*/
+	ret = snd_soc_dai_set_tristate(codec_dai, 0);
+	if (ret) {
+		printk(KERN_ERR "can't disable codec VIF tristate\n");
+		return ret;
+	}
+
 	/* Set the codec system clock for DAC and ADC */
 	ret = snd_soc_dai_set_sysclk(codec_dai, 0, 26000000,
 					SND_SOC_CLOCK_IN);
@@ -118,11 +260,169 @@ static int zoom2_hw_voice_params(struct snd_pcm_substream *substream,
 		return ret;
 	}
 
+	ret = twl4030_cpu_enable_ext_clock(codec_dai->codec, cpu_dai);
+	if (ret < 0) {
+		printk(KERN_ERR "can't set 256 FS clock\n");
+		return ret;
+	}
+
 	return 0;
 }
 
+static void zoom2_voice_shutdown(struct snd_pcm_substream *substream)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+	int ret;
+
+	zoom2_asoc_mux_config(ZOOM2_ASOC_MUX_MCBSP3_TRISTATE);
+
+	ret = snd_soc_dai_set_tristate(codec_dai, 1);
+	if (ret) {
+		printk(KERN_ERR "can't set codec VIF tristate\n");
+		/* Ignore error and follow through */
+	}
+
+	ret = twl4030_cpu_disable_ext_clock(codec_dai->codec, cpu_dai);
+	if (ret)
+		printk(KERN_ERR "can't set 256 FS clock\n");
+}
+
 static struct snd_soc_ops zoom2_voice_ops = {
+	.shutdown  = zoom2_voice_shutdown,
 	.hw_params = zoom2_hw_voice_params,
+};
+
+static int zoom2_fm_hw_params(struct snd_pcm_substream *substream,
+	struct snd_pcm_hw_params *params)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+	int ret;
+
+	zoom2_asoc_mux_config(ZOOM2_ASOC_MUX_MCBSP4_SLAVE);
+
+	/* Set cpu DAI configuration */
+	ret = snd_soc_dai_set_fmt(cpu_dai,
+				  SND_SOC_DAIFMT_I2S |
+				  SND_SOC_DAIFMT_NB_NF |
+				  SND_SOC_DAIFMT_CBM_CFM);
+	if (ret < 0) {
+		printk(KERN_ERR "can't set cpu DAI configuration\n");
+		return ret;
+	}
+
+	/* Set the codec system clock for DAC and ADC */
+	ret = snd_soc_dai_set_sysclk(codec_dai, 0, 26000000,
+					SND_SOC_CLOCK_IN);
+	if (ret < 0) {
+		printk(KERN_ERR "can't set codec system clock\n");
+		return ret;
+	}
+
+	ret = twl4030_cpu_enable_ext_clock(codec_dai->codec, cpu_dai);
+	if (ret < 0) {
+		printk(KERN_ERR "can't set 256 FS clock\n");
+		return ret;
+	}
+
+	return 0;
+}
+
+static void zoom2_fm_shutdown(struct snd_pcm_substream *substream)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+	int ret;
+
+	ret = twl4030_cpu_disable_ext_clock(codec_dai->codec, cpu_dai);
+	if (ret < 0)
+		printk(KERN_ERR "can't disable 256 FS clock\n");
+}
+
+static struct snd_soc_ops zoom2_fm_ops = {
+	.shutdown  = zoom2_fm_shutdown,
+	.hw_params = zoom2_fm_hw_params,
+};
+
+static int zoom2_pcm_hw_params(struct snd_pcm_substream *substream,
+				struct snd_pcm_hw_params *params)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+	int ret;
+
+	if (gpio_request(ZOOM2_BT_MCBSP_GPIO, "bt_mux") == 0) {
+		gpio_direction_output(ZOOM2_BT_MCBSP_GPIO, 1);
+		gpio_free(ZOOM2_BT_MCBSP_GPIO);
+	}
+	zoom2_asoc_mux_config(ZOOM2_ASOC_MUX_MCBSP3_SLAVE);
+
+	/* Set codec DAI configuration */
+	ret = snd_soc_dai_set_fmt(codec_dai,
+				SND_SOC_DAIFMT_DSP_B |
+				SND_SOC_DAIFMT_NB_IF |
+				SND_SOC_DAIFMT_CBM_CFM);
+	if (ret < 0) {
+		printk(KERN_ERR "can't set codec DAI configuration\n");
+		return ret;
+	}
+
+	/* Set cpu DAI configuration */
+	ret = snd_soc_dai_set_fmt(cpu_dai,
+				SND_SOC_DAIFMT_DSP_B |
+				SND_SOC_DAIFMT_NB_IF |
+				SND_SOC_DAIFMT_CBM_CFM);
+	if (ret < 0) {
+		printk(KERN_ERR "can't set cpu DAI configuration\n");
+		return ret;
+	}
+
+	/* Set the codec system clock for DAC and ADC */
+	ret = snd_soc_dai_set_sysclk(codec_dai, 0, 26000000,
+						SND_SOC_CLOCK_IN);
+	if (ret < 0) {
+		printk(KERN_ERR "can't set codec system clock\n");
+		return ret;
+	}
+
+	ret = snd_soc_dai_set_tristate(codec_dai, 1);
+	if (ret < 0) {
+		printk(KERN_ERR "can't set codec VIF tristate\n");
+		return ret;
+	}
+
+	ret = twl4030_cpu_enable_ext_clock(codec_dai->codec, cpu_dai);
+	if (ret < 0) {
+		printk(KERN_ERR "can't set 256 FS clock\n");
+		return ret;
+	}
+
+	return 0;
+}
+
+
+static void zoom2_pcm_shutdown(struct snd_pcm_substream *substream)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+	int ret;
+
+	zoom2_asoc_mux_config(ZOOM2_ASOC_MUX_MCBSP3_TRISTATE);
+
+	ret = twl4030_cpu_disable_ext_clock(codec_dai->codec, cpu_dai);
+	if (ret < 0)
+		printk(KERN_ERR "can't disable 256 FS clock\n");
+}
+
+static struct snd_soc_ops zoom2_pcm_ops = {
+	.shutdown  = zoom2_pcm_shutdown,
+	.hw_params = zoom2_pcm_hw_params,
 };
 
 /* Zoom2 machine DAPM */
@@ -184,6 +484,8 @@ static int zoom2_twl4030_init(struct snd_soc_pcm_runtime *rtd)
 	snd_soc_dapm_nc_pin(dapm, "CARKITMIC");
 	snd_soc_dapm_nc_pin(dapm, "DIGIMIC0");
 	snd_soc_dapm_nc_pin(dapm, "DIGIMIC1");
+	snd_soc_dapm_nc_pin(dapm, "OUTL");
+	snd_soc_dapm_nc_pin(dapm, "OUTR");
 	snd_soc_dapm_nc_pin(dapm, "EARPIECE");
 	snd_soc_dapm_nc_pin(dapm, "PREDRIVEL");
 	snd_soc_dapm_nc_pin(dapm, "PREDRIVER");
@@ -221,7 +523,7 @@ static struct snd_soc_dai_link zoom2_dai[] = {
 		.ops = &zoom2_ops,
 	},
 	{
-		.name = "TWL4030 PCM",
+		.name = "TWL4030 VOICE",
 		.stream_name = "TWL4030 Voice",
 		.cpu_dai_name = "omap-mcbsp-dai.2",
 		.codec_dai_name = "twl4030-voice",
@@ -229,6 +531,25 @@ static struct snd_soc_dai_link zoom2_dai[] = {
 		.codec_name = "twl4030-codec",
 		.init = zoom2_twl4030_voice_init,
 		.ops = &zoom2_voice_ops,
+	},
+	{	/* For bluetooth */
+		.name = "TWL4030 PCM",
+		.stream_name = "TWL4030 PCM",
+		.cpu_dai_name = "omap-mcbsp-dai.2",
+		.codec_dai_name = "twl4030-voice",
+		.platform_name = "omap-pcm-audio",
+		.codec_name = "twl4030-codec",
+		.init = zoom2_twl4030_voice_init,
+		.ops = &zoom2_pcm_ops,
+	},
+	{
+		.name = "TWL4030 FM",
+		.stream_name = "TWL4030 FM",
+		.cpu_dai_name = "omap-mcbsp-dai.3",
+		.codec_dai_name = "twl4030-clock",
+		.platform_name = "omap-pcm-audio",
+		.codec_name = "twl4030-codec",
+		.ops = &zoom2_fm_ops,
 	},
 };
 
@@ -262,7 +583,6 @@ static int __init zoom2_soc_init(void)
 
 	BUG_ON(gpio_request(ZOOM2_HEADSET_MUX_GPIO, "hs_mux") < 0);
 	gpio_direction_output(ZOOM2_HEADSET_MUX_GPIO, 0);
-
 
 	BUG_ON(gpio_request(ZOOM2_HEADSET_EXTMUTE_GPIO, "ext_mute") < 0);
 	gpio_direction_output(ZOOM2_HEADSET_EXTMUTE_GPIO, 1);
