@@ -69,6 +69,10 @@
 #include <dspbridge/io_sm.h>
 #include "_msg_sm.h"
 
+#ifdef CONFIG_TIDSPBRIDGE_DVFS
+#include <plat/dsp.h>
+#endif
+
 /* Defines, Data Structures, Typedefs */
 #define OUTPUTNOTREADY  0xffff
 #define NOTENABLED      0xffff	/* Channel(s) not enabled */
@@ -1601,7 +1605,7 @@ int io_sh_msetting(struct io_mgr *hio_mgr, u8 desc, void *pargs)
 {
 #ifdef CONFIG_TIDSPBRIDGE_DVFS
 	u32 i;
-	struct dspbridge_platform_data *pdata =
+	 struct omap_dsp_platform_data *pdata =
 	    omap_dspbridge_dev->dev.platform_data;
 
 	switch (desc) {

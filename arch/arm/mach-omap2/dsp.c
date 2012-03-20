@@ -21,7 +21,7 @@
 #include <linux/platform_device.h>
 #include "cm2xxx_3xxx.h"
 #include "prm2xxx_3xxx.h"
-#ifdef CONFIG_BRIDGE_DVFS
+#ifdef CONFIG_TIDSPBRIDGE_DVFS
 #include <plat/omap-pm.h>
 #endif
 
@@ -32,7 +32,7 @@ extern phys_addr_t omap_dsp_get_mempool_base(void);
 static struct platform_device *omap_dsp_pdev;
 
 static struct omap_dsp_platform_data omap_dsp_pdata __initdata = {
-#ifdef CONFIG_BRIDGE_DVFS
+#ifdef CONFIG_TIDSPBRIDGE_DVFS
 	.dsp_set_min_opp = omap_pm_dsp_set_min_opp,
 	.dsp_get_opp = omap_pm_dsp_get_opp,
 	.cpu_set_freq = omap_pm_cpu_set_freq,

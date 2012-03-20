@@ -1135,7 +1135,7 @@ int node_create(struct node_object *hnode)
 	struct dsp_processorstate proc_state;
 	struct proc_object *hprocessor;
 #if defined(CONFIG_TIDSPBRIDGE_DVFS) && !defined(CONFIG_CPU_FREQ)
-	struct dspbridge_platform_data *pdata =
+	 struct omap_dsp_platform_data *pdata =
 	    omap_dspbridge_dev->dev.platform_data;
 #endif
 

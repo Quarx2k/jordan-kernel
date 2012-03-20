@@ -29,6 +29,12 @@
 
 bool off_mode_enabled;
 
+#ifdef CONFIG_TIDSPBRIDGE_DVFS
+#include <plat/common.h>
+#include <../mach-omap2/omap_opp_data.h>
+static struct clk *clk_handle;
+#endif
+
 /*
  * Device-driver-originated constraints (via board-*.c files)
  * WARNING: Device drivers need to now use pm_qos directly.
@@ -116,10 +122,25 @@ const struct omap_opp *omap_pm_dsp_get_opp_table(void)
 
 void omap_pm_dsp_set_min_opp(u8 opp_id)
 {
-	WARN(1, "Deprecated %s: Driver should use omap_device_scale/opp\n",
-	     __func__);
+#ifdef CONFIG_TIDSPBRIDGE_DVFS
+	struct device *iva_dev;
+	int i, cnt = 1;
+	int size;
+	unsigned long dsp_rate[5] = {0};
 
-	return;
+	size  =
+	sizeof(omap36xx_opp_def_list_shared)/sizeof(struct omap_opp_def);
+	for (i = 0; i < size; i++) {
+		if (omap36xx_opp_def_list_shared[i].freq == 0)
+			break;
+		if (!strcmp("iva", omap36xx_opp_def_list_shared[i].hwmod_name))
+			dsp_rate[cnt++] = omap36xx_opp_def_list_shared[i].freq;
+	}
+
+	iva_dev = omap2_get_iva_device();
+
+	omap_device_scale(iva_dev, iva_dev, dsp_rate[opp_id]);
+#endif
 }
 
 int omap_pm_set_min_mpu_freq(struct device *dev, unsigned long f)
@@ -135,9 +156,33 @@ EXPORT_SYMBOL(omap_pm_set_min_mpu_freq);
 
 u8 omap_pm_dsp_get_opp(void)
 {
-	WARN(1, "Deprecated %s: Driver should use omap_device_scale/opp\n",
-	     __func__);
+#ifdef CONFIG_TIDSPBRIDGE_DVFS
+	unsigned long freq;
+	int i, cnt = 1;
+	int size;
+	unsigned long dsp_rate[5] = {0};
 
+	size  =
+	sizeof(omap36xx_opp_def_list_shared)/sizeof(struct omap_opp_def);
+	for (i = 0; i < size; i++) {
+		if (omap36xx_opp_def_list_shared[i].freq == 0)
+			break;
+		if (!strcmp("iva", omap36xx_opp_def_list_shared[i].hwmod_name))
+			dsp_rate[cnt++] = omap36xx_opp_def_list_shared[i].freq;
+	}
+
+	clk_handle = clk_get(NULL, "dpll2_ck");
+	if (!clk_handle)
+		pr_err("%s: clk_get failed to get dpll2_ck\n", __func__);
+
+	freq = clk_get_rate(clk_handle);
+
+	size = sizeof(dsp_rate)/sizeof(int);
+	for (i = 0; i < size; i++) {
+		if (dsp_rate[i] == freq)
+			return i;
+	}
+#endif
 	return 0;
 }
 

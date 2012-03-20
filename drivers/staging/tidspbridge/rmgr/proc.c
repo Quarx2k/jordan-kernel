@@ -1107,7 +1107,7 @@ int proc_load(void *hprocessor, const s32 argc_index,
 #endif
 
 #if defined(CONFIG_TIDSPBRIDGE_DVFS) && !defined(CONFIG_CPU_FREQ)
-	struct dspbridge_platform_data *pdata =
+	 struct omap_dsp_platform_data *pdata =
 	    omap_dspbridge_dev->dev.platform_data;
 #endif
 
@@ -1245,7 +1245,7 @@ int proc_load(void *hprocessor, const s32 argc_index,
 		/* Boost the OPP level to Maximum level supported by baseport */
 #if defined(CONFIG_TIDSPBRIDGE_DVFS) && !defined(CONFIG_CPU_FREQ)
 		if (pdata->cpu_set_freq)
-			(*pdata->cpu_set_freq) (pdata->mpu_speed[VDD1_OPP5]);
+			(*pdata->cpu_set_freq) (pdata->mpu_speed[VDD1_OPP4]);
 #endif
 		status = cod_load_base(cod_mgr, argc_index, (char **)user_args,
 				       dev_brd_write_fxn,

@@ -58,6 +58,7 @@ struct omap_opp_def {
 	bool default_available;
 };
 
+extern struct omap_opp_def omap36xx_opp_def_list_shared[15];
 /*
  * Initialization wrapper used to define an OPP for OMAP variants.
  */

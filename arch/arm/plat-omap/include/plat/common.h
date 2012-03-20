@@ -98,5 +98,6 @@ extern struct device *omap2_get_iva_device(void);
 extern struct device *omap2_get_l3_device(void);
 extern struct device *omap4_get_dsp_device(void);
 extern struct device *omap4_get_fdif_device(void);
-
+extern int omap_device_scale(struct device *req_dev, struct device *target_dev,
+			unsigned long rate);
 #endif /* __ARCH_ARM_MACH_OMAP_COMMON_H */

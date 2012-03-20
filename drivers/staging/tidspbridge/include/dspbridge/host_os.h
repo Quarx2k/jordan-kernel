@@ -57,4 +57,12 @@
 extern struct platform_device *omap_dspbridge_dev;
 extern struct device *bridge;
 
+#ifdef CONFIG_TIDSPBRIDGE_DVFS
+#define DSP_EHANDLE 1
+
+#define VDD1_OPP1   1
+#define VDD1_OPP2   2
+#define VDD1_OPP3   3
+#define VDD1_OPP4   4
+#endif
 #endif

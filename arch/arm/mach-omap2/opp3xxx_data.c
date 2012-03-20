@@ -25,6 +25,9 @@
 #include "omap_opp_data.h"
 #include "pm.h"
 
+#include <plat/common.h>
+struct omap_opp_def omap36xx_opp_def_list_shared[15];  /*shared*/
+
 /* 34xx */
 
 /* VDD1 */
@@ -191,6 +194,11 @@ struct omap_vdd_dep_info omap36xx_vddmpu_dep_info[] = {
 int __init omap3_opp_init(void)
 {
 	int r = -ENODEV;
+
+	memset(omap36xx_opp_def_list_shared, 0,
+		sizeof(omap36xx_opp_def_list_shared));
+	memcpy(omap36xx_opp_def_list_shared, omap36xx_opp_def_list,
+		sizeof(omap36xx_opp_def_list));
 
 	if (!cpu_is_omap34xx())
 		return r;
