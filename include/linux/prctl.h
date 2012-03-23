@@ -126,4 +126,7 @@
 # define PR_SET_MM_AUXV			12
 # define PR_SET_MM_EXE_FILE		13
 
+#define PR_SET_CHILD_SUBREAPER 36
+#define PR_GET_CHILD_SUBREAPER 37
+
 #endif /* _LINUX_PRCTL_H */
