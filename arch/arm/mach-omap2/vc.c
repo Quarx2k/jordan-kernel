@@ -2,6 +2,7 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/clk.h>
+#include <linux/string.h>
 
 #include <plat/cpu.h>
 
@@ -576,7 +577,6 @@ void __init omap_vc_init_channel(struct voltagedomain *voltdm)
 		voltdm->rmw(vc->smps_sa_mask,
 			vc->i2c_slave_addr << __ffs(vc->smps_sa_mask),
 			vc->common->smps_sa_reg);
-		vc->cfg_channel |= vc_cfg_bits->sa;
 	}
 
 	/*
@@ -586,19 +586,21 @@ void __init omap_vc_init_channel(struct voltagedomain *voltdm)
 		voltdm->rmw(vc->smps_volra_mask,
 			    vc->volt_reg_addr << __ffs(vc->smps_volra_mask),
 			    vc->common->smps_volra_reg);
-		vc->cfg_channel |= vc_cfg_bits->rav;
+		if (!strcmp(voltdm->name, "core"))
+			vc->cfg_channel |= vc_cfg_bits->rav;
 	}
 
 	if (vc->cmd_reg_addr != USE_DEFAULT_CHANNEL_I2C_PARAM) {
 		voltdm->rmw(vc->smps_cmdra_mask,
 			    vc->cmd_reg_addr << __ffs(vc->smps_cmdra_mask),
 			    vc->common->smps_cmdra_reg);
-		vc->cfg_channel |= vc_cfg_bits->rac;
 	}
 
 	/* If voltage and cmd regs are same, we can use cmdra register */
-	if (vc->volt_reg_addr == vc->cmd_reg_addr)
-		vc->cfg_channel |= vc_cfg_bits->racen;
+	if (vc->volt_reg_addr == vc->cmd_reg_addr) {
+		if (!strcmp(voltdm->name, "core"))
+			vc->cfg_channel |= vc_cfg_bits->racen;
+	}
 
 	/* Set up the on, inactive, retention and off voltage */
 	on_vsel = voltdm->pmic->uv_to_vsel(voltdm->pmic->on_volt);
