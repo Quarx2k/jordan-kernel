@@ -98,6 +98,11 @@ static struct omap_dss_device zoom_lcd_device = {
 	.name			= "lcd",
 	.driver_name		= "NEC_8048_panel",
 	.type			= OMAP_DISPLAY_TYPE_DPI,
+	.clocks = {
+		.dispc  = {
+			.dispc_fclk_src = OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DISPC,
+		},
+	},
 	.phy.dpi.data_lines	= 24,
 	.platform_enable	= zoom_panel_enable_lcd,
 	.platform_disable	= zoom_panel_disable_lcd,
