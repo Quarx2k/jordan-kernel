@@ -276,6 +276,8 @@ void machine_shutdown(void)
 void machine_halt(void)
 {
 	machine_shutdown();
+	local_fiq_disable();
+	local_irq_disable();
 	while (1);
 }
 
