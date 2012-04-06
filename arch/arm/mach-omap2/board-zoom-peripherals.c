@@ -24,6 +24,11 @@
 
 #include <media/v4l2-int-device.h>
 
+#ifdef CONFIG_PANEL_SIL9022
+#include <mach/sil9022.h>
+#endif
+
+
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
@@ -528,7 +533,8 @@ static int __init omap_i2c_init(void)
 	omap_pmic_init(1, 2400, "twl5030", INT_34XX_SYS_NIRQ, &zoom_twldata);
 	omap_register_i2c_bus(2, 100, zoom2_i2c_bus2_info,
 			ARRAY_SIZE(zoom2_i2c_bus2_info));
-	omap_register_i2c_bus(3, 400, NULL, 0);
+	omap_register_i2c_bus(3, 400, zoom2_i2c_bus3_info,
+			ARRAY_SIZE(zoom2_i2c_bus3_info));
 	return 0;
 }
 
@@ -552,4 +558,8 @@ void __init zoom_peripherals_init(void)
 	enable_board_wakeup_source();
 	omap_serial_init();
 	zoom2_cam_init();
+	#ifdef CONFIG_PANEL_SIL9022
+	config_hdmi_gpio();
+	zoom_hdmi_reset_enable(1);
+	#endif
 }

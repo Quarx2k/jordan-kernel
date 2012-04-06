@@ -16,10 +16,66 @@
 #include <linux/spi/spi.h>
 #include <plat/mcspi.h>
 #include <video/omapdss.h>
+#include <plat/omap-pm.h>
+#include "mux.h"
+#ifdef CONFIG_PANEL_SIL9022
+#include <mach/sil9022.h>
+#endif
 
 #define LCD_PANEL_RESET_GPIO_PROD	96
 #define LCD_PANEL_RESET_GPIO_PILOT	55
 #define LCD_PANEL_QVGA_GPIO		56
+
+#define SIL9022_RESET_GPIO		97
+
+#ifdef CONFIG_PANEL_SIL9022
+void config_hdmi_gpio(void)
+{
+	/* HDMI_RESET uses CAM_PCLK mode 4*/
+	omap_mux_init_signal("gpio_97", OMAP_PIN_INPUT_PULLUP);
+}
+
+void zoom_hdmi_reset_enable(int level)
+{
+	/* Set GPIO_97 to high to pull SiI9022 HDMI transmitter out of reset
+	* and low to disable it.
+	*/
+	gpio_request(SIL9022_RESET_GPIO, "hdmi reset");
+	gpio_direction_output(SIL9022_RESET_GPIO, level);
+}
+
+static int zoom_panel_enable_hdmi(struct omap_dss_device *dssdev)
+{
+	zoom_hdmi_reset_enable(1);
+	return 0;
+}
+
+static void zoom_panel_disable_hdmi(struct omap_dss_device *dssdev)
+{
+	zoom_hdmi_reset_enable(0);
+}
+
+struct hdmi_platform_data zoom_hdmi_data = {
+
+};
+
+static struct omap_dss_device zoom_hdmi_device = {
+	.name = "hdmi",
+	.driver_name = "hdmi_panel",
+	.type = OMAP_DISPLAY_TYPE_DPI,
+	.clocks	= {
+		.dispc	= {
+			.dispc_fclk_src	= OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DISPC,
+		},
+	},
+	.phy.dpi.data_lines = 24,
+	.platform_enable = zoom_panel_enable_hdmi,
+	.platform_disable = zoom_panel_disable_hdmi,
+	.dev		= {
+		.platform_data = &zoom_hdmi_data,
+	},
+};
+#endif
 
 static struct gpio zoom_lcd_gpios[] __initdata = {
 	{ -EINVAL,		GPIOF_OUT_INIT_HIGH, "lcd reset" },
@@ -112,6 +168,9 @@ static struct omap_dss_device zoom_lcd_device = {
 
 static struct omap_dss_device *zoom_dss_devices[] = {
 	&zoom_lcd_device,
+	#ifdef CONFIG_PANEL_SIL9022
+		&zoom_hdmi_device,
+	#endif
 };
 
 static struct omap_dss_board_info zoom_dss_data = {
