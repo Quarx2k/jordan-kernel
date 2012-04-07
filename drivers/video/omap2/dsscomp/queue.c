@@ -179,7 +179,11 @@ dsscomp_t dsscomp_new(struct omap_overlay_manager *mgr)
 	comp->ix = ix;	/* save where this composition came from */
 	comp->ovl_mask = comp->ovl_dmask = 0;
 	comp->frm.sync_id = 0;
-	comp->frm.mgr.ix = display_ix;
+	if (cpu_is_omap3630())
+		comp->frm.mgr.ix = 0;
+	else
+		comp->frm.mgr.ix = display_ix;
+
 	comp->state = DSSCOMP_STATE_ACTIVE;
 
 	DO_IF_DEBUG_FS({
@@ -643,14 +647,16 @@ int dsscomp_state_notifier(struct notifier_block *nb,
 	enum omap_dss_display_state state = arg;
 	struct omap_overlay_manager *mgr = dssdev->manager;
 	if (mgr) {
-		mutex_lock(&mtx);
-		if (state == OMAP_DSS_DISPLAY_DISABLED) {
-			mgr->blank(mgr, true);
-			mgrq[mgr->id].blanking = true;
-		} else if (state == OMAP_DSS_DISPLAY_ACTIVE) {
-			mgrq[mgr->id].blanking = false;
+		if (!cpu_is_omap3630()) {
+			mutex_lock(&mtx);
+			if (state == OMAP_DSS_DISPLAY_DISABLED) {
+				mgr->blank(mgr, true);
+				mgrq[mgr->id].blanking = true;
+			} else if (state == OMAP_DSS_DISPLAY_ACTIVE) {
+				mgrq[mgr->id].blanking = false;
+			}
+			mutex_unlock(&mtx);
 		}
-		mutex_unlock(&mtx);
 	}
 	return 0;
 }

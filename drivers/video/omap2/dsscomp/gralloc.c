@@ -219,7 +219,10 @@ int dsscomp_gralloc_queue(struct dsscomp_setup_dispc_data *d,
 		/* verify display is valid & connected, ignore if not */
 		if (d->mgrs[i].ix >= cdev->num_displays)
 			continue;
-		dev = cdev->displays[d->mgrs[i].ix];
+		if (cpu_is_omap3630())
+			dev = cdev->mgrs[d->mgrs[i].ix]->device;
+		else
+			dev = cdev->displays[d->mgrs[i].ix];
 		if (!dev) {
 			dev_warn(DEV(cdev), "failed to get display%d\n",
 								d->mgrs[i].ix);
