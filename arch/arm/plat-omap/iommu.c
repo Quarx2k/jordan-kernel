@@ -861,10 +861,14 @@ struct iommu *iommu_get(const char *name)
 	mutex_lock(&obj->iommu_lock);
 
 	if (obj->refcount++ == 0) {
-		dev_info(obj->dev, "%s: %s qos_request\n", __func__, obj->name);
-		pm_qos_update_request(obj->qos_request, 10);
+		if (cpu_is_omap44xx()) {
+			dev_info(obj->dev, "%s: %s qos_request\n", __func__,
+							obj->name);
+			pm_qos_update_request(obj->qos_request, 10);
+	}
 		err = iommu_enable(obj);
-		if (err) {
+	if (err) {
+		if (cpu_is_omap44xx())
 			pm_qos_update_request(obj->qos_request, -1);
 			goto err_enable;
 		}
@@ -908,7 +912,8 @@ void iommu_put(struct iommu *obj)
 
 	if (--obj->refcount == 0) {
 		iommu_disable(obj);
-		pm_qos_update_request(obj->qos_request, -1);
+		if (cpu_is_omap44xx())
+			pm_qos_update_request(obj->qos_request, -1);
 	}
 
 	module_put(obj->owner);

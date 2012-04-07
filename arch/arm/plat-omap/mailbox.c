@@ -256,8 +256,6 @@ static int omap_mbox_startup(struct omap_mbox *mbox)
 
 	mutex_lock(&mbox_configured_lock);
 	if (!mbox_configured++) {
-		pm_qos_update_request(&mbox_qos_request,
-					SET_MPU_CORE_CONSTRAINT);
 		if (likely(mbox->ops->startup)) {
 			ret = mbox->ops->startup(mbox);
 			if (unlikely(ret))
