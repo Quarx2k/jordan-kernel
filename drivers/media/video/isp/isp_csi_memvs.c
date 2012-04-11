@@ -696,7 +696,8 @@ static int vidioc_streamoff(struct file *file, void *fh, enum v4l2_buf_type i)
  * @arg: ioctl arg value
  *
  */
-static long vidioc_default(struct file *file, void *_fh, int cmd, void *arg)
+static long vidioc_default(struct file *file, void *_fh,
+			   bool valid_prio, int cmd, void *arg)
 {
 	struct isp_csi_memvs_sensor *sensor = video_drvdata(file);
 	struct v4l2_int_device *vdev = sensor->v4l2_int_device;

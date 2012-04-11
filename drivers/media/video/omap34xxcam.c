@@ -1591,7 +1591,8 @@ int vidioc_unsubscribe_event(struct v4l2_fh *vfh,
  * feedback. The request is then passed on to the ISP private IOCTL handler,
  * isp_handle_private()
  */
-static long vidioc_default(struct file *file, void *_fh, int cmd, void *arg)
+static long vidioc_default(struct file *file, void *_fh,
+			   bool valid_prio, int cmd, void *arg)
 {
 	struct v4l2_fh *vfh = file->private_data;
 	struct omap34xxcam_fh *ofh = to_omap34xxcam_fh(vfh);
