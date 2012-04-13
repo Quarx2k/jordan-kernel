@@ -7,8 +7,16 @@
 #include <plat/dsscomp.h>
 #include "dsscomp.h"
 
+#ifdef CONFIG_OMAP3_ISP_RESIZER_ON_720P_VIDEO
+#include "dsscomp_ispresizer.h"
+#endif
+
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
+#endif
+
+#ifdef CONFIG_OMAP3_ISP_RESIZER_ON_720P_VIDEO
+static u32 prev_buf_addr;
 #endif
 static bool blanked;
 
@@ -391,6 +399,42 @@ skip_map1d:
 
 		if (oi->cfg.enabled)
 			ovl_new_use_mask[ch] |= 1 << oi->cfg.ix;
+
+#ifdef CONFIG_OMAP3_ISP_RESIZER_ON_720P_VIDEO
+		if (cpu_is_omap3630() && is_isprsz_enabled() &&
+			(oi->cfg.width * oi->cfg.height ==
+				VID_MAX_WIDTH * VID_MAX_HEIGHT)) {
+			/* when same frame is received multiple time same
+			physical address will be received. Since same buffer
+			is using for input and output buffers ISP Resizer will
+			resize the frame multiple times which will result in
+			tile-based image. */
+
+			if (prev_buf_addr != oi->ba) {
+				prev_buf_addr = oi->ba;
+				if (ispresizer_init(oi) == 0) {
+					if (ispresizer_begin(oi) == 0) {
+						oi->cfg.width = oi->cfg.win.w;
+						oi->cfg.height = oi->cfg.win.h;
+						oi->cfg.crop.w = oi->cfg.win.w;
+						oi->cfg.crop.h = oi->cfg.win.h;
+						oi->cfg.stride =
+							oi->cfg.width * 2;
+					} else
+						pr_info("%s: ISP resizer"
+							"begin returned"
+							"non-zero value",
+							__func__);
+				}
+			} else {
+				oi->cfg.width = oi->cfg.win.w;
+				oi->cfg.height = oi->cfg.win.h;
+				oi->cfg.crop.w = oi->cfg.win.w;
+				oi->cfg.crop.h = oi->cfg.win.h;
+				oi->cfg.stride = oi->cfg.width*2;
+			}
+		}
+#endif
 
 		r = dsscomp_set_ovl(comp[ch], oi);
 		if (r)

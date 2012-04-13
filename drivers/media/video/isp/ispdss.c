@@ -40,7 +40,7 @@
 /**
  * WA: Adjustment operation speed of ISP Resizer engine
  */
-#define ISPDSS_RSZ_EXPAND_720p	16
+#define ISPDSS_RSZ_EXPAND_720p	4
 
 enum config_done {
 	STATE_CONFIGURED,		/* Resizer driver configured */

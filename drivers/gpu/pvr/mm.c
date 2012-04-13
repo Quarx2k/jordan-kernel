@@ -186,6 +186,10 @@ static DEBUG_LINUX_MEM_AREA_REC *DebugLinuxMemAreaRecordFind(LinuxMemArea *psLin
 static IMG_VOID DebugLinuxMemAreaRecordRemove(LinuxMemArea *psLinuxMemArea);
 #endif
 
+#ifdef CONFIG_OMAP3_ISP_RESIZER_ON_720P_VIDEO
+int isp_reset;
+#endif
+
 PVRSRV_ERROR
 LinuxMMInit(IMG_VOID)
 {
@@ -1200,6 +1204,9 @@ FreeIONLinuxMemArea(LinuxMemArea *psLinuxMemArea)
                               __FILE__, __LINE__);
 #endif
 
+#ifdef CONFIG_OMAP3_ISP_RESIZER_ON_720P_VIDEO
+	isp_reset = 1;
+#endif
     
     psLinuxMemArea->uData.sIONTilerAlloc.pCPUPhysAddrs = IMG_NULL;
     psLinuxMemArea->uData.sIONTilerAlloc.psIONHandle = IMG_NULL;
