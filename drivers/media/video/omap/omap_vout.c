@@ -2287,13 +2287,18 @@ static int __init omap_vout_setup_video_bufs(struct platform_device *pdev,
 		}
 	}
 
-	for (i = 0; i < VRFB_NUM_BUFS; i++) {
-		if (omap_vrfb_request_ctx(&vout->vrfb_context[i])) {
-			dev_info(&pdev->dev, ": VRFB allocation failed\n");
-			for (j = 0; j < i; j++)
-				omap_vrfb_release_ctx(&vout->vrfb_context[j]);
-			ret = -ENOMEM;
-			goto free_buffers;
+	if (cpu_is_omap3630() &&  (vid1_static_vrfb_alloc ||
+		vid2_static_vrfb_alloc)) {
+		for (i = 0; i < VRFB_NUM_BUFS; i++) {
+			if (omap_vrfb_request_ctx(&vout->vrfb_context[i])) {
+				dev_info(&pdev->dev,
+					": VRFB allocation failed\n");
+				for (j = 0; j < i; j++)
+					omap_vrfb_release_ctx(
+						&vout->vrfb_context[j]);
+				ret = -ENOMEM;
+				goto free_buffers;
+			}
 		}
 	}
 	vout->cropped_offset = 0;

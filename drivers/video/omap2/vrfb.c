@@ -169,11 +169,14 @@ void omap_vrfb_setup(struct vrfb *vrfb, unsigned long paddr,
 	DBG("omapfb_set_vrfb(%d, %lx, %dx%d, %d, %d)\n", ctx, paddr,
 			width, height, bytespp, yuv_mode);
 
+	vrfb_width = ALIGN(width, VRFB_PAGE_WIDTH);
+
 	/* For YUV2 and UYVY modes VRFB needs to handle pixels a bit
 	 * differently. See TRM. */
 	if (yuv_mode) {
 		bytespp *= 2;
 		width /= 2;
+		vrfb_width /= 2;
 	}
 
 	if (bytespp == 4)
@@ -183,7 +186,6 @@ void omap_vrfb_setup(struct vrfb *vrfb, unsigned long paddr,
 	else
 		BUG();
 
-	vrfb_width = ALIGN(width * bytespp, VRFB_PAGE_WIDTH) / bytespp;
 	vrfb_height = ALIGN(height, VRFB_PAGE_HEIGHT);
 
 	DBG("vrfb w %u, h %u bytespp %d\n", vrfb_width, vrfb_height, bytespp);
@@ -192,8 +194,10 @@ void omap_vrfb_setup(struct vrfb *vrfb, unsigned long paddr,
 	size |= vrfb_height << SMS_IMAGEHEIGHT_OFFSET;
 
 	control  = pixel_size_exp << SMS_PS_OFFSET;
-	control |= VRFB_PAGE_WIDTH_EXP  << SMS_PW_OFFSET;
-	control |= VRFB_PAGE_HEIGHT_EXP << SMS_PH_OFFSET;
+	if (!cpu_is_omap3630()) {
+		control |= VRFB_PAGE_WIDTH_EXP  << SMS_PW_OFFSET;
+		control |= VRFB_PAGE_HEIGHT_EXP << SMS_PH_OFFSET;
+	}
 
 	vrfb_hw_context[ctx].physical_ba = paddr;
 	vrfb_hw_context[ctx].size = size;

@@ -15,9 +15,15 @@
 #include <linux/earlysuspend.h>
 #endif
 
+#ifdef CONFIG_OMAP2_VRFB
+#include <linux/ion.h>
+#include <linux/omap_ion.h>
+#endif
+
 #ifdef CONFIG_OMAP3_ISP_RESIZER_ON_720P_VIDEO
 static u32 prev_buf_addr;
 #endif
+
 static bool blanked;
 
 #define NUM_TILER1D_SLOTS 2
@@ -433,6 +439,14 @@ skip_map1d:
 				oi->cfg.crop.h = oi->cfg.win.h;
 				oi->cfg.stride = oi->cfg.width*2;
 			}
+		}
+#endif
+
+#ifdef CONFIG_OMAP2_VRFB
+		if (cpu_is_omap3630() && (
+			oi->cfg.color_mode == OMAP_DSS_COLOR_YUV2 ||
+			oi->cfg.color_mode == OMAP_DSS_COLOR_UYVY)) {
+			omap_setup_vrfb_buffer(oi);
 		}
 #endif
 

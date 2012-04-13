@@ -252,7 +252,8 @@ int set_dss_ovl_info(struct dss2_ovl_info *oi)
 	info.vaddr = NULL;
 
 	/* check for TILER 2D buffer */
-	if (info.paddr >= 0x60000000 && info.paddr < 0x78000000) {
+	if ((!cpu_is_omap3630()) &&
+		info.paddr >= 0x60000000 && info.paddr < 0x78000000) {
 		int bpp = 1 << ((info.paddr >> 27) & 3);
 		struct tiler_view_t t;
 
@@ -299,11 +300,22 @@ int set_dss_ovl_info(struct dss2_ovl_info *oi)
 			info.p_uv_addr += crop.x * (bpp / 8) +
 				(crop.y >> 1) * cfg->stride;
 
-		/* no rotation on DMA buffer */
-		if (cfg->rotation & 3 || cfg->mirror)
-			return -EINVAL;
-
-		info.rotation_type = OMAP_DSS_ROT_DMA;
+#ifdef CONFIG_OMAP2_VRFB
+		if (cpu_is_omap3630() &&
+			(info.paddr >= 0x70000000 &&
+						info.paddr <= 0x7FFFFFFF) ||
+			(info.paddr >= 0xE0000000 &&
+						info.paddr <= 0xFBFFFFFF)) {
+			info.rotation_type = OMAP_DSS_ROT_VRFB;
+		} else {
+#endif
+			/* no rotation on DMA buffer */
+			if (cfg->rotation & 3 || cfg->mirror)
+				return -EINVAL;
+			info.rotation_type = OMAP_DSS_ROT_DMA;
+#ifdef CONFIG_OMAP2_VRFB
+		}
+#endif
 	}
 
 	info.max_x_decim = cfg->decim.max_x ? : 255;

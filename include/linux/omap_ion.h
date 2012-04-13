@@ -18,6 +18,7 @@
 #define _LINUX_OMAP_ION_H
 
 #include <linux/types.h>
+#include <video/dsscomp.h>
 
 /**
  * struct omap_ion_tiler_alloc_data - metadata passed from userspace for allocations
@@ -57,6 +58,11 @@ int omap_ion_mem_alloc(struct ion_client *client,
 int omap_ion_get_pages(struct ion_client *client, struct ion_handle *handle,
 			int *n, unsigned long *ion_addr,
 			struct omap_ion_tiler_alloc_data *sAllocData);
+#ifdef CONFIG_OMAP2_VRFB
+void omap_get_vrfb_buffer(__u32 paddr);
+void omap_free_vrfb_buffer(__u32 paddr);
+int omap_setup_vrfb_buffer(struct dss2_ovl_info *ovl_info);
+#endif /* CONFIG_OMAP2_VRFB */
 #else
 static int omap_ion_mem_alloc(struct ion_client *client,
 			struct omap_ion_tiler_alloc_data *data)
