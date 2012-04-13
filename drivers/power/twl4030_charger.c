@@ -774,7 +774,7 @@ static int twl4030battery_voltage(void)
 		req.func_cb = NULL;
 		twl4030_madc_conversion(&req);
 		volt = (u16)req.rbuf[12];
-		return (volt * VOLT_STEP_SIZE) / VOLT_PSR_R;
+		return volt;
 	}
 }
 
