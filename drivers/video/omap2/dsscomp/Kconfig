@@ -18,3 +18,12 @@ config DSSCOMP_DEBUG_LOG
 	  logs the last 128 entries (last few frames' worth) in a
 	  log buffer.  This is a separate menuconfig in case this is
 	  deemed an overhead.
+
+config OMAP3_ISP_RESIZER_ON_720P_VIDEO
+	bool "ISP resizer used  for 720p video in DSSCOMP in OMAP3 (EXPERIMENTAL)"
+	depends on EXPERIMENTAL && VIDEO_OMAP34XX_ISP_RESIZER
+	default n
+	help
+	  Use ISP resizer on video buffers instead of DSS resizer.
+	  Could increase performance of playing 720p clip but,
+	  have some issues when record 720p with camera.
