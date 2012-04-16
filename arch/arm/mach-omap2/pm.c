@@ -259,6 +259,17 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state)
 	if (cur_state == state)
 		return ret;
 
+	if (cpu_is_omap34xx()) {
+		/*
+		 * Bridge pm handles dsp hibernation. just return success
+		 * Sleep switch is performed for IVA which is not necessary.
+		 * This causes conflict between PM and bridge.
+		 * This touching IVA reg hence adding below condition.
+		 */
+		if (!strcmp(pwrdm->name, "iva2_pwrdm"))
+			return 0;
+	}
+
 	if (pwrdm_read_pwrst(pwrdm) < PWRDM_POWER_ON) {
 		if ((pwrdm_read_pwrst(pwrdm) > state) &&
 			(pwrdm->flags & PWRDM_HAS_LOWPOWERSTATECHANGE)) {
