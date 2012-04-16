@@ -11,6 +11,8 @@
 int omap3xxx_clk_init(void);
 int omap3_dpll4_set_rate(struct clk *clk, unsigned long rate);
 int omap3_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate);
+int omap3_core_l3_set_rate(struct clk *clk, unsigned long rate);
+long omap3_core_l3_round_rate(struct clk *clk, unsigned long target_rate);
 void omap3_clk_lock_dpll5(void);
 
 extern struct clk *sdrc_ick_p;

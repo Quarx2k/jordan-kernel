@@ -29,6 +29,8 @@
 #include "clock3xxx.h"
 #include "clock34xx.h"
 #include "sdrc.h"
+#include "cm2xxx_3xxx.h"
+#include "cm-regbits-34xx.h"
 
 #define CYCLES_PER_MHZ			1000000
 
@@ -118,5 +120,37 @@ int omap3_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate)
 	clk->rate = rate;
 
 	return 0;
+}
+
+
+int omap3_core_l3_set_rate(struct clk *clk, unsigned long rate)
+{
+	struct clk *dpll3_m2_ck = clk_get(NULL, "dpll3_m2_ck");
+	int l3_div, ret;
+
+	l3_div = omap2_cm_read_mod_reg(CORE_MOD, CM_CLKSEL) &
+		OMAP3430_CLKSEL_L3_MASK;
+	ret = omap3_core_dpll_m2_set_rate(dpll3_m2_ck, (rate * l3_div));
+
+	clk_put(dpll3_m2_ck);
+
+	clk->rate = dpll3_m2_ck->rate / l3_div;
+	return ret;
+}
+
+long omap3_core_l3_round_rate(struct clk *clk, unsigned long target_rate)
+{
+	struct clk *dpll3_m2_ck = clk_get(NULL, "dpll3_m2_ck");
+	long m2_clk;
+	int l3_div;
+	u32 new_div;
+
+	l3_div = omap2_cm_read_mod_reg(CORE_MOD, CM_CLKSEL) &
+		OMAP3430_CLKSEL_L3_MASK;
+
+	m2_clk = omap2_clksel_round_rate_div(clk, (target_rate * l3_div),
+					&new_div);
+	clk_put(dpll3_m2_ck);
+	return m2_clk / l3_div;
 }
 

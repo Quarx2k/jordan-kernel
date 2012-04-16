@@ -1153,6 +1153,8 @@ static struct clk l3_ick = {
 	.clksel_mask	= OMAP3430_CLKSEL_L3_MASK,
 	.clksel		= div2_core_clksel,
 	.clkdm_name	= "core_l3_clkdm",
+	.set_rate	= &omap3_core_l3_set_rate,
+	.round_rate	= &omap3_core_l3_round_rate,
 	.recalc		= &omap2_clksel_recalc,
 };
 
