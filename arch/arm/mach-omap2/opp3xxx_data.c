@@ -166,9 +166,11 @@ static struct omap_opp_def __initdata omap36xx_opp_def_list[] = {
 	/* DSP OPP2 - OPP100 */
 	OPP_INITIALIZER("iva", "dpll2_ck", "mpu_iva", true,  520000000, OMAP3630_VDD_MPU_OPP100_UV),
 	/* DSP OPP3 - OPP-Turbo */
-	OPP_INITIALIZER("iva", "dpll2_ck", "mpu_iva", false, 660000000, OMAP3630_VDD_MPU_OPP120_UV),
+	OPP_INITIALIZER("iva", "dpll2_ck", "mpu_iva", true,
+				660000000, OMAP3630_VDD_MPU_OPP120_UV),
 	/* DSP OPP4 - OPP-SB */
-	OPP_INITIALIZER("iva", "dpll2_ck", "mpu_iva", false, 800000000, OMAP3630_VDD_MPU_OPP1G_UV),
+	OPP_INITIALIZER("iva", "dpll2_ck", "mpu_iva", true,
+				800000000, OMAP3630_VDD_MPU_OPP1G_UV),
 };
 
 /* OMAP 3630 MPU Core VDD dependency table */
