@@ -858,6 +858,7 @@ static int ehci_hub_control (
 	unsigned long	flags;
 	int		retval = 0;
 	unsigned	selector;
+	u32		runstop;
 
 	/*
 	 * FIXME:  support SetPortFeatures USB_PORT_FEAT_INDICATOR.
@@ -1025,6 +1026,18 @@ static int ehci_hub_control (
 				set_bit(wIndex, &ehci->port_c_suspend);
 				ehci->reset_done[wIndex] = 0;
 
+				/* Workaround for OMAP errata:
+				 * The errata affects suspend-resume and
+				 * remote-wakeup. We need to halt the
+				 * controller before clearing the resume bit
+				 */
+				runstop = ehci_readl(ehci,
+						&ehci->regs->command);
+				ehci_writel(ehci, (runstop & ~1),
+						&ehci->regs->command);
+				(void) ehci_readl(ehci, &ehci->regs->command);
+				handshake(ehci, &ehci->regs->status,
+						STS_HALT, STS_HALT, 2000);
 				/* stop resume signaling */
 				temp = ehci_readl(ehci, status_reg);
 				ehci_writel(ehci,
@@ -1032,6 +1045,10 @@ static int ehci_hub_control (
 					status_reg);
 				retval = handshake(ehci, status_reg,
 					   PORT_RESUME, 0, 2000 /* 2msec */);
+
+				ehci_writel(ehci, runstop,
+						&ehci->regs->command);
+				(void) ehci_readl(ehci, &ehci->regs->command);
 				if (retval != 0) {
 					ehci_err(ehci,
 						"port %d resume error %d\n",
