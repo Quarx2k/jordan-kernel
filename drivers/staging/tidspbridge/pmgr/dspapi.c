@@ -719,16 +719,19 @@ u32 procwrap_begin_dma(union trapped_args *args, void *pr_ctxt)
  */
 u32 procwrap_flush_memory(union trapped_args *args, void *pr_ctxt)
 {
-	int status;
-
+	int status = 0;
 	if (args->args_proc_flushmemory.flags >
-	    PROC_WRITEBACK_INVALIDATE_MEM)
+	    PROC_WRBK_INV_ALL)
 		return -EINVAL;
 
-	status = proc_flush_memory(pr_ctxt,
+	if (args->args_proc_flushmemory.flags == PROC_WRBK_INV_ALL)
+		__cpuc_flush_kern_all();
+	else
+		status = proc_flush_memory(pr_ctxt,
 				   args->args_proc_flushmemory.mpu_addr,
 				   args->args_proc_flushmemory.size,
 				   args->args_proc_flushmemory.flags);
+
 	return status;
 }
 

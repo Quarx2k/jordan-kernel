@@ -204,6 +204,7 @@ enum dsp_flushtype {
 	PROC_INVALIDATE_MEM = 0,
 	PROC_WRITEBACK_MEM,
 	PROC_WRITEBACK_INVALIDATE_MEM,
+	PROC_WRBK_INV_ALL,
 };
 
 /* Memory Segment Status Values */
