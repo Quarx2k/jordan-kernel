@@ -3400,7 +3400,10 @@ static struct omap_hwmod_ocp_if *omap34xx_mcspi1_slaves[] = {
 };
 
 static struct omap2_mcspi_dev_attr omap_mcspi1_dev_attr = {
-	.num_chipselect = 4,
+	.num_chipselect	= 4,
+	.force_cs_mode	= 1,
+	.mode		= OMAP2_MCSPI_MASTER,
+	.fifo_depth	= 0,
 };
 
 static struct omap_hwmod omap34xx_mcspi1 = {
