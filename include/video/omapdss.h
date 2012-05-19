@@ -600,6 +600,11 @@ struct omap_dss_device {
 
 	struct blocking_notifier_head state_notifiers;
 
+	/* HDMI specific */
+	void (*enable_device_detect)(struct omap_dss_device *dssdev, u8 enable);
+	bool (*get_device_detect)(struct omap_dss_device *dssdev);
+	int (*get_device_connected)(struct omap_dss_device *dssdev);
+
 	/* platform specific  */
 	int (*platform_enable)(struct omap_dss_device *dssdev);
 	void (*platform_disable)(struct omap_dss_device *dssdev);
@@ -659,6 +664,12 @@ struct omap_dss_driver {
 	int (*get_modedb)(struct omap_dss_device *dssdev,
 			  struct fb_videomode *modedb,
 			  int modedb_len);
+
+	void (*enable_device_detect)(struct omap_dss_device *dssdev, u8 enable);
+	bool (*get_device_detect)(struct omap_dss_device *dssdev);
+	int (*get_device_connected)(struct omap_dss_device *dssdev);
+
+
 	int (*set_mode)(struct omap_dss_device *dssdev,
 			struct fb_videomode *mode);
 

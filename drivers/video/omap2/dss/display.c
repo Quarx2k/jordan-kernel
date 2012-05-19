@@ -292,6 +292,57 @@ static ssize_t display_wss_store(struct device *dev,
 	return size;
 }
 
+static ssize_t display_device_detect_enabled_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct omap_dss_device *dssdev = to_dss_device(dev);
+	unsigned long device_detect_enabled;
+
+	if (!dssdev->enable_device_detect || !dssdev->get_device_detect)
+		return -ENOENT;
+
+	if (strict_strtoul(buf, 0, &device_detect_enabled))
+		return -EINVAL;
+
+	dssdev->enable_device_detect(dssdev, device_detect_enabled);
+
+	return size;
+}
+
+static ssize_t display_device_detect_enabled_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct omap_dss_device *dssdev = to_dss_device(dev);
+	unsigned int device_detect_enabled;
+
+	if (!dssdev->enable_device_detect || !dssdev->get_device_detect)
+		return -ENOENT;
+
+	device_detect_enabled = dssdev->get_device_detect(dssdev);
+
+	return snprintf(buf, PAGE_SIZE, "%d\n", device_detect_enabled);
+}
+
+static ssize_t display_device_connected_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct omap_dss_device *dssdev = to_dss_device(dev);
+	int device_connected;
+
+	if (!dssdev->enable_device_detect ||
+		!dssdev->get_device_detect ||
+		!dssdev->get_device_connected)
+		return -ENOENT;
+
+	device_connected = dssdev->get_device_connected(dssdev);
+
+	if (device_connected == -EINVAL)
+		return -EINVAL;
+
+	return snprintf(buf, PAGE_SIZE, "%d\n", device_connected);
+}
+
+
 static DEVICE_ATTR(enabled, S_IRUGO|S_IWUSR,
 		display_enabled_show, display_enabled_store);
 static DEVICE_ATTR(update_mode, S_IRUGO|S_IWUSR,
@@ -306,6 +357,12 @@ static DEVICE_ATTR(mirror, S_IRUGO|S_IWUSR,
 		display_mirror_show, display_mirror_store);
 static DEVICE_ATTR(wss, S_IRUGO|S_IWUSR,
 		display_wss_show, display_wss_store);
+static DEVICE_ATTR(device_detect_enabled, S_IRUGO|S_IWUSR,
+		display_device_detect_enabled_show,
+		display_device_detect_enabled_store);
+static DEVICE_ATTR(device_connected, S_IRUGO,
+		display_device_connected_show,
+		NULL);
 
 static struct device_attribute *display_sysfs_attrs[] = {
 	&dev_attr_enabled,
@@ -315,6 +372,8 @@ static struct device_attribute *display_sysfs_attrs[] = {
 	&dev_attr_rotate,
 	&dev_attr_mirror,
 	&dev_attr_wss,
+	&dev_attr_device_detect_enabled,
+	&dev_attr_device_connected,
 	NULL
 };
 
