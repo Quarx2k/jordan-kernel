@@ -458,6 +458,14 @@ void omap_sram_idle(bool suspend)
         }
 
 	/* CORE */
+	if (core_next_state <= PWRDM_POWER_RET) {
+		set_dpll3_volt_freq(0);
+		omap2_cm_write_mod_reg((1 << OMAP3430_AUTO_PERIPH_DPLL_SHIFT) |
+			(1 << OMAP3430_AUTO_CORE_DPLL_SHIFT),
+			PLL_MOD,
+			CM_AUTOIDLE);
+	}
+
 	if (core_next_state < PWRDM_POWER_ON) {
 		if (core_next_state == PWRDM_POWER_OFF) {
 			omap2_prm_set_mod_reg_bits(OMAP3430_AUTO_OFF_MASK,
@@ -531,6 +539,8 @@ void omap_sram_idle(bool suspend)
 	omap2_cm_write_mod_reg(1 << OMAP3430_AUTO_PERIPH_DPLL_SHIFT, PLL_MOD,
 								CM_AUTOIDLE);
 
+	if (core_next_state <= PWRDM_POWER_RET)
+		set_dpll3_volt_freq(1);
 
 	omap3_intc_resume_idle();
 
