@@ -7,7 +7,7 @@ u32 out_buf_phy_addr[MAX_VIDEO_BUFFERS];
 static int index;
 extern int isp_reset;
 struct kobject *isprsz_kobj;
-static int isprsz_enable_val;
+static int isprsz_enable_val = 1;
 
 void dsscomp_isp_rsz_dma_tx_callback(void *arg)
 {
@@ -130,6 +130,11 @@ static ssize_t isprsz_enable_store(const char *buf, size_t size)
 {
 	if (sscanf(buf, "%d", &isprsz_enable_val) != 1)
 		return -EINVAL;
+
+	if (isprsz_enable_val == 0) {
+		ispdss_put_resource();
+		isp_reset = 1;
+	}
 
 	return size;
 }
