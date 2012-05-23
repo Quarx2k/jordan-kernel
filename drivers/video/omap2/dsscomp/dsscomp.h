@@ -36,7 +36,7 @@
 #elif defined(CONFIG_ARCH_OMAP3)
 #define MAX_MANAGERS	2
 #define MAX_OVERLAYS	3
-#define MAX_DISPLAYS	2
+#define MAX_DISPLAYS	3
 #endif
 
 
