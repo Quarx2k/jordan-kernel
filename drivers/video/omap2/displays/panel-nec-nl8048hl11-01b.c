@@ -143,7 +143,7 @@ static int nec_8048_panel_probe(struct omap_dss_device *dssdev)
 	bl->props.fb_blank = FB_BLANK_UNBLANK;
 	bl->props.power = FB_BLANK_UNBLANK;
 	bl->props.max_brightness = dssdev->max_backlight_level;
-	bl->props.brightness = dssdev->max_backlight_level;
+	bl->props.brightness = 0;
 
 	r = nec_8048_bl_update_status(bl);
 	if (r < 0)
