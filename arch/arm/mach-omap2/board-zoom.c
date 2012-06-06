@@ -40,7 +40,7 @@
 #define ZOOM3_EHCI_RESET_GPIO		64
 #define ZOOM3_McBSP3_BT_GPIO            164
 #define ZOOM3_BT_RESET_GPIO             109
-#define ZOOM3_WIFI_PMENA_GPIO		101
+#define ZOOM3_WIFI_PMENA_GPIO		157
 #define ZOOM3_WIFI_IRQ_GPIO		162
 
 #define WILINK_UART_DEV_NAME            "/dev/ttyO1"
