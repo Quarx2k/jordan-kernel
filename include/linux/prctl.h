@@ -126,8 +126,8 @@
 # define PR_SET_MM_AUXV			12
 # define PR_SET_MM_EXE_FILE		13
 
-#define PR_SET_CHILD_SUBREAPER 36
-#define PR_GET_CHILD_SUBREAPER 37
+#define PR_SET_CHILD_SUBREAPER	36
+#define PR_GET_CHILD_SUBREAPER	37
 
 /*
  * If no_new_privs is set, then operations that grant new privileges (i.e.
@@ -141,7 +141,9 @@
  * asking selinux for a specific new context (e.g. with runcon) will result
  * in execve returning -EPERM.
  */
-#define PR_SET_NO_NEW_PRIVS 38
-#define PR_GET_NO_NEW_PRIVS 39
+#define PR_SET_NO_NEW_PRIVS	38
+#define PR_GET_NO_NEW_PRIVS	39
+
+#define PR_GET_TID_ADDRESS	40
 
 #endif /* _LINUX_PRCTL_H */
