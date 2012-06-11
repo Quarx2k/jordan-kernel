@@ -583,6 +583,10 @@ static int bridge_brd_start(struct bridge_dev_context *dev_ctxt,
 		(*pdata->dsp_cm_write)(OMAP34XX_CLKSTCTRL_ENABLE_AUTO,
 					OMAP3430_IVA2_MOD, OMAP2_CM_CLKSTCTRL);
 
+		/* Start wdt */
+		dsp_wdt_sm_set((void *)ul_shm_base);
+		dsp_wdt_enable(true);
+
 		/* Let DSP go */
 		dev_dbg(bridge, "%s Unreset\n", __func__);
 		/* Enable DSP MMU Interrupts */
@@ -603,9 +607,8 @@ static int bridge_brd_start(struct bridge_dev_context *dev_ctxt,
 		if (!wait_for_start(dev_context, dw_sync_addr))
 			status = -ETIMEDOUT;
 
-		/* Start wdt */
+		/* write the wdt again */
 		dsp_wdt_sm_set((void *)ul_shm_base);
-		dsp_wdt_enable(true);
 
 		status = dev_get_io_mgr(dev_context->dev_obj, &hio_mgr);
 		if (hio_mgr) {
