@@ -283,12 +283,6 @@ int omap_setup_vrfb_buffer(struct dss2_ovl_info *ovl_info)
 		ion_vrfb_t[i].ismapped = 1;
 	}
 
-	if (ovl_info->cfg.rotation & 1)	{
-		ovl_info->cfg.win.w =
-			(ovl_info->cfg.win.h * ovl_info->cfg.win.h) /
-			ovl_info->cfg.win.w;
-	}
-
 	ovl_info->cfg.stride =  VRFB_LINE_LENGTH * 2;
 
 	return 0;
