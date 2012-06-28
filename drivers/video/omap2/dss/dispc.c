@@ -2534,7 +2534,7 @@ static void _enable_digit_out(bool enable)
 	REG_FLD_MOD(DISPC_CONTROL, enable ? 1 : 0, 1, 1);
 }
 
-static void dispc_enable_digit_out(enum omap_display_type type, bool enable)
+void dispc_enable_digit_out(enum omap_display_type type, bool enable)
 {
 	struct completion frame_done_completion;
 	int r;

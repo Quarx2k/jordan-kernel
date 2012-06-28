@@ -253,6 +253,7 @@ enum omap_dss_clk_source dss_get_lcd_clk_source(enum omap_channel channel);
 
 void dss_set_venc_output(enum omap_dss_venc_type type);
 void dss_set_dac_pwrdn_bgz(bool enable);
+void dss_configure_venc(bool enable);
 
 unsigned long dss_get_dpll4_rate(void);
 int dss_calc_clock_rates(struct dss_clock_info *cinfo);
@@ -456,6 +457,7 @@ bool dispc_go_busy(enum omap_channel channel);
 void dispc_go(enum omap_channel channel);
 void dispc_enable_channel(enum omap_channel channel,
 		enum omap_display_type type, bool enable);
+void dispc_enable_digit_out(enum omap_display_type type, bool enable);
 bool dispc_is_channel_enabled(enum omap_channel channel);
 int dispc_enable_plane(enum omap_plane plane, bool enable);
 void dispc_enable_replication(enum omap_plane plane, bool enable);

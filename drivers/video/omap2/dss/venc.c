@@ -26,6 +26,7 @@
 #include <linux/clk.h>
 #include <linux/err.h>
 #include <linux/io.h>
+#include <linux/gpio.h>
 #include <linux/mutex.h>
 #include <linux/completion.h>
 #include <linux/delay.h>
@@ -475,6 +476,8 @@ static void venc_power_on(struct omap_dss_device *dssdev)
 {
 	u32 l;
 
+	dss_configure_venc(1);
+
 	venc_reset();
 	venc_write_config(venc_timings_to_config(&dssdev->panel.timings));
 
@@ -501,6 +504,8 @@ static void venc_power_on(struct omap_dss_device *dssdev)
 	if (dssdev->platform_enable)
 		dssdev->platform_enable(dssdev);
 
+	dispc_enable_digit_out(OMAP_DISPLAY_TYPE_VENC, 1);
+
 	dssdev->manager->enable(dssdev->manager);
 }
 
@@ -509,12 +514,16 @@ static void venc_power_off(struct omap_dss_device *dssdev)
 	venc_write_reg(VENC_OUTPUT_CONTROL, 0);
 	dss_set_dac_pwrdn_bgz(0);
 
+	dispc_enable_digit_out(OMAP_DISPLAY_TYPE_VENC, 0);
+
 	dssdev->manager->disable(dssdev->manager);
 
 	if (dssdev->platform_disable)
 		dssdev->platform_disable(dssdev);
 
 	regulator_disable(venc.vdda_dac_reg);
+
+	dss_configure_venc(0);
 }
 
 
@@ -699,7 +708,6 @@ static void venc_configure_tv_detect(u8 enable)
 {
 	u32 reg;
 
-	venc_enable_clocks(1);
 	reg = venc_read_reg(VENC_GEN_CTRL);
 
 	if (enable) {
@@ -717,7 +725,6 @@ static void venc_configure_tv_detect(u8 enable)
 
 		venc_write_reg(VENC_GEN_CTRL, reg);
 	}
-	venc_enable_clocks(0);
 }
 
 static void venc_enable_tv_detect(struct omap_dss_device *dssdev, u8 enable)
@@ -798,6 +805,14 @@ int venc_init_display(struct omap_dss_device *dssdev)
 
 		venc.vdda_dac_reg = vdda_dac;
 	}
+
+	dssdev->enable_device_detect = venc_enable_tv_detect;
+	dssdev->get_device_detect = venc_get_tv_detect;
+	dssdev->get_device_connected = venc_get_tv_connected;
+
+	tv_detect_enabled = 0;
+	gpio_request(TV_INT_GPIO, "tv_detect");
+	gpio_direction_input(TV_INT_GPIO);
 
 	return 0;
 }
