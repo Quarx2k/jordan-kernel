@@ -594,4 +594,19 @@ static inline void dss_collect_irq_stats(u32 irqstatus, unsigned *irq_arr)
 }
 #endif
 
+#ifdef CONFIG_ARCH_OMAP3
+int hpd_panel_init(void);
+int hpd_panel_exit(void);
+#else
+static inline int hpd_panel_init(void)
+{
+	return 0;
+}
+
+static inline int hpd_panel_exit(void)
+{
+	return 0;
+}
+#endif
+
 #endif

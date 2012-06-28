@@ -222,6 +222,9 @@ static int omap_dss_probe(struct platform_device *pdev)
 	if (r)
 		goto err_debugfs;
 
+	if (cpu_is_omap3630())
+		hpd_panel_init();
+
 	for (i = 0; i < pdata->num_devices; ++i) {
 		struct omap_dss_device *dssdev = pdata->devices[i];
 
@@ -243,6 +246,9 @@ static int omap_dss_probe(struct platform_device *pdev)
 	return 0;
 
 err_register:
+	if (cpu_is_omap3630())
+		hpd_panel_exit();
+
 	dss_uninitialize_debugfs();
 err_debugfs:
 	hdmi_uninit_platform_driver();
@@ -265,6 +271,9 @@ static int omap_dss_remove(struct platform_device *pdev)
 {
 	struct omap_dss_board_info *pdata = pdev->dev.platform_data;
 	int i;
+
+	if (cpu_is_omap3630())
+		hpd_panel_exit();
 
 	dss_uninitialize_debugfs();
 
