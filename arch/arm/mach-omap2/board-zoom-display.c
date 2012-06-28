@@ -14,6 +14,8 @@
 #include <linux/gpio.h>
 #include <linux/i2c/twl.h>
 #include <linux/spi/spi.h>
+#include <linux/regulator/machine.h>
+#include <linux/regulator/consumer.h>
 #include <plat/mcspi.h>
 #include <video/omapdss.h>
 #include <plat/omap-pm.h>
@@ -25,7 +27,7 @@
 #define LCD_PANEL_RESET_GPIO_PROD	96
 #define LCD_PANEL_RESET_GPIO_PILOT	55
 #define LCD_PANEL_QVGA_GPIO		56
-
+#define TV_PANEL_ENABLE_GPIO		95
 #define SIL9022_RESET_GPIO		97
 
 #ifdef CONFIG_PANEL_SIL9022
@@ -92,6 +94,21 @@ static void __init zoom_lcd_panel_init(void)
 		pr_err("%s: Failed to get LCD GPIOs.\n", __func__);
 }
 
+static void __init zoom_tv_panel_init(void)
+{
+	int ret;
+
+	ret = gpio_request(TV_PANEL_ENABLE_GPIO, "tv panel");
+	if (ret) {
+		pr_err("Failed to get TV_PANEL_ENABLE_GPIO.\n");
+		goto err1;
+	}
+	gpio_direction_output(TV_PANEL_ENABLE_GPIO, 0);
+
+err1:
+	return;
+}
+
 static int zoom_panel_enable_lcd(struct omap_dss_device *dssdev)
 {
 	return 0;
@@ -150,6 +167,37 @@ static int zoom_set_bl_intensity(struct omap_dss_device *dssdev, int level)
 	return 0;
 }
 
+static int zoom_panel_enable_tv(struct omap_dss_device *dssdev)
+{
+	int ret;
+	struct regulator *vdac_reg;
+
+	vdac_reg = regulator_get(NULL, "vdda_dac");
+	if (IS_ERR(vdac_reg)) {
+		pr_err("Unable to get vdac regulator\n");
+		return PTR_ERR(vdac_reg);
+	}
+	ret = regulator_enable(vdac_reg);
+	if (ret < 0)
+		return ret;
+	gpio_set_value(TV_PANEL_ENABLE_GPIO, 0);
+
+	return 0;
+}
+
+static void zoom_panel_disable_tv(struct omap_dss_device *dssdev)
+{
+	struct regulator *vdac_reg;
+
+	vdac_reg = regulator_get(NULL, "vdda_dac");
+	if (IS_ERR(vdac_reg)) {
+		pr_err("Unable to get vpll2 regulator\n");
+		return;
+	}
+	regulator_disable(vdac_reg);
+	gpio_set_value(TV_PANEL_ENABLE_GPIO, 1);
+}
+
 static struct omap_dss_device zoom_lcd_device = {
 	.name			= "lcd",
 	.driver_name		= "NEC_8048_panel",
@@ -166,11 +214,21 @@ static struct omap_dss_device zoom_lcd_device = {
 	.set_backlight		= zoom_set_bl_intensity,
 };
 
+static struct omap_dss_device zoom_tv_device = {
+	.name                   = "tv",
+	.driver_name            = "venc",
+	.type                   = OMAP_DISPLAY_TYPE_VENC,
+	.phy.venc.type          = OMAP_DSS_VENC_TYPE_COMPOSITE,
+	.platform_enable        = zoom_panel_enable_tv,
+	.platform_disable       = zoom_panel_disable_tv,
+};
+
 static struct omap_dss_device *zoom_dss_devices[] = {
 	&zoom_lcd_device,
 	#ifdef CONFIG_PANEL_SIL9022
 		&zoom_hdmi_device,
 	#endif
+	&zoom_tv_device
 };
 
 static struct omap_dss_board_info zoom_dss_data = {
@@ -200,5 +258,6 @@ void __init zoom_display_init(void)
 	spi_register_board_info(nec_8048_spi_board_info,
 				ARRAY_SIZE(nec_8048_spi_board_info));
 	zoom_lcd_panel_init();
+	zoom_tv_panel_init();
 }
 
