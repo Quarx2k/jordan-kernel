@@ -334,6 +334,8 @@ struct dss2_ovl_cfg {
 	struct omap_dss_cconv_coefs cconv;
 	struct dss2_vc1_range_map_info vc1;
 
+	__u8 wb_source;	/* pipe: is source or not, wb: capture device id */
+	enum omap_writeback_mode wb_mode;
 	__u8 ix;	/* ovl index same as sysfs/overlay# */
 	__u8 zorder;	/* 0..3 */
 	__u8 enabled;	/* bool */
@@ -631,6 +633,7 @@ struct dsscomp_wait_data {
 	__u32 timeout_us;	/* timeout in microseconds */
 	enum dsscomp_wait_phase phase;	/* phase to wait for */
 };
+
 
 /* IOCTLS */
 #define DSSCIOC_SETUP_MGR	_IOW('O', 128, struct dsscomp_setup_mgr_data)
