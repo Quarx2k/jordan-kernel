@@ -549,6 +549,11 @@ static int rsz_release(struct inode *inode, struct file *filp)
 
 	isp_put();
 
+	if (&fhdl->src_vbq)
+		videobuf_mmap_free(&fhdl->src_vbq);
+	if (&fhdl->dst_vbq)
+		videobuf_mmap_free(&fhdl->dst_vbq);
+
 	kfree(fhdl);
 
 	return 0;

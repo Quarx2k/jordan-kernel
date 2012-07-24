@@ -1921,6 +1921,7 @@ static int omap34xxcam_release(struct file *file)
 	struct omap34xxcam_videodev *vdev = ofh->vdev;
 	struct device *isp = vdev->cam->isp;
 	int i;
+	struct videobuf_queue *q = &ofh->vbq;
 
 	mutex_lock(&vdev->mutex);
 	if (vdev->cam->streaming == file) {
@@ -1937,6 +1938,9 @@ static int omap34xxcam_release(struct file *file)
 					    OMAP34XXCAM_SLAVE_POWER_ALL);
 		isp_put();
 	}
+
+	videobuf_mmap_free(q);
+
 	mutex_unlock(&vdev->mutex);
 
 	file->private_data = NULL;

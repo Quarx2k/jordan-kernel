@@ -1008,6 +1008,9 @@ static int isp_csi_memvs_vout_release(struct file *file)
 	}
 	mutex_unlock(&sensor->mutex);
 
+	if (&ofh->vbq)
+		videobuf_mmap_free(&ofh->vbq);
+
 	kfree(ofh);
 
 	sensor->opened = false;
