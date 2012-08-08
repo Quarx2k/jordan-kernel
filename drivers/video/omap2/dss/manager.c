@@ -1490,7 +1490,13 @@ static void schedule_completion_irq(void)
 
 	if (mask != dss_cache.comp_irq_enabled) {
 		if (dss_cache.comp_irq_enabled)
-			omap_dispc_unregister_isr(dss_completion_irq_handler,
+			/* Code paths leading to here are non-trivial, and
+			 * this particular callback does not seem to be
+			 * needing synchronized unregister. To ease our
+			 * lives, just leave it nosync.
+			 */
+			omap_dispc_unregister_isr_nosync(
+				dss_completion_irq_handler,
 				NULL, dss_cache.comp_irq_enabled);
 		if (mask)
 			omap_dispc_register_isr(dss_completion_irq_handler,
@@ -1609,7 +1615,7 @@ static void dss_apply_irq_handler(void *data, u32 mask)
 	if (dss_has_feature(FEAT_MGR_LCD2))
 		irq_mask |= DISPC_IRQ_VSYNC2;
 
-	omap_dispc_unregister_isr(dss_apply_irq_handler, NULL, irq_mask);
+	omap_dispc_unregister_isr_nosync(dss_apply_irq_handler, NULL, irq_mask);
 	dss_cache.irq_enabled = false;
 
 end:

@@ -2521,7 +2521,7 @@ static void dispc_enable_lcd_out(enum omap_channel channel, bool enable)
 					msecs_to_jiffies(100)))
 			DSSERR("timeout waiting for FRAME DONE\n");
 
-		r = omap_dispc_unregister_isr(dispc_disable_isr,
+		r = omap_dispc_unregister_isr_sync(dispc_disable_isr,
 				&frame_done_completion, irq);
 
 		if (r)
@@ -2580,7 +2580,7 @@ void dispc_enable_digit_out(enum omap_display_type type, bool enable)
 			DSSERR("timeout waiting for EVSYNC\n");
 	}
 
-	r = omap_dispc_unregister_isr(dispc_disable_isr,
+	r = omap_dispc_unregister_isr_sync(dispc_disable_isr,
 			&frame_done_completion,
 			DISPC_IRQ_EVSYNC_EVEN | DISPC_IRQ_EVSYNC_ODD
 						| DISPC_IRQ_FRAMEDONETV);
@@ -3501,7 +3501,8 @@ err:
 }
 EXPORT_SYMBOL(omap_dispc_register_isr);
 
-int omap_dispc_unregister_isr(omap_dispc_isr_t isr, void *arg, u32 mask)
+/* WARNING: callback might be executed even after this function returns! */
+int omap_dispc_unregister_isr_nosync(omap_dispc_isr_t isr, void *arg, u32 mask)
 {
 	int i;
 	unsigned long flags;
@@ -3533,7 +3534,37 @@ int omap_dispc_unregister_isr(omap_dispc_isr_t isr, void *arg, u32 mask)
 
 	return ret;
 }
-EXPORT_SYMBOL(omap_dispc_unregister_isr);
+EXPORT_SYMBOL(omap_dispc_unregister_isr_nosync);
+
+/*
+ * Ensure that callback <isr> will NOT be executed after this function
+ * returns. Must be called from sleepable context, though!
+ */
+int omap_dispc_unregister_isr_sync(omap_dispc_isr_t isr, void *arg, u32 mask)
+{
+	int ret;
+
+	ret = omap_dispc_unregister_isr_nosync(isr, arg, mask);
+
+	/* Task context is not really needed. But if we're called from atomic
+	 * context, it is probably from DISPC IRQ, where we will deadlock.
+	 * So use might_sleep() to catch potential deadlocks.
+	 */
+	might_sleep();
+
+#if defined(CONFIG_SMP)
+	/* DISPC IRQ executes callbacks with dispc.irq_lock released. Hence
+	 * unregister_isr() and DISPC IRQ might be running in parallel on
+	 * different CPUs. So there is a chance that a callback is executed
+	 * even though it has been unregistered. Add a barrier, in order to
+	 * ensure that after returning from this function, the new DISPC IRQ
+	 * will use an updated callback array, and NOT its cached copy.
+	 */
+	synchronize_irq(dispc.irq);
+#endif
+
+	return ret;
+}
 
 #ifdef DEBUG
 static void print_irq_status(u32 status)
@@ -3895,7 +3926,8 @@ int omap_dispc_wait_for_irq_timeout(u32 irqmask, unsigned long timeout)
 
 	timeout = wait_for_completion_timeout(&completion, timeout);
 
-	omap_dispc_unregister_isr(dispc_irq_wait_handler, &completion, irqmask);
+	omap_dispc_unregister_isr_sync(dispc_irq_wait_handler, &completion,
+			irqmask);
 
 	if (timeout == 0)
 		return -ETIMEDOUT;
@@ -3930,7 +3962,8 @@ int omap_dispc_wait_for_irq_interruptible_timeout(u32 irqmask,
 	timeout = wait_for_completion_interruptible_timeout(&completion,
 			timeout);
 
-	omap_dispc_unregister_isr(dispc_irq_wait_handler, &completion, irqmask);
+	omap_dispc_unregister_isr_sync(dispc_irq_wait_handler, &completion,
+			irqmask);
 
 	if (timeout == 0)
 		r = -ETIMEDOUT;

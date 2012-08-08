@@ -4584,8 +4584,8 @@ static void dsi_display_uninit_dispc(struct omap_dss_device *dssdev)
 		DISPC_IRQ_FRAMEDONE : DISPC_IRQ_FRAMEDONE2;
 
 	if(dssdev->phy.dsi.type == OMAP_DSS_DSI_TYPE_CMD_MODE)
-		omap_dispc_unregister_isr(dsi_framedone_irq_callback, (void *) dssdev,
-					  irq);
+		omap_dispc_unregister_isr_sync(dsi_framedone_irq_callback,
+					(void *) dssdev, irq);
 }
 
 static int dsi_configure_dsi_clocks(struct omap_dss_device *dssdev)

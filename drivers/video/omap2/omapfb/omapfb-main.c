@@ -2355,7 +2355,8 @@ int omapfb_enable_vsync(struct omapfb2_device *fbdev)
 
 void omapfb_disable_vsync(struct omapfb2_device *fbdev)
 {
-	omap_dispc_unregister_isr(omapfb_vsync_isr, fbdev, DISPC_IRQ_VSYNC);
+	omap_dispc_unregister_isr_sync(omapfb_vsync_isr, fbdev,
+			DISPC_IRQ_VSYNC);
 }
 
 static int omapfb_probe(struct platform_device *pdev)

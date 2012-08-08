@@ -1308,7 +1308,7 @@ static int omap_vout_release(struct file *file)
 
 		mask = DISPC_IRQ_VSYNC | DISPC_IRQ_EVSYNC_EVEN |
 			DISPC_IRQ_EVSYNC_ODD;
-		omap_dispc_unregister_isr(omap_vout_isr, vout, mask);
+		omap_dispc_unregister_isr_sync(omap_vout_isr, vout, mask);
 		vout->streaming = 0;
 
 		videobuf_streamoff(q);
@@ -2017,7 +2017,7 @@ static int vidioc_streamoff(struct file *file, void *fh, enum v4l2_buf_type i)
 	vout->streaming = 0;
 	mask = DISPC_IRQ_VSYNC | DISPC_IRQ_EVSYNC_EVEN | DISPC_IRQ_EVSYNC_ODD;
 
-	omap_dispc_unregister_isr(omap_vout_isr, vout, mask);
+	omap_dispc_unregister_isr_sync(omap_vout_isr, vout, mask);
 
 	for (j = 0; j < ovid->num_overlays; j++) {
 		struct omap_overlay *ovl = ovid->overlays[j];
