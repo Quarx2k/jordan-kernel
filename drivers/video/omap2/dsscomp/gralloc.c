@@ -158,7 +158,7 @@ int dsscomp_gralloc_queue_ioctl(struct dsscomp_setup_dispc_data *d)
 	return ret;
 }
 
-static bool dsscomp_is_any_device_active()
+static bool dsscomp_is_any_device_active(void)
 {
 	struct omap_dss_device *dssdev;
 	u32 display_ix;
