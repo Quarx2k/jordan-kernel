@@ -26,6 +26,8 @@
 
 #include "tick-internal.h"
 
+const int softirq_stop_idle_mask = (~(1 << RCU_SOFTIRQ));
+
 /*
  * Per cpu nohz control structure
  */
@@ -322,7 +324,8 @@ void tick_nohz_stop_sched_tick(int inidle)
 	if (unlikely(local_softirq_pending() && cpu_online(cpu))) {
 		static int ratelimit;
 
-		if (ratelimit < 10) {
+		if (ratelimit < 10 &&
+		    (local_softirq_pending() & softirq_stop_idle_mask)) {
 			printk(KERN_ERR "NOHZ: local_softirq_pending %02x\n",
 			       local_softirq_pending());
 			ratelimit++;
