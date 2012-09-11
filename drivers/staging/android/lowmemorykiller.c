@@ -56,7 +56,7 @@ static int lowmem_minfree_size = 4;
 static struct task_struct *lowmem_deathpending;
 static unsigned long lowmem_deathpending_timeout;
 
-extern int compact_nodes();
+extern int compact_nodes(bool sync);
 
 #define lowmem_print(level, x...)			\
 	do {						\
@@ -182,7 +182,7 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 		     sc->nr_to_scan, sc->gfp_mask, rem);
 	read_unlock(&tasklist_lock);
     if (selected)
-        compact_nodes();
+        compact_nodes(false);
 	return rem;
 }
 
