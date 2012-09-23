@@ -639,7 +639,8 @@ static struct clockdomain emu_sys_44xx_clkdm = {
 	.prcm_partition	  = OMAP4430_PRM_PARTITION,
 	.cm_inst	  = OMAP4430_PRM_EMU_CM_INST,
 	.clkdm_offs	  = OMAP4430_PRM_EMU_CM_EMU_CDOFFS,
-	.flags		  = CLKDM_CAN_HWSUP,
+	.flags		  = (CLKDM_CAN_ENABLE_AUTO | CLKDM_CAN_FORCE_WAKEUP |
+			     CLKDM_MISSING_IDLE_REPORTING),
 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP44XX),
 };
 

@@ -1282,7 +1282,8 @@ static int _enable(struct omap_hwmod *oh)
 
 	_add_initiator_dep(oh, mpu_oh);
 	if (oh->_clk && oh->_clk->clkdm) {
-		hwsup = clkdm_is_idle(oh->_clk->clkdm);
+		hwsup = clkdm_is_idle(oh->_clk->clkdm) &&
+			!clkdm_missing_idle_reporting(oh->_clk->clkdm);
 		clkdm_wakeup(oh->_clk->clkdm);
 	}
 	_enable_clocks(oh);
