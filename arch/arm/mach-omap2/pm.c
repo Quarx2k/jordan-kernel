@@ -371,7 +371,7 @@ static int __init omap2_set_init_voltage(char *vdd_name, char *clk_name,
 	}
 
 	voltdm = voltdm_lookup(vdd_name);
-	if (IS_ERR(voltdm)) {
+	if (!voltdm) {
 		printk(KERN_ERR "%s: Unable to get vdd pointer for vdd_%s\n",
 			__func__, vdd_name);
 		goto exit;
