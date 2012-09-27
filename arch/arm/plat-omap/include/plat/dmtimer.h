@@ -51,12 +51,26 @@
 #define OMAP_TIMER_TRIGGER_OVERFLOW		0x01
 #define OMAP_TIMER_TRIGGER_OVERFLOW_AND_COMPARE	0x02
 
+/* posted mode types */
+#define OMAP_TIMER_NONPOSTED			0x00
+#define OMAP_TIMER_POSTED			0x01
+
 /*
  * IP revision identifier so that Highlander IP
  * in OMAP4 can be distinguished.
  */
 #define OMAP_TIMER_IP_VERSION_1                        0x1
 #define OMAP_TIMER_IP_VERSION_2			0x2
+
+/*
+ * timer errata flags
+ *
+ * Errata i103/i767 impacts all OMAP3/4/5 devices including AM33xx. This
+ * errata prevents us from using posted mode on these devices, unless the
+ * timer counter register is never read. For more details please refer to
+ * the OMAP3/4/5 errata documents.
+ */
+#define OMAP_TIMER_ERRATA_I103_I767			0x80000000
 
 struct omap_secure_timer_dev_attr {
 	bool is_secure_timer;
@@ -101,6 +115,7 @@ struct omap_dm_timer {
 	bool context_saved;
 	u32 ctx_loss_count;
 	struct timer_regs context;
+	u32 errata;
 	struct platform_device *pdev;
 	struct list_head node;
 
@@ -116,10 +131,14 @@ struct dmtimer_platform_data {
 	u32 is_early_init:1;
 	u32 needs_manual_reset:1;
 	bool loses_context;
+	u32 timer_errata;
 
 };
 
+struct omap_dm_timer *__omap_dm_timer_request(int posted);
 struct omap_dm_timer *omap_dm_timer_request(void);
+struct omap_dm_timer *__omap_dm_timer_request_specific(int timer_id,
+	int posted);
 struct omap_dm_timer *omap_dm_timer_request_specific(int timer_id);
 int omap_dm_timer_free(struct omap_dm_timer *timer);
 int omap_dm_timer_enable(struct omap_dm_timer *timer);
@@ -155,6 +174,5 @@ int omap_dm_timer_write_counter(struct omap_dm_timer *timer,
 	unsigned int value);
 
 int omap_dm_timers_active(void);
-
 
 #endif /* __ASM_ARCH_DMTIMER_H */

@@ -34,6 +34,19 @@
 static u8 __initdata system_timer_id;
 
 /**
+ * omap_dm_timer_get_errata - get errata flags for a timer
+ *
+ * Get the timer errata flags that are specific to the OMAP device being used.
+ */
+static u32 __init omap_dm_timer_get_errata(void)
+{
+	if (cpu_is_omap24xx())
+		return 0;
+
+	return OMAP_TIMER_ERRATA_I103_I767;
+}
+
+/**
  * omap2_dm_timer_set_src - change the timer input clock source
  * @pdev:	timer platform device pointer
  * @source:	array index of parent clock source
@@ -161,6 +174,7 @@ static int __init omap_timer_init(struct omap_hwmod *oh, void *unused)
 		goto err_free_mem;
 	}
 	pdata->loses_context = pwrdm_can_ever_lose_context(pwrdm);
+	pdata->timer_errata = omap_dm_timer_get_errata();
 
 	od = omap_device_build(name, id, oh, pdata, sizeof(*pdata),
 			omap2_dmtimer_latency,
@@ -233,6 +247,7 @@ int __init omap2_system_timer_init(u8 id)
 		goto err_free_mem;
 	}
 	pdata->loses_context = pwrdm_can_ever_lose_context(pwrdm);
+	pdata->timer_errata = omap_dm_timer_get_errata();
 
 	od = omap_device_build(name, id, oh, pdata, sizeof(*pdata),
 			omap2_dmtimer_latency,

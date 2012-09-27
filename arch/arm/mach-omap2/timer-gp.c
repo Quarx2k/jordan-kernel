@@ -138,7 +138,13 @@ static void __init omap2_gp_clockevent_init(void)
 
 	inited = 1;
 
-	gptimer = omap_dm_timer_request_specific(gptimer_id);
+	/*
+	 * For clock-event timers we never read the timer counter and
+	 * so we are not impacted by errata i103 and i767. Therefore,
+	 * we can safely ignore this errata for clock-event timers.
+	 */
+	gptimer = __omap_dm_timer_request_specific(gptimer_id,
+			OMAP_TIMER_POSTED);
 	BUG_ON(gptimer == NULL);
 	gptimer_wakeup = gptimer;
 
