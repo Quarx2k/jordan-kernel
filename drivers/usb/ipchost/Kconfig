@@ -1,0 +1,32 @@
+#
+# USB IPC driver configuration
+#
+
+comment "NOTE: USB_IPC enables AP-BP data transfer"
+	depends on USB
+
+config USB_IPC
+	tristate "USB IPC support"
+	depends on USB
+	---help---
+	  Say Y here if you want to enable AP-BP data transfer.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called usb-ipc.
+
+config USB_IPC_TEST
+        tristate "USB IPC TEST support"
+        depends on USB_IPC
+        ---help---
+          Say Y here if you want to build IPC test module.
+
+          To compile this driver as a module, choose M here: the
+          module will be called usb-ipc-test.
+
+config IPC_USBHOST_DBG
+	tristate "USB IPC and USBHOST Debug support"
+	depends on USB_IPC
+	---help---
+	  Say Y here if you want to log IPC/USBHOST activities into memory
+	  for debugging IPC/BP Panic issues. Log will be dumped by printk
+	  when disconnect ocurrs.

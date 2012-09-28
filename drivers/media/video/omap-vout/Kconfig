@@ -1,0 +1,9 @@
+config VIDEO_OMAP_VIDEOOUT
+	tristate "Video out driver"
+	depends on VIDEO_DEV && VIDEO_V4L2 && OMAP2_DSS
+	select VIDEOBUF_GEN
+
+config VIDEO_OMAP_VIDEOOUT_BUFPOOL
+	tristate "Video out driver buffer pool"
+	depends on VIDEO_OMAP_VIDEOOUT
+

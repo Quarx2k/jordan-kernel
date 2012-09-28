@@ -1,0 +1,11 @@
+#
+# Netmux configuration
+#
+
+menu "Motorola netmux link driver"
+
+config NETMUX_LINKDRIVER
+        tristate "Motorola netmux link driver"
+        default m
+
+endmenu

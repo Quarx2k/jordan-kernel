@@ -1,0 +1,9 @@
+# Kconfig for OMAP3 ISP driver
+
+config VIDEO_OLDOMAP34XX_ISP_PREVIEWER
+	tristate "OMAP ISP Previewer"
+	depends on !ARCH_OMAP3410
+
+config VIDEO_OLDOMAP34XX_ISP_RESIZER
+	tristate "OMAP ISP Resizer"
+	depends on !ARCH_OMAP3410

@@ -1,0 +1,15 @@
+menu "SMC Driver Support for OMAP3"
+	depends on ARCH_OMAP3
+config  SMC_DRIVER
+	bool "SMC Driver for OMAP3"
+	default n
+	help
+	  This option selects SMC driver for OMAP5 EMU/HS Devices.
+
+config SMC_DRIVER_DEBUG_SUPPORT
+	depends on SMC_DRIVER
+	bool "Debug build"
+	default n
+	help
+	  This option selects the debug build
+endmenu

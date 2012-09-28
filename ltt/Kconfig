@@ -1,0 +1,223 @@
+menuconfig LTT
+	bool "Linux Trace Toolkit Next Generation (LTTng)"
+	depends on EXPERIMENTAL
+	select MARKERS
+	select TRACEPOINTS
+	default n
+	help
+	  It is possible for the kernel to log important events to a trace
+	  facility. Doing so enables the use of the generated traces in order
+	  to reconstruct the dynamic behavior of the kernel, and hence the
+	  whole system.
+
+	  The tracing process contains 4 parts :
+	      1) The logging of events by key parts of the kernel.
+	      2) The tracer that keeps the events in a data buffer (uses
+	         relay).
+	      3) A trace daemon that interacts with the tracer and is
+	         notified every time there is a certain quantity of data to
+	         read from the tracer.
+	      4) A trace event data decoder that reads the accumulated data
+	         and formats it in a human-readable format.
+
+	  If you say Y, the first component will be built into the kernel.
+
+	  For more information on kernel tracing, lttctl, lttd or lttv,
+	  please check the following address :
+	       http://ltt.polymtl.ca
+
+if LTT
+
+config LTT_FILTER
+	tristate
+
+config HAVE_LTT_DUMP_TABLES
+	def_bool n
+
+config LTT_RELAY
+	def_bool n
+
+choice
+	prompt "LTTng Buffer Concurrency Management Algorithm"
+	depends on LTT_TRACER
+	default LTT_RELAY_LOCKLESS
+	help
+	  Choose between the fast lockless and the slower, spinlock/irq disable
+	  mechanism to manage tracing concurrency within a buffer.
+
+	config LTT_RELAY_LOCKLESS
+		bool "Linux Trace Toolkit High-speed Lockless Data Relay"
+	select LTT_RELAY
+	select DEBUG_FS
+	help
+	  Support using the fast lockless algorithm to log the data obtained
+	  through LTT.
+
+	  If you don't have special hardware, you almost certainly want
+	  to say Y here.
+
+	config LTT_RELAY_IRQOFF
+		bool "Linux Trace Toolkit Irq-off Data Relay"
+	select LTT_RELAY
+	select DEBUG_FS
+	depends on BROKEN
+	help
+	  Support using interrupt disable algorithm to log the data obtained
+	  through LTT.
+
+	config LTT_RELAY_LOCKED
+		bool "Linux Trace Toolkit Lock-Protected Data Relay"
+	select LTT_RELAY
+	select DEBUG_FS
+	depends on BROKEN
+	help
+	  Support using the slow spinlock and interrupt disable algorithm to log
+	  the data obtained through LTT.
+
+endchoice
+
+config LTT_SERIALIZE
+	tristate "Linux Trace Toolkit Serializer"
+	depends on LTT_RELAY
+	depends on (LTT_RELAY_LOCKLESS || LTT_RELAY_IRQOFF || LTT_RELAY_LOCKED)
+	default y
+	help
+	  Library for serializing information from format string and argument
+	  list to the trace buffers.
+
+config LTT_FAST_SERIALIZE
+	tristate "Linux Trace Toolkit Custom Serializer"
+	depends on LTT_RELAY
+	depends on (LTT_RELAY_LOCKLESS || LTT_RELAY_IRQOFF || LTT_RELAY_LOCKED)
+	default y
+	help
+	  Library for serializing information from custom, efficient, tracepoint
+	  probes.
+
+config LTT_TRACEPROBES
+	tristate "Compile lttng tracing probes"
+	depends on LTT_FAST_SERIALIZE
+	depends on LTT_SERIALIZE
+	default m
+	select LTT_FILTER
+	help
+	  Compile lttng tracing probes, which connect to the tracepoints when
+	  loaded and format the information collected by the tracepoints with
+	  the Markers.
+
+config LTT_TRACE_CONTROL
+	tristate "Linux Trace Toolkit Trace Controller"
+	depends on LTT_TRACER
+	depends on LTT_SERIALIZE
+	default y
+	help
+	  If you enable this option, the debugfs-based Linux Trace Toolkit Trace
+	  Controller will be either built in the kernel or as module.
+
+config LTT_TRACER
+	tristate "Linux Trace Toolkit Tracer"
+	default y
+	help
+	  If you enable this option, the Linux Trace Toolkit Tracer will be
+	  either built in the kernel or as module.
+
+	  Critical parts of the kernel will call upon the kernel tracing
+	  function. The data is then recorded by the tracer if a trace daemon
+	  is running in user-space and has issued a "start" command.
+
+	  For more information on kernel tracing, the trace daemon or the event
+	  decoder, please check the following address :
+	       http://www.opersys.com/ltt
+	  See also the experimental page of the project :
+	       http://ltt.polymtl.ca
+
+config LTT_ALIGNMENT
+	bool "Align Linux Trace Toolkit Traces"
+	default n
+	help
+	  This option enables dynamic alignment of data in buffers. The
+	  alignment is made on the smallest size between architecture size
+	  and the size of the value to be written.
+
+	  Dynamically calculating the offset of the data has a performance cost,
+	  but it is more efficient on some architectures (especially 64 bits) to
+	  align data than to write it unaligned.
+
+config LTT_CHECK_ARCH_EFFICIENT_UNALIGNED_ACCESS
+	def_bool y
+	select LTT_ALIGNMENT if !HAVE_EFFICIENT_UNALIGNED_ACCESS
+
+config LTT_DEBUG_EVENT_SIZE
+	bool "Add event size field to LTT events for tracer debugging"
+	default n
+	help
+	  Tracer-internal option to help debugging event type encoding problems.
+
+config LTT_USERSPACE_EVENT
+	tristate "Support logging events from userspace"
+	depends on LTT_TRACER
+	depends on LTT_FAST_SERIALIZE
+	default m
+	help
+	  This option lets userspace write text events in
+	  /debugfs/ltt/write_event.
+
+config LTT_VMCORE
+	bool "Support trace extraction from crash dump"
+	default y
+	help
+	  If you enable this option, the Linux Trace Toolkit Tracer will
+	  support extacting ltt log from vmcore, which can be generated with
+	  kdump or LKCD tools.
+
+	  Special crash extension should be used to extract ltt buffers.
+
+config LTT_STATEDUMP
+	tristate "Linux Trace Toolkit State Dump"
+	depends on LTT_TRACER
+	default m
+	help
+	  If you enable this option, the Linux Trace Toolkit State Dump will
+	  be either built in the kernel or as module.
+
+	  This module saves the state of the running kernel at trace start
+	  into the trace buffers along with the ongoing tracing information.
+
+config LTT_KPROBES
+	tristate "Linux Trace Toolkit Kprobes Support"
+	depends on LTT_TRACE_CONTROL
+	depends on LTT_FAST_SERIALIZE
+	depends on LTT_STATEDUMP
+	depends on KPROBES
+	default y
+	help
+	  Allows connecting the LTTng tracer on kprobes using simple debugfs
+	  file operations :
+	    ltt/kprobes/enable
+	    ltt/kprobes/disable
+	    ltt/kprobes/list
+
+config LTT_FTRACE
+	bool "Linux Trace Toolkit Function Tracer Support"
+	depends on LTT_SERIALIZE
+	depends on LTT_MARKER_CONTROL
+	select FUNCTION_TRACER
+	default n
+	help
+	  Integration of function entry trace with LTTng. Connect the
+	  ftrace_cpu_start and ftrace_cpu_stop probes to markers to start/stop
+	  function tracing while a trace is being taken. Typically used when the
+	  surroundings of a problem has been identified in a prior trace.
+
+config LTT_ASCII
+	bool "Linux Trace Toolkit Ascii Output (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
+	depends on LTT_TRACER
+	depends on LTT_RELAY
+	depends on LTT_SERIALIZE
+	default n
+	help
+	  Output trace data in a text-formatted ascii file, presented in
+	  /mnt/debugfs/ltt/ascii/<trace name>.
+
+endif # LTT

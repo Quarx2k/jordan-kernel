@@ -1,0 +1,8 @@
+# Kconfig for OMAP3 HP3A driver
+
+config VIDEO_OMAP3_HP3A
+	tristate "HP OMAP3 Imaging/3A driver"
+	depends on VIDEO_V4L2
+	---help---
+	  This enables the use of the HP image processing for V4L2 camera.
+

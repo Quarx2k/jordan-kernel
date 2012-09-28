@@ -1,0 +1,195 @@
+comment "OMAP Core Type"
+	depends on ARCH_OMAP2
+
+config ARCH_OMAP24XX
+	bool "OMAP24xx Based System"
+	depends on ARCH_OMAP2
+
+config ARCH_OMAP2420
+	bool "OMAP2420 support"
+	depends on ARCH_OMAP24XX
+	select OMAP_DM_TIMER
+	select ARCH_OMAP_OTG
+
+config ARCH_OMAP2430
+	bool "OMAP2430 support"
+	depends on ARCH_OMAP24XX
+
+config ARCH_OMAP34XX
+	bool "OMAP34xx Based System"
+	depends on ARCH_OMAP3
+	select USB_ARCH_HAS_EHCI
+
+config ARCH_OMAP3430
+	bool "OMAP3430 support"
+	depends on ARCH_OMAP3 && ARCH_OMAP34XX
+	select ARCH_OMAP_OTG
+
+comment "OMAP Board Type"
+	depends on ARCH_OMAP2 || ARCH_OMAP3 || ARCH_OMAP4
+
+config MACH_OMAP_GENERIC
+	bool "Generic OMAP board"
+	depends on ARCH_OMAP2 && ARCH_OMAP24XX
+
+config MACH_OMAP2_TUSB6010
+	bool
+	depends on ARCH_OMAP2 && ARCH_OMAP2420
+	default y if MACH_NOKIA_N8X0
+
+config MACH_OMAP_H4
+	bool "OMAP 2420 H4 board"
+	depends on ARCH_OMAP2 && ARCH_OMAP24XX
+	select OMAP_DEBUG_DEVICES
+
+config MACH_OMAP_APOLLON
+	bool "OMAP 2420 Apollon board"
+	depends on ARCH_OMAP2 && ARCH_OMAP24XX
+
+config MACH_OMAP_2430SDP
+	bool "OMAP 2430 SDP board"
+	depends on ARCH_OMAP2 && ARCH_OMAP24XX
+
+config MACH_OMAP3_BEAGLE
+	bool "OMAP3 BEAGLE board"
+	depends on ARCH_OMAP3 && ARCH_OMAP34XX
+
+config MACH_OMAP_LDP
+	bool "OMAP3 LDP board"
+	depends on ARCH_OMAP3 && ARCH_OMAP34XX
+
+config MACH_OVERO
+	bool "Gumstix Overo board"
+	depends on ARCH_OMAP3 && ARCH_OMAP34XX
+
+config MACH_OMAP3EVM
+	bool "OMAP 3530 EVM board"
+	depends on ARCH_OMAP3 && ARCH_OMAP34XX
+
+config MACH_OMAP3517EVM
+	bool "OMAP3517/ AM3517 EVM board"
+	depends on ARCH_OMAP3 && ARCH_OMAP34XX
+
+config MACH_OMAP3_PANDORA
+	bool "OMAP3 Pandora"
+	depends on ARCH_OMAP3 && ARCH_OMAP34XX
+
+config OMAP3_EMU
+	bool "OMAP3 debugging peripherals"
+	depends on ARCH_OMAP3
+	select OC_ETM
+	help
+	  Say Y here to enable debugging hardware of omap3
+
+config WIFI_CONTROL_FUNC
+        bool "Enable WiFi control function abstraction"
+	depends on MACH_OMAP_ZOOM2 || MACH_SHOLES || MACH_MAPPHONE
+        help
+          Enables Power/Reset/Carddetect function abstraction
+
+config TIWLAN_SDIO
+	bool "TI WLAN Enhanced SDIO Contoller support"
+	depends on MMC_OMAP || MMC_OMAP_MODULE || MMC_OMAP_HS || MMC_OMAP_HS_MODULE
+	help
+	   Say Y here if you want to be able to use TI's WLAN device using the
+	   SDIO interface. If unsure, say N.
+
+config TIWLAN_MMC_CONTROLLER
+	int "MMC Controller number that TI WLAN chip is connected to"
+	range 1 3
+	depends on TIWLAN_SDIO || MMC_EMBEDDED_SDIO
+	default "3"
+	help
+	  Choose the number of the MMC controller that TI WLAN chip is
+	  connected to. TI WLAN has SDIO host controller that will control
+	  this MMC port.
+
+config MACH_OMAP_3430SDP
+	bool "OMAP 3430 SDP board"
+	depends on ARCH_OMAP3 && ARCH_OMAP34XX
+
+config MACH_NOKIA_N800
+       bool
+
+config MACH_NOKIA_N810
+       bool
+
+config MACH_NOKIA_N810_WIMAX
+       bool
+
+config MACH_NOKIA_N8X0
+	bool "Nokia N800/N810"
+	depends on ARCH_OMAP2420
+	select MACH_NOKIA_N800
+	select MACH_NOKIA_N810
+	select MACH_NOKIA_N810_WIMAX
+
+config MACH_NOKIA_RX51
+	bool "Nokia RX-51 board"
+	depends on ARCH_OMAP3 && ARCH_OMAP34XX
+
+config MACH_OMAP_ZOOM2
+	bool "OMAP3 Zoom2 board"
+	depends on ARCH_OMAP3 && ARCH_OMAP34XX
+
+config MACH_OMAP_ZOOM3
+	bool "OMAP3630 Zoom3 board"
+
+config MACH_SHOLES
+	bool "Motorola sholes"
+	depends on ARCH_OMAP3 && ARCH_OMAP34XX
+
+config MACH_SHOLES_UMTS
+	bool "Motorola sholes umts"
+	depends on MACH_SHOLES
+
+config MACH_MAPPHONE
+        bool "Motorola Android Platform phone"
+        depends on ARCH_OMAP3 && ARCH_OMAP34XX
+
+config MACH_CM_T35
+	bool "CompuLab CM-T35 module"
+	depends on ARCH_OMAP3 && ARCH_OMAP34XX
+
+config MACH_IGEP0020
+	bool "IGEP0020"
+	depends on ARCH_OMAP3 && ARCH_OMAP34XX
+
+config MACH_OMAP_3630SDP
+	bool "OMAP3630 SDP board"
+	depends on ARCH_OMAP3 && ARCH_OMAP34XX
+
+config MACH_OMAP_4430SDP
+	bool "OMAP 4430 SDP board"
+	depends on ARCH_OMAP4
+
+config MACH_OMAP_3430_ES3_ARM_ERRATA
+	bool "OMAP 3430 ES3.x Cortex-A8 ARM Errata"
+	default y if ARCH_OMAP3_HS
+	select ARM_ERRATA_430973
+	select ARM_ERRATA_621766
+	select ARM_ERRATA_725233
+
+config EMU_UART_DEBUG
+	bool "Setting MiniUSB port as UART3 to debug kernel"
+	default n
+	help
+	  This feature is specific for Motorola phone with CPCAP power IC.
+	  If this option is selected, USB functionality is NOT available any more.
+
+config OMAP3_EXPORT_DIE_ID
+       bool "Export DIE ID code under /proc/socinfo"
+       depends on ARCH_OMAP3
+       default n
+       help
+         Say Y here if you need DIE ID code to be exported via /proc/socinfo
+         in production systems. You will need also to explicitly flag it by
+         appending the "omap3_die_id" parameter to your boot command line.
+
+config PM_DEEPSLEEP
+	bool "instant on feature"
+	default n
+	help
+	  if enabling this feature, when PM state is set to DEEPSLEEP, the kerne
+	  ignore all key press except long press power key.
+

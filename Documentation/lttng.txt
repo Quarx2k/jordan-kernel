@@ -1,0 +1,35 @@
+
+Linux Text Toolkit Next Generation
+Mathieu Desnoyers, July 2009
+
+This guide contains quickstart information on how to to use LTTng. It currently
+only contains information about ascii text dump, but (TODO) we should bring the
+LTTng manual here.
+
+ * Quick and dirty startup ascii output script:
+
+#!/bin/sh
+
+LTT_DIR=/mnt/debugfs/ltt
+ltt-armall
+echo trace > ${LTT_DIR}/setup_trace
+cd control/
+cd trace/
+echo relay > ${LTT_DIR}/control/trace/trans
+cd channel/
+for a in ${LTT_DIR}/control/trace/channel/*/switch_timer;
+	do echo 100 > $a; done
+#note: error for metadata channel for the following line is OK
+#it is not permitted to set metadata channel in overwrite mode
+for a in ${LTT_DIR}/control/trace/channel/*/overwrite;
+	do echo 1 > $a; done
+for a in ${LTT_DIR}/control/trace/channel/*/enable;
+	do echo 1 > $a; done
+cd ..
+echo 1 > ${LTT_DIR}/control/trace/alloc
+echo 1 > ${LTT_DIR}/control/trace/enabled
+
+To see the events for a given channel (e.g. kernel events):
+
+cat ${LTT_DIR}/ascii/trace/kernel
+(hit CTRL-C to stop)
