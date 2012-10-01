@@ -92,6 +92,10 @@
 #if defined(CONFIG_VIDEO_OV5650) || defined(CONFIG_VIDEO_OV5650_MODULE)
 #include <media/ov5650.h>
 #endif
+#if defined(CONFIG_VIDEO_CAM_ISE) || defined(CONFIG_VIDEO_CAM_ISE_MODULE)
+#include <media/camise.h>
+#endif
+
 
 #if defined(CONFIG_LEDS_BD7885)
 #include <linux/leds-bd7885.h>
@@ -1468,6 +1472,12 @@ static struct i2c_board_info __initdata
 		.platform_data = &mapphone_ov5650_platform_data,
 	},
 #endif
+#if defined(CONFIG_VIDEO_CAM_ISE)
+	{
+		I2C_BOARD_INFO("camise", CAMISE_I2C_ADDR),
+		.platform_data = &mapphone_camise_platform_data,
+	},
+#endif
 #ifdef CONFIG_VIDEO_OMAP3_HPLENS
 	{
 		I2C_BOARD_INFO("HP_GEN_LENS", 0x04),
@@ -1619,7 +1629,12 @@ static int initialize_i2c_bus_info
 	feat_prop = of_get_property(bus_node,
 			prop_name, NULL);
 	if (NULL != feat_prop) {
+	if (bus_num==3) {
+		device_names = "camise,HP_GEN_LENS,lm3554_led,mt9p012" 
+
+	} else {
 		device_names = (char *)feat_prop;
+	}
 		printk(KERN_INFO
 			"I2C-%d devices: %s\n", bus_num, device_names);
 		device_name_len = strlen(device_names);
@@ -2607,3 +2622,4 @@ MACHINE_START(MAPPHONE, "mapphone_")
 	.init_machine	= mapphone_init,
 	.timer		= &omap_timer,
 MACHINE_END
+

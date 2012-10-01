@@ -348,6 +348,14 @@ config VIDEO_OMAP3_HPLENS
 	---help---
 	  This is a Video4Linux2 generic lens driver.
 
+config VIDEO_CAM_ISE
+        bool "Motorola Camera ISE Interface"
+        depends on I2C && VIDEO_V4L2
+	default n
+        ---help---
+          This is a Video4Linux2 isp and vl42 configuration handler for
+          the motorole ISE driver, which resides in the user space.
+
 config VIDEO_MT9P012
 	tristate "Micron MT9P012 raw sensor driver (5MP)"
 	depends on I2C && VIDEO_V4L2
@@ -1135,3 +1143,4 @@ config USB_S2255
 
 endif # V4L_USB_DRIVERS
 endif # VIDEO_CAPTURE_DRIVERS
+

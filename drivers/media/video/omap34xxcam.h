@@ -60,6 +60,7 @@
 #define OMAP34XXCAM_SLAVE_POWER_ALL	-1
 
 #define OMAP34XXCAM_VIDEODEVS		4
+#define CAM_DEVICE_SOC                  3
 
 /* #define OMAP34XXCAM_POWEROFF_DELAY (2 * HZ) */
 

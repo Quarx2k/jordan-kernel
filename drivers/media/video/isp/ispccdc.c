@@ -38,7 +38,8 @@ static unsigned long fpc_table_add_m;
 /**
  * struct isp_ccdc - Structure for the CCDC module to store its own information
  * @ccdc_inuse: Flag to determine if CCDC has been reserved or not (0 or 1).
- * @ccdcout_w: CCDC output width.
+ * @ccdcout_w: CCDC output width (with padding).
+ * @ccdcout_w_img: CCDC output width (no padding).
  * @ccdcout_h: CCDC output height.
  * @ccdcin_w: CCDC input width.
  * @ccdcin_h: CCDC input height.
@@ -68,6 +69,7 @@ struct lsc_table {
 static struct isp_ccdc {
 	u8 ccdc_inuse;
 	u32 ccdcout_w;
+	u32 ccdcout_w_img;
 	u32 ccdcout_h;
 	u32 ccdcin_w;
 	u32 ccdcin_h;
@@ -865,7 +867,7 @@ int ispccdc_config_datapath(enum ccdc_input input, enum ccdc_output output)
 		syncif.fldstat = 0;
 		syncif.hdpol = 0;
 		syncif.ipmod = YUV16;
-		syncif.vdpol = 1;
+		syncif.vdpol = 0;
 		ispccdc_config_imgattr(0);
 		ispccdc_config_sync_if(syncif);
 		blkcfg.dcsubval = 0;
@@ -1373,14 +1375,21 @@ int ispccdc_try_size(u32 input_w, u32 input_h, u32 *output_w, u32 *output_h)
 		*output_w &= 0xFFFFFFFE;
 	}
 
-	if (ispccdc_obj.ccdc_outfmt == CCDC_OTHERS_MEM
-		|| ispccdc_obj.ccdc_outfmt == CCDC_OTHERS_VP_MEM
-		|| ispccdc_obj.ccdc_outfmt == CCDC_OTHERS_VP_MEM_LSC) {
-		if (*output_w % 32) {
-			*output_w -= (*output_w % 32);
-			*output_w += 32;
+	/* Store actual image width, before byte padding for 32 pixel
+	   alignment */
+	ispccdc_obj.ccdcout_w_img = *output_w;
+
+	if (ispccdc_obj.ccdc_outfmt == CCDC_OTHERS_MEM) {
+		if (*output_w % 16) {
+			*output_w -= (*output_w % 16);
+			*output_w += 16;
 		}
-		*output_h &= 0xFFFFFFFE;
+	} else if (ispccdc_obj.ccdc_outfmt == CCDC_OTHERS_VP_MEM
+		|| ispccdc_obj.ccdc_outfmt == CCDC_OTHERS_VP_MEM_LSC) {
+			if (*output_w % 32) {
+				*output_w -= (*output_w % 32);
+				*output_w += 32;
+			}
 	}
 
 	ispccdc_obj.ccdcout_w = *output_w;
@@ -1388,11 +1397,13 @@ int ispccdc_try_size(u32 input_w, u32 input_h, u32 *output_w, u32 *output_h)
 	ispccdc_obj.ccdcin_w = input_w;
 	ispccdc_obj.ccdcin_h = input_h;
 
-	DPRINTK_ISPCCDC("try size: ccdcin_w=%u,ccdcin_h=%u,ccdcout_w=%u,"
-			" ccdcout_h=%u\n",
+	DPRINTK_ISPCCDC("try size: ccdcin_w=%u,ccdcin_h=%u,"
+			"ccdcout_w=%u,ccdcout_w_img=%u,"
+			"ccdcout_h=%u\n",
 			ispccdc_obj.ccdcin_w,
 			ispccdc_obj.ccdcin_h,
 			ispccdc_obj.ccdcout_w,
+			ispccdc_obj.ccdcout_w_img,
 			ispccdc_obj.ccdcout_h);
 
 	return 0;
@@ -1455,7 +1466,7 @@ int ispccdc_config_size(u32 input_w, u32 input_h, u32 output_w, u32 output_h)
 			ISPCCDC_VERT_LINES);
 		isp_reg_writel((0
 			<< ISPCCDC_HORZ_INFO_SPH_SHIFT) |
-			((ispccdc_obj.ccdcout_w - 1) <<
+			((ispccdc_obj.ccdcout_w_img - 1) <<
 			ISPCCDC_HORZ_INFO_NPH_SHIFT),
 			OMAP3_ISP_IOMEM_CCDC,
 			ISPCCDC_HORZ_INFO);
@@ -1464,22 +1475,20 @@ int ispccdc_config_size(u32 input_w, u32 input_h, u32 output_w, u32 output_h)
 			<< ISPCCDC_VERT_START_SLV0_SHIFT,
 			OMAP3_ISP_IOMEM_CCDC,
 			ISPCCDC_VERT_START);
-		isp_reg_writel((ispccdc_obj.ccdcout_h -
-			ispccdc_obj.ccdcin_hoffset - 1) <<
+		isp_reg_writel((ispccdc_obj.ccdcout_h - 1) <<
 			ISPCCDC_VERT_LINES_NLV_SHIFT,
 			OMAP3_ISP_IOMEM_CCDC,
 			ISPCCDC_VERT_LINES);
 		isp_reg_writel((ispccdc_obj.ccdcin_woffset
 			<< ISPCCDC_HORZ_INFO_SPH_SHIFT) |
-			((ispccdc_obj.ccdcout_w -
-			ispccdc_obj.ccdcin_woffset) <<
+			((ispccdc_obj.ccdcout_w_img - 1) <<
 			ISPCCDC_HORZ_INFO_NPH_SHIFT),
 			OMAP3_ISP_IOMEM_CCDC,
 			ISPCCDC_HORZ_INFO);
 	}
 
 	ispccdc_config_outlineoffset(ispccdc_obj.ccdcout_w * 2, 0, 0);
-	isp_reg_writel((((ispccdc_obj.ccdcout_h - 2) &
+	isp_reg_writel((((ispccdc_obj.ccdcout_h - 4) &
 			 ISPCCDC_VDINT_0_MASK) <<
 			ISPCCDC_VDINT_0_SHIFT) |
 		       ((50 & ISPCCDC_VDINT_1_MASK) <<
@@ -1491,18 +1500,16 @@ int ispccdc_config_size(u32 input_w, u32 input_h, u32 output_w, u32 output_h)
 		isp_reg_writel(0, OMAP3_ISP_IOMEM_CCDC, ISPCCDC_VP_OUT);
 	} else if ((ispccdc_obj.ccdc_outfmt == CCDC_OTHERS_VP) ||
 		(ispccdc_obj.ccdc_outfmt == CCDC_OTHERS_VP_MEM_LSC)) {
-		isp_reg_writel((ispccdc_obj.ccdcout_w
+		isp_reg_writel((ispccdc_obj.ccdcout_w_img
 			<< ISPCCDC_VP_OUT_HORZ_NUM_SHIFT) |
 			(ispccdc_obj.ccdcout_h <<
 			ISPCCDC_VP_OUT_VERT_NUM_SHIFT),
 			OMAP3_ISP_IOMEM_CCDC,
 			ISPCCDC_VP_OUT);
 	} else {
-		isp_reg_writel(((ispccdc_obj.ccdcout_w -
-			ispccdc_obj.ccdcin_woffset)
+		isp_reg_writel(((ispccdc_obj.ccdcout_w_img)
 			<< ISPCCDC_VP_OUT_HORZ_NUM_SHIFT) |
-			((ispccdc_obj.ccdcout_h -
-			ispccdc_obj.ccdcin_hoffset - 1) <<
+			((ispccdc_obj.ccdcout_h) <<
 			ISPCCDC_VP_OUT_VERT_NUM_SHIFT),
 			OMAP3_ISP_IOMEM_CCDC,
 			ISPCCDC_VP_OUT);

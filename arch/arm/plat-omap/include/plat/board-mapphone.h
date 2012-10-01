@@ -64,6 +64,9 @@ extern struct ov5650_platform_data mapphone_ov5650_platform_data;
 #ifdef CONFIG_VIDEO_OMAP3_HPLENS
 extern struct hplens_platform_data mapphone_hplens_platform_data;
 #endif
+#ifdef CONFIG_VIDEO_CAM_ISE
+extern struct camise_platform_data mapphone_camise_platform_data;
+#endif
 
 #define GPIO_MT9P012_STANDBY		58
 #define GPIO_MT9P012_RESET		98
