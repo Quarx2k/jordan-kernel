@@ -1,151 +1,133 @@
-/**********************************************************************
- *
- * Copyright(c) 2008 Imagination Technologies Ltd. All rights reserved.
- * 
- * This program is free software; you can redistribute it and/or modify it
- * under the terms and conditions of the GNU General Public License,
- * version 2, as published by the Free Software Foundation.
- * 
- * This program is distributed in the hope it will be useful but, except 
- * as otherwise stated in writing, without any warranty; without even the 
- * implied warranty of merchantability or fitness for a particular purpose. 
- * See the GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * The full GNU General Public License is included in this distribution in
- * the file called "COPYING".
- *
- * Contact Information:
- * Imagination Technologies Ltd. <gpl-support@imgtec.com>
- * Home Park Estate, Kings Langley, Herts, WD4 8LZ, UK 
- *
- ******************************************************************************/
+/*************************************************************************/ /*!
+@Title          OMAP Linux display driver structures and prototypes
+@Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
+@License        Dual MIT/GPLv2
 
+The contents of this file are subject to the MIT license as set out below.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+Alternatively, the contents of this file may be used under the terms of
+the GNU General Public License Version 2 ("GPL") in which case the provisions
+of GPL are applicable instead of those above.
+
+If you wish to allow use of your version of this file only under the terms of
+GPL, and not to allow others to use your version of this file under the terms
+of the MIT license, indicate your decision by deleting the provisions above
+and replace them with the notice and other provisions required by GPL as set
+out in the file called "GPL-COPYING" included in this distribution. If you do
+not delete the provisions above, a recipient may use your version of this file
+under the terms of either the MIT license or GPL.
+
+This License is also included in this distribution in the file called
+"MIT-COPYING".
+
+EXCEPT AS OTHERWISE STATED IN A NEGOTIATED AGREEMENT: (A) THE SOFTWARE IS
+PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+PURPOSE AND NONINFRINGEMENT; AND (B) IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+  
+*/ /**************************************************************************/
 #ifndef __OMAPLFB_H__
 #define __OMAPLFB_H__
 
-extern IMG_BOOL PVRGetDisplayClassJTable(PVRSRV_DC_DISP2SRV_KMJTABLE *psJTable);
+#include <linux/version.h>
 
-#define OMAPLCD_IRQ			25
+#include <asm/atomic.h>
 
-#define OMAPLCD_SYSCONFIG           0x0410
-#define OMAPLCD_CONFIG              0x0444
-#define OMAPLCD_DEFAULT_COLOR0      0x044C
-#define OMAPLCD_TIMING_H            0x0464
-#define OMAPLCD_TIMING_V            0x0468
-#define OMAPLCD_POL_FREQ            0x046C
-#define OMAPLCD_DIVISOR             0x0470
-#define OMAPLCD_SIZE_DIG            0x0478
-#define OMAPLCD_SIZE_LCD            0x047C
-#define OMAPLCD_GFX_POSITION        0x0488
-#define OMAPLCD_GFX_SIZE            0x048C
-#define OMAPLCD_GFX_ATTRIBUTES      0x04a0
-#define OMAPLCD_GFX_FIFO_THRESHOLD  0x04a4
-#define OMAPLCD_GFX_WINDOW_SKIP     0x04b4
+#include <linux/kernel.h>
+#include <linux/console.h>
+#include <linux/fb.h>
+#include <linux/module.h>
+#include <linux/string.h>
+#include <linux/notifier.h>
+#include <linux/mutex.h>
 
-#define OMAPLCD_IRQSTATUS       0x0418
-#define OMAPLCD_IRQENABLE       0x041c
-#define OMAPLCD_CONTROL         0x0440
-#define OMAPLCD_GFX_BA0         0x0480
-#define OMAPLCD_GFX_BA1         0x0484
-#define OMAPLCD_GFX_ROW_INC     0x04ac
-#define OMAPLCD_GFX_PIX_INC     0x04b0
-#define OMAPLCD_VID1_BA0        0x04bc
-#define OMAPLCD_VID1_BA1        0x04c0
-#define OMAPLCD_VID1_ROW_INC    0x04d8
-#define OMAPLCD_VID1_PIX_INC    0x04dc
+#ifdef CONFIG_HAS_EARLYSUSPEND
+#include <linux/earlysuspend.h>
+#endif
 
-#define	OMAP_CONTROL_GODIGITAL      (1 << 6)
-#define	OMAP_CONTROL_GOLCD          (1 << 5)
-#define	OMAP_CONTROL_DIGITALENABLE  (1 << 1)
-#define	OMAP_CONTROL_LCDENABLE      (1 << 0)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38))
+#define	OMAPLFB_CONSOLE_LOCK()		console_lock()
+#define	OMAPLFB_CONSOLE_UNLOCK()	console_unlock()
+#else
+#define	OMAPLFB_CONSOLE_LOCK()		acquire_console_sem()
+#define	OMAPLFB_CONSOLE_UNLOCK()	release_console_sem()
+#endif
 
-#define OMAPLCD_INTMASK_VSYNC       (1 << 1)
-#define OMAPLCD_INTMASK_OFF		0
+#define unref__ __attribute__ ((unused))
 
-typedef void *       OMAP_HANDLE;
+typedef void *       OMAPLFB_HANDLE;
 
-typedef enum tag_omap_bool
-{
-	OMAP_FALSE = 0,
-	OMAP_TRUE  = 1,
-} OMAP_BOOL, *OMAP_PBOOL;
+typedef bool OMAPLFB_BOOL, *OMAPLFB_PBOOL;
+#define	OMAPLFB_FALSE false
+#define OMAPLFB_TRUE true
 
+typedef	atomic_t	OMAPLFB_ATOMIC_BOOL;
+
+typedef atomic_t	OMAPLFB_ATOMIC_INT;
+
+/* OMAPLFB buffer structure */
 typedef struct OMAPLFB_BUFFER_TAG
 {
-	struct list_head		list;
-
-	unsigned long                ulBufferSize;
-
-	
-	
-
-	IMG_SYS_PHYADDR              sSysAddr;
-	IMG_CPU_VIRTADDR             sCPUVAddr;
-	PVRSRV_SYNC_DATA            *psSyncData;
-
 	struct OMAPLFB_BUFFER_TAG	*psNext;
+	struct OMAPLFB_DEVINFO_TAG	*psDevInfo;
 
-	OMAP_HANDLE			hCmdCookie;
+	struct work_struct sWork;
+
+	/* Position of this buffer in the virtual framebuffer */
+	unsigned long		     	ulYOffset;
+
+	/* IMG structures used, to minimise API function code */
+	/* replace with own structures where necessary */
+	IMG_SYS_PHYADDR              	sSysAddr;
+	IMG_CPU_VIRTADDR             	sCPUVAddr;
+	PVRSRV_SYNC_DATA            	*psSyncData;
+
+	OMAPLFB_HANDLE      		hCmdComplete;
+	unsigned long    		ulSwapInterval;
 } OMAPLFB_BUFFER;
 
-typedef struct OMAPLFB_VSYNC_FLIP_ITEM_TAG
+/* OMAPLFB swapchain structure */
+typedef struct OMAPLFB_SWAPCHAIN_TAG
 {
-	
+	/* Swap chain ID */
+	unsigned int			uiSwapChainID;
 
+	/* number of buffers in swapchain */
+	unsigned long       		ulBufferCount;
 
-	OMAP_HANDLE      hCmdComplete;
-	
-	unsigned long    ulSwapInterval;
-	
-	OMAP_BOOL        bValid;
-	
-	OMAP_BOOL        bFlipped;
-	
-	OMAP_BOOL        bCmdCompleted;
+	/* list of buffers in the swapchain */
+	OMAPLFB_BUFFER     		*psBuffer;
 
-	
-	
+	/* Swap chain work queue */
+	struct workqueue_struct   	*psWorkQueue;
 
-	
-	IMG_SYS_PHYADDR* sSysAddr;
-} OMAPLFB_VSYNC_FLIP_ITEM;
+	/*
+	 * Set if we didn't manage to wait for VSync on last swap,
+	 * or if we think we need to wait for VSync on the next flip.
+	 * The flag helps to avoid jitter when the screen is
+	 * unblanked, by forcing an extended wait for VSync before
+	 * attempting the next flip.
+	 */
+	OMAPLFB_BOOL			bNotVSynced;
 
-typedef struct PVRPDP_SWAPCHAIN_TAG
-{
-	
-	unsigned long       ulBufferCount;
-	
-	OMAPLFB_BUFFER     *psBuffer;
-	
-	OMAPLFB_VSYNC_FLIP_ITEM	*psVSyncFlips;
+	/* Previous number of blank events */
+	int				iBlankEvents;
 
-	
-	unsigned long       ulInsertIndex;
-	
-	
-	unsigned long       ulRemoveIndex;
-
-	
-	void *pvRegs;
-
-	
-	PVRSRV_DC_DISP2SRV_KMJTABLE	*psPVRJTable;
-
-	
-	OMAP_BOOL           bFlushCommands;
-
-	
-	unsigned long       ulSetFlushStateRefCount;
-
-	
-	OMAP_BOOL           bBlanked;
-
-	
-	spinlock_t         *psSwapChainLock;
+	/* Framebuffer Device ID for messages (e.g. printk) */
+	unsigned int            	uiFBDevID;
 } OMAPLFB_SWAPCHAIN;
 
 typedef struct OMAPLFB_FBINFO_TAG
@@ -156,79 +138,100 @@ typedef struct OMAPLFB_FBINFO_TAG
 	unsigned long       ulWidth;
 	unsigned long       ulHeight;
 	unsigned long       ulByteStride;
+	unsigned long       ulPhysicalWidthmm;
+	unsigned long       ulPhysicalHeightmm;
 
-	
-	
-	IMG_SYS_PHYADDR     sSysAddr;
+	/* IMG structures used, to minimise API function code */
+	/* replace with own structures where necessary */
+	IMG_SYS_PHYADDR     sSysAddr;//system physical address
 	IMG_CPU_VIRTADDR    sCPUVAddr;
 
-	
+	/* pixelformat of system/primary surface */
 	PVRSRV_PIXEL_FORMAT ePixelFormat;
-}OMAPLFB_FBINFO;
 
+#if defined(CONFIG_DSSCOMP)
+	OMAPLFB_BOOL		bIs2D;
+	IMG_SYS_PHYADDR		*psPageList;
+	struct ion_handle	*psIONHandle;
+	IMG_UINT32			uiBytesPerPixel;
+#endif
+} OMAPLFB_FBINFO;
+
+/* kernel device information structure */
 typedef struct OMAPLFB_DEVINFO_TAG
 {
-	IMG_UINT32          uDeviceID;
+	/* Framebuffer Device ID */
+	unsigned int            uiFBDevID;
 
-	
+	/* PVR Device ID */
+	unsigned int            uiPVRDevID;
+
+	/* Swapchain create/destroy mutex */
+	struct mutex		sCreateSwapChainMutex;
+
+	/* system surface info */
 	OMAPLFB_BUFFER          sSystemBuffer;
 
-	
+	/* jump table into PVR services */
 	PVRSRV_DC_DISP2SRV_KMJTABLE	sPVRJTable;
 	
-	
+	/* jump table into DC */
 	PVRSRV_DC_SRV2DISP_KMJTABLE	sDCJTable;
 
-	
+	/* fb info structure */
 	OMAPLFB_FBINFO          sFBInfo;
 
-	
-	unsigned long           ulRefCount;
-
-	
+	/* Only one swapchain supported by this device so hang it here */
 	OMAPLFB_SWAPCHAIN      *psSwapChain;
 
-	
-	OMAP_BOOL               bFlushCommands;
+	/* Swap chain ID */
+	unsigned int		uiSwapChainID;
 
-	
+	/* True if PVR Services is flushing its command queues */
+	OMAPLFB_ATOMIC_BOOL     sFlushCommands;
+
+	/* pointer to linux frame buffer information structure */
 	struct fb_info         *psLINFBInfo;
 
-	
+	/* Linux Framebuffer event notification block */
 	struct notifier_block   sLINNotifBlock;
 
-	
-	OMAP_BOOL               bDeviceSuspended;
+	/* IMG structures used, to minimise API function code */
+	/* replace with own structures where necessary */
 
-	
-	spinlock_t             sSwapChainLock;
-
-	
-	
-
-	
-	IMG_DEV_VIRTADDR		sDisplayDevVAddr;
+	/* Address of the surface being displayed */
+	IMG_DEV_VIRTADDR	sDisplayDevVAddr;
 
 	DISPLAY_INFO            sDisplayInfo;
 
-	
+	/* Display format */
 	DISPLAY_FORMAT          sDisplayFormat;
 	
-	
+	/* Display dimensions */
 	DISPLAY_DIMS            sDisplayDim;
 
-	struct list_head	active_list;
-	struct mutex		active_list_lock;
-	struct work_struct	active_work;
-	struct workqueue_struct *workq;
+	/* True if screen is blanked */
+	OMAPLFB_ATOMIC_BOOL	sBlanked;
+
+	/* Number of blank/unblank events */
+	OMAPLFB_ATOMIC_INT	sBlankEvents;
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	/* Set by early suspend */
+	OMAPLFB_ATOMIC_BOOL	sEarlySuspendFlag;
+
+	struct early_suspend    sEarlySuspend;
+#endif
+
+#if defined(SUPPORT_DRI_DRM)
+	OMAPLFB_ATOMIC_BOOL     sLeaveVT;
+#endif
+
 }  OMAPLFB_DEVINFO;
 
 #define	OMAPLFB_PAGE_SIZE 4096
-#define	OMAPLFB_PAGE_MASK (OMAPLFB_PAGE_SIZE - 1)
-#define	OMAPLFB_PAGE_TRUNC (~OMAPLFB_PAGE_MASK)
 
-#define	OMAPLFB_PAGE_ROUNDUP(x) (((x) + OMAPLFB_PAGE_MASK) & OMAPLFB_PAGE_TRUNC)
-
+/* DEBUG only printk */
 #ifdef	DEBUG
 #define	DEBUG_PRINTK(x) printk x
 #else
@@ -240,41 +243,82 @@ typedef struct OMAPLFB_DEVINFO_TAG
 #define	DEVNAME	DRVNAME
 #define	DRIVER_PREFIX DRVNAME
 
-typedef enum _OMAP_ERROR_
+/*!
+ *****************************************************************************
+ * Error values
+ *****************************************************************************/
+typedef enum _OMAPLFB_ERROR_
 {
-	OMAP_OK                             =  0,
-	OMAP_ERROR_GENERIC                  =  1,
-	OMAP_ERROR_OUT_OF_MEMORY            =  2,
-	OMAP_ERROR_TOO_FEW_BUFFERS          =  3,
-	OMAP_ERROR_INVALID_PARAMS           =  4,
-	OMAP_ERROR_INIT_FAILURE             =  5,
-	OMAP_ERROR_CANT_REGISTER_CALLBACK   =  6,
-	OMAP_ERROR_INVALID_DEVICE           =  7,
-	OMAP_ERROR_DEVICE_REGISTER_FAILED   =  8
-} OMAP_ERROR;
+	OMAPLFB_OK                             =  0,
+	OMAPLFB_ERROR_GENERIC                  =  1,
+	OMAPLFB_ERROR_OUT_OF_MEMORY            =  2,
+	OMAPLFB_ERROR_TOO_FEW_BUFFERS          =  3,
+	OMAPLFB_ERROR_INVALID_PARAMS           =  4,
+	OMAPLFB_ERROR_INIT_FAILURE             =  5,
+	OMAPLFB_ERROR_CANT_REGISTER_CALLBACK   =  6,
+	OMAPLFB_ERROR_INVALID_DEVICE           =  7,
+	OMAPLFB_ERROR_DEVICE_REGISTER_FAILED   =  8,
+	OMAPLFB_ERROR_SET_UPDATE_MODE_FAILED   =  9
+} OMAPLFB_ERROR;
 
+typedef enum _OMAPLFB_UPDATE_MODE_
+{
+	OMAPLFB_UPDATE_MODE_UNDEFINED			= 0,
+	OMAPLFB_UPDATE_MODE_MANUAL			= 1,
+	OMAPLFB_UPDATE_MODE_AUTO			= 2,
+	OMAPLFB_UPDATE_MODE_DISABLED			= 3
+} OMAPLFB_UPDATE_MODE;
 
 #ifndef UNREFERENCED_PARAMETER
 #define	UNREFERENCED_PARAMETER(param) (param) = (param)
 #endif
 
-OMAP_ERROR OMAPLFBInit(void);
-OMAP_ERROR OMAPLFBDeinit(void);
+OMAPLFB_ERROR OMAPLFBInit(void);
+OMAPLFB_ERROR OMAPLFBDeInit(void);
 
+/* OS Specific APIs */
+OMAPLFB_DEVINFO *OMAPLFBGetDevInfoPtr(unsigned uiFBDevID);
+unsigned OMAPLFBMaxFBDevIDPlusOne(void);
 void *OMAPLFBAllocKernelMem(unsigned long ulSize);
 void OMAPLFBFreeKernelMem(void *pvMem);
-OMAP_ERROR OMAPLFBGetLibFuncAddr(char *szFunctionName, PFN_DC_GET_PVRJTABLE *ppfnFuncTable);
-OMAP_ERROR OMAPLFBInstallVSyncISR (OMAPLFB_SWAPCHAIN *psSwapChain);
-OMAP_ERROR OMAPLFBUninstallVSyncISR(OMAPLFB_SWAPCHAIN *psSwapChain);
-OMAP_BOOL OMAPLFBVSyncIHandler(OMAPLFB_SWAPCHAIN *psSwapChain);
-void OMAPLFBEnableVSyncInterrupt(OMAPLFB_SWAPCHAIN *psSwapChain);
-void OMAPLFBDisableVSyncInterrupt(OMAPLFB_SWAPCHAIN *psSwapChain);
-void OMAPLFBEnableDisplayRegisterAccess(void);
-void OMAPLFBDisableDisplayRegisterAccess(void);
-void OMAPLFBSync(void);
-void OMAPLFBFlip(OMAPLFB_SWAPCHAIN *psSwapChain, unsigned long paddr);
-void OMAPLFBDisplayInit(void);
-void OMAPLFBDriverSuspend(void);
-void OMAPLFBDriverResume(void);
+OMAPLFB_ERROR OMAPLFBGetLibFuncAddr(char *szFunctionName, PFN_DC_GET_PVRJTABLE *ppfnFuncTable);
+OMAPLFB_ERROR OMAPLFBCreateSwapQueue (OMAPLFB_SWAPCHAIN *psSwapChain);
+void OMAPLFBDestroySwapQueue(OMAPLFB_SWAPCHAIN *psSwapChain);
+void OMAPLFBInitBufferForSwap(OMAPLFB_BUFFER *psBuffer);
+void OMAPLFBSwapHandler(OMAPLFB_BUFFER *psBuffer);
+void OMAPLFBQueueBufferForSwap(OMAPLFB_SWAPCHAIN *psSwapChain, OMAPLFB_BUFFER *psBuffer);
+void OMAPLFBFlip(OMAPLFB_DEVINFO *psDevInfo, OMAPLFB_BUFFER *psBuffer);
+OMAPLFB_UPDATE_MODE OMAPLFBGetUpdateMode(OMAPLFB_DEVINFO *psDevInfo);
+OMAPLFB_BOOL OMAPLFBSetUpdateMode(OMAPLFB_DEVINFO *psDevInfo, OMAPLFB_UPDATE_MODE eMode);
+OMAPLFB_BOOL OMAPLFBWaitForVSync(OMAPLFB_DEVINFO *psDevInfo);
+OMAPLFB_BOOL OMAPLFBManualSync(OMAPLFB_DEVINFO *psDevInfo);
+OMAPLFB_BOOL OMAPLFBCheckModeAndSync(OMAPLFB_DEVINFO *psDevInfo);
+OMAPLFB_ERROR OMAPLFBUnblankDisplay(OMAPLFB_DEVINFO *psDevInfo);
+OMAPLFB_ERROR OMAPLFBEnableLFBEventNotification(OMAPLFB_DEVINFO *psDevInfo);
+OMAPLFB_ERROR OMAPLFBDisableLFBEventNotification(OMAPLFB_DEVINFO *psDevInfo);
+void OMAPLFBCreateSwapChainLockInit(OMAPLFB_DEVINFO *psDevInfo);
+void OMAPLFBCreateSwapChainLockDeInit(OMAPLFB_DEVINFO *psDevInfo);
+void OMAPLFBCreateSwapChainLock(OMAPLFB_DEVINFO *psDevInfo);
+void OMAPLFBCreateSwapChainUnLock(OMAPLFB_DEVINFO *psDevInfo);
+void OMAPLFBAtomicBoolInit(OMAPLFB_ATOMIC_BOOL *psAtomic, OMAPLFB_BOOL bVal);
+void OMAPLFBAtomicBoolDeInit(OMAPLFB_ATOMIC_BOOL *psAtomic);
+void OMAPLFBAtomicBoolSet(OMAPLFB_ATOMIC_BOOL *psAtomic, OMAPLFB_BOOL bVal);
+OMAPLFB_BOOL OMAPLFBAtomicBoolRead(OMAPLFB_ATOMIC_BOOL *psAtomic);
+void OMAPLFBAtomicIntInit(OMAPLFB_ATOMIC_INT *psAtomic, int iVal);
+void OMAPLFBAtomicIntDeInit(OMAPLFB_ATOMIC_INT *psAtomic);
+void OMAPLFBAtomicIntSet(OMAPLFB_ATOMIC_INT *psAtomic, int iVal);
+int OMAPLFBAtomicIntRead(OMAPLFB_ATOMIC_INT *psAtomic);
+void OMAPLFBAtomicIntInc(OMAPLFB_ATOMIC_INT *psAtomic);
 
+#if defined(DEBUG)
+void OMAPLFBPrintInfo(OMAPLFB_DEVINFO *psDevInfo);
+#else
+#define	OMAPLFBPrintInfo(psDevInfo)
 #endif
+
+#endif /* __OMAPLFB_H__ */
+
+/******************************************************************************
+ End of file (omaplfb.h)
+******************************************************************************/
+
