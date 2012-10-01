@@ -430,6 +430,8 @@ static int try_pix_parm(struct omap34xxcam_videodev *vdev,
 
 		fmtd.index = fmtd_index;
 		fmtd.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+		if (vdev->vfd->minor == CAM_DEVICE_SOC)
+			fmtd.pixelformat = V4L2_PIX_FMT_YUYV;
 		rval = vidioc_int_enum_fmt_cap(vdev->vdev_sensor, &fmtd);
 		if (rval)
 			break;

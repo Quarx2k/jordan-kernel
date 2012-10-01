@@ -684,7 +684,7 @@ void isp_power_settings(int idle)
 {
 	if (idle) {
 		isp_reg_writel(ISP_SYSCONFIG_AUTOIDLE |
-			       (ISP_SYSCONFIG_MIDLEMODE_NOSTANBY <<
+			       (ISP_SYSCONFIG_MIDLEMODE_SMARTSTANDBY <<
 				ISP_SYSCONFIG_MIDLEMODE_SHIFT),
 			       OMAP3_ISP_IOMEM_MAIN,
 			       ISP_SYSCONFIG);
@@ -1001,7 +1001,7 @@ static irqreturn_t omap34xx_isp_isr(int irq, void *_isp)
 	if (irqstatus & HS_VS) {
 		if (isp_obj.isp_lsc_workaround == 0 &&
 			CCDC_PREV_RESZ_CAPTURE(&isp_obj) &&
-			!ispresizer_busy()) {
+			!ispresizer_busy() && !isppreview_busy()) {
 			if (isp_obj.module.applyCrop == 0 &&
 				isp_obj.running == ISP_RUNNING)
 				ispresizer_enable(1);
@@ -2646,8 +2646,6 @@ int isp_get(void)
 			isp_restore_ctx();
 		else
 			has_context = 1;
-		/* No standy */
-		isp_power_settings(1);
 		enable_irq(omap3isp->irq);
 #if defined(CONFIG_VIDEO_OMAP3_HP3A)
 			hp3a_hw_enabled(1);
@@ -2686,8 +2684,6 @@ int isp_put(void)
 		isp_save_ctx();
 		isp_release_resources();
 		isp_obj.module.isp_pipeline = 0;
-		/*force ISP standby, smart standby disabled*/
-		isp_power_settings(0);
 		isp_disable_clocks();
 		memset(&ispcroprect, 0, sizeof(ispcroprect));
 		memset(&cur_rect, 0, sizeof(cur_rect));
