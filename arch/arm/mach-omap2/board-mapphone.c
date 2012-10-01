@@ -378,7 +378,7 @@ static struct omap_board_config_kernel mapphone_config[] __initdata = {
 	{OMAP_TAG_UART,		&mapphone_uart_config },
 };
 
-static int mapphone_touch_reset(void)
+int mapphone_touch_reset(void)
 {
 	int reset_pin;
 	int retval = 0;
@@ -398,6 +398,7 @@ static int mapphone_touch_reset(void)
 
 	return retval;
 }
+EXPORT_SYMBOL(mapphone_touch_reset);
 
 static struct qtouch_ts_platform_data mapphone_ts_platform_data;
 
