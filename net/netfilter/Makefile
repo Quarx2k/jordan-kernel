@@ -94,6 +94,8 @@ obj-$(CONFIG_NETFILTER_XT_MATCH_STRING) += xt_string.o
 obj-$(CONFIG_NETFILTER_XT_MATCH_TCPMSS) += xt_tcpmss.o
 obj-$(CONFIG_NETFILTER_XT_MATCH_TIME) += xt_time.o
 obj-$(CONFIG_NETFILTER_XT_MATCH_U32) += xt_u32.o
-
+xt_owner2-objs := xt_qtaguid.o xt_qtaguid_print.o xt_qtaguid_sockets.o
+obj-$(CONFIG_NETFILTER_XT_MATCH_QTAGUID) += xt_quota2.o
+obj-$(CONFIG_NETFILTER_XT_MATCH_QTAGUID) += xt_owner2.o
 # IPVS
 obj-$(CONFIG_IP_VS) += ipvs/
