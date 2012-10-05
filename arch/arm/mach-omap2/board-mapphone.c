@@ -1631,7 +1631,7 @@ static int initialize_i2c_bus_info
 			prop_name, NULL);
 	if (NULL != feat_prop) {
 	if (bus_num==3) {
-		device_names = "camise,HP_GEN_LENS,lm3554_led,mt9p012" 
+		device_names = "camise,HP_GEN_LENS,lm3554_led,mt9p012";
 
 	} else {
 		device_names = (char *)feat_prop;
