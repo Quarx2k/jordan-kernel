@@ -147,6 +147,10 @@ config MACH_MAPPHONE
         bool "Motorola Android Platform phone"
         depends on ARCH_OMAP3 && ARCH_OMAP34XX
 
+config MAPPHONE_2NDBOOT
+	bool "Motorola Android Platform phone 2nd-boot kernel modifications
+	depends on MACH_MAPPHONE
+
 config MACH_CM_T35
 	bool "CompuLab CM-T35 module"
 	depends on ARCH_OMAP3 && ARCH_OMAP34XX

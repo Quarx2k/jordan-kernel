@@ -562,6 +562,11 @@ int dss_init(bool skip_init)
 	omap_writel(0, 0x4805041C);
 #endif
 
+#ifdef CONFIG_MAPPHONE_2NDBOOT
+	/* Reset state */
+	omap_writel(0x1FFFF, 0x48050418);
+#endif
+
 	r = request_irq(INT_24XX_DSS_IRQ,
 			cpu_is_omap24xx()
 			? dss_irq_handler_omap2

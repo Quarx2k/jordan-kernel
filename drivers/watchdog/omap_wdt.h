@@ -53,7 +53,13 @@
 #endif
 
 #ifdef CONFIG_OMAP_WATCHDOG_AUTOPET
+
+#ifdef CONFIG_MAPPHONE_2NDBOOT
+#define TIMER_AUTOPET_FREQ	5
+#else
 #define TIMER_AUTOPET_FREQ	45
+#endif
+
 #endif
 
 #define PTV			0	/* prescale */
