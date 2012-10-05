@@ -53,7 +53,9 @@
 #endif
 
 #ifdef CONFIG_OMAP_WATCHDOG_AUTOPET
+
 #define TIMER_AUTOPET_FREQ	45
+
 #endif
 
 #define PTV			0	/* prescale */
