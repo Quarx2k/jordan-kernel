@@ -699,8 +699,42 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 		goto err_pdata;
 	}
 
+#ifdef CONFIG_MAPPHONE_2NDBOOT
+
+	/* FIXME: Find proper defines for the addresses */
+
+	/* We need to get the interrupts in order */
+	printk(KERN_INFO "EHCI-OMAP: Fixing after 2nd-boot\n");
+	
+	/* Mask IRQs */
+	omap_writel(0x2000, 0x482000cc);
+	
+	/* Reset USBINTR */
+	omap_writel(0x00, 0x48064818);
+	
+	/* Set ERROR status on everything (this may not be necessary) */
+	omap_writel(0x3f, 0x48064814);
+	
+	/* Clear HCINTERRUPTSTATUS */
+	omap_writel(0x4000007f, 0x4806440c);
+	
+	/* Clear HCINTERRUPTDISABLE */
+	omap_writel(0xc000007f, 0x48064414);
+
+#endif
+
 	if (usb_disabled())
 		goto err_disabled;
+	
+#ifdef CONFIG_MAPPHONE_2NDBOOT
+
+	/* Enable IRQs */
+	omap_writel(0x0, 0x4806201c);
+	
+	/* Set them to event pending */
+	omap_writel(0x7, 0x48062018);
+
+#endif
 
 	ret = request_irq(78, usbtll_irq, IRQF_DISABLED | IRQF_SHARED,
 				"usbtll", pdev);
