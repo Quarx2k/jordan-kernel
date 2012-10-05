@@ -42,8 +42,8 @@ obj-$(CONFIG_LEDS_CPCAP)		+= leds-cpcap-adb.o \
 					   leds-cpcap-gpio.o \
 					   leds-cpcap-kpb.o \
 					   leds-cpcap-mdb.o \
-					   leds-cpcap-rgb.o
-
+					   leds-cpcap-rgb.o \
+					   leds-cpcap-usb.o
 # LED Triggers
 obj-$(CONFIG_LEDS_TRIGGER_TIMER)	+= ledtrig-timer.o
 obj-$(CONFIG_LEDS_TRIGGER_IDE_DISK)	+= ledtrig-ide-disk.o
