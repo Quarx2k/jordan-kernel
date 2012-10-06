@@ -32,7 +32,7 @@
 #include <linux/timer.h>
 #include <linux/workqueue.h>
 #include <linux/moduleparam.h>
-#include <asm/cputime.h>
+#include <asm-generic/cputime.h>
 #include <linux/earlysuspend.h>
 
 
