@@ -1050,6 +1050,15 @@ long omap2_dpll_round_rate(struct clk *clk, unsigned long target_rate)
 
 	dd->last_rounded_m = min_e_m;
 	dd->last_rounded_n = min_e_n;
+
+	if (strcmp(clk->name, "dpll1_ck") == 0) {
+		if (dd->last_rounded_n == 1 && dd->last_rounded_m < 1024) {
+			dd->last_rounded_n = 2;
+			dd->last_rounded_m = dd->last_rounded_m * 2;
+			pr_debug("Clock divider fixed.");
+		}
+        }
+
 	dd->last_rounded_rate = _dpll_compute_new_rate(dd->clk_ref->rate,
 						       min_e_m,  min_e_n);
 
