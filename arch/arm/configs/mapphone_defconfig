@@ -1966,6 +1966,8 @@ CONFIG_SIM=y
 # RAR Register Driver
 #
 # CONFIG_RAR_REGISTER is not set
+CONFIG_XVMALLOC=y
+CONFIG_ZRAM=y
 # CONFIG_IIO is not set
 
 #
