@@ -23,16 +23,16 @@
  *
  */
 
-#include &lt;linux/cpu.h&gt;
-#include &lt;linux/cpumask.h&gt;
-#include &lt;linux/cpufreq.h&gt;
-#include &lt;linux/sched.h&gt;
-#include &lt;linux/tick.h&gt;
-#include &lt;linux/timer.h&gt;
-#include &lt;linux/workqueue.h&gt;
-#include &lt;linux/moduleparam.h&gt;
-#include &lt;asm/cputime.h&gt;
-#include &lt;linux/earlysuspend.h&gt;
+#include <linux/cpu.h>
+#include <linux/cpumask.h>
+#include <linux/cpufreq.h>
+#include <linux/sched.h>
+#include <linux/tick.h>
+#include <linux/timer.h>
+#include <linux/workqueue.h>
+#include <linux/moduleparam.h>
+#include <asm-generic/cputime.h>
+#include <linux/earlysuspend.h>
 
 static void (*pm_idle_old)(void);
 static atomic_t active_count = ATOMIC_INIT(0);
@@ -73,7 +73,7 @@ static unsigned long down_rate_us;
 static unsigned int up_min_freq;
 
 /*
- * When sleep_max_freq&gt;0 the frequency when suspended will be capped
+ * When sleep_max_freq>0 the frequency when suspended will be capped
  * by this frequency. Also will wake up at max frequency of policy
  * to minimize wakeup issues.
  * Set sleep_max_freq=0 to disable this behavior.
@@ -101,13 +101,13 @@ static unsigned int ramp_up_step;
 static unsigned int max_ramp_down;
 
 /*
- * CPU freq will be increased if measured load &gt; max_cpu_load;
+ * CPU freq will be increased if measured load > max_cpu_load;
  */
 #define DEFAULT_MAX_CPU_LOAD 60
 static unsigned long max_cpu_load;
 
 /*
- * CPU freq will be decreased if measured load &lt; min_cpu_load;
+ * CPU freq will be decreased if measured load < min_cpu_load;
  */
 #define DEFAULT_MIN_CPU_LOAD 30
 static unsigned long min_cpu_load;
@@ -131,73 +131,73 @@ static void cpufreq_smoothass_timer(unsigned long data)
 	u64 delta_idle;
 	u64 update_time;
 	u64 now_idle;
-	struct smoothass_info_s *this_smoothass = &amp;per_cpu(smoothass_info, data);
-	struct cpufreq_policy *policy = this_smoothass-&gt;cur_policy;
+	struct smoothass_info_s *this_smoothass = &per_cpu(smoothass_info, data);
+	struct cpufreq_policy *policy = this_smoothass->cur_policy;
 
-	now_idle = get_cpu_idle_time_us(data, &amp;update_time);
+	now_idle = get_cpu_idle_time_us(data, &update_time);
 
-	if (update_time == this_smoothass-&gt;idle_exit_time)
+	if (update_time == this_smoothass->idle_exit_time)
 		return;
 
-	delta_idle = cputime64_sub(now_idle, this_smoothass-&gt;time_in_idle);
-	//printk(KERN_INFO "smoothass: t=%llu i=%llu\n",cputime64_sub(update_time,this_smoothass-&gt;idle_exit_time),delta_idle);
+	delta_idle = cputime64_sub(now_idle, this_smoothass->time_in_idle);
+	//printk(KERN_INFO "smoothass: t=%llu i=%llu\n",cputime64_sub(update_time,this_smoothass->idle_exit_time),delta_idle);
 
 	/* Scale up if there were no idle cycles since coming out of idle */
 	if (delta_idle == 0) {
-		if (policy-&gt;cur == policy-&gt;max)
+		if (policy->cur == policy->max)
 			return;
 
-		if (nr_running() &lt; 1)
+		if (nr_running() < 1)
 			return;
 
-		this_smoothass-&gt;force_ramp_up = 1;
-		cpumask_set_cpu(data, &amp;work_cpumask);
-		queue_work(up_wq, &amp;freq_scale_work);
+		this_smoothass->force_ramp_up = 1;
+		cpumask_set_cpu(data, &work_cpumask);
+		queue_work(up_wq, &freq_scale_work);
 		return;
 	}
 
 	/*
 	 * There is a window where if the cpu utlization can go from low to high
-	 * between the timer expiring, delta_idle will be &gt; 0 and the cpu will
+	 * between the timer expiring, delta_idle will be > 0 and the cpu will
 	 * be 100% busy, preventing idle from running, and this timer from
 	 * firing. So setup another timer to fire to check cpu utlization.
 	 * Do not setup the timer if there is no scheduled work.
 	 */
-	if (!timer_pending(&amp;this_smoothass-&gt;timer) &amp;&amp; nr_running() &gt; 0) { 
-			this_smoothass-&gt;time_in_idle = get_cpu_idle_time_us(
-					data, &amp;this_smoothass-&gt;idle_exit_time);
-			mod_timer(&amp;this_smoothass-&gt;timer, jiffies + sample_rate_jiffies);
+	if (!timer_pending(&this_smoothass->timer) && nr_running() > 0) { 
+			this_smoothass->time_in_idle = get_cpu_idle_time_us(
+					data, &this_smoothass->idle_exit_time);
+			mod_timer(&this_smoothass->timer, jiffies + sample_rate_jiffies);
 	}
 
-	if (policy-&gt;cur == policy-&gt;min)
+	if (policy->cur == policy->min)
 		return;
 
 	/*
 	 * Do not scale down unless we have been at this frequency for the
 	 * minimum sample time.
 	 */
-	if (cputime64_sub(update_time, freq_change_time) &lt; down_rate_us)
+	if (cputime64_sub(update_time, freq_change_time) < down_rate_us)
 		return;
 
-	cpumask_set_cpu(data, &amp;work_cpumask);
-	queue_work(down_wq, &amp;freq_scale_work);
+	cpumask_set_cpu(data, &work_cpumask);
+	queue_work(down_wq, &freq_scale_work);
 }
 
 static void cpufreq_idle(void)
 {
-	struct smoothass_info_s *this_smoothass = &amp;per_cpu(smoothass_info, smp_processor_id());
-	struct cpufreq_policy *policy = this_smoothass-&gt;cur_policy;
+	struct smoothass_info_s *this_smoothass = &per_cpu(smoothass_info, smp_processor_id());
+	struct cpufreq_policy *policy = this_smoothass->cur_policy;
 
 	pm_idle_old();
 
-	if (!cpumask_test_cpu(smp_processor_id(), policy-&gt;cpus))
+	if (!cpumask_test_cpu(smp_processor_id(), policy->cpus))
 			return;
 
 	/* Timer to fire in 1-2 ticks, jiffie aligned. */
-	if (timer_pending(&amp;this_smoothass-&gt;timer) == 0) {
-		this_smoothass-&gt;time_in_idle = get_cpu_idle_time_us(
-				smp_processor_id(), &amp;this_smoothass-&gt;idle_exit_time);
-		mod_timer(&amp;this_smoothass-&gt;timer, jiffies + sample_rate_jiffies);
+	if (timer_pending(&this_smoothass->timer) == 0) {
+		this_smoothass->time_in_idle = get_cpu_idle_time_us(
+				smp_processor_id(), &this_smoothass->idle_exit_time);
+		mod_timer(&this_smoothass->timer, jiffies + sample_rate_jiffies);
 	}
 }
 
@@ -214,28 +214,28 @@ static unsigned int cpufreq_smoothass_calc_freq(unsigned int cpu, struct cpufreq
 	u64 current_wall_time;
 	u64 current_idle_time;
 
-	current_idle_time = get_cpu_idle_time_us(cpu, &amp;current_wall_time);
+	current_idle_time = get_cpu_idle_time_us(cpu, &current_wall_time);
 
 	idle_time = (unsigned int)( current_idle_time - freq_change_time_in_idle );
 	delta_time = (unsigned int)( current_wall_time - freq_change_time );
 
 	cpu_load = 100 * (delta_time - idle_time) / delta_time;
 	//printk(KERN_INFO "Smoothass calc_freq: delta_time=%u cpu_load=%u\n",delta_time,cpu_load);
-	if (cpu_load &lt; min_cpu_load) {
+	if (cpu_load < min_cpu_load) {
 		cpu_load += 100 - max_cpu_load; // dummy load.
-		new_freq = policy-&gt;cur * cpu_load / 100;
-		if (max_ramp_down &amp;&amp; new_freq &lt; policy-&gt;cur - max_ramp_down)
-			new_freq = policy-&gt;cur - max_ramp_down;
-		//printk(KERN_INFO "Smoothass calc_freq: %u =&gt; %u\n",policy-&gt;cur,new_freq);
+		new_freq = policy->cur * cpu_load / 100;
+		if (max_ramp_down && new_freq < policy->cur - max_ramp_down)
+			new_freq = policy->cur - max_ramp_down;
+		//printk(KERN_INFO "Smoothass calc_freq: %u => %u\n",policy->cur,new_freq);
 		return new_freq;
-	} if (cpu_load &gt; max_cpu_load) {
+	} if (cpu_load > max_cpu_load) {
 		if (ramp_up_step)
-			new_freq = policy-&gt;cur + ramp_up_step;
+			new_freq = policy->cur + ramp_up_step;
 		else
-			new_freq = policy-&gt;max;
+			new_freq = policy->max;
 		return new_freq;
 	}
-	return policy-&gt;cur;
+	return policy->cur;
 }
 
 /* We use the same work function to sale up and down */
@@ -247,30 +247,30 @@ static void cpufreq_smoothass_freq_change_time_work(struct work_struct *work)
 	struct cpufreq_policy *policy;
 	cpumask_t tmp_mask = work_cpumask;
 	for_each_cpu(cpu, tmp_mask) {
-		this_smoothass = &amp;per_cpu(smoothass_info, cpu);
-		policy = this_smoothass-&gt;cur_policy;
+		this_smoothass = &per_cpu(smoothass_info, cpu);
+		policy = this_smoothass->cur_policy;
 
-		if (this_smoothass-&gt;force_ramp_up) {
-			this_smoothass-&gt;force_ramp_up = 0;
+		if (this_smoothass->force_ramp_up) {
+			this_smoothass->force_ramp_up = 0;
 
 			if (nr_running() == 1) {
-				cpumask_clear_cpu(cpu, &amp;work_cpumask);
+				cpumask_clear_cpu(cpu, &work_cpumask);
 				return;
 			}
 
-			if (policy-&gt;cur == policy-&gt;max)
+			if (policy->cur == policy->max)
 				return;
 
 			if (ramp_up_step)
-				new_freq = policy-&gt;cur + ramp_up_step;
+				new_freq = policy->cur + ramp_up_step;
 			else
-				new_freq = policy-&gt;max;
+				new_freq = policy->max;
 
-			if (suspended &amp;&amp; sleep_max_freq) {
-				if (new_freq &gt; sleep_max_freq)
+			if (suspended && sleep_max_freq) {
+				if (new_freq > sleep_max_freq)
 					new_freq = sleep_max_freq;
 			} else {
-				if (new_freq &lt; up_min_freq)
+				if (new_freq < up_min_freq)
 					new_freq = up_min_freq;
 			}
 
@@ -279,24 +279,24 @@ static void cpufreq_smoothass_freq_change_time_work(struct work_struct *work)
 
 			// in suspend limit to sleep_max_freq and
 			// jump straight to sleep_max_freq to avoid wakeup problems
-			if (suspended &amp;&amp; sleep_max_freq &amp;&amp;
-			    (new_freq &gt; sleep_max_freq || new_freq &gt; policy-&gt;cur))
+			if (suspended && sleep_max_freq &&
+			    (new_freq > sleep_max_freq || new_freq > policy->cur))
 				new_freq = sleep_max_freq;
 		}
 
-		if (new_freq &gt; policy-&gt;max)
-			new_freq = policy-&gt;max;
+		if (new_freq > policy->max)
+			new_freq = policy->max;
 		
-		if (new_freq &lt; policy-&gt;min)
-			new_freq = policy-&gt;min;
+		if (new_freq < policy->min)
+			new_freq = policy->min;
 		
 		__cpufreq_driver_target(policy, new_freq,
 					CPUFREQ_RELATION_L);
 
 		freq_change_time_in_idle = get_cpu_idle_time_us(cpu,
-							&amp;freq_change_time);
+							&freq_change_time);
 
-		cpumask_clear_cpu(cpu, &amp;work_cpumask);
+		cpumask_clear_cpu(cpu, &work_cpumask);
 	}
 
 
@@ -311,8 +311,8 @@ static ssize_t store_down_rate_us(struct cpufreq_policy *policy, const char *buf
 {
         ssize_t res;
 	unsigned long input;
-	res = strict_strtoul(buf, 0, &amp;input);
-	if (res &gt;= 0 &amp;&amp; input &gt;= 1000 &amp;&amp; input &lt;= 100000000)
+	res = strict_strtoul(buf, 0, &input);
+	if (res >= 0 && input >= 1000 && input <= 100000000)
 	  down_rate_us = input;
 	return res;
 }
@@ -329,8 +329,8 @@ static ssize_t store_up_min_freq(struct cpufreq_policy *policy, const char *buf,
 {
         ssize_t res;
 	unsigned long input;
-	res = strict_strtoul(buf, 0, &amp;input);
-	if (res &gt;= 0 &amp;&amp; input &gt;= 0)
+	res = strict_strtoul(buf, 0, &input);
+	if (res >= 0 && input >= 0)
 	  up_min_freq = input;
 	return res;
 }
@@ -347,8 +347,8 @@ static ssize_t store_sleep_max_freq(struct cpufreq_policy *policy, const char *b
 {
         ssize_t res;
 	unsigned long input;
-	res = strict_strtoul(buf, 0, &amp;input);
-	if (res &gt;= 0 &amp;&amp; input &gt;= 0)
+	res = strict_strtoul(buf, 0, &input);
+	if (res >= 0 && input >= 0)
 	  sleep_max_freq = input;
 	return res;
 }
@@ -365,8 +365,8 @@ static ssize_t store_sample_rate_jiffies(struct cpufreq_policy *policy, const ch
 {
         ssize_t res;
 	unsigned long input;
-	res = strict_strtoul(buf, 0, &amp;input);
-	if (res &gt;= 0 &amp;&amp; input &gt; 0 &amp;&amp; input &lt;= 1000)
+	res = strict_strtoul(buf, 0, &input);
+	if (res >= 0 && input > 0 && input <= 1000)
 	  sample_rate_jiffies = input;
 	return res;
 }
@@ -383,8 +383,8 @@ static ssize_t store_ramp_up_step(struct cpufreq_policy *policy, const char *buf
 {
         ssize_t res;
 	unsigned long input;
-	res = strict_strtoul(buf, 0, &amp;input);
-	if (res &gt;= 0)
+	res = strict_strtoul(buf, 0, &input);
+	if (res >= 0)
 	  ramp_up_step = input;
 	return res;
 }
@@ -401,8 +401,8 @@ static ssize_t store_max_ramp_down(struct cpufreq_policy *policy, const char *bu
 {
         ssize_t res;
 	unsigned long input;
-	res = strict_strtoul(buf, 0, &amp;input);
-	if (res &gt;= 0)
+	res = strict_strtoul(buf, 0, &input);
+	if (res >= 0)
 	  max_ramp_down = input;
 	return res;
 }
@@ -419,8 +419,8 @@ static ssize_t store_max_cpu_load(struct cpufreq_policy *policy, const char *buf
 {
         ssize_t res;
 	unsigned long input;
-	res = strict_strtoul(buf, 0, &amp;input);
-	if (res &gt;= 0 &amp;&amp; input &gt; 0 &amp;&amp; input &lt;= 100)
+	res = strict_strtoul(buf, 0, &input);
+	if (res >= 0 && input > 0 && input <= 100)
 	  max_cpu_load = input;
 	return res;
 }
@@ -437,8 +437,8 @@ static ssize_t store_min_cpu_load(struct cpufreq_policy *policy, const char *buf
 {
         ssize_t res;
 	unsigned long input;
-	res = strict_strtoul(buf, 0, &amp;input);
-	if (res &gt;= 0 &amp;&amp; input &gt; 0 &amp;&amp; input &lt; 100)
+	res = strict_strtoul(buf, 0, &input);
+	if (res >= 0 && input > 0 && input < 100)
 	  min_cpu_load = input;
 	return res;
 }
@@ -447,14 +447,14 @@ static struct freq_attr min_cpu_load_attr = __ATTR(min_cpu_load, 0644,
 		show_min_cpu_load, store_min_cpu_load);
 
 static struct attribute * smoothass_attributes[] = {
-	&amp;down_rate_us_attr.attr,
-	&amp;up_min_freq_attr.attr,
-	&amp;sleep_max_freq_attr.attr,
-	&amp;sample_rate_jiffies_attr.attr,
-	&amp;ramp_up_step_attr.attr,
-	&amp;max_ramp_down_attr.attr,
-	&amp;max_cpu_load_attr.attr,
-	&amp;min_cpu_load_attr.attr,
+	&down_rate_us_attr.attr,
+	&up_min_freq_attr.attr,
+	&sleep_max_freq_attr.attr,
+	&sample_rate_jiffies_attr.attr,
+	&ramp_up_step_attr.attr,
+	&max_ramp_down_attr.attr,
+	&max_cpu_load_attr.attr,
+	&min_cpu_load_attr.attr,
 	NULL,
 };
 
@@ -466,55 +466,55 @@ static struct attribute_group smoothass_attr_group = {
 static int cpufreq_governor_smoothass(struct cpufreq_policy *new_policy,
 		unsigned int event)
 {
-	unsigned int cpu = new_policy-&gt;cpu;
+	unsigned int cpu = new_policy->cpu;
 	int rc;
-	struct smoothass_info_s *this_smoothass = &amp;per_cpu(smoothass_info, cpu);
+	struct smoothass_info_s *this_smoothass = &per_cpu(smoothass_info, cpu);
 	
 	switch (event) {
 	case CPUFREQ_GOV_START:
-		if ((!cpu_online(cpu)) || (!new_policy-&gt;cur))
+		if ((!cpu_online(cpu)) || (!new_policy->cur))
 			return -EINVAL;
 
-		if (this_smoothass-&gt;enable) /* Already enabled */
+		if (this_smoothass->enable) /* Already enabled */
 			break;
 
 		/*
 		 * Do not register the idle hook and create sysfs
 		 * entries if we have already done so.
 		 */
-		if (atomic_inc_return(&amp;active_count) &gt; 1)
+		if (atomic_inc_return(&active_count) > 1)
 			return 0;
 
-		rc = sysfs_create_group(&amp;new_policy-&gt;kobj, &amp;smoothass_attr_group);
+		rc = sysfs_create_group(&new_policy->kobj, &smoothass_attr_group);
 		if (rc)
 			return rc;
 		pm_idle_old = pm_idle;
 		pm_idle = cpufreq_idle;
 
-		this_smoothass-&gt;cur_policy = new_policy;
-		this_smoothass-&gt;cur_policy-&gt;max = 1401600;
-		this_smoothass-&gt;cur_policy-&gt;min = 122880;
-		this_smoothass-&gt;cur_policy-&gt;cur = 1401600;
-		this_smoothass-&gt;enable = 1;
+		this_smoothass->cur_policy = new_policy;
+		this_smoothass->cur_policy->max = 1401600;
+		this_smoothass->cur_policy->min = 122880;
+		this_smoothass->cur_policy->cur = 1401600;
+		this_smoothass->enable = 1;
 
 		// notice no break here!
 
 	case CPUFREQ_GOV_LIMITS:
-		if (this_smoothass-&gt;cur_policy-&gt;cur != new_policy-&gt;max)
-			__cpufreq_driver_target(new_policy, new_policy-&gt;max, CPUFREQ_RELATION_H);
+		if (this_smoothass->cur_policy->cur != new_policy->max)
+			__cpufreq_driver_target(new_policy, new_policy->max, CPUFREQ_RELATION_H);
 
 		break;
 
 	case CPUFREQ_GOV_STOP:
-		this_smoothass-&gt;enable = 0;
+		this_smoothass->enable = 0;
 
-		if (atomic_dec_return(&amp;active_count) &gt; 1)
+		if (atomic_dec_return(&active_count) > 1)
 			return 0;
-		sysfs_remove_group(&amp;new_policy-&gt;kobj,
-				&amp;smoothass_attr_group);
+		sysfs_remove_group(&new_policy->kobj,
+				&smoothass_attr_group);
 
 		pm_idle = pm_idle_old;
-		del_timer(&amp;this_smoothass-&gt;timer);
+		del_timer(&this_smoothass->timer);
 		break;
 	}
 
@@ -523,25 +523,25 @@ static int cpufreq_governor_smoothass(struct cpufreq_policy *new_policy,
 
 static void smoothass_suspend(int cpu, int suspend)
 {
-	struct smoothass_info_s *this_smoothass = &amp;per_cpu(smoothass_info, smp_processor_id());
-	struct cpufreq_policy *policy = this_smoothass-&gt;cur_policy;
+	struct smoothass_info_s *this_smoothass = &per_cpu(smoothass_info, smp_processor_id());
+	struct cpufreq_policy *policy = this_smoothass->cur_policy;
 	unsigned int new_freq;
 
-	if (!this_smoothass-&gt;enable || sleep_max_freq==0) // disable behavior for sleep_max_freq==0
+	if (!this_smoothass->enable || sleep_max_freq==0) // disable behavior for sleep_max_freq==0
 		return;
 
 	if (suspend) {
-	    if (policy-&gt;cur &gt; sleep_max_freq) {
+	    if (policy->cur > sleep_max_freq) {
 			new_freq = sleep_max_freq;
-			if (new_freq &gt; policy-&gt;max)
-				new_freq = policy-&gt;max;
-			if (new_freq &lt; policy-&gt;min)
-				new_freq = policy-&gt;min;
+			if (new_freq > policy->max)
+				new_freq = policy->max;
+			if (new_freq < policy->min)
+				new_freq = policy->min;
 			__cpufreq_driver_target(policy, new_freq,
 						CPUFREQ_RELATION_H);
 		}
 	} else { // resume at max speed:
-		__cpufreq_driver_target(policy, policy-&gt;max,
+		__cpufreq_driver_target(policy, policy->max,
 					CPUFREQ_RELATION_H);
 	}
 
@@ -583,26 +583,26 @@ static int __init cpufreq_smoothass_init(void)
 
 	/* Initalize per-cpu data: */
 	for_each_possible_cpu(i) {
-		this_smoothass = &amp;per_cpu(smoothass_info, i);
-		this_smoothass-&gt;enable = 0;
-		this_smoothass-&gt;force_ramp_up = 0;
-		this_smoothass-&gt;time_in_idle = 0;
-		this_smoothass-&gt;idle_exit_time = 0;
+		this_smoothass = &per_cpu(smoothass_info, i);
+		this_smoothass->enable = 0;
+		this_smoothass->force_ramp_up = 0;
+		this_smoothass->time_in_idle = 0;
+		this_smoothass->idle_exit_time = 0;
 		// intialize timer:
-		init_timer_deferrable(&amp;this_smoothass-&gt;timer);
-		this_smoothass-&gt;timer.function = cpufreq_smoothass_timer;
-		this_smoothass-&gt;timer.data = i;
+		init_timer_deferrable(&this_smoothass->timer);
+		this_smoothass->timer.function = cpufreq_smoothass_timer;
+		this_smoothass->timer.data = i;
 	}
 
 	/* Scale up is high priority */
 	up_wq = create_rt_workqueue("ksmoothass_up");
 	down_wq = create_workqueue("ksmoothass_down");
 
-	INIT_WORK(&amp;freq_scale_work, cpufreq_smoothass_freq_change_time_work);
+	INIT_WORK(&freq_scale_work, cpufreq_smoothass_freq_change_time_work);
 
-	register_early_suspend(&amp;smoothass_power_suspend);
+	register_early_suspend(&smoothass_power_suspend);
 
-	return cpufreq_register_governor(&amp;cpufreq_gov_smoothass);
+	return cpufreq_register_governor(&cpufreq_gov_smoothass);
 }
 
 #ifdef CONFIG_CPU_FREQ_DEFAULT_GOV_SMOOTHASS
@@ -613,7 +613,7 @@ module_init(cpufreq_smoothass_init);
 
 static void __exit cpufreq_smoothass_exit(void)
 {
-	cpufreq_unregister_governor(&amp;cpufreq_gov_smoothass);
+	cpufreq_unregister_governor(&cpufreq_gov_smoothass);
 	destroy_workqueue(up_wq);
 	destroy_workqueue(down_wq);
 }
