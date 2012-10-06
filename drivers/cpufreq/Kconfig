@@ -355,7 +355,7 @@ config CPU_FREQ_GOV_LAGFREE
           rather than jumping to 100% when speed is required.
 
           To compile this driver as a module, choose M here: the
-          module will be called cpufreq_lagfree.
+          module will be called cpufreq_lagfree
 
           For details, take a look at linux/Documentation/cpu-freq.
 
