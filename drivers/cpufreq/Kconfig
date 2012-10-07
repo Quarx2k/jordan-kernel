@@ -1,3 +1,4 @@
+
 config CPU_FREQ
 	bool "CPU Frequency scaling"
 	help
