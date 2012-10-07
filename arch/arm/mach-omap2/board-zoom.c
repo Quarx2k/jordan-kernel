@@ -84,39 +84,32 @@ static struct mtd_partition zoom_nand_partitions[] = {
 	{
 		.name		= "X-Loader-NAND",
 		.offset		= 0,
-		.size		= 4 * (64 * 2048),	/* 512KB, 0x80000 */
+		.size		= 4 * (64 * 2048),
 		.mask_flags	= MTD_WRITEABLE,	/* force read-only */
 	},
 	{
 		.name		= "U-Boot-NAND",
 		.offset		= MTDPART_OFS_APPEND,	/* Offset = 0x80000 */
-		.size		= 10 * (64 * 2048),	/* 1.25MB, 0x140000 */
+		.size		= 4 * (64 * 2048),
 		.mask_flags	= MTD_WRITEABLE,	/* force read-only */
 	},
 	{
 		.name		= "Boot Env-NAND",
-		.offset		= MTDPART_OFS_APPEND,   /* Offset = 0x1c0000 */
-		.size		= 2 * (64 * 2048),	/* 256KB, 0x40000 */
+
+		.offset		= MTDPART_OFS_APPEND,	/* Offset = 0x100000 */
+		.size		= 2 * (64 * 2048),
 	},
 	{
 		.name		= "Kernel-NAND",
-		.offset		= MTDPART_OFS_APPEND,	/* Offset = 0x0200000*/
-		.size		= 240 * (64 * 2048),	/* 30M, 0x1E00000 */
+		.offset		= MTDPART_OFS_APPEND,	/* Offset = 0x140000 */
+		.size		= 32 * (64 * 2048),
+
+
 	},
 	{
-		.name		= "system",
-		.offset		= MTDPART_OFS_APPEND,	/* Offset = 0x2000000 */
-		.size		= 1760 * (64 * 2048),	/* 220M, 0xDC00000 */
-	},
-	{
-		.name		= "userdata",
-		.offset		= MTDPART_OFS_APPEND,	/* Offset = 0x1C000000*/
-		.size		= 512 * (64 * 2048),	/* 64M, 0x4000000 */
-	},
-	{
-		.name		= "cache",
-		.offset		= MTDPART_OFS_APPEND,	/* Offset = 0x1E000000*/
-		.size		= 256 * (64 * 2048),	/* 32M, 0x2000000 */
+		.name		= "File System - NAND",
+		.size		= MTDPART_SIZ_FULL,
+		.offset		= MTDPART_OFS_APPEND,	/* Offset = 0x540000 */
 	},
 };
 
