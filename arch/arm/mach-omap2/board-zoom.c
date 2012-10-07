@@ -33,8 +33,7 @@
 
 #include "board-flash.h"
 #include "mux.h"
-#include "sdram-micron-mt46h32m32lf-6.h"
-#include "sdram-hynix-h8mbx00u0mer-0em.h"
+#include "sdram-toshiba-hynix-numonyx.h"
 #include "omap_ion.h"
 
 #define ZOOM3_EHCI_RESET_GPIO		64
@@ -48,12 +47,17 @@
 static void __init omap_zoom_init_early(void)
 {
 	omap2_init_common_infrastructure();
+/*
 	if (machine_is_omap_zoom2())
 		omap2_init_common_devices(mt46h32m32lf6_sdrc_params,
 					  mt46h32m32lf6_sdrc_params);
 	else if (machine_is_omap_zoom3())
 		omap2_init_common_devices(h8mbx00u0mer0em_sdrc_params,
 					  h8mbx00u0mer0em_sdrc_params);
+*/
+		omap2_init_common_devices(JEDEC_JESD209A_sdrc_params,
+					  JEDEC_JESD209A_sdrc_params);
+
 }
 
 #ifdef CONFIG_OMAP_MUX
