@@ -251,8 +251,8 @@ static void __init zoom_reserve(void)
 	omap_reserve();
 }
 
-MACHINE_START(OMAP_ZOOM2, "OMAP Zoom2 board")
-	.boot_params	= 0x80000100,
+MACHINE_START(MAPPHONE, "mapphone_")
+	.boot_params	= 0x80C00100,
 	.reserve	= omap_reserve,
 	.map_io		= omap3_map_io,
 	.init_early	= omap_zoom_init_early,
@@ -261,12 +261,3 @@ MACHINE_START(OMAP_ZOOM2, "OMAP Zoom2 board")
 	.timer		= &omap_timer,
 MACHINE_END
 
-MACHINE_START(OMAP_ZOOM3, "OMAP Zoom3 board")
-	.boot_params	= 0x80000100,
-	.reserve	= zoom_reserve,
-	.map_io		= omap3_map_io,
-	.init_early	= omap_zoom_init_early,
-	.init_irq	= omap_init_irq,
-	.init_machine	= omap_zoom_init,
-	.timer		= &omap_timer,
-MACHINE_END
