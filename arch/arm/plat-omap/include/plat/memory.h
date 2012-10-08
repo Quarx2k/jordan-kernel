@@ -36,11 +36,15 @@
 /*
  * Physical DRAM offset.
  */
+/*
 #if defined(CONFIG_ARCH_OMAP1)
 #define PLAT_PHYS_OFFSET		UL(0x10000000)
 #else
 #define PLAT_PHYS_OFFSET		UL(0x80000000)
 #endif
+*/
+#define PLAT_PHYS_OFFSET		UL(0x80C00000)  //TODO: make ifdef
+
 
 /*
  * Bus address is physical address, except for OMAP-1510 Local Bus.
