@@ -470,6 +470,12 @@ config OMAP4_ARM_ERRATA_743622
 	  This is handled for HS devices in the PPA code and does not need to be
 	  enabled."
 
+config EMU_UART_DEBUG
+	bool "Setting MiniUSB port as UART3 to debug kernel"
+	default n
+	help
+	  This feature is specific for Motorola phone with CPCAP power IC.
+	  If this option is selected, USB functionality is NOT available any more.
 endmenu
 
 endif

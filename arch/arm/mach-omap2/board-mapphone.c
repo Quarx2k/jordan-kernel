@@ -27,6 +27,10 @@
 #include "mux.h"
 #include "sdram-toshiba-hynix-numonyx.h"
 
+#ifdef CONFIG_EMU_UART_DEBUG
+#include <plat/board-mapphone-emu_uart.h>
+#endif
+
 #if defined(CONFIG_SMC91X) || defined(CONFIG_SMC91X_MODULE)
 
 static struct omap_smc91x_platform_data board_smc91x_data = {
@@ -139,6 +143,10 @@ static void __init omap_sdp_init(void)
 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBP);
 	omap_board_config = sdp_config;
 	omap_board_config_size = ARRAY_SIZE(sdp_config);
+#ifdef CONFIG_EMU_UART_DEBUG
+	/* emu-uart function will override devtree iomux setting */
+	activate_emu_uart();
+#endif
 	board_smc91x_init();
 	board_flash_init(sdp_flash_partitions, chip_sel_sdp, NAND_BUSWIDTH_16);
 	enable_board_wakeup_source();
