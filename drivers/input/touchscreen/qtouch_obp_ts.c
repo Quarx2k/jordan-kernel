@@ -930,13 +930,27 @@ static int do_touch_multi_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 	down = !(msg->status & (QTM_TOUCH_MULTI_STATUS_RELEASE |
 		 QTM_TOUCH_MULTI_STATUS_SUPPRESS));
 
-	if (down) {
-		ts->finger_data[finger].x_data = x;
-		ts->finger_data[finger].y_data = y;
-		ts->finger_data[finger].w_data = width;
-		ts->finger_data[finger].z_data = pressure;
-		ts->finger_data[finger].vector = msg->touch_vect;
-		ts->finger_data[finger].down = 1;
+	if (down)
+	{
+		/* The chip may report erroneous points way
+			beyond what a user could possibly perform so we filter
+			these out */
+		if (ts->finger_data[finger].down &&
+				(abs(ts->finger_data[finger].x_data - x) > ts->x_delta ||
+				abs(ts->finger_data[finger].y_data - y) > ts->y_delta))
+		{
+			down = 0;
+		}
+		else
+		{
+
+			ts->finger_data[finger].x_data = x;
+			ts->finger_data[finger].y_data = y;
+			ts->finger_data[finger].w_data = width;
+			ts->finger_data[finger].z_data = pressure;
+			ts->finger_data[finger].vector = msg->touch_vect;
+			ts->finger_data[finger].down = 1;
+		}
 	} else {
 		memset(&ts->finger_data[finger], 0,
 			sizeof(struct coordinate_map));
