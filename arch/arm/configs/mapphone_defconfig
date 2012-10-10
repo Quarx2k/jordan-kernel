@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.32.9
-# Sun Oct  7 21:41:59 2012
+# Wed Oct 10 16:52:50 2012
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -127,7 +127,7 @@ CONFIG_HAVE_CLK=y
 #
 # GCOV-based kernel profiling
 #
-# CONFIG_SLOW_WORK is not set
+CONFIG_SLOW_WORK=y
 # CONFIG_LTT is not set
 CONFIG_HAVE_LTT_DUMP_TABLES=y
 # CONFIG_HAVE_IMMEDIATE is not set
@@ -2102,7 +2102,21 @@ CONFIG_YAFFS_SHORT_NAMES_IN_RAM=y
 # CONFIG_ROMFS_FS is not set
 # CONFIG_SYSV_FS is not set
 # CONFIG_UFS_FS is not set
-# CONFIG_NETWORK_FILESYSTEMS is not set
+CONFIG_NETWORK_FILESYSTEMS=y
+# CONFIG_NFS_FS is not set
+# CONFIG_NFSD is not set
+# CONFIG_SMB_FS is not set
+CONFIG_CIFS=m
+# CONFIG_CIFS_STATS is not set
+# CONFIG_CIFS_WEAK_PW_HASH is not set
+# CONFIG_CIFS_UPCALL is not set
+# CONFIG_CIFS_XATTR is not set
+# CONFIG_CIFS_DEBUG2 is not set
+# CONFIG_CIFS_DFS_UPCALL is not set
+# CONFIG_CIFS_EXPERIMENTAL is not set
+# CONFIG_NCP_FS is not set
+# CONFIG_CODA_FS is not set
+# CONFIG_AFS_FS is not set
 
 #
 # Partition Types
@@ -2164,7 +2178,7 @@ CONFIG_NLS_ISO8859_1=y
 # CONFIG_NLS_ISO8859_15 is not set
 # CONFIG_NLS_KOI8_R is not set
 # CONFIG_NLS_KOI8_U is not set
-# CONFIG_NLS_UTF8 is not set
+CONFIG_NLS_UTF8=m
 # CONFIG_DLM is not set
 
 #
