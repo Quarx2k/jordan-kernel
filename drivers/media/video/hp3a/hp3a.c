@@ -28,7 +28,7 @@
 #include "hp3a_common.h"
 
 #define	HP3A_DRV_NAME	"hp3a"
-#define	HP3A_DRV_SYSFS	"hp3A-omap"
+#define	HP3A_DRV_SYSFS	"hp3a-omap"
 
 /**
  * Global variables.
