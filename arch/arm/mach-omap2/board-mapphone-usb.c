@@ -606,6 +606,7 @@ static struct platform_device ohci_device = {
 };
 #endif /* OHCI specific data */
 
+#ifdef CONFIG_USB_QSC6085_CDMA_MODEM 
 extern void set_cdma_modem_interface(unsigned int number);
 
 void mapphone_init_modem_interface(void)
@@ -636,7 +637,7 @@ void mapphone_init_modem_interface(void)
 	of_node_put(node);
 	return;
 }
-
+#endif
 
 void __init mapphone_ehci_init(void)
 {
@@ -655,9 +656,10 @@ void __init mapphone_ehci_init(void)
 		ohci_device.dev.platform_data  = &dummy_usb_config_via;
 	}
 #endif
+#ifdef CONFIG_USB_QSC6085_CDMA_MODEM 
 	if (is_cdma_phone())
 		mapphone_init_modem_interface();
-
+#endif 
 #if defined(CONFIG_USB_EHCI_HCD) || defined(CONFIG_USB_EHCI_HCD_MODULE)
 	if (!is_cdma_phone()) {
 		usb_platform_data.port_data[2].mode =

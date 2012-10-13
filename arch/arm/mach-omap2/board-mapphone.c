@@ -2572,7 +2572,9 @@ static void __init mapphone_init(void)
 #endif
 	mapphone_gpio_mapping_init();
 	mapphone_ramconsole_init();
+#ifdef CONFIG_USB_QSC6085_CDMA_MODEM
 	mapphone_mdm_ctrl_init();
+#endif
 	mapphone_spi_init();
 	mapphone_cpcap_client_init();
 	mapphone_flash_init();

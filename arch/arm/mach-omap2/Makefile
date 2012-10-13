@@ -114,9 +114,9 @@ obj-$(CONFIG_MACH_MAPPHONE)             += board-mapphone.o \
                                            board-mapphone-keypad.o \
                                            board-mapphone-wifi.o \
                                            board-mapphone-gpio.o \
-                                           board-mapphone-modem.o \
                                            board-mapphone-mmcprobe.o \
                                            board-mapphone-usb.o
+obj-$(CONFIG_USB_QSC6085_CDMA_MODEM)    += board-mapphone-modem.o \
 obj-$(CONFIG_MOT_FEAT_MDTV)             += board-mapphone-mdtv.o
 obj-$(CONFIG_EMU_UART_DEBUG)		+= board-mapphone-emu_uart.o
 obj-$(CONFIG_HAVE_TRACE_CLOCK)		+= trace-clock.o
