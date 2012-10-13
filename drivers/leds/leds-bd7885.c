@@ -54,9 +54,11 @@ static int bd7885_release(struct inode *inode, struct file *file);
 static int bd7885_ioctl(struct inode *inode,
 			struct file *file, unsigned int cmd, unsigned long arg);
 
+#ifdef CONFIG_VIDEO_OV8810
 /*Below two external definition is for strobe manual control.*/
 extern int ov8810_strobe_manual_ready(void);
 extern int ov8810_strobe_manual_trigger(void);
+#endif
 
 #if defined(CONFIG_LEDS_BU9847)
 int bu9847_fetch_regs(void);
@@ -653,7 +655,7 @@ static int bd7885_ioctl(struct inode *inode, struct file *file,
 		return error;
 #endif
 	break;
-
+#ifdef CONFIG_VIDEO_OV8810
     case BD7885_IOCTL_READY_STROBE_MANUAL:
 		ov8810_strobe_manual_ready();
 	break;
@@ -661,7 +663,7 @@ static int bd7885_ioctl(struct inode *inode, struct file *file,
     case BD7885_IOCTL_FIRE_STROBE_MANUAL:
 		ov8810_strobe_manual_trigger();
 	break;
-
+#endif
     default:
       return -ENOTTY;
     }
