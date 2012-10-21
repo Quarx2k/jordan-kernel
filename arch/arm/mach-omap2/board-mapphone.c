@@ -21,11 +21,12 @@
 #include <plat/gpmc-smc91x.h>
 #include <plat/usb.h>
 
-#include <mach/board-zoom.h>
+#include <mach/board-mapphone.h>
 
 #include "board-flash.h"
 #include "mux.h"
 #include "sdram-toshiba-hynix-numonyx.h"
+#include "omap_ion.h"
 
 #ifdef CONFIG_EMU_UART_DEBUG
 #include <plat/board-mapphone-emu_uart.h>
@@ -61,14 +62,14 @@ static void enable_board_wakeup_source(void)
 
 static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
 
-	.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
-	.port_mode[1] = OMAP_EHCI_PORT_MODE_PHY,
-	.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
+	//.port_mode[0] = OMAP_EHCI_PORT_MODE_PHY,
+	//.port_mode[1] = OMAP_EHCI_PORT_MODE_PHY,
+	//.port_mode[2] = OMAP_USBHS_PORT_MODE_UNUSED,
 
-	.phy_reset  = true,
-	.reset_gpio_port[0]  = 126,
-	.reset_gpio_port[1]  = 61,
-	.reset_gpio_port[2]  = -EINVAL
+	//.phy_reset  = true,
+	//.reset_gpio_port[0]  = 126,
+	//.reset_gpio_port[1]  = 61,
+	//.reset_gpio_port[2]  = -EINVAL
 };
 
 static struct omap_board_config_kernel sdp_config[] __initdata = {
@@ -76,6 +77,10 @@ static struct omap_board_config_kernel sdp_config[] __initdata = {
 
 static void __init omap_sdp_init_early(void)
 {
+#ifdef CONFIG_EMU_UART_DEBUG
+	/* emu-uart function will override devtree iomux setting */
+	activate_emu_uart();
+#endif
 	omap2_init_common_infrastructure();
 	omap2_init_common_devices(JEDEC_JESD209A_sdrc_params,
 				   JEDEC_JESD209A_sdrc_params);
@@ -140,22 +145,27 @@ static struct flash_partitions sdp_flash_partitions[] = {
 
 static void __init omap_sdp_init(void)
 {
-	omap3_mux_init(board_mux, OMAP_PACKAGE_CBP);
-	omap_board_config = sdp_config;
-	omap_board_config_size = ARRAY_SIZE(sdp_config);
-#ifdef CONFIG_EMU_UART_DEBUG
-	/* emu-uart function will override devtree iomux setting */
-	activate_emu_uart();
+	omap_register_ion();
+	//omap3_mux_init(board_mux, OMAP_PACKAGE_CBP);
+	//omap_board_config = sdp_config;
+	//omap_board_config_size = ARRAY_SIZE(sdp_config);
+	//board_smc91x_init();
+	//board_flash_init(sdp_flash_partitions, chip_sel_sdp, NAND_BUSWIDTH_16);
+	//enable_board_wakeup_source();
+	//usbhs_init(&usbhs_bdata);
+}
+
+static void __init mapphone_reserve(void)
+{
+#ifdef CONFIG_ION_OMAP
+	omap_ion_init();
 #endif
-	board_smc91x_init();
-	board_flash_init(sdp_flash_partitions, chip_sel_sdp, NAND_BUSWIDTH_16);
-	enable_board_wakeup_source();
-	usbhs_init(&usbhs_bdata);
+	omap_reserve();
 }
 
 MACHINE_START(MAPPHONE, "mapphone_")
 	.boot_params	= 0x80C00100,
-	.reserve	= omap_reserve,
+	.reserve	= mapphone_reserve,
 	.map_io		= omap3_map_io,
 	.init_early	= omap_sdp_init_early,
 	.init_irq	= omap_init_irq,
