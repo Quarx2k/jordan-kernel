@@ -17,8 +17,6 @@ config ARCH_OMAP2PLUS_TYPICAL
 	select I2C_OMAP
 	select MFD_SUPPORT
 	select MENELAUS if ARCH_OMAP2
-	select TWL4030_CORE if ARCH_OMAP3 || ARCH_OMAP4
-	select TWL4030_POWER if ARCH_OMAP3 || ARCH_OMAP4
 	help
 	  Compile a kernel suitable for booting most boards
 
