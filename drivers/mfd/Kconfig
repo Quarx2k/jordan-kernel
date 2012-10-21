@@ -60,6 +60,12 @@ config MFD_ASIC3
 	  This driver supports the ASIC3 multifunction chip found on many
 	  PDAs (mainly iPAQ and HTC based ones)
 
+config MFD_CPCAP
+	tristate "Support for CPCAP"
+	depends on SPI
+	help
+	  Say yes here if you want to include drivers for the CPCAP chip.
+
 config MFD_DAVINCI_VOICECODEC
 	tristate
 	select MFD_CORE
