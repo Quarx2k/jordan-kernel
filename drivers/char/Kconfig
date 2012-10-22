@@ -633,5 +633,10 @@ config MSM_SMD_PKT
 	  Enables userspace clients to read and write to some packet SMD
 	  ports via device interface for MSM chipset.
 
+config GPIODEV
+	tristate "Enable Motorola GPIODev"
+	default n
+	help
+          This feature enables GPIODev for accessing GPIO pins in user space.
 endmenu
 
