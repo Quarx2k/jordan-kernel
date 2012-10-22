@@ -27,6 +27,8 @@ hwmod-common				= omap_hwmod.o \
 clock-common				= clock.o clock_common_data.o \
 					  clkt_dpll.o clkt_clksel.o
 
+#EXTRA_CFLAGS += -DDEBUG
+
 obj-$(CONFIG_ARCH_OMAP2) += $(omap-2-3-common) $(hwmod-common)
 obj-$(CONFIG_ARCH_OMAP3) += $(omap-2-3-common) $(hwmod-common)
 obj-$(CONFIG_ARCH_OMAP4) += prm44xx.o $(hwmod-common)
@@ -264,12 +266,11 @@ obj-$(CONFIG_MACH_OMAP_3630SDP)		+= board-3630sdp.o \
 					   hsmmc.o \
 					   omapxx_apps_brd_id.o
 obj-$(CONFIG_MACH_OMAP_MAPPHONE)	   += board-mapphone.o \
-					   board-flash.o \
 					   hsmmc.o \
 					   omapxx_apps_brd_id.o \
-					   board-mapphone-gpio.o \
 					   board-mapphone-hsmmc.o \
-					   board-mapphone-panel.o
+					   board-mapphone-gpio.o \
+					   board-mapphone-panel.o 
 obj-$(CONFIG_EMU_UART_DEBUG)		+= board-mapphone-emu_uart.o
 obj-$(CONFIG_MACH_CM_T35)		+= board-cm-t35.o \
 					   hsmmc.o

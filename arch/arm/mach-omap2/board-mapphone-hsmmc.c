@@ -310,7 +310,7 @@ int __init mapphone_hsmmc_init(void)
 	}
 
 	/* use devtree to change default emmc Vcc (VSDIO) here */
-	/* Set wifi's controller id */
+	/* Set wifi's controller id 
 	mmc_node = of_find_node_by_path(DT_PATH_MMC3);
 	if (mmc_node) {
 		mmc_prop = of_get_property(mmc_node,
@@ -323,14 +323,14 @@ int __init mapphone_hsmmc_init(void)
 		mmc_controllers[2].mmc = tiwlan_mmc_controller;
 	else
 		tiwlan_mmc_controller = 0;
-
-	/* set sd_det_n */
+	*/
+	/* set sd_det_n 
 	sd_det_n = get_gpio_by_name("sd_det_n");
 	if (sd_det_n >= 0)
 		mmc_controllers[0].gpio_cd = sd_det_n;
 	else
 		mmc_controllers[0].gpio_cd = GPIO_SIGNAL_SD_DET_N;
-
+	*/
 	omap2_hsmmc_init(mmc_controllers);
 	for (c = mmc_controllers; c->mmc; c++)
 		mapphone_hsmmc_set_late_init(c->dev);
