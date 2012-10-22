@@ -146,6 +146,7 @@ static struct flash_partitions sdp_flash_partitions[] = {
 static void __init omap_sdp_init(void)
 {
 	mapphone_gpio_mapping_init();
+	mapphone_hsmmc_init();
 	omap_register_ion();
 	//omap3_mux_init(board_mux, OMAP_PACKAGE_CBP);
 	//omap_board_config = sdp_config;

@@ -9,6 +9,7 @@ extern int __init zoom_debugboard_init(void);
 extern void __init zoom_peripherals_init(void);
 extern void __init zoom_display_init(void);
 void __init mapphone_gpio_mapping_init(void);
+int __init mapphone_hsmmc_init(void);
 
 #if (defined(CONFIG_VIDEO_IMX046) || defined(CONFIG_VIDEO_IMX046_MODULE)) && \
 	defined(CONFIG_VIDEO_OMAP3)
