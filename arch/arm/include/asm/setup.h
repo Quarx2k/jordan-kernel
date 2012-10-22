@@ -139,6 +139,41 @@ struct tag_acorn {
 /* footbridge memory clock, see arch/arm/mach-footbridge/arch.c */
 #define ATAG_MEMCLK	0x41000402
 
+#ifdef CONFIG_BOOTINFO
+
+/* Powerup Reason */
+#define ATAG_POWERUP_REASON 0xf1000401
+
+struct tag_powerup_reason {
+	u32 powerup_reason;
+};
+
+/* MBM version */
+#define ATAG_MBM_VERSION 0xf1000407
+struct tag_mbm_version {
+	u32 mbm_version;
+};
+
+/* MBM loader version */
+#define ATAG_MBM_LOADER_VERSION 0xf1000408
+struct tag_mbm_loader_version {
+	u32 mbm_loader_version;
+};
+
+/* Battery status at boot */
+#define ATAG_BATTERY_STATUS_AT_BOOT 0xf100040E
+struct tag_battery_status_at_boot {
+	u16 battery_status_at_boot;
+	u16 padding; /* each atag must be at least 4 bytes */
+};
+
+/* CID recover boot */
+#define ATAG_CID_RECOVER_BOOT 0xf1000414
+struct tag_cid_recover_boot {
+	u8 cid_recover_boot;
+};
+#endif
+
 struct tag_memclk {
 	__u32 fmemclk;
 };
@@ -165,6 +200,16 @@ struct tag {
 		 * DC21285 specific
 		 */
 		struct tag_memclk	memclk;
+#ifdef CONFIG_BOOTINFO
+		/*
+		 * Motorola specific ATAGs
+		 */
+		struct tag_powerup_reason powerup_reason;
+		struct tag_mbm_version mbm_version;
+		struct tag_mbm_loader_version mbm_loader_version;
+		struct tag_battery_status_at_boot battery_status_at_boot;
+		struct tag_cid_recover_boot cid_recover_boot;
+#endif
 	} u;
 };
 

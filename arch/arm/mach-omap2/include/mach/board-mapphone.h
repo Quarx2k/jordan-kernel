@@ -9,6 +9,8 @@ void __init mapphone_gpio_mapping_init(void);
 int __init mapphone_hsmmc_init(void);
 void __init mapphone_panel_init(void);
 
+#define BOOT_MODE_MAX_LEN 30
+
 #if (defined(CONFIG_VIDEO_IMX046) || defined(CONFIG_VIDEO_IMX046_MODULE)) && \
 	defined(CONFIG_VIDEO_OMAP3)
 #include <media/imx046.h>

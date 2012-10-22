@@ -6,12 +6,15 @@
  * published by the Free Software Foundation.
  */
 
+#include <linux/bootmem.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/platform_device.h>
 #include <linux/input.h>
 #include <linux/gpio.h>
 #include <linux/mtd/nand.h>
+#include <linux/of_fdt.h>
+#include <linux/of.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -31,6 +34,49 @@
 #ifdef CONFIG_EMU_UART_DEBUG
 #include <plat/board-mapphone-emu_uart.h>
 #endif
+
+static char boot_mode[BOOT_MODE_MAX_LEN+1];
+
+int __init board_boot_mode_init(char *s)
+{
+	strncpy(boot_mode, s, BOOT_MODE_MAX_LEN);
+	boot_mode[BOOT_MODE_MAX_LEN] = '\0';
+	pr_debug("boot_mode=%s\n", boot_mode);
+	return 1;
+}
+__setup("androidboot.mode=", board_boot_mode_init);
+
+/* Flat dev tree address */
+#define ATAG_FLAT_DEV_TREE_ADDRESS 0xf100040A
+struct tag_flat_dev_tree_address {
+	u32 address;
+	u32 size;
+};
+
+static u32 fdt_start_address;
+static u32 fdt_size;
+
+/* process flat device tree for hardware configuration */
+static int __init parse_tag_flat_dev_tree_address(const struct tag *tag)
+{
+	struct tag_flat_dev_tree_address *fdt_addr =
+		(struct tag_flat_dev_tree_address *)&tag->u;
+
+	if (fdt_addr->size) {
+		fdt_start_address = (u32)phys_to_virt(fdt_addr->address);
+		fdt_size = fdt_addr->size;
+	}
+
+	/*have_of = 1;*/
+	printk(KERN_INFO
+		"flat_dev_tree_address=0x%08x, flat_dev_tree_size == 0x%08X\n",
+		fdt_addr->address,
+		fdt_addr->size);
+
+	return 0;
+}
+
+__tagtable(ATAG_FLAT_DEV_TREE_ADDRESS, parse_tag_flat_dev_tree_address);
 
 #if defined(CONFIG_SMC91X) || defined(CONFIG_SMC91X_MODULE)
 
@@ -84,6 +130,21 @@ static void __init omap_sdp_init_early(void)
 	omap2_init_common_infrastructure();
 	omap2_init_common_devices(JEDEC_JESD209A_sdrc_params,
 				   JEDEC_JESD209A_sdrc_params);
+
+	if (fdt_start_address) {
+		struct device_node *machine_node;
+		const void *machine_prop;
+		const void *cpu_tier_prop;
+		void *mem;
+
+		mem = __alloc_bootmem(fdt_size, __alignof__(int), 0);
+		BUG_ON(!mem);
+		memcpy(mem, (const void *)fdt_start_address, fdt_size);
+		initial_boot_params = (struct boot_param_header *)mem;
+		pr_info("Unflattening device tree: 0x%08x\n", (u32)mem);
+		unflatten_device_tree();
+	}
+
 }
 
 #ifdef CONFIG_OMAP_MUX
