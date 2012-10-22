@@ -24,6 +24,16 @@
 
 #include <asm/page.h>
 
+#ifdef CONFIG_MACH_OMAP_MAPPHONE
+/*
+ * HACK: Historically, Motorola products used little endian device trees.
+ */
+#define be32		u32
+#define be32_to_cpu(n)	(n)
+#define be32_to_cpup(p)	(*(p))
+#endif
+
+
 char *of_fdt_get_string(struct boot_param_header *blob, u32 offset)
 {
 	return ((char *)blob) +
