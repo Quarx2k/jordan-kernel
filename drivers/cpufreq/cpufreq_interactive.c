@@ -443,7 +443,7 @@ static void cpufreq_interactive_tune(struct work_struct *work)
 					pcpu->freq_table, pcpu->policy->min,
 					CPUFREQ_RELATION_H, &index);
 				hispeed_freq =
-					pcpu->freq_table[index+1].frequency;
+					pcpu->freq_table[index-1].frequency;
 				cur_tune_value = LOW_POWER_TUNE;
 		}
 		mutex_unlock(&set_speed_lock);
