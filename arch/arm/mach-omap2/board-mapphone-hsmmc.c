@@ -67,7 +67,7 @@ int tiwlan_mmc_controller;
 static int emmc_set_power(struct device *dev, int slot, int power_on,
 			  int vdd)
 {
-	printk("enter to %s\n",__func__);
+	//printk("enter to %s\n",__func__);
 	int ret = 0;
 	struct omap_mmc_platform_data *mmc = dev->platform_data;
 
@@ -120,7 +120,7 @@ static int emmc_set_power(struct device *dev, int slot, int power_on,
 static int emmc_set_sleep(struct device *dev, int slot, int sleep,
 			  int vdd, int cardsleep)
 {
-	printk("enter to %s\n",__func__);
+	//printk("enter to %s\n",__func__);
 	int ret = 0;
 
 	if (!emmc_regulator)
@@ -139,7 +139,7 @@ static int emmc_set_sleep(struct device *dev, int slot, int sleep,
 static int microsd_set_power(struct device *dev, int slot, int power_on,
 				int vdd)
 {
-	printk("enter to %s\n",__func__);
+	//printk("enter to %s\n",__func__);
 	int ret = 0;
 	struct omap_mmc_platform_data *mmc = dev->platform_data;
 
@@ -190,13 +190,14 @@ static int microsd_set_power(struct device *dev, int slot, int power_on,
 
 static int mapphone_hsmmc_late_init(struct device *dev)
 {
-	printk("enter to %s\n",__func__);
+	//printk("enter to %s\n",__func__);
 	int ret = 0;
 	struct platform_device *pdev = container_of(dev,
 				struct platform_device, dev);
 	struct omap_mmc_platform_data *pdata = dev->platform_data;
 
 	if (pdev->id == 0) {
+		//printk("%s: pdev->id == 0\n",__func__);
 		micro_sd_regulator = regulator_get(NULL,
 			micro_sd_regulator_name);
 		if (IS_ERR(micro_sd_regulator)) {
@@ -206,6 +207,7 @@ static int mapphone_hsmmc_late_init(struct device *dev)
 
 		pdata->slots[0].set_power = microsd_set_power;
 	} else if (pdev->id == 1) {
+		//printk("%s: pdev->id == 1\n",__func__);
 		emmc_regulator = regulator_get(NULL, emmc_regulator_name);
 		if (IS_ERR(emmc_regulator)) {
 			dev_dbg(dev, "eMMC Vcc regulator missing\n");
@@ -213,14 +215,16 @@ static int mapphone_hsmmc_late_init(struct device *dev)
 		}
 		pdata->slots[0].set_power = emmc_set_power;
 		pdata->slots[0].set_sleep = emmc_set_sleep;
-	} else if (pdev->id == 2)
+	 }// else if (pdev->id == 2)
+		//printk("%s: pdev->id == 2\n",__func__);
 		//pdata->slots[0].set_power = wifi_set_power;
+
 	return ret;
 }
 
 static __init void mapphone_hsmmc_set_late_init(struct device *dev)
 {
-	printk("enter to %s\n",__func__);
+	//printk("enter to %s\n",__func__);
 	struct omap_mmc_platform_data *pdata;
 
 	/* dev can be null if CONFIG_MMC_OMAP_HS is not set */
@@ -248,23 +252,23 @@ static struct omap2_hsmmc_info mmc_controllers[] = {
 	},
 	{
 		.mmc            = 2,
-		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
+		.caps		=  MMC_CAP_8_BIT_DATA,
 		.gpio_cd        = -EINVAL,
 		.gpio_wp        = -EINVAL,
 		.no_off		= 1,
-		.ocr_mask       = MMC_VDD_30_31,
+		.ocr_mask       = MMC_VDD_165_195,
 		.nonremovable	= 1,
 #ifdef CONFIG_PM_RUNTIME
 		.power_saving   = true,
 #endif
-	},
+//	},
 	/* [2]->wifi controller: set the controller id according to devtree */
-	{	.mmc		= 0,
-		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_POWER_OFF_CARD,
-		.gpio_cd	= -EINVAL,
-		.gpio_wp	= -EINVAL,
-		.ocr_mask	= MMC_VDD_165_195,
-		.nonremovable   = true,
+//	{	.mmc		= 0,
+//		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_POWER_OFF_CARD,
+//		.gpio_cd	= -EINVAL,
+//		.gpio_wp	= -EINVAL,
+//		.ocr_mask	= MMC_VDD_165_195,
+//		.nonremovable   = true,
 	},
 	{}	/* Terminator */
 };
@@ -278,7 +282,7 @@ static struct omap2_hsmmc_info mmc_controllers[] = {
 #define MMC_PWR_VSIMCARD 0x3
 int __init mapphone_hsmmc_init(void)
 {
-	printk("enter to %s\n",__func__);
+	//printk("enter to %s\n",__func__);
 	struct device_node *mmc_node;
 	const void *mmc_prop;
 	struct omap2_hsmmc_info *c;
