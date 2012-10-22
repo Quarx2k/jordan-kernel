@@ -268,7 +268,8 @@ obj-$(CONFIG_MACH_OMAP_MAPPHONE)	   += board-mapphone.o \
 					   hsmmc.o \
 					   omapxx_apps_brd_id.o \
 					   board-mapphone-gpio.o \
-					   board-mapphone-hsmmc.o
+					   board-mapphone-hsmmc.o \
+					   board-mapphone-panel.o
 obj-$(CONFIG_EMU_UART_DEBUG)		+= board-mapphone-emu_uart.o
 obj-$(CONFIG_MACH_CM_T35)		+= board-cm-t35.o \
 					   hsmmc.o

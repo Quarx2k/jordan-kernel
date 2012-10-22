@@ -61,6 +61,18 @@ enum omap_display_type {
 	OMAP_DISPLAY_TYPE_HDMI		= 1 << 5,
 };
 
+enum omap_dsi_te_type {
+	OMAP_DSI_TE_MIPI_PHY	= 0,
+	OMAP_DSI_TE_CMOS_TE_0	= 1
+};
+
+/* Denotes the manual power control state of a display */
+enum omap_dss_manual_pwrctrl {
+	OMAP_DSS_MPC_DISABLED = 0,
+	OMAP_DSS_MPC_SUSPEND,
+	OMAP_DSS_MPC_RESUME,
+};
+
 enum omap_plane {
 	OMAP_DSS_GFX	= 0,
 	OMAP_DSS_VIDEO1	= 1,
@@ -170,6 +182,7 @@ enum omap_dss_display_state {
 	OMAP_DSS_DISPLAY_DISABLED = 0,
 	OMAP_DSS_DISPLAY_ACTIVE,
 	OMAP_DSS_DISPLAY_SUSPENDED,
+	OMAP_DSS_DISPLAY_TRANSITION,
 };
 
 enum omap_dispc_irq_type {
@@ -336,6 +349,33 @@ struct omap_video_timings {
 	u16 vfp;	/* Vertical front porch */
 	/* Unit: line clocks */
 	u16 vbp;	/* Vertical back porch */
+};
+
+struct omap_dsi_video_timings {
+	/* Unit: pixel clocks */
+	u16 hsa;        /* Horizontal synch active */
+	/* Unit: pixel clocks */
+	u16 hfp;        /* Horizontal front porch */
+	/* Unit: pixel clocks */
+	u16 hbp;        /* Horizontal back porch */
+	/* Unit: line clocks */
+	u16 vsa;        /* Vertical synch active */
+	/* Unit: line clocks */
+	u16 vfp;        /* Vertical front porch */
+	/* Unit: line clocks */
+	u16 vbp;        /* Vertical back porch */
+};
+
+struct omap_dsi_hs_mode_timing {
+	/* time in nsec */
+	u32 ths_prepare;
+	u32 ths_prepare_ths_zero;
+	u32 ths_trail;
+	u32 ths_exit;
+	u32 tlpx_half;
+	u32 tclk_trail;
+	u32 tclk_prepare;
+	u32 tclk_zero;
 };
 
 #ifdef CONFIG_OMAP2_DSS_VENC
@@ -532,6 +572,9 @@ struct omap_dss_device {
 
 			bool ext_te;
 			u8 ext_te_gpio;
+			struct omap_dsi_video_timings vm_timing;
+			struct omap_dsi_hs_mode_timing hs_timing;
+			bool d2l_use_ulps;
 		} dsi;
 
 		struct {
@@ -578,6 +621,9 @@ struct omap_dss_device {
 		int acb;	/* ac-bias pin frequency */
 
 		enum omap_panel_config config;
+		unsigned long panel_id;
+		u32 width_in_mm;
+		u32 height_in_mm;
 		struct fb_monspecs monspecs;
 
 		u32 width_in_um;
@@ -593,8 +639,8 @@ struct omap_dss_device {
 	int hpd_gpio;
 
 	bool skip_init;
-
 	int max_backlight_level;
+
 
 	const char *name;
 
@@ -604,6 +650,10 @@ struct omap_dss_device {
 	void *data;
 
 	struct omap_dss_driver *driver;
+
+	enum omap_dss_manual_pwrctrl manual_power_control;
+	int (*platform_enable_hpd)(struct omap_dss_device *dssdev);
+	void (*platform_disable_hpd)(struct omap_dss_device *dssdev);
 
 	/* helper variable for driver suspend/resume */
 	bool activate_after_resume;
@@ -635,6 +685,8 @@ struct omap_dss_driver {
 	void (*remove)(struct omap_dss_device *);
 
 	int (*enable)(struct omap_dss_device *display);
+	int (*framedone)(struct omap_dss_device *display);
+
 	void (*disable)(struct omap_dss_device *display);
 	int (*suspend)(struct omap_dss_device *display);
 	int (*resume)(struct omap_dss_device *display);
@@ -651,6 +703,8 @@ struct omap_dss_driver {
 
 	int (*enable_te)(struct omap_dss_device *dssdev, bool enable);
 	int (*get_te)(struct omap_dss_device *dssdev);
+	bool (*support_te)(struct omap_dss_device *dssdev);
+	bool (*manual_te_trigger)(struct omap_dss_device *dssdev);
 
 	u8 (*get_rotate)(struct omap_dss_device *dssdev);
 	int (*set_rotate)(struct omap_dss_device *dssdev, u8 rotate);
@@ -688,6 +742,14 @@ struct omap_dss_driver {
 
 	int (*set_mode)(struct omap_dss_device *dssdev,
 			struct fb_videomode *mode);
+
+	int (*reg_read)(struct omap_dss_device *dssdev, u8 address, u16 size,
+			u8 *buf, u8 use_hs_mode);
+	int (*reg_write)(struct omap_dss_device *dssdev, u16 size, u8 *buf,
+		u8 use_hs_mode);
+
+	int (*get_dsi_vc_chnls)(struct omap_dss_device *dssdev,
+			u8 *dsi_vc_cmd_chnl, u8 *dsi_vc_video_chnl);
 
 	/* for wrapping around state changes */
 	void (*disable_orig)(struct omap_dss_device *display);

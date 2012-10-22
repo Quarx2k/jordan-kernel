@@ -23,6 +23,11 @@ config PANEL_SHARP_LS037V7DW01
         help
           LCD Panel used in TI's SDP3430 and EVM boards
 
+config PANEL_MAPPHONE
+	tristate "Mapphone Panel"
+	help
+	  LCD Panel used in Mapphone
+
 config PANEL_NEC_NL8048HL11_01B
 	tristate "NEC NL8048HL11-01B Panel"
 	depends on OMAP2_DSS_DPI
