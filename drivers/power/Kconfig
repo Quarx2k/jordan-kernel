@@ -248,4 +248,16 @@ config CHARGER_GPIO
 	  This driver can be build as a module. If so, the module will be
 	  called gpio-charger.
 
+config CHARGER_CPCAP
+	tristate "CPCAP Charger Driver"
+	depends on MFD_CPCAP && BATTERY_CPCAP
+	help
+	 Say Y to include support for CPCAP Main Battery Charger.
+
+config BATTERY_CPCAP
+	tristate "CPCAP Battery Driver"
+	depends on MFD_CPCAP
+	help
+	 Say Y to include support for CPCAP Main Battery.
+
 endif # POWER_SUPPLY
