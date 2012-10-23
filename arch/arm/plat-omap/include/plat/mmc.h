@@ -69,6 +69,9 @@ struct omap_mmc_platform_data {
 	/* Register offset deviation */
 	u16 reg_offset;
 
+	/* delay in msec before starting host */
+	int init_delay;
+
 	struct omap_mmc_slot_data {
 
 		/*
