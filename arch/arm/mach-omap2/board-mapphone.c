@@ -102,6 +102,8 @@ static void __init omap_mapphone_init(void)
 	mapphone_gpio_mapping_init();
 	mapphone_panel_init();
 	mapphone_hsmmc_init();
+	mapphone_cpcap_client_init();
+	mapphone_spi_init();
 	omap_register_ion();
 	//omap3_mux_init(board_mux, OMAP_PACKAGE_CBP);
 	//omap_board_config = sdp_config;

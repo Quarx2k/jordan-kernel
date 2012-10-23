@@ -56,3 +56,9 @@ obj-$(CONFIG_LEDS_TRIGGER_BACKLIGHT)	+= ledtrig-backlight.o
 obj-$(CONFIG_LEDS_TRIGGER_GPIO)		+= ledtrig-gpio.o
 obj-$(CONFIG_LEDS_TRIGGER_DEFAULT_ON)	+= ledtrig-default-on.o
 obj-$(CONFIG_LEDS_TRIGGER_SLEEP)	+= ledtrig-sleep.o
+obj-$(CONFIG_LEDS_CPCAP)		+= leds-cpcap-adb.o \
+					   leds-cpcap-gpio.o \
+					   leds-cpcap-kpb.o \
+					   leds-cpcap-mdb.o \
+					   leds-cpcap-rgb.o
+

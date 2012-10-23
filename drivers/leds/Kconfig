@@ -135,6 +135,12 @@ config LEDS_COBALT_RAQ
 	help
 	  This option enables support for the Cobalt Raq series LEDs.
 
+config LEDS_CPCAP
+	tristate "LED Support for CPCAP device"
+	depends on LEDS_CLASS && MFD_CPCAP
+	help
+	  This option enables support for LEDs on CPCAP.
+
 config LEDS_SUNFIRE
 	tristate "LED support for SunFire servers."
 	depends on LEDS_CLASS
