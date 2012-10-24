@@ -857,7 +857,6 @@ static void __init mapphone_kxtf9_init(void)
 /*
  * AKM8975
  */
-
 static struct regulator *mapphone_akm8975_regulator;
 
 static int mapphone_akm8975_initialization(void)
@@ -1237,17 +1236,22 @@ void __init mapphone_sensors_init(void)
 		mapphone_sfh7743_init();
 		platform_device_register(&sfh7743_platform_device);
 	}
-
+#ifdef CONFIG_INPUT_HALLEFFECT_BU52014HV
 	mapphone_bu52014hfv_init();
-
-	mapphone_akm8973_init();
+	platform_device_register(&omap3430_hall_effect_dock);
+#endif
+#ifdef CONFIG_SENSORS_AKM8975
 	mapphone_akm8975_init();
+#endif
+#ifdef CONFIG_BACKLIGHT_ADP8870
 	mapphone_adp8870_init();
-
+#endif
+#ifdef CONFIG_SENSORS_AKM8973_AKMD
+	mapphone_akm8973_init();
+#endif
 #ifdef CONFIG_SENSORS_AIRC
 	mapphone_airc_init();
 #endif
-	platform_device_register(&omap3430_hall_effect_dock);
 
 	linear_vib_only = 0;
 	if (mapphone_lvibrator_devtree()) {

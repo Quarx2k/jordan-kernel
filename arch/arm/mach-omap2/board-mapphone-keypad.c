@@ -484,8 +484,9 @@ static int __init mapphone_dt_kp_init(void)
 
 		of_node_put(kp_node);
 	}
-
+#ifdef CONFIG_MOT_KEYBOARD_ADP5588
 	mapphone_adp5588_leds_pdata.use_leds = 0;
+
 	kp_node = of_find_node_by_name(NULL, "LEDController");
 	while (kp_node) {
 		kp_prop = of_get_property(kp_node, "type", NULL);
@@ -499,7 +500,7 @@ static int __init mapphone_dt_kp_init(void)
 
 		kp_node = of_find_node_by_name(kp_node, "LEDController");
 	}
-
+#endif
 	return kp_node ? 0 : -ENODEV;
 }
 #endif

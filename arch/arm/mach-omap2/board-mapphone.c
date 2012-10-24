@@ -1395,10 +1395,12 @@ static struct i2c_board_info __initdata
 		I2C_BOARD_INFO("akm8973", 0x1C),
 		.irq = OMAP_GPIO_IRQ(MAPPHONE_AKM8973_INT_GPIO),
 	},
+#ifdef CONFIG_SENSORS_LIS331DLH
 	{
 		I2C_BOARD_INFO("lis331dlh", 0x19),
 		.platform_data = &mapphone_lis331dlh_data,
 	},
+#endif
 	{
 		I2C_BOARD_INFO("kxtf9", 0x0F),
 		.platform_data = &mapphone_kxtf9_data,
@@ -1408,11 +1410,13 @@ static struct i2c_board_info __initdata
 		.platform_data = &omap3430_als_light_data,
 		.irq = OMAP_GPIO_IRQ(MAPPHONE_LM_3530_INT_GPIO),
 	},
+#ifdef CONFIG_SENSORS_AKM8975
 	{
 		I2C_BOARD_INFO("akm8975", 0x0C),
 		.platform_data = &mapphone_akm8975_pdata,
 		.irq = OMAP_GPIO_IRQ(MAPPHONE_AKM8975_INT_GPIO),
 	},
+#endif
 };
 
 #ifdef CONFIG_KEYBOARD_ADP5588
@@ -1504,12 +1508,14 @@ static struct i2c_board_info __initdata
 		.platform_data = &mapphone_adp5588_pdata,
 	},
 #endif
+#ifdef CONFIG_LEDS_LM3559
 	/* LM3559 must be the last element in the array,
 		new devices need to be added above */
 	{
 		I2C_BOARD_INFO("lm3559_led", 0x53),
 		.platform_data = &mapphone_camera_flash_3559,
 	},
+#endif
 };
 
 
@@ -2577,7 +2583,7 @@ static void __init mapphone_init(void)
 #endif
 	mapphone_spi_init();
 	mapphone_cpcap_client_init();
-	mapphone_flash_init();
+	//mapphone_flash_init();
 	mapphone_serial_init();
 	mapphone_als_init();
 	mapphone_panel_init();
@@ -2589,7 +2595,7 @@ static void __init mapphone_init(void)
 	mapphone_ehci_init();
 	mapphone_sdrc_init();
 	mapphone_pm_init();
-	config_mmc2_init();
+	//config_mmc2_init();
 	config_wlan_gpio();
 	omap_hdq_init();
 	mapphone_bt_init();
@@ -2598,7 +2604,7 @@ static void __init mapphone_init(void)
 #else
 	mapphone_hsmmc_init();
 #endif
-	mapphone_vout_init();
+	//mapphone_vout_init();
 	mapphone_sgx_init();
 	mapphone_power_off_init();
 	mapphone_gadget_init();

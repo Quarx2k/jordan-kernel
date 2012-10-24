@@ -793,7 +793,9 @@ static int __init omap2_init_devices(void)
 	 */
 	omap_hsmmc_reset();
 	omap_init_camera();
+#ifdef CONFIG_ARCH_OMAP4
 	omap_init_mbox();
+#endif
 	omap_init_mcspi();
 	omap_init_sti();
 	omap_init_sha1_md5();
