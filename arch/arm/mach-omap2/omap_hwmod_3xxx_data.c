@@ -36,7 +36,7 @@
 #include <mach/am35xx.h>
 
 /*
- * OMAP3xxx hardware module integration data
+ * OMAP3&omap3xxx_uart3_hwmod,xxx hardware module integration data
  *
  * ALl of the data in this section should be autogeneratable from the
  * TI hardware database or other technical documentation.  Data that
@@ -4090,7 +4090,7 @@ static __initdata struct omap_hwmod *omap3xxx_hwmods[] = {
 	&omap3xxx_wd_timer2_hwmod,
 	&omap3xxx_uart1_hwmod,
 	&omap3xxx_uart2_hwmod,
-	//&omap3xxx_uart3_hwmod,
+	&omap3xxx_uart3_hwmod,
 	&omap3xxx_uart4_hwmod,
 	/* dss class */
 	&omap3430es1_dss_core_hwmod,
