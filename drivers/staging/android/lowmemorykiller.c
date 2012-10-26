@@ -35,7 +35,6 @@
 #include <linux/oom.h>
 #include <linux/sched.h>
 #include <linux/notifier.h>
-#include <linux/memcontrol.h>
 
 static uint32_t lowmem_debug_level = 2;
 static int lowmem_adj[6] = {
@@ -52,15 +51,6 @@ static size_t lowmem_minfree[6] = {
 	16 * 1024,	/* 64MB */
 };
 static int lowmem_minfree_size = 4;
-static int lowmem_order[6] = {
-       0,
-       1,
-       2,
-       3,
-       4,
-       5,
-};
-static int lowmem_order_size = 6;
 
 static struct task_struct *lowmem_deathpending;
 static unsigned long lowmem_deathpending_timeout;
@@ -78,39 +68,18 @@ static struct notifier_block task_nb = {
 	.notifier_call	= task_notify_func,
 };
 
-static int max_free_order(void)
-{
-	struct zone *zone;
-	int order, max = 0;
-
-	for_each_zone(zone)
-		for (order = MAX_ORDER-1; order >= max; order--)
-			if (zone->free_area[order].nr_free) {
-				max = order;
-				break;
-			}
-	return max;
-}
-
 static int
 task_notify_func(struct notifier_block *self, unsigned long val, void *data)
 {
 	struct task_struct *task = data;
-	if (task == lowmem_deathpending) {
+
+	if (task == lowmem_deathpending)
 		lowmem_deathpending = NULL;
-		task_free_unregister(&task_nb);
-	}
+
 	return NOTIFY_OK;
 }
 
-#ifdef CONFIG_DUMP_TASKS_ON_NOPAGE
-extern int sysctl_oom_dump_tasks;
-extern void dump_tasks(const struct mem_cgroup *mem);
-static int selected_oom_adj_array[OOM_ADJUST_MAX - OOM_ADJUST_MIN + 1];
-static unsigned long timeout;
-#endif
-
-static int lowmem_shrink(int nr_to_scan, gfp_t gfp_mask)
+static int lowmem_shrink(struct shrinker *s, int nr_to_scan, gfp_t gfp_mask)
 {
 	struct task_struct *p;
 	struct task_struct *selected = NULL;
@@ -124,7 +93,6 @@ static int lowmem_shrink(int nr_to_scan, gfp_t gfp_mask)
 	int other_free = global_page_state(NR_FREE_PAGES);
 	int other_file = global_page_state(NR_FILE_PAGES) -
 						global_page_state(NR_SHMEM);
-	int free_order = max_free_order();
 
 	/*
 	 * If we already have a death outstanding, then
@@ -141,11 +109,8 @@ static int lowmem_shrink(int nr_to_scan, gfp_t gfp_mask)
 		array_size = lowmem_adj_size;
 	if (lowmem_minfree_size < array_size)
 		array_size = lowmem_minfree_size;
-	if (lowmem_order_size < array_size)
-		array_size = lowmem_order_size;
 	for (i = 0; i < array_size; i++) {
-		if ((free_order < lowmem_order[i] ||
-		    other_free < lowmem_minfree[i]) &&
+		if (other_free < lowmem_minfree[i] &&
 		    other_file < lowmem_minfree[i]) {
 			min_adj = lowmem_adj[i];
 			break;
@@ -205,19 +170,6 @@ static int lowmem_shrink(int nr_to_scan, gfp_t gfp_mask)
 		lowmem_print(1, "send sigkill to %d (%s), adj %d, size %d\n",
 			     selected->pid, selected->comm,
 			     selected_oom_adj, selected_tasksize);
-
-#ifdef CONFIG_DUMP_TASKS_ON_NOPAGE
-		if (sysctl_oom_dump_tasks &&
-			!selected_oom_adj_array[selected_oom_adj]) {
-			dump_tasks(NULL);
-			selected_oom_adj_array[selected_oom_adj] = 1;
-		}
-		if (time_after(jiffies, timeout)) {
-			memset(selected_oom_adj_array, 0,
-			(OOM_ADJUST_MAX - OOM_ADJUST_MIN + 1) * sizeof(int));
-			timeout = jiffies + 1200 * HZ;
-		}
-#endif
 		lowmem_deathpending = selected;
 		lowmem_deathpending_timeout = jiffies + HZ;
 		force_sig(SIGKILL, selected);
@@ -236,9 +188,7 @@ static struct shrinker lowmem_shrinker = {
 
 static int __init lowmem_init(void)
 {
-#ifdef CONFIG_DUMP_TASKS_ON_NOPAGE
-	timeout = jiffies + 1200 * HZ;
-#endif
+	task_free_register(&task_nb);
 	register_shrinker(&lowmem_shrinker);
 	return 0;
 }
@@ -246,6 +196,7 @@ static int __init lowmem_init(void)
 static void __exit lowmem_exit(void)
 {
 	unregister_shrinker(&lowmem_shrinker);
+	task_free_unregister(&task_nb);
 }
 
 module_param_named(cost, lowmem_shrinker.seeks, int, S_IRUGO | S_IWUSR);
@@ -253,8 +204,6 @@ module_param_array_named(adj, lowmem_adj, int, &lowmem_adj_size,
 			 S_IRUGO | S_IWUSR);
 module_param_array_named(minfree, lowmem_minfree, uint, &lowmem_minfree_size,
 			 S_IRUGO | S_IWUSR);
-module_param_array_named(order, lowmem_order, uint, &lowmem_order_size,
-			S_IRUGO | S_IWUSR);
 module_param_named(debug_level, lowmem_debug_level, uint, S_IRUGO | S_IWUSR);
 
 module_init(lowmem_init);
