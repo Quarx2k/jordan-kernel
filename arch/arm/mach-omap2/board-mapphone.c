@@ -2105,12 +2105,12 @@ static void mapphone_pm_init(void)
 			CPCAP_SMPS_VOL_OPP2, 0x2E);
 
 	/* Configure BP <-> AP wake pins */
-	//omap_cfg_reg(AA21_34XX_GPIO157_OUT);
-	//omap_cfg_reg(AE6_34XX_GPIO141_DOWN);
+	omap_cfg_reg(AA21_34XX_GPIO157_OUT);
+	omap_cfg_reg(AE6_34XX_GPIO141_DOWN);
 
-	//platform_device_register(&mapphone_bpwake_device);
-	//platform_driver_register(&mapphone_bpwake_driver);
-	//cpcap_driver_register(&cpcap_vio_active_driver);
+	platform_device_register(&mapphone_bpwake_device);
+	platform_driver_register(&mapphone_bpwake_driver);
+	cpcap_driver_register(&cpcap_vio_active_driver);
 
 #ifdef CONFIG_MEM_DUMP
 	if (reset_status == COLDRESET)
