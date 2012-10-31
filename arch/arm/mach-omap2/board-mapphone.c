@@ -81,6 +81,15 @@ static int __init parse_tag_flat_dev_tree_address(const struct tag *tag)
 
 __tagtable(ATAG_FLAT_DEV_TREE_ADDRESS, parse_tag_flat_dev_tree_address);
 
+static struct attribute *mapphone_properties_attrs[] = {
+	//&mapphone_virtual_keys_attr.attr,
+	NULL,
+};
+
+static struct attribute_group mapphone_properties_attr_group = {
+	.attrs = mapphone_properties_attrs,
+};
+
 static void __init mapphone_voltage_init(void)
 {
 	/* cpcap is the default power supply for core and iva */
@@ -106,6 +115,15 @@ static void __init omap_mapphone_init_early(void)
 
 static void __init omap_mapphone_init(void)
 {
+	struct kobject *properties_kobj = NULL;
+	int ret = 0;
+	properties_kobj = kobject_create_and_add("board_properties", NULL);
+	if (properties_kobj)
+		ret = sysfs_create_group(properties_kobj,
+				 &mapphone_properties_attr_group);
+	if (!properties_kobj || ret)
+		pr_err("failed to create board_properties\n");
+
 	mapphone_voltage_init();
 	mapphone_gpio_mapping_init();
 	mapphone_panel_init();
