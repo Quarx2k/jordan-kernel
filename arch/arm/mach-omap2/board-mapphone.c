@@ -31,6 +31,7 @@
 #include "sdram-toshiba-hynix-numonyx.h"
 #include "omap_ion.h"
 #include "dt_path.h"
+#include "pm.h"
 
 #ifdef CONFIG_EMU_UART_DEBUG
 #include <plat/board-mapphone-emu_uart.h>
@@ -80,6 +81,12 @@ static int __init parse_tag_flat_dev_tree_address(const struct tag *tag)
 
 __tagtable(ATAG_FLAT_DEV_TREE_ADDRESS, parse_tag_flat_dev_tree_address);
 
+static void __init mapphone_voltage_init(void)
+{
+	/* cpcap is the default power supply for core and iva */
+	omap_cpcap_init();
+}
+
 static void __init omap_mapphone_init_early(void)
 {
 	omap2_init_common_infrastructure();
@@ -99,6 +106,7 @@ static void __init omap_mapphone_init_early(void)
 
 static void __init omap_mapphone_init(void)
 {
+	mapphone_voltage_init();
 	mapphone_gpio_mapping_init();
 	mapphone_panel_init();
 	mapphone_hsmmc_init();

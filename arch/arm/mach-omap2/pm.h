@@ -216,6 +216,7 @@ extern void omap_pmic_data_init(void);
 extern int omap_pmic_update(struct omap_pmic_map *tmp_map, char *name,
 		u32 old_chip_id, u32 new_chip_id);
 
+
 #ifdef CONFIG_TWL4030_CORE
 extern int omap_twl_init(void);
 extern int omap3_twl_set_sr_bit(bool enable);
@@ -230,6 +231,10 @@ static inline int omap_twl_pmic_update(char *name, u32 old_chip_id,
 {
 	return -EINVAL;
 }
+#endif
+
+#ifdef CONFIG_MACH_OMAP_MAPPHONE
+extern int omap_cpcap_init(void);
 #endif
 
 #ifdef CONFIG_OMAP_TPS6236X
