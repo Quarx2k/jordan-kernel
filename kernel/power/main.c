@@ -132,6 +132,15 @@ power_attr(pm_test);
 
 #endif /* CONFIG_PM_SLEEP */
 
+#ifdef CONFIG_PM_DEEPSLEEP
+static int pm_deepsleep_enabled;
+int get_deepsleep_mode(void)
+{
+	return pm_deepsleep_enabled;
+}
+EXPORT_SYMBOL(get_deepsleep_mode);
+#endif
+
 struct kobject *power_kobj;
 
 /**

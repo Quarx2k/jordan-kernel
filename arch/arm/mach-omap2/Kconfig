@@ -474,6 +474,15 @@ config EMU_UART_DEBUG
 	help
 	  This feature is specific for Motorola phone with CPCAP power IC.
 	  If this option is selected, USB functionality is NOT available any more.
+
+config PM_DEEPSLEEP
+	bool "instant on feature"
+	depends on ARCH_OMAP3
+	default n
+	help
+	  If enabling this feature, when PM state is set to DEEPSLEEP, the
+	  kernel ignore all key press except long press power key.
+
 endmenu
 
 endif
