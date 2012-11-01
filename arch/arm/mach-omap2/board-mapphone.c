@@ -24,6 +24,7 @@
 #include <plat/board.h>
 #include <plat/gpmc-smc91x.h>
 #include <plat/usb.h>
+#include <plat/system.h>
 #include <plat/mux.h>
 #include <mach/board-mapphone.h>
 
@@ -37,6 +38,9 @@
 #ifdef CONFIG_EMU_UART_DEBUG
 #include <plat/board-mapphone-emu_uart.h>
 #endif
+
+#define MAPPHONE_POWER_OFF_GPIO 176
+
 
 static char boot_mode[BOOT_MODE_MAX_LEN+1];
 
@@ -91,6 +95,60 @@ static struct attribute_group mapphone_properties_attr_group = {
 	.attrs = mapphone_properties_attrs,
 };
 
+static void mapphone_pm_power_off(void)
+{
+	printk(KERN_INFO "mapphone_pm_power_off start...\n");
+	local_irq_disable();
+
+	/* config gpio 176 back from safe mode to reset the device */
+	omap_writew(0x4, 0x480021D2);
+	gpio_direction_output(MAPPHONE_POWER_OFF_GPIO, 0);
+
+	do {} while (1);
+
+	local_irq_enable();
+}
+
+static void mapphone_pm_reset(void)
+{
+	arch_reset('h', NULL);
+}
+
+static int cpcap_charger_connected_probe(struct platform_device *pdev)
+{
+	pm_power_off = mapphone_pm_reset;
+	return 0;
+}
+
+static int cpcap_charger_connected_remove(struct platform_device *pdev)
+{
+	pm_power_off = mapphone_pm_power_off;
+	return 0;
+}
+
+static struct platform_driver cpcap_charger_connected_driver = {
+	.probe          = cpcap_charger_connected_probe,
+	.remove         = cpcap_charger_connected_remove,
+	.driver         = {
+		.name   = "cpcap_charger_connected",
+		.owner  = THIS_MODULE,
+	},
+};
+
+static void __init mapphone_power_off_init(void)
+{
+	gpio_request(MAPPHONE_POWER_OFF_GPIO, "mapphone power off");
+	gpio_direction_output(MAPPHONE_POWER_OFF_GPIO, 1);
+
+	/* config gpio176 into safe mode with the pull up enabled to avoid
+	 * glitch at reboot */
+	omap_writew(0x1F, 0x480021D2);
+	pm_power_off = mapphone_pm_power_off;
+
+	platform_driver_register(&cpcap_charger_connected_driver);
+}
+
+
 static void __init mapphone_voltage_init(void)
 {
 	/* cpcap is the default power supply for core and iva */
@@ -134,6 +192,7 @@ static void __init omap_mapphone_init(void)
 	mapphone_cpcap_client_init();
 	mapphone_spi_init();
 	omap_register_ion();
+	mapphone_power_off_init();
 	//omap3_mux_init(board_mux, OMAP_PACKAGE_CBP);
 	//omap_board_config = sdp_config;
 	//omap_board_config_size = ARRAY_SIZE(sdp_config);
