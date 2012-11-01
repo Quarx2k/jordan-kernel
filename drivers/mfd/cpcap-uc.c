@@ -713,7 +713,7 @@ static int fw_load(struct cpcap_uc_data *uc_data, struct device *dev)
 			uc_data->cpcap->vendor, err);
 		goto err;
 	}
-
+		printk("CPCAP VERSION: %d\n",uc_data->cpcap->vendor);
 	for (rec = (void *)fw->data; rec; rec = ihex_next_binrec(rec)) {
 		odd_bytes = 0;
 		num_bytes = be16_to_cpu(rec->len);
