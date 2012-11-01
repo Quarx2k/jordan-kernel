@@ -10,6 +10,8 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/platform_device.h>
+#include <linux/spi/cpcap.h>
+#include <linux/spi/cpcap-regbits.h>
 #include <linux/input.h>
 #include <linux/clk.h>
 #include <linux/gpio.h>
@@ -27,6 +29,8 @@
 #include <plat/usb.h>
 #include <plat/system.h>
 #include <plat/mux.h>
+#include <plat/hdq.h>
+
 #include <mach/board-mapphone.h>
 
 #include "board-flash.h"
@@ -39,6 +43,7 @@
 #ifdef CONFIG_EMU_UART_DEBUG
 #include <plat/board-mapphone-emu_uart.h>
 #endif
+#include <../drivers/w1/w1_family.h> /* for W1_EEPROM_DS2502 */
 
 #define MAPPHONE_POWER_OFF_GPIO 176
 
@@ -95,6 +100,17 @@ static struct attribute *mapphone_properties_attrs[] = {
 static struct attribute_group mapphone_properties_attr_group = {
 	.attrs = mapphone_properties_attrs,
 };
+
+static struct omap2_hdq_platform_config mapphone_hdq_data = {
+	.mode = OMAP_SDQ_MODE,
+	.id = W1_EEPROM_DS2502,
+};
+
+static int __init omap_hdq_init(void)
+{
+	omap_hdq_dev.dev.platform_data = &mapphone_hdq_data;
+	return platform_device_register(&omap_hdq_dev);
+}
 
 static void __init mapphone_bp_model_init(void)
 {
@@ -219,6 +235,8 @@ static void __init omap_mapphone_init(void)
 	mapphone_cpcap_client_init();
 	mapphone_spi_init();
 	omap_register_ion();
+	omap_hdq_init();
+
 	mapphone_power_off_init();
 	//omap3_mux_init(board_mux, OMAP_PACKAGE_CBP);
 	//omap_board_config = sdp_config;

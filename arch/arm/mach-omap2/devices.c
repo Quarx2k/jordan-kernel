@@ -34,7 +34,6 @@
 #include <plat/omap_device.h>
 #include <plat/omap4-keypad.h>
 #include <plat/mcpdm.h>
-
 #include <sound/omap-abe-dsp.h>
 
 #include "mux.h"
@@ -834,7 +833,7 @@ static struct resource omap_hdq_resources[] = {
 		.flags		= IORESOURCE_IRQ,
 	},
 };
-static struct platform_device omap_hdq_dev = {
+struct platform_device omap_hdq_dev = {
 	.name = "omap_hdq",
 	.id = 0,
 	.dev = {
@@ -957,7 +956,7 @@ static int __init omap2_init_devices(void)
 	omap_init_mcasp();
 	omap_init_mcspi();
 	omap_init_pmu();
-	omap_hdq_init();
+	//omap_hdq_init();
 	omap_init_sti();
 	omap_init_sham();
 	omap_init_aes();
