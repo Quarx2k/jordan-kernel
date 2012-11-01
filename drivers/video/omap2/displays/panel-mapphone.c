@@ -29,19 +29,11 @@
 #define FACTORY_BOARD_TEST
 #endif
 
-/*#define DEBUG 1*/
+#define DEBUG 1
 
-#ifdef DEBUG
 static unsigned int panel_debug;
 #define DBG(format, ...) \
-do { \
-	if (panel_debug) \
 		printk(KERN_DEBUG "mapphone-panel: " format, ## __VA_ARGS__); \
-} while (0)
-
-#else
-#define DBG(format, ...)
-#endif
 
 #define EDISCO_CMD_SOFT_RESET		0x01
 #define EDISCO_CMD_GET_POWER_MODE       0x0A
