@@ -11,6 +11,7 @@
 #include <linux/init.h>
 #include <linux/platform_device.h>
 #include <linux/input.h>
+#include <linux/clk.h>
 #include <linux/gpio.h>
 #include <linux/mtd/nand.h>
 #include <linux/of_fdt.h>
@@ -41,7 +42,7 @@
 
 #define MAPPHONE_POWER_OFF_GPIO 176
 
-
+char *bp_model = "CDMA";
 static char boot_mode[BOOT_MODE_MAX_LEN+1];
 
 int __init board_boot_mode_init(char *s)
@@ -94,6 +95,31 @@ static struct attribute *mapphone_properties_attrs[] = {
 static struct attribute_group mapphone_properties_attr_group = {
 	.attrs = mapphone_properties_attrs,
 };
+
+static void __init mapphone_bp_model_init(void)
+{
+#ifdef CONFIG_OMAP_RESET_CLOCKS
+	struct clk *clkp;
+#endif
+	struct device_node *bp_node;
+	const void *bp_prop;
+
+	if ((bp_node = of_find_node_by_path(DT_PATH_CHOSEN))) {
+		if ((bp_prop = of_get_property(bp_node, \
+			DT_PROP_CHOSEN_BP, NULL)))
+			bp_model = (char *)bp_prop;
+		printk("BP MODEL:%s\n",bp_model);
+		of_node_put(bp_node);
+	}
+#ifdef CONFIG_OMAP_RESET_CLOCKS
+	/* Enable sad2d iclk */
+	clkp = clk_get(NULL, "sad2d_ick");
+	if (clkp) {
+             clk_enable(clkp);
+             printk("sad2d_ick enabled\n");
+	}
+#endif
+}
 
 static void mapphone_pm_power_off(void)
 {
@@ -183,6 +209,7 @@ static void __init omap_mapphone_init(void)
 	if (!properties_kobj || ret)
 		pr_err("failed to create board_properties\n");
 
+	mapphone_bp_model_init();
 	mapphone_voltage_init();
 	mapphone_gpio_mapping_init();
 	mapphone_i2c_init();
