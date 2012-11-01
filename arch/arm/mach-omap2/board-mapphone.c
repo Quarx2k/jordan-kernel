@@ -15,6 +15,7 @@
 #include <linux/mtd/nand.h>
 #include <linux/of_fdt.h>
 #include <linux/of.h>
+#include <linux/led-lm3530.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -23,7 +24,7 @@
 #include <plat/board.h>
 #include <plat/gpmc-smc91x.h>
 #include <plat/usb.h>
-
+#include <plat/mux.h>
 #include <mach/board-mapphone.h>
 
 #include "board-flash.h"
@@ -126,7 +127,9 @@ static void __init omap_mapphone_init(void)
 
 	mapphone_voltage_init();
 	mapphone_gpio_mapping_init();
+	mapphone_i2c_init();
 	mapphone_panel_init();
+	mapphone_als_init();
 	mapphone_hsmmc_init();
 	mapphone_cpcap_client_init();
 	mapphone_spi_init();
