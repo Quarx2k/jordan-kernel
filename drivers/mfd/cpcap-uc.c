@@ -702,7 +702,6 @@ static int fw_load(struct cpcap_uc_data *uc_data, struct device *dev)
 
 	if (!uc_data || !dev)
 		return -EINVAL;
-
 	if (uc_data->cpcap->vendor == CPCAP_VENDOR_ST)
 		err = request_ihex_firmware(&fw, "cpcap/firmware_0_2x.fw", dev);
 	else
@@ -723,7 +722,7 @@ static int fw_load(struct cpcap_uc_data *uc_data, struct device *dev)
 			num_bytes++;
 			odd_bytes = 1;
 		}
-		return 0; //TODO: MAKE IT WORK.
+		//return 0; //TODO: MAKE IT WORK.
 		num_words = num_bytes >> 1;
 		dev_info(dev, "Loading %d word(s) at 0x%04x\n",
 			 num_words, be32_to_cpu(rec->addr));

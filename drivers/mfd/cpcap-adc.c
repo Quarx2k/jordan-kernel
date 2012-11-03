@@ -189,7 +189,7 @@ static void adc_setup(struct cpcap_device *cpcap,
 	unsigned short value1 = 0;
 	unsigned short value2 = 0;
 
-	data = cpcap->spi->controller_data;
+	data = cpcap->spi->dev.platform_data;
 	ato = data->adc_ato;
 
 	if (req->type == CPCAP_ADC_TYPE_BANK_1)

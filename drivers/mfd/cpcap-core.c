@@ -362,7 +362,7 @@ static int __devinit cpcap_probe(struct spi_device *spi)
 		return -ENOMEM;
 
 	cpcap->spi = spi;
-	data = spi->controller_data;
+	data = spi->dev.platform_data;
 	spi_set_drvdata(spi, cpcap);
 
 	retval = cpcap_regacc_init(cpcap);

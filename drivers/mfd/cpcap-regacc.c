@@ -339,7 +339,7 @@ int cpcap_regacc_write(struct cpcap_device *cpcap,
 	struct cpcap_platform_data *data;
 	struct spi_device *spi = cpcap->spi;
 
-	data = (struct cpcap_platform_data *)spi->controller_data;
+	data = (struct cpcap_platform_data *)spi->dev.platform_data;
 
 	if (IS_CPCAP(reg) &&
 	    (mask & register_info_tbl[reg].constant_mask) == 0) {
@@ -376,7 +376,7 @@ int cpcap_regacc_init(struct cpcap_device *cpcap)
 	struct cpcap_platform_data *data;
 	struct spi_device *spi = cpcap->spi;
 
-	data = (struct cpcap_platform_data *)spi->controller_data;
+	data = (struct cpcap_platform_data *)spi->dev.platform_data;
 
 	for (i = 0; i < data->init_len; i++) {
 		mask = 0xFFFF;

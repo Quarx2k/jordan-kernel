@@ -516,7 +516,7 @@ static int __devinit cpcap_regulator_probe(struct platform_device *pdev)
 
 	/* Already set by core driver */
 	cpcap = platform_get_drvdata(pdev);
-	data = cpcap->spi->controller_data;
+	data = cpcap->spi->dev.platform_data;
 	init = pdev->dev.platform_data;
 
 	for (i = 0; i < CPCAP_NUM_REGULATORS; i++) {
