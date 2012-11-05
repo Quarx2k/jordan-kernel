@@ -236,7 +236,6 @@ static int get_bootinfo(char *buf, char **start,
 						int *eof, void *data)
 {
 	int len = 0;
-	printk("DEVTREE ADDRESS %x\n",flat_dev_tree_address);
 	EMIT_POWERUPREASON();
 	EMIT_MBM_VERSION();
 	EMIT_MBM_LOADER_VERSION();
