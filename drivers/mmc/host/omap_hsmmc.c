@@ -2287,6 +2287,7 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 	host->dma_ch	= -1;
 	host->irq	= irq;
 	host->id	= pdev->id;
+	host->mmc->init_delay = pdata->init_delay;
 	host->slot_id	= 0;
 	host->mapbase	= res->start;
 	host->base	= ioremap(host->mapbase, SZ_4K);

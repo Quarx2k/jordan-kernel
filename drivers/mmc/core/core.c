@@ -1696,7 +1696,7 @@ void mmc_rescan(struct work_struct *work)
 void mmc_start_host(struct mmc_host *host)
 {
 	mmc_power_off(host);
-	mmc_detect_change(host, 0);
+	mmc_detect_change(host, msecs_to_jiffies(host->init_delay));
 }
 
 void mmc_stop_host(struct mmc_host *host)

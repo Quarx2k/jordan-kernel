@@ -246,7 +246,7 @@ static struct omap2_hsmmc_info mmc_controllers[] = {
 		.gpio_cd	= -EINVAL,
 		.gpio_wp	= -EINVAL,
 		.nonremovable	= 0,	/* MMC_UNSAFE_RESUME defined */
-		.init_delay	= 50,	/* make mmc0 detect after mmc1 */
+		.init_delay	= 10,	/* make mmc0 detect after mmc1 */
 		.ocr_mask	= MMC_VDD_32_33 | MMC_VDD_33_34 |
 					MMC_VDD_165_195,
 	},
