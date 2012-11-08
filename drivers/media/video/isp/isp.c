@@ -2641,11 +2641,9 @@ int isp_get(void)
 		ret_err = isp_enable_clocks();
 		if (ret_err)
 			goto out_err;
-		ret_err = isp_tmp_buf_alloc(ISP_LSC_MEMORY);
-		if (ret_err) {
+		if (isp_tmp_buf_alloc(ISP_LSC_MEMORY)) {
 			printk(KERN_ERR "Couldn't allocate lsc"
 					  " workaround memory\n");
-			goto out_err;
 		}
 		/* We don't want to restore context before saving it! */
 		if (has_context)
@@ -2654,7 +2652,7 @@ int isp_get(void)
 			has_context = 1;
 		enable_irq(omap3isp->irq);
 #if defined(CONFIG_VIDEO_OMAP3_HP3A)
-			hp3a_hw_enabled(1);
+		hp3a_hw_enabled(1);
 #endif
 	}
 	mutex_unlock(&(isp_obj.isp_mutex));
