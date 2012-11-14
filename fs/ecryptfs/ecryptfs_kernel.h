@@ -270,10 +270,11 @@ struct ecryptfs_crypt_stat {
 #define ECRYPTFS_ENCFN_USE_MOUNT_FNEK 0x00001000
 #define ECRYPTFS_ENCFN_USE_FEK        0x00002000
 #define ECRYPTFS_UNLINK_SIGS	      0x00004000
+#define ECRYPTFS_I_SIZE_INITIALIZED   0x00008000
 	u32 flags;
 	unsigned int file_version;
 	size_t iv_bytes;
-	size_t metadata_size;
+	size_t num_header_bytes_at_front;
 	size_t extent_size; /* Data extent size; default is 4096 */
 	size_t key_size;
 	size_t extent_shift;
@@ -376,7 +377,6 @@ struct ecryptfs_mount_crypt_stat {
 #define ECRYPTFS_GLOBAL_ENCRYPT_FILENAMES      0x00000010
 #define ECRYPTFS_GLOBAL_ENCFN_USE_MOUNT_FNEK   0x00000020
 #define ECRYPTFS_GLOBAL_ENCFN_USE_FEK          0x00000040
-#define ECRYPTFS_NO_NEW_ENCRYPTED	       0x00000080
 	u32 flags;
 	struct list_head global_auth_tok_list;
 	struct mutex global_auth_tok_list_mutex;
@@ -464,14 +464,6 @@ struct ecryptfs_daemon {
 };
 
 extern struct mutex ecryptfs_daemon_hash_mux;
-
-static inline size_t
-ecryptfs_lower_header_size(struct ecryptfs_crypt_stat *crypt_stat)
-{
-	if (crypt_stat->flags & ECRYPTFS_METADATA_IN_XATTR)
-		return 0;
-	return crypt_stat->metadata_size;
-}
 
 static inline struct ecryptfs_file_info *
 ecryptfs_file_to_private(struct file *file)
@@ -628,6 +620,7 @@ struct ecryptfs_open_req {
 int ecryptfs_interpose(struct dentry *hidden_dentry,
 		       struct dentry *this_dentry, struct super_block *sb,
 		       u32 flags);
+void ecryptfs_i_size_init(const char *page_virt, struct inode *inode);
 int ecryptfs_lookup_and_interpose_lower(struct dentry *ecryptfs_dentry,
 					struct dentry *lower_dentry,
 					struct inode *ecryptfs_dir_inode,
@@ -660,9 +653,6 @@ int ecryptfs_decrypt_page(struct page *page);
 int ecryptfs_write_metadata(struct dentry *ecryptfs_dentry);
 int ecryptfs_read_metadata(struct dentry *ecryptfs_dentry);
 int ecryptfs_new_file_context(struct dentry *ecryptfs_dentry);
-void ecryptfs_write_crypt_stat_flags(char *page_virt,
-				     struct ecryptfs_crypt_stat *crypt_stat,
-				     size_t *written);
 int ecryptfs_read_and_validate_header_region(char *data,
 					     struct inode *ecryptfs_inode);
 int ecryptfs_read_and_validate_xattr_region(char *page_virt,

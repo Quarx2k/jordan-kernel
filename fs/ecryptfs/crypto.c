@@ -381,8 +381,8 @@ out:
 static void ecryptfs_lower_offset_for_extent(loff_t *offset, loff_t extent_num,
 					     struct ecryptfs_crypt_stat *crypt_stat)
 {
-	(*offset) = ecryptfs_lower_header_size(crypt_stat)
-		    + (crypt_stat->extent_size * extent_num);
+	(*offset) = (crypt_stat->num_header_bytes_at_front
+		     + (crypt_stat->extent_size * extent_num));
 }
 
 /**
@@ -834,13 +834,13 @@ void ecryptfs_set_default_sizes(struct ecryptfs_crypt_stat *crypt_stat)
 	set_extent_mask_and_shift(crypt_stat);
 	crypt_stat->iv_bytes = ECRYPTFS_DEFAULT_IV_BYTES;
 	if (crypt_stat->flags & ECRYPTFS_METADATA_IN_XATTR)
-		crypt_stat->metadata_size = ECRYPTFS_MINIMUM_HEADER_EXTENT_SIZE;
+		crypt_stat->num_header_bytes_at_front = 0;
 	else {
 		if (PAGE_CACHE_SIZE <= ECRYPTFS_MINIMUM_HEADER_EXTENT_SIZE)
-			crypt_stat->metadata_size =
+			crypt_stat->num_header_bytes_at_front =
 				ECRYPTFS_MINIMUM_HEADER_EXTENT_SIZE;
 		else
-			crypt_stat->metadata_size = PAGE_CACHE_SIZE;
+			crypt_stat->num_header_bytes_at_front =	PAGE_CACHE_SIZE;
 	}
 }
 
@@ -1107,9 +1107,9 @@ static void write_ecryptfs_marker(char *page_virt, size_t *written)
 	(*written) = MAGIC_ECRYPTFS_MARKER_SIZE_BYTES;
 }
 
-void ecryptfs_write_crypt_stat_flags(char *page_virt,
-				     struct ecryptfs_crypt_stat *crypt_stat,
-				     size_t *written)
+static void
+write_ecryptfs_flags(char *page_virt, struct ecryptfs_crypt_stat *crypt_stat,
+		     size_t *written)
 {
 	u32 flags = 0;
 	int i;
@@ -1237,7 +1237,8 @@ ecryptfs_write_header_metadata(char *virt,
 
 	header_extent_size = (u32)crypt_stat->extent_size;
 	num_header_extents_at_front =
-		(u16)(crypt_stat->metadata_size / crypt_stat->extent_size);
+		(u16)(crypt_stat->num_header_bytes_at_front
+		      / crypt_stat->extent_size);
 	put_unaligned_be32(header_extent_size, virt);
 	virt += 4;
 	put_unaligned_be16(num_header_extents_at_front, virt);
@@ -1290,8 +1291,7 @@ static int ecryptfs_write_headers_virt(char *page_virt, size_t max,
 	offset = ECRYPTFS_FILE_SIZE_BYTES;
 	write_ecryptfs_marker((page_virt + offset), &written);
 	offset += written;
-	ecryptfs_write_crypt_stat_flags((page_virt + offset), crypt_stat,
-					&written);
+	write_ecryptfs_flags((page_virt + offset), crypt_stat, &written);
 	offset += written;
 	ecryptfs_write_header_metadata((page_virt + offset), crypt_stat,
 				       &written);
@@ -1381,7 +1381,7 @@ int ecryptfs_write_metadata(struct dentry *ecryptfs_dentry)
 		rc = -EINVAL;
 		goto out;
 	}
-	virt_len = crypt_stat->metadata_size;
+	virt_len = crypt_stat->num_header_bytes_at_front;
 	order = get_order(virt_len);
 	/* Released in this function */
 	virt = (char *)ecryptfs_get_zeroed_pages(GFP_KERNEL, order);
@@ -1427,15 +1427,16 @@ static int parse_header_metadata(struct ecryptfs_crypt_stat *crypt_stat,
 	header_extent_size = get_unaligned_be32(virt);
 	virt += sizeof(__be32);
 	num_header_extents_at_front = get_unaligned_be16(virt);
-	crypt_stat->metadata_size = (((size_t)num_header_extents_at_front
-				     * (size_t)header_extent_size));
+	crypt_stat->num_header_bytes_at_front =
+		(((size_t)num_header_extents_at_front
+		  * (size_t)header_extent_size));
 	(*bytes_read) = (sizeof(__be32) + sizeof(__be16));
 	if ((validate_header_size == ECRYPTFS_VALIDATE_HEADER_SIZE)
-	    && (crypt_stat->metadata_size
+	    && (crypt_stat->num_header_bytes_at_front
 		< ECRYPTFS_MINIMUM_HEADER_EXTENT_SIZE)) {
 		rc = -EINVAL;
 		printk(KERN_WARNING "Invalid header size: [%zd]\n",
-		       crypt_stat->metadata_size);
+		       crypt_stat->num_header_bytes_at_front);
 	}
 	return rc;
 }
@@ -1450,7 +1451,27 @@ static int parse_header_metadata(struct ecryptfs_crypt_stat *crypt_stat,
  */
 static void set_default_header_data(struct ecryptfs_crypt_stat *crypt_stat)
 {
-	crypt_stat->metadata_size = ECRYPTFS_MINIMUM_HEADER_EXTENT_SIZE;
+	crypt_stat->num_header_bytes_at_front =
+		ECRYPTFS_MINIMUM_HEADER_EXTENT_SIZE;
+}
+
+void ecryptfs_i_size_init(const char *page_virt, struct inode *inode)
+{
+	struct ecryptfs_mount_crypt_stat *mount_crypt_stat;
+	struct ecryptfs_crypt_stat *crypt_stat;
+	u64 file_size;
+
+	crypt_stat = &ecryptfs_inode_to_private(inode)->crypt_stat;
+	mount_crypt_stat =
+		&ecryptfs_superblock_to_private(inode->i_sb)->mount_crypt_stat;
+	if (mount_crypt_stat->flags & ECRYPTFS_ENCRYPTED_VIEW_ENABLED) {
+		file_size = i_size_read(ecryptfs_inode_to_lower(inode));
+		if (crypt_stat->flags & ECRYPTFS_METADATA_IN_XATTR)
+			file_size += crypt_stat->num_header_bytes_at_front;
+	} else
+		file_size = get_unaligned_be64(page_virt);
+	i_size_write(inode, (loff_t)file_size);
+	crypt_stat->flags |= ECRYPTFS_I_SIZE_INITIALIZED;
 }
 
 /**
@@ -1483,6 +1504,8 @@ static int ecryptfs_read_headers_virt(char *page_virt,
 		rc = -EINVAL;
 		goto out;
 	}
+	if (!(crypt_stat->flags & ECRYPTFS_I_SIZE_INITIALIZED))
+		ecryptfs_i_size_init(page_virt, ecryptfs_dentry->d_inode);
 	offset += MAGIC_ECRYPTFS_MARKER_SIZE_BYTES;
 	rc = ecryptfs_process_flags(crypt_stat, (page_virt + offset),
 				    &bytes_read);
@@ -1528,22 +1551,10 @@ out:
  */
 int ecryptfs_read_xattr_region(char *page_virt, struct inode *ecryptfs_inode)
 {
-	struct ecryptfs_inode_info *inode_info =
-		ecryptfs_inode_to_private(ecryptfs_inode);
-	struct dentry *lower_dentry = NULL;
+	struct dentry *lower_dentry =
+		ecryptfs_inode_to_private(ecryptfs_inode)->lower_file->f_dentry;
 	ssize_t size;
 	int rc = 0;
-
-	mutex_lock(&inode_info->lower_file_mutex);
-	if (!inode_info->lower_file) {
-		printk(KERN_INFO "Found null lower_file in read_xattr\n");
-		mutex_unlock(&inode_info->lower_file_mutex);
-		return -EINVAL;
-	}
-
-	lower_dentry = inode_info->lower_file->f_dentry;
-
-	mutex_unlock(&inode_info->lower_file_mutex);
 
 	size = ecryptfs_getxattr_lower(lower_dentry, ECRYPTFS_XATTR_NAME,
 				       page_virt, ECRYPTFS_DEFAULT_EXTENT_SIZE);
@@ -1616,14 +1627,11 @@ int ecryptfs_read_metadata(struct dentry *ecryptfs_dentry)
 						ecryptfs_dentry,
 						ECRYPTFS_VALIDATE_HEADER_SIZE);
 	if (rc) {
-		memset(page_virt, 0, PAGE_CACHE_SIZE);
 		rc = ecryptfs_read_xattr_region(page_virt, ecryptfs_inode);
 		if (rc) {
-			/* disable it because this will generate lots of
-			 * informational messages when there are many "clear"
-			 * files in ecryptfs mounted FS */
-			/*printk(KERN_DEBUG"Valid eCryptfs headers not found in"
-			       " file header region or xattr region\n");*/
+			printk(KERN_DEBUG "Valid eCryptfs headers not found in "
+			       "file header region or xattr region, inode %lu\n",
+				ecryptfs_inode->i_ino);
 			rc = -EINVAL;
 			goto out;
 		}
@@ -1632,7 +1640,8 @@ int ecryptfs_read_metadata(struct dentry *ecryptfs_dentry)
 						ECRYPTFS_DONT_VALIDATE_HEADER_SIZE);
 		if (rc) {
 			printk(KERN_DEBUG "Valid eCryptfs headers not found in "
-			       "file xattr region either\n");
+			       "file xattr region either, inode %lu\n",
+				ecryptfs_inode->i_ino);
 			rc = -EINVAL;
 		}
 		if (crypt_stat->mount_crypt_stat->flags
@@ -1643,7 +1652,8 @@ int ecryptfs_read_metadata(struct dentry *ecryptfs_dentry)
 			       "crypto metadata only in the extended attribute "
 			       "region, but eCryptfs was mounted without "
 			       "xattr support enabled. eCryptfs will not treat "
-			       "this like an encrypted file.\n");
+			       "this like an encrypted file, inode %lu\n",
+				ecryptfs_inode->i_ino);
 			rc = -EINVAL;
 		}
 	}
@@ -1948,7 +1958,7 @@ static unsigned char *portable_filename_chars = ("-.0123456789ABCD"
 
 /* We could either offset on every reverse map or just pad some 0x00's
  * at the front here */
-static const unsigned char filename_rev_map[] = {
+static const unsigned char filename_rev_map[256] = {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 7 */
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 15 */
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /* 23 */
@@ -1964,7 +1974,7 @@ static const unsigned char filename_rev_map[] = {
 	0x00, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C, /* 103 */
 	0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x33, 0x34, /* 111 */
 	0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, /* 119 */
-	0x3D, 0x3E, 0x3F
+	0x3D, 0x3E, 0x3F /* 123 - 255 initialized to 0x00 */
 };
 
 /**

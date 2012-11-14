@@ -212,7 +212,7 @@ enum { ecryptfs_opt_sig, ecryptfs_opt_ecryptfs_sig,
        ecryptfs_opt_passthrough, ecryptfs_opt_xattr_metadata,
        ecryptfs_opt_encrypted_view, ecryptfs_opt_fnek_sig,
        ecryptfs_opt_fn_cipher, ecryptfs_opt_fn_cipher_key_bytes,
-       ecryptfs_opt_unlink_sigs, ecryptfs_opt_no_new_encrypted,
+       ecryptfs_opt_unlink_sigs, ecryptfs_opt_check_dev_ruid,
        ecryptfs_opt_err };
 
 static const match_table_t tokens = {
@@ -228,7 +228,7 @@ static const match_table_t tokens = {
 	{ecryptfs_opt_fn_cipher, "ecryptfs_fn_cipher=%s"},
 	{ecryptfs_opt_fn_cipher_key_bytes, "ecryptfs_fn_key_bytes=%u"},
 	{ecryptfs_opt_unlink_sigs, "ecryptfs_unlink_sigs"},
-	{ecryptfs_opt_no_new_encrypted, "no_new_encrypted"},
+	{ecryptfs_opt_check_dev_ruid, "ecryptfs_check_dev_ruid"},
 	{ecryptfs_opt_err, NULL}
 };
 
@@ -272,6 +272,7 @@ static void ecryptfs_init_mount_crypt_stat(
  * ecryptfs_parse_options
  * @sb: The ecryptfs super block
  * @options: The options pased to the kernel
+ * @check_ruid: set to 1 if device uid should be checked against the ruid
  *
  * Parse mount options:
  * debug=N 	   - ecryptfs_verbosity level for debug output
@@ -287,7 +288,8 @@ static void ecryptfs_init_mount_crypt_stat(
  *
  * Returns zero on success; non-zero on error
  */
-static int ecryptfs_parse_options(struct super_block *sb, char *options)
+static int ecryptfs_parse_options(struct super_block *sb, char *options,
+					uid_t *check_ruid)
 {
 	char *p;
 	int rc = 0;
@@ -311,6 +313,8 @@ static int ecryptfs_parse_options(struct super_block *sb, char *options)
 	char *fnek_src;
 	char *cipher_key_bytes_src;
 	char *fn_cipher_key_bytes_src;
+
+	*check_ruid = 0;
 
 	if (!options) {
 		rc = -EINVAL;
@@ -412,8 +416,8 @@ static int ecryptfs_parse_options(struct super_block *sb, char *options)
 		case ecryptfs_opt_unlink_sigs:
 			mount_crypt_stat->flags |= ECRYPTFS_UNLINK_SIGS;
 			break;
-		case ecryptfs_opt_no_new_encrypted:
-			mount_crypt_stat->flags |= ECRYPTFS_NO_NEW_ENCRYPTED;
+		case ecryptfs_opt_check_dev_ruid:
+			*check_ruid = 1;
 			break;
 		case ecryptfs_opt_err:
 		default:
@@ -492,6 +496,7 @@ out:
 }
 
 struct kmem_cache *ecryptfs_sb_info_cache;
+static struct file_system_type ecryptfs_fs_type;
 
 /**
  * ecryptfs_fill_super
@@ -556,7 +561,8 @@ out:
  * ecryptfs_interpose to create our initial inode and super block
  * struct.
  */
-static int ecryptfs_read_super(struct super_block *sb, const char *dev_name)
+static int ecryptfs_read_super(struct super_block *sb, const char *dev_name,
+				uid_t check_ruid)
 {
 	struct path path;
 	int rc;
@@ -566,6 +572,22 @@ static int ecryptfs_read_super(struct super_block *sb, const char *dev_name)
 		ecryptfs_printk(KERN_WARNING, "path_lookup() failed\n");
 		goto out;
 	}
+	if (path.dentry->d_sb->s_type == &ecryptfs_fs_type) {
+		rc = -EINVAL;
+		printk(KERN_ERR "Mount on filesystem of type "
+			"eCryptfs explicitly disallowed due to "
+			"known incompatibilities\n");
+		goto out_free;
+	}
+
+	if (check_ruid && path.dentry->d_inode->i_uid != current_uid()) {
+		rc = -EPERM;
+		printk(KERN_ERR "Mount of device (uid: %d) not owned by "
+		       "requested user (uid: %d)\n",
+		       path.dentry->d_inode->i_uid, current_uid());
+		goto out_free;
+	}
+
 	ecryptfs_set_superblock_lower(sb, path.dentry->d_sb);
 	sb->s_maxbytes = path.dentry->d_sb->s_maxbytes;
 	sb->s_blocksize = path.dentry->d_sb->s_blocksize;
@@ -595,8 +617,8 @@ out:
  *                        with as much information as it can before needing
  *                        the lower filesystem.
  * ecryptfs_read_super(): this accesses the lower filesystem and uses
- *                        ecryptfs_interpose to perform most of the linking
- * ecryptfs_interpose(): links the lower filesystem into ecryptfs (inode.c)
+ *                        ecryptfs_interpolate to perform most of the linking
+ * ecryptfs_interpolate(): links the lower filesystem into ecryptfs
  */
 static int ecryptfs_get_sb(struct file_system_type *fs_type, int flags,
 			const char *dev_name, void *raw_data,
@@ -604,6 +626,7 @@ static int ecryptfs_get_sb(struct file_system_type *fs_type, int flags,
 {
 	int rc;
 	struct super_block *sb;
+	uid_t check_ruid;
 
 	rc = get_sb_nodev(fs_type, flags, raw_data, ecryptfs_fill_super, mnt);
 	if (rc < 0) {
@@ -611,12 +634,12 @@ static int ecryptfs_get_sb(struct file_system_type *fs_type, int flags,
 		goto out;
 	}
 	sb = mnt->mnt_sb;
-	rc = ecryptfs_parse_options(sb, raw_data);
+	rc = ecryptfs_parse_options(sb, raw_data, &check_ruid);
 	if (rc) {
 		printk(KERN_ERR "Error parsing options; rc = [%d]\n", rc);
 		goto out_abort;
 	}
-	rc = ecryptfs_read_super(sb, dev_name);
+	rc = ecryptfs_read_super(sb, dev_name, check_ruid);
 	if (rc) {
 		printk(KERN_ERR "Reading sb failed; rc = [%d]\n", rc);
 		goto out_abort;

@@ -71,6 +71,8 @@ extern void check_tsc_sync_source(int cpu);
 extern void check_tsc_sync_target(void);
 
 extern int notsc_setup(char *);
+extern void save_sched_clock_state(void);
+extern void restore_sched_clock_state(void);
 
 extern int test_tsc_synchronization(void);
 extern int _tsc_is_sync;

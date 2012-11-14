@@ -193,8 +193,6 @@ static int ecryptfs_show_options(struct seq_file *m, struct vfsmount *mnt)
 		seq_printf(m, ",ecryptfs_encrypted_view");
 	if (mount_crypt_stat->flags & ECRYPTFS_UNLINK_SIGS)
 		seq_printf(m, ",ecryptfs_unlink_sigs");
-	if (mount_crypt_stat->flags & ECRYPTFS_NO_NEW_ENCRYPTED)
-		seq_printf(m, ",no_new_encrypted");
 
 	return 0;
 }

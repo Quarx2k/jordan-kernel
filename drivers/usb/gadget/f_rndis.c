@@ -475,8 +475,7 @@ rndis_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 #ifdef CONFIG_USB_MOT_ANDROID
 		if (w_length > req->length || w_value)
 #else
-		if (w_length > req->length || w_value
-		    || w_index != rndis->ctrl_id)
+		if (w_value || w_index != rndis->ctrl_id)
 #endif
 			goto invalid;
 		/* read the request; process it later */

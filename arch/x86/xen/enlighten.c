@@ -48,6 +48,7 @@
 #include <asm/traps.h>
 #include <asm/setup.h>
 #include <asm/desc.h>
+#include <asm/pgalloc.h>
 #include <asm/pgtable.h>
 #include <asm/tlbflush.h>
 #include <asm/reboot.h>
@@ -923,7 +924,7 @@ static const struct pv_init_ops xen_init_ops __initdata = {
 };
 
 static const struct pv_time_ops xen_time_ops __initdata = {
-	.sched_clock = xen_sched_clock,
+	.sched_clock = xen_clocksource_read,
 };
 
 static const struct pv_cpu_ops xen_cpu_ops __initdata = {
@@ -944,7 +945,10 @@ static const struct pv_cpu_ops xen_cpu_ops __initdata = {
 	.wbinvd = native_wbinvd,
 
 	.read_msr = native_read_msr_safe,
+	.rdmsr_regs = native_rdmsr_safe_regs,
 	.write_msr = xen_write_msr_safe,
+	.wrmsr_regs = native_wrmsr_safe_regs,
+
 	.read_tsc = native_read_tsc,
 	.read_pmc = native_read_pmc,
 
@@ -996,10 +1000,6 @@ static const struct pv_apic_ops xen_apic_ops __initdata = {
 static void xen_reboot(int reason)
 {
 	struct sched_shutdown r = { .reason = reason };
-
-#ifdef CONFIG_SMP
-	smp_send_stop();
-#endif
 
 	if (HYPERVISOR_sched_op(SCHEDOP_shutdown, &r))
 		BUG();
@@ -1092,6 +1092,12 @@ asmlinkage void __init xen_start_kernel(void)
 		__supported_pte_mask &= ~(_PAGE_PWT | _PAGE_PCD);
 
 	__supported_pte_mask |= _PAGE_IOMAP;
+
+	/*
+	 * Prevent page tables from being allocated in highmem, even
+	 * if CONFIG_HIGHPTE is enabled.
+	 */
+	__userpte_alloc_gfp &= ~__GFP_HIGHMEM;
 
 #ifdef CONFIG_X86_64
 	/* Work out if we support NX */
