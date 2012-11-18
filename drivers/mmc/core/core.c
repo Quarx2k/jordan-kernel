@@ -428,17 +428,6 @@ static int mmc_host_do_disable(struct mmc_host *host, int lazy)
 int mmc_host_disable(struct mmc_host *host)
 {
 	int err;
-	unsigned long flags;
-
-	spin_lock_irqsave(&host->lock, flags);
-
-	if (host->rescan_disable) {
-		spin_unlock_irqrestore(&host->lock, flags);
-		return;
-	}
-
-	spin_unlock_irqrestore(&host->lock, flags);
-
 
 	if (!(host->caps & MMC_CAP_DISABLE))
 		return 0;
@@ -1085,6 +1074,16 @@ void mmc_rescan(struct work_struct *work)
 	u32 ocr;
 	int err;
 	int extend_wakelock = 0;
+	unsigned long flags;
+
+	spin_lock_irqsave(&host->lock, flags);
+
+	if (host->rescan_disable) {
+		spin_unlock_irqrestore(&host->lock, flags);
+		return;
+	}
+
+	spin_unlock_irqrestore(&host->lock, flags);
 
 	mmc_bus_get(host);
 
