@@ -30,7 +30,6 @@
 
 static struct omap_mbox *mboxes;
 static DEFINE_SPINLOCK(mboxes_lock);
-static bool rq_full;
 
 static int mbox_configured;
 static DEFINE_MUTEX(mbox_configured_lock);

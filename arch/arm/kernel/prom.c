@@ -126,12 +126,13 @@ static unsigned long __init unflatten_dt_node(unsigned long mem,
 			int n = scnprintf(np->full_name, allocl, "%s/%s",
 				dad && dad->parent ? dad->full_name : "",
 				pathp);
-#ifdef DEBUG
+
 			if (n != allocl) {
+#ifdef DEBUG
 				DBG("%s: p: %d, l: %d, a: %d\n",
 				    pathp, (int)strlen(p), l, allocl);
-			}
 #endif
+			}
 		} else
 			memcpy(np->full_name, pathp, l);
 		prev_pp = &np->properties;

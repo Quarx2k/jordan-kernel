@@ -955,7 +955,7 @@ static void __init mapphone_als_init(void)
 	} else {
 		mapphone_i2c_bus1_master_board_info[1].irq =
 				 OMAP_GPIO_IRQ(lm3530_int_gpio);
-		mapphone_i2c_bus2_master_board_info[3].irq =
+		mapphone_i2c_bus2_master_board_info[2].irq =
 				 OMAP_GPIO_IRQ(lm3530_int_gpio);
 	}
 	lm3530_reset_gpio = get_gpio_by_name("lm3530_reset");
@@ -1395,12 +1395,6 @@ static struct i2c_board_info __initdata
 		I2C_BOARD_INFO("akm8973", 0x1C),
 		.irq = OMAP_GPIO_IRQ(MAPPHONE_AKM8973_INT_GPIO),
 	},
-#ifdef CONFIG_SENSORS_LIS331DLH
-	{
-		I2C_BOARD_INFO("lis331dlh", 0x19),
-		.platform_data = &mapphone_lis331dlh_data,
-	},
-#endif
 	{
 		I2C_BOARD_INFO("kxtf9", 0x0F),
 		.platform_data = &mapphone_kxtf9_data,
@@ -1410,6 +1404,12 @@ static struct i2c_board_info __initdata
 		.platform_data = &omap3430_als_light_data,
 		.irq = OMAP_GPIO_IRQ(MAPPHONE_LM_3530_INT_GPIO),
 	},
+#ifdef CONFIG_SENSORS_LIS331DLH
+	{
+		I2C_BOARD_INFO("lis331dlh", 0x19),
+		.platform_data = &mapphone_lis331dlh_data,
+	},
+#endif
 #ifdef CONFIG_SENSORS_AKM8975
 	{
 		I2C_BOARD_INFO("akm8975", 0x0C),

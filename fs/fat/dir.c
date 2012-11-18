@@ -38,6 +38,9 @@ static inline loff_t fat_make_i_pos(struct super_block *sb,
 				    struct buffer_head *bh,
 				    struct msdos_dir_entry *de)
 {
+	if (de == NULL)
+		de = (struct msdos_dir_entry *) bh->b_data;
+
 	return ((loff_t)bh->b_blocknr << MSDOS_SB(sb)->dir_per_block_bits)
 		| (de - (struct msdos_dir_entry *)bh->b_data);
 }
@@ -1242,7 +1245,7 @@ int fat_add_entries(struct inode *dir, void *slots, int nr_slots,
 	struct super_block *sb = dir->i_sb;
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 	struct buffer_head *bh, *prev, *bhs[3]; /* 32*slots (672bytes) */
-	struct msdos_dir_entry *de;
+	struct msdos_dir_entry *de = NULL;
 	int err, free_slots, i, nr_bhs;
 	loff_t pos, i_pos;
 
