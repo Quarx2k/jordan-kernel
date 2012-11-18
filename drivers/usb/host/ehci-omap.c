@@ -327,7 +327,9 @@ static void omap_usb_utmi_init(struct ehci_hcd_omap *omap)
  */
 static int omap_start_ehc(struct ehci_hcd_omap *omap, struct usb_hcd *hcd)
 {
+#ifndef CONFIG_MAPPHONE_2NDBOOT
 	unsigned long timeout = jiffies + msecs_to_jiffies(1000);
+#endif
 	unsigned reg = 0;
 	int ret = 0;
 	int reset_delay;
@@ -508,9 +510,11 @@ static int omap_start_ehc(struct ehci_hcd_omap *omap, struct usb_hcd *hcd)
 
 	return 0;
 
+#ifndef CONFIG_MAPPHONE_2NDBOOT
 err_sys_status:
 	clk_disable(omap->usbtll_ick);
 	clk_put(omap->usbtll_ick);
+#endif
 
 err_tll_ick:
 	clk_disable(omap->usbtll_fck);
