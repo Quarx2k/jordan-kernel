@@ -168,7 +168,7 @@ int omap_is_SEC(void){
 		fab_id = read_tap_reg(OMAP_TAP_DIE_ID_1) >> 24;
 		if (fab_id == FAB_ID_SEC)
 			is_SEC = 1;
-		printk(KERN_CRIT"%s: fab_id = %d, it is %s OMAP3630 Silicon\n",
+		pr_info("%s: fab_id = %d, it is %s OMAP3630 Silicon\n",
 			__func__, fab_id, (is_SEC) ? "SEC" : "UMC");
 	}
 	return is_SEC;

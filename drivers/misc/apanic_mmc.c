@@ -335,7 +335,7 @@ static void mmc_panic_notify_add(struct raw_hd_struct *hd,
 	wait_for_completion(&complete);
 
 	blkdev_put(bdev, FMODE_READ);
-	printk(KERN_ERR "apanic: Bound to mmc block device '%s(%d:%d)'\n",
+	pr_notice("apanic: Bound to mmc block device '%s(%d:%d)'\n",
 		apanic_dev_name, hd->major, hd->first_minor + hd->partno);
 
 	if (hdr->magic != PANIC_MAGIC) {

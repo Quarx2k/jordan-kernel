@@ -1369,7 +1369,7 @@ static int __init omap3_pm_init(void)
 		omap_ctrl_writel(0x0, OMAP36XX_CONTROL_MEM_RTA_CTRL);
 	}
 
-	printk(KERN_ERR "Power Management for TI OMAP3.\n");
+	pr_info("Power Management for TI OMAP3.\n");
 
 	/* XXX prcm_setup_regs needs to be before enabling hw
 	 * supervised mode for powerdomains */

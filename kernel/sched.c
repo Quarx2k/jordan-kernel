@@ -2766,9 +2766,11 @@ void wake_up_new_task(struct task_struct *p, unsigned long clone_flags)
 {
 	unsigned long flags;
 	struct rq *rq;
-	int cpu = get_cpu();
-
 #ifdef CONFIG_SMP
+	int cpu;
+
+	get_cpu();
+
 	rq = task_rq_lock(p, &flags);
 	p->state = TASK_WAKING;
 
@@ -2785,6 +2787,8 @@ void wake_up_new_task(struct task_struct *p, unsigned long clone_flags)
 
 	p->state = TASK_RUNNING;
 	task_rq_unlock(rq, &flags);
+#else
+	get_cpu();
 #endif
 
 	rq = task_rq_lock(p, &flags);
@@ -7320,7 +7324,7 @@ cpumask_var_t nohz_cpu_mask;
  */
 static void update_sysctl(void)
 {
-	unsigned int cpus = min(num_online_cpus(), 8U);
+	unsigned int cpus = min_t(unsigned int, num_online_cpus(), 8);
 	unsigned int factor = 1 + ilog2(cpus);
 
 #define SET_SYSCTL(name) \
@@ -11163,6 +11167,7 @@ static void cpuacct_update_stats(struct task_struct *tsk,
 		ca = ca->parent;
 	} while (ca);
 	rcu_read_unlock();
+	batch = 0;
 }
 
 struct cgroup_subsys cpuacct_subsys = {
