@@ -47,4 +47,5 @@ obj-$(CONFIG_IIO)		+= iio/
 obj-$(CONFIG_ZRAM)		+= zram/
 obj-$(CONFIG_XVMALLOC)		+= zram/
 obj-$(CONFIG_ZCACHE)		+= zcache/
-
+obj-$(CONFIG_SNAPPY_COMPRESS)   += snappy/
+obj-$(CONFIG_SNAPPY_DECOMPRESS) += snappy/
