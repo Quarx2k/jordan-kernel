@@ -181,6 +181,9 @@ struct vm_area_struct {
 #ifdef CONFIG_NUMA
 	struct mempolicy *vm_policy;	/* NUMA policy for the VMA */
 #endif
+#ifdef CONFIG_ZRAM_FOR_ANDROID
+	int vma_swap_done;
+#endif /* CONFIG_ZRAM_FOR_ANDROID */
 };
 
 struct core_thread {
@@ -306,6 +309,9 @@ struct mm_struct {
 #ifdef CONFIG_MMU_NOTIFIER
 	struct mmu_notifier_mm *mmu_notifier_mm;
 #endif
+#ifdef CONFIG_ZRAM_FOR_ANDROID
+	int mm_swap_done;
+#endif /* CONFIG_ZRAM_FOR_ANDROID */
 };
 
 /* Future-safe accessor for struct mm_struct's cpu_vm_mask. */
