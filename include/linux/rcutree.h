@@ -109,3 +109,4 @@ static inline int rcu_blocking_is_gp(void)
 }
 
 #endif /* __LINUX_RCUTREE_H */
+

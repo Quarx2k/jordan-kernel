@@ -300,6 +300,8 @@ DECLARE_PER_CPU(struct rcu_data, rcu_preempt_data);
 
 #else /* #ifdef RCU_TREE_NONCORE */
 
+static struct lock_class_key rcu_root_class;
+
 /* Forward declarations for rcutree_plugin.h */
 static void rcu_bootup_announce(void);
 long rcu_batches_completed(void);
@@ -325,3 +327,4 @@ static void rcu_preempt_send_cbs_to_orphanage(void);
 static void __init __rcu_init_preempt(void);
 
 #endif /* #else #ifdef RCU_TREE_NONCORE */
+

@@ -87,7 +87,6 @@ void synchronize_rcu(void)
 	if (!rcu_scheduler_active)
 		return;
 
-	INIT_RCU_HEAD(&rcu.head);
 	init_completion(&rcu.completion);
 	/* Will wake me after RCU finished. */
 	call_rcu(&rcu.head, wakeme_after_rcu);
@@ -190,3 +189,4 @@ void rcu_scheduler_starting(void)
 	WARN_ON(nr_context_switches() > 0);
 	rcu_scheduler_active = 1;
 }
+

@@ -17,7 +17,7 @@
  *
  * Copyright IBM Corporation, 2008
  *
- * Author: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+ * Author: Paul E. McKenney <paulmck <at> linux.vnet.ibm.com>
  *
  * For detailed explanation of Read-Copy Update mechanism see -
  * 		Documentation/RCU
@@ -292,3 +292,4 @@ void __rcu_init(void)
 {
 	open_softirq(RCU_SOFTIRQ, rcu_process_callbacks);
 }
+

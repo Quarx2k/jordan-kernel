@@ -17,7 +17,7 @@
  *
  * Copyright IBM Corporation, 2008
  *
- * Author: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+ * Author: Paul E. McKenney <paulmck <at> linux.vnet.ibm.com>
  *
  * For detailed explanation of Read-Copy Update mechanism see -
  * 		Documentation/RCU
@@ -95,3 +95,4 @@ static inline void exit_rcu(void)
 }
 
 #endif /* __LINUX_RCUTINY_H */
+
