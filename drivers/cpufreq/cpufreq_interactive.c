@@ -31,9 +31,10 @@
 #include <linux/input.h>
 #include <asm/cputime.h>
 
+/*
 #define CREATE_TRACE_POINTS
 #include <trace/events/cpufreq_interactive.h>
-
+*/
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
@@ -295,9 +296,11 @@ static void cpufreq_interactive_timer(unsigned long data)
 			    cputime64_sub(pcpu->timer_run_time,
 					  pcpu->hispeed_validate_time)
 			    < above_hispeed_delay_val) {
+/*
 				trace_cpufreq_interactive_notyet(data, cpu_load,
 								 pcpu->target_freq,
 								 new_freq);
+*/
 				goto rearm;
 			}
 		}
@@ -326,8 +329,10 @@ static void cpufreq_interactive_timer(unsigned long data)
 		if (cputime64_sub(pcpu->timer_run_time,
 				  pcpu->floor_validate_time)
 		    < min_sample_time) {
+/*
 			trace_cpufreq_interactive_notyet(data, cpu_load,
 					 pcpu->target_freq, new_freq);
+*/
 			goto rearm;
 		}
 	}
@@ -336,13 +341,16 @@ static void cpufreq_interactive_timer(unsigned long data)
 	pcpu->floor_validate_time = pcpu->timer_run_time;
 
 	if (pcpu->target_freq == new_freq) {
+/*
 		trace_cpufreq_interactive_already(data, cpu_load,
 						  pcpu->target_freq, new_freq);
+*/
 		goto rearm_if_notmax;
 	}
-
+/*
 	trace_cpufreq_interactive_target(data, cpu_load, pcpu->target_freq,
 					 new_freq);
+*/
 	pcpu->target_set_time_in_idle = now_idle;
 	pcpu->target_set_time = pcpu->timer_run_time;
 
@@ -586,8 +594,9 @@ static int cpufreq_interactive_up_task(void *data)
 							max_freq,
 							CPUFREQ_RELATION_H);
 			mutex_unlock(&set_speed_lock);
-			trace_cpufreq_interactive_up(cpu, pcpu->target_freq,
+/*			trace_cpufreq_interactive_up(cpu, pcpu->target_freq,
 						     pcpu->policy->cur);
+*/
 		}
 	}
 
@@ -631,8 +640,10 @@ static void cpufreq_interactive_freq_down(struct work_struct *work)
 						CPUFREQ_RELATION_H);
 
 		mutex_unlock(&set_speed_lock);
+/*
 		trace_cpufreq_interactive_down(cpu, pcpu->target_freq,
 					       pcpu->policy->cur);
+*/
 	}
 }
 
@@ -683,7 +694,7 @@ static void cpufreq_interactive_input_event(struct input_handle *handle,
 					    unsigned int code, int value)
 {
 	if (input_boost_val && type == EV_SYN && code == SYN_REPORT) {
-		trace_cpufreq_interactive_boost("input");
+		//trace_cpufreq_interactive_boost("input");
 		cpufreq_interactive_boost();
 	}
 }
@@ -914,10 +925,10 @@ static ssize_t store_boost(struct kobject *kobj, struct attribute *attr,
 	boost_val = val;
 
 	if (boost_val) {
-		trace_cpufreq_interactive_boost("on");
+		//trace_cpufreq_interactive_boost("on");
 		cpufreq_interactive_boost();
 	} else {
-		trace_cpufreq_interactive_unboost("off");
+		//trace_cpufreq_interactive_unboost("off");
 	}
 
 	return count;
@@ -935,7 +946,7 @@ static ssize_t store_boostpulse(struct kobject *kobj, struct attribute *attr,
 	if (ret < 0)
 		return ret;
 
-	trace_cpufreq_interactive_boost("pulse");
+	//trace_cpufreq_interactive_boost("pulse");
 	cpufreq_interactive_boost();
 	return count;
 }
