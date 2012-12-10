@@ -1,6 +1,6 @@
 /**********************************************************************
  *
- * Copyright(c) 2008 Imagination Technologies Ltd. All rights reserved.
+ * Copyright (C) Imagination Technologies Ltd. All rights reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -24,8 +24,12 @@
  *
  ******************************************************************************/
 
+#include <linux/version.h>
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,38))
 #ifndef AUTOCONF_INCLUDED
  #include <linux/config.h>
+#endif
 #endif
 
 #include <asm/io.h>
@@ -72,7 +76,11 @@ static IMG_CHAR gszBufferIRQ[PVR_MAX_MSG_LEN + 1];
 static PVRSRV_LINUX_MUTEX gsDebugMutexNonIRQ;
 
  
-static spinlock_t gsDebugLockIRQ = SPIN_LOCK_UNLOCKED;
+#if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,38))
+	static spinlock_t gsDebugLockIRQ = SPIN_LOCK_UNLOCKED;
+#else
+	static spinlock_t gsDebugLockIRQ = __SPIN_LOCK_UNLOCKED(gsDebugLockIRQ);
+#endif
 
 #if !defined (USE_SPIN_LOCK)  
 #define	USE_SPIN_LOCK (in_interrupt() || !preemptible())
@@ -312,7 +320,8 @@ IMG_VOID PVRSRVDebugPrintf	(
 				IMG_CHAR* pszTruncBackInter;
 
 				
-				pszFileName = pszFullFileName + strlen(DEBUG_LOG_PATH_TRUNCATE)+1;
+				if (strlen(pszFullFileName) > strlen(DEBUG_LOG_PATH_TRUNCATE)+1)
+					pszFileName = pszFullFileName + strlen(DEBUG_LOG_PATH_TRUNCATE)+1;
 
 				
 				strncpy(szFileNameRewrite, pszFileName,PVR_MAX_FILEPATH_LEN);

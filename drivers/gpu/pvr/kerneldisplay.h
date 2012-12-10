@@ -1,6 +1,6 @@
 /**********************************************************************
  *
- * Copyright(c) 2008 Imagination Technologies Ltd. All rights reserved.
+ * Copyright (C) Imagination Technologies Ltd. All rights reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -154,7 +154,7 @@ typedef struct DISPLAYCLASS_FLIP_COMMAND_TAG
 
 typedef IMG_BOOL (*PFN_DC_GET_PVRJTABLE)(PPVRSRV_DC_DISP2SRV_KMJTABLE);
 
-IMG_IMPORT IMG_BOOL PVRGetDisplayClassJTable(PVRSRV_DC_DISP2SRV_KMJTABLE *psJTable);
+IMG_IMPORT IMG_BOOL PVRGetDisplayClassJTable2(PVRSRV_DC_DISP2SRV_KMJTABLE *psJTable);
 
 
 #if defined (__cplusplus)

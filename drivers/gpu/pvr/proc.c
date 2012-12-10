@@ -1,6 +1,6 @@
 /**********************************************************************
  *
- * Copyright(c) 2008 Imagination Technologies Ltd. All rights reserved.
+ * Copyright (C) Imagination Technologies Ltd. All rights reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -23,14 +23,16 @@
  * Home Park Estate, Kings Langley, Herts, WD4 8LZ, UK 
  *
  ******************************************************************************/
+#include <linux/version.h>
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,38))
 #ifndef AUTOCONF_INCLUDED
  #include <linux/config.h>
+#endif
 #endif
 
 #include <linux/init.h>
 #include <linux/module.h>
-#include <linux/version.h>
 #include <linux/fs.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
@@ -819,14 +821,14 @@ static void* ProcSeqOff2ElementSysNodes(struct seq_file * sfile, loff_t off)
     psSysData = SysAcquireDataNoCheck();
     if (psSysData != IMG_NULL)
     {
-
+	
 	psDevNode = (PVRSRV_DEVICE_NODE*)
 			List_PVRSRV_DEVICE_NODE_Any_va(psSysData->psDeviceNodeList,
 													DecOffPsDev_AnyVaCb,
 													&off);
     }
 
-
+    
     return (void*)psDevNode;
 }
 

@@ -1,6 +1,6 @@
 /**********************************************************************
  *
- * Copyright(c) 2008 Imagination Technologies Ltd. All rights reserved.
+ * Copyright (C) Imagination Technologies Ltd. All rights reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -24,6 +24,8 @@
  *
  ******************************************************************************/
 
+#include <linux/delay.h>
+#include <linux/io.h>
 #include "services_headers.h"
 #include "buffer_manager.h"
 #include "pvr_bridge_km.h"
@@ -32,6 +34,9 @@
 #include "pdump_km.h"
 #include "deviceid.h"
 #include "ra.h"
+#if defined(TTRACE)
+#include "ttrace.h"
+#endif
 
 #include "pvrversion.h"
 
@@ -40,6 +45,60 @@
 IMG_UINT32	g_ui32InitFlags;
 
 #define		INIT_DATA_ENABLE_PDUMPINIT	0x1U
+#define		INIT_DATA_ENABLE_TTARCE		0x2U
+
+#ifdef PLAT_TI81xx
+#define SGX_TI81xx_CLK_DVDR_ADDR 0x481803b0
+#define CLKCTRL                                 0x4
+#define TENABLE                                 0x8
+#define TENABLEDIV                              0xC
+#define M2NDIV                                  0x10
+#define MN2DIV                              0x14
+#define STATUS                              0x24
+#define PLL_BASE_ADDRESS         0x481C5000
+#define SGX_PLL_BASE            (PLL_BASE_ADDRESS+0x0B0)
+#define OSC_0                                    20
+#define SGX_DIVIDER_ADDR        0x481803B0
+// ADPLLJ_CLKCRTL_Register Value Configurations
+// ADPLLJ_CLKCRTL_Register SPEC bug  bit 19,bit29 -- CLKLDOEN,CLKDCOEN
+#define ADPLLJ_CLKCRTL_HS2       0x00000801 //HS2 Mode,TINTZ =1  --used by all PLL's except HDMI
+#define WR_MEM_32(addr, data)    *(unsigned int*)(addr) = data
+#define RD_MEM_32(addr) 	 *(unsigned int*)(addr)
+#define UWORD32                          unsigned int
+void PLL_Clocks_Config(UWORD32 Base_Address,UWORD32 OSC_FREQ,UWORD32 N,UWORD32 M,UWORD32 M2,UWORD32 CLKCTRL_VAL);
+#endif
+
+#ifdef PLAT_TI81xx
+//Function to configure PLL clocks. Only required for TI814x. For other devices its taken care in u-boot.
+void PLL_Clocks_Config(UWORD32 Base_Address,UWORD32 OSC_FREQ,UWORD32 N,UWORD32 M,UWORD32 M2,UWORD32 CLKCTRL_VAL)
+{
+        UWORD32 m2nval,mn2val,read_clkctrl;
+        m2nval = (M2<<16) | N;
+        mn2val =  M;
+	WR_MEM_32((Base_Address+M2NDIV    ),m2nval);
+	msleep(100); 
+	WR_MEM_32((Base_Address+MN2DIV    ),mn2val);  
+	msleep(100); 
+	WR_MEM_32((Base_Address+TENABLEDIV),0x1);
+	msleep(100); 
+	WR_MEM_32((Base_Address+TENABLEDIV),0x0);
+	msleep(100); 
+	WR_MEM_32((Base_Address+TENABLE   ),0x1);
+	msleep(100); 
+	WR_MEM_32((Base_Address+TENABLE   ),0x0);
+	msleep(100); 
+	read_clkctrl = RD_MEM_32(Base_Address+CLKCTRL);
+	//configure the TINITZ(bit0) and CLKDCO BITS IF REQUIRED  
+	WR_MEM_32(Base_Address+CLKCTRL,(read_clkctrl & 0xff7fe3ff) | CLKCTRL_VAL);
+	msleep(100); 
+	read_clkctrl = RD_MEM_32(Base_Address+CLKCTRL);
+
+	// poll for the freq,phase lock to occur
+	while (( (RD_MEM_32(Base_Address+STATUS)) & 0x00000600) != 0x00000600);
+	//wait for the clocks to get stabized
+	msleep(10); 
+}
+#endif  
 
 PVRSRV_ERROR AllocateDeviceID(SYS_DATA *psSysData, IMG_UINT32 *pui32DevID)
 {
@@ -196,7 +255,26 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVEnumerateDevicesKM(IMG_UINT32 *pui32NumDevices,
 PVRSRV_ERROR IMG_CALLCONV PVRSRVInit(PSYS_DATA psSysData)
 {
 	PVRSRV_ERROR	eError;
+#ifdef PLAT_TI81xx
+	void __iomem *pll_base;
+	void __iomem *div_base;
+#endif
 
+#ifdef PLAT_TI81xx
+        if(cpu_is_ti816x()) {
+          div_base = ioremap(SGX_TI81xx_CLK_DVDR_ADDR,0x100);
+          WR_MEM_32((div_base),0x2);
+          msleep(100);
+          iounmap (div_base);
+        } else {
+            div_base = ioremap(SGX_TI81xx_CLK_DVDR_ADDR,0x100);
+            WR_MEM_32((div_base),0x0);
+            pll_base = ioremap(SGX_PLL_BASE,0x100);
+	    PLL_Clocks_Config((int)pll_base,OSC_0,19,800,4,ADPLLJ_CLKCRTL_HS2);
+            iounmap (div_base);
+            iounmap (pll_base);
+        }
+#endif
 	
 	eError = ResManInit();
 	if (eError != PVRSRV_OK)
@@ -238,10 +316,22 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVInit(PSYS_DATA psSysData)
 		goto Error;
 	}
 
-	if(OSEventObjectCreate("PVRSRV_GLOBAL_EVENTOBJECT", psSysData->psGlobalEventObject) != PVRSRV_OK)
+	if(OSEventObjectCreateKM("PVRSRV_GLOBAL_EVENTOBJECT", psSysData->psGlobalEventObject) != PVRSRV_OK)
 	{
 		goto Error;
 	}
+
+	
+	psSysData->pfnHighResTimerCreate = OSFuncHighResTimerCreate;
+	psSysData->pfnHighResTimerGetus = OSFuncHighResTimerGetus;
+	psSysData->pfnHighResTimerDestroy = OSFuncHighResTimerDestroy;
+
+#if defined(TTRACE)
+	eError = PVRSRVTimeTraceInit();
+	if (eError != PVRSRV_OK)
+		goto Error;
+	g_ui32InitFlags |= INIT_DATA_ENABLE_TTARCE;
+#endif
 
 	
 	PDUMPINIT();
@@ -267,7 +357,13 @@ IMG_VOID IMG_CALLCONV PVRSRVDeInit(PSYS_DATA psSysData)
 		PVR_DPF((PVR_DBG_ERROR,"PVRSRVDeInit: PVRSRVHandleDeInit failed - invalid param"));
 		return;
 	}
-
+#if defined(TTRACE)
+	
+	if ((g_ui32InitFlags & INIT_DATA_ENABLE_TTARCE) > 0)
+	{
+		PVRSRVTimeTraceDeinit();
+	}
+#endif
 	
 	if( (g_ui32InitFlags & INIT_DATA_ENABLE_PDUMPINIT) > 0)
 	{
@@ -277,7 +373,7 @@ IMG_VOID IMG_CALLCONV PVRSRVDeInit(PSYS_DATA psSysData)
 	
 	if(psSysData->psGlobalEventObject)
 	{
-		OSEventObjectDestroy(psSysData->psGlobalEventObject);
+		OSEventObjectDestroyKM(psSysData->psGlobalEventObject);
 		OSFreeMem( PVRSRV_PAGEABLE_SELECT,
 						 sizeof(PVRSRV_EVENTOBJECT),
 						 psSysData->psGlobalEventObject,
@@ -621,14 +717,14 @@ PVRSRV_ERROR IMG_CALLCONV PollForValueKM (volatile IMG_UINT32*	pui32LinMemAddr,
 										  IMG_BOOL				bAllowPreemption)
 {
 	{
-		IMG_UINT32	ui32ActualValue = 0xFFFFFFFFU;
+		IMG_UINT32	ui32ActualValue = 0xFFFFFFFFU; 
 
 		if (bAllowPreemption)
 		{
 			PVR_ASSERT(ui32PollPeriodus >= 1000);
 		}
 
-
+		 
 		LOOP_UNTIL_TIMEOUT(ui32Timeoutus)
 		{
 			ui32ActualValue = (*pui32LinMemAddr & ui32Mask);
@@ -636,7 +732,7 @@ PVRSRV_ERROR IMG_CALLCONV PollForValueKM (volatile IMG_UINT32*	pui32LinMemAddr,
 			{
 				return PVRSRV_OK;
 			}
-
+			
 			if (bAllowPreemption)
 			{
 				OSSleepms(ui32PollPeriodus / 1000);
@@ -646,7 +742,7 @@ PVRSRV_ERROR IMG_CALLCONV PollForValueKM (volatile IMG_UINT32*	pui32LinMemAddr,
 				OSWaitus(ui32PollPeriodus);
 			}
 		} END_LOOP_UNTIL_TIMEOUT();
-
+	
 		PVR_DPF((PVR_DBG_ERROR,"PollForValueKM: Timeout. Expected 0x%x but found 0x%x (mask 0x%x).",
 				ui32Value, ui32ActualValue, ui32Mask));
 	}
@@ -666,7 +762,7 @@ static IMG_VOID PVRSRVGetMiscInfoKM_RA_GetStats_ForEachVaCb(BM_HEAP *psBMHeap, v
 	pui32StrLen = va_arg(va, IMG_UINT32*);
 	ui32Mode = va_arg(va, IMG_UINT32);
 
-
+	
 	switch(ui32Mode)
 	{
 		case PVRSRV_MISC_INFO_MEMSTATS_PRESENT:
@@ -762,7 +858,11 @@ static PVRSRV_ERROR PVRSRVGetMiscInfoKM_Device_AnyVaCb(PVRSRV_DEVICE_NODE *psDev
 
 
 IMG_EXPORT
+#if defined (SUPPORT_SID_INTERFACE)
+PVRSRV_ERROR IMG_CALLCONV PVRSRVGetMiscInfoKM(PVRSRV_MISC_INFO_KM *psMiscInfo)
+#else
 PVRSRV_ERROR IMG_CALLCONV PVRSRVGetMiscInfoKM(PVRSRV_MISC_INFO *psMiscInfo)
+#endif
 {
 	SYS_DATA *psSysData;
 
@@ -857,7 +957,7 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVGetMiscInfoKM(PVRSRV_MISC_INFO *psMiscInfo)
 	}
 
 	
-	if((psMiscInfo->ui32StateRequest & PVRSRV_MISC_INFO_FREEMEM_PRESENT)
+	if(((psMiscInfo->ui32StateRequest & PVRSRV_MISC_INFO_FREEMEM_PRESENT) != 0)
 		&& psMiscInfo->pszMemoryStr)
 	{
 		IMG_CHAR			*pszStr;
@@ -929,6 +1029,8 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVGetMiscInfoKM(PVRSRV_MISC_INFO *psMiscInfo)
 
 	if((psMiscInfo->ui32StateRequest & PVRSRV_MISC_INFO_CPUCACHEOP_PRESENT) != 0UL)
 	{
+		psMiscInfo->ui32StatePresent |= PVRSRV_MISC_INFO_CPUCACHEOP_PRESENT;
+
 		if(psMiscInfo->sCacheOpCtl.bDeferOp)
 		{
 			
@@ -936,10 +1038,16 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVGetMiscInfoKM(PVRSRV_MISC_INFO *psMiscInfo)
 		}
 		else
 		{
+#if defined (SUPPORT_SID_INTERFACE)
+			PVRSRV_KERNEL_MEM_INFO *psKernelMemInfo = psMiscInfo->sCacheOpCtl.psKernelMemInfo;
+
+			if(!psMiscInfo->sCacheOpCtl.psKernelMemInfo)
+#else
 			PVRSRV_KERNEL_MEM_INFO *psKernelMemInfo;
 			PVRSRV_PER_PROCESS_DATA *psPerProc;
 
 			if(!psMiscInfo->sCacheOpCtl.u.psKernelMemInfo)
+#endif
 			{
 				PVR_DPF((PVR_DBG_WARNING, "PVRSRVGetMiscInfoKM: "
 						 "Ignoring non-deferred cache op with no meminfo"));
@@ -953,6 +1061,9 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVGetMiscInfoKM(PVRSRV_MISC_INFO *psMiscInfo)
 						 "to combine deferred cache ops with immediate ones"));
 			}
 
+#if defined (SUPPORT_SID_INTERFACE)
+			PVR_DBG_BREAK
+#else
 			
 			psPerProc = PVRSRVFindPerProcessData();
 
@@ -965,6 +1076,7 @@ PVRSRV_ERROR IMG_CALLCONV PVRSRVGetMiscInfoKM(PVRSRV_MISC_INFO *psMiscInfo)
 						 "Can't find kernel meminfo"));
 				return PVRSRV_ERROR_INVALID_PARAMS;
 			}
+#endif
 
 			if(psMiscInfo->sCacheOpCtl.eCacheOpType == PVRSRV_MISC_INFO_CPUCACHEOP_FLUSH)
 			{
@@ -1109,9 +1221,9 @@ IMG_VOID IMG_CALLCONV PVRSRVMISR(IMG_VOID *pvSysData)
 									&PVRSRVMISR_ForEachCb);
 
 	
-	if (PVRSRVProcessQueues(ISR_ID, IMG_FALSE) == PVRSRV_ERROR_PROCESSING_BLOCKED)
+	if (PVRSRVProcessQueues(IMG_FALSE) == PVRSRV_ERROR_PROCESSING_BLOCKED)
 	{
-		PVRSRVProcessQueues(ISR_ID, IMG_FALSE);
+		PVRSRVProcessQueues(IMG_FALSE);
 	}
 
 	
@@ -1120,7 +1232,7 @@ IMG_VOID IMG_CALLCONV PVRSRVMISR(IMG_VOID *pvSysData)
 		IMG_HANDLE hOSEventKM = psSysData->psGlobalEventObject->hOSEventKM;
 		if(hOSEventKM)
 		{
-			OSEventObjectSignal(hOSEventKM);
+			OSEventObjectSignalKM(hOSEventKM);
 		}
 	}
 }

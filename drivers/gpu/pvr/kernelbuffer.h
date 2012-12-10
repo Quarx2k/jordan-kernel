@@ -1,6 +1,6 @@
 /**********************************************************************
  *
- * Copyright(c) 2008 Imagination Technologies Ltd. All rights reserved.
+ * Copyright (C) Imagination Technologies Ltd. All rights reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -63,7 +63,7 @@ typedef struct PVRSRV_BC_BUFFER2SRV_KMJTABLE_TAG
 
 typedef IMG_BOOL (*PFN_BC_GET_PVRJTABLE) (PPVRSRV_BC_BUFFER2SRV_KMJTABLE); 
 
-IMG_IMPORT IMG_BOOL PVRGetBufferClassJTable(PVRSRV_BC_BUFFER2SRV_KMJTABLE *psJTable);
+IMG_IMPORT IMG_BOOL PVRGetBufferClassJTable2(PVRSRV_BC_BUFFER2SRV_KMJTABLE *psJTable);
 
 #if defined (__cplusplus)
 }

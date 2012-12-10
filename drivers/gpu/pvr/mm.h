@@ -1,6 +1,6 @@
 /**********************************************************************
  *
- * Copyright(c) 2008 Imagination Technologies Ltd. All rights reserved.
+ * Copyright (C) Imagination Technologies Ltd. All rights reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -27,11 +27,14 @@
 #ifndef __IMG_LINUX_MM_H__
 #define __IMG_LINUX_MM_H__
 
+#include <linux/version.h>
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,38))
 #ifndef AUTOCONF_INCLUDED
  #include <linux/config.h>
 #endif
+#endif
 
-#include <linux/version.h>
 #include <linux/slab.h>
 #include <linux/mm.h>
 #include <linux/list.h>
@@ -160,11 +163,11 @@ IMG_VOID LinuxMMCleanup(IMG_VOID);
 
 
 #if defined(DEBUG_LINUX_MEMORY_ALLOCATIONS)
-#define KMallocWrapper(ui32ByteSize) _KMallocWrapper(ui32ByteSize, __FILE__, __LINE__)
+#define KMallocWrapper(ui32ByteSize, uFlags) _KMallocWrapper(ui32ByteSize, uFlags, __FILE__, __LINE__)
 #else
-#define KMallocWrapper(ui32ByteSize) _KMallocWrapper(ui32ByteSize, NULL, 0)
+#define KMallocWrapper(ui32ByteSize, uFlags) _KMallocWrapper(ui32ByteSize, uFlags, NULL, 0)
 #endif
-IMG_VOID *_KMallocWrapper(IMG_UINT32 ui32ByteSize, IMG_CHAR *szFileName, IMG_UINT32 ui32Line);
+IMG_VOID *_KMallocWrapper(IMG_UINT32 ui32ByteSize, gfp_t uFlags, IMG_CHAR *szFileName, IMG_UINT32 ui32Line);
 
 
 #if defined(DEBUG_LINUX_MEMORY_ALLOCATIONS)

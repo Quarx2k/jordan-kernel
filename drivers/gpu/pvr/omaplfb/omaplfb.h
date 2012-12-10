@@ -1,6 +1,6 @@
 /**********************************************************************
  *
- * Copyright(c) 2008 Imagination Technologies Ltd. All rights reserved.
+ * Copyright (C) Imagination Technologies Ltd. All rights reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -27,125 +27,76 @@
 #ifndef __OMAPLFB_H__
 #define __OMAPLFB_H__
 
-extern IMG_BOOL PVRGetDisplayClassJTable(PVRSRV_DC_DISP2SRV_KMJTABLE *psJTable);
+#include <linux/version.h>
 
-#define OMAPLCD_IRQ			25
+#include <asm/atomic.h>
 
-#define OMAPLCD_SYSCONFIG           0x0410
-#define OMAPLCD_CONFIG              0x0444
-#define OMAPLCD_DEFAULT_COLOR0      0x044C
-#define OMAPLCD_TIMING_H            0x0464
-#define OMAPLCD_TIMING_V            0x0468
-#define OMAPLCD_POL_FREQ            0x046C
-#define OMAPLCD_DIVISOR             0x0470
-#define OMAPLCD_SIZE_DIG            0x0478
-#define OMAPLCD_SIZE_LCD            0x047C
-#define OMAPLCD_GFX_POSITION        0x0488
-#define OMAPLCD_GFX_SIZE            0x048C
-#define OMAPLCD_GFX_ATTRIBUTES      0x04a0
-#define OMAPLCD_GFX_FIFO_THRESHOLD  0x04a4
-#define OMAPLCD_GFX_WINDOW_SKIP     0x04b4
+#include <linux/kernel.h>
+#include <linux/console.h>
+#include <linux/fb.h>
+#include <linux/module.h>
+#include <linux/string.h>
+#include <linux/notifier.h>
+#include <linux/mutex.h>
 
-#define OMAPLCD_IRQSTATUS       0x0418
-#define OMAPLCD_IRQENABLE       0x041c
-#define OMAPLCD_CONTROL         0x0440
-#define OMAPLCD_GFX_BA0         0x0480
-#define OMAPLCD_GFX_BA1         0x0484
-#define OMAPLCD_GFX_ROW_INC     0x04ac
-#define OMAPLCD_GFX_PIX_INC     0x04b0
-#define OMAPLCD_VID1_BA0        0x04bc
-#define OMAPLCD_VID1_BA1        0x04c0
-#define OMAPLCD_VID1_ROW_INC    0x04d8
-#define OMAPLCD_VID1_PIX_INC    0x04dc
+#ifdef CONFIG_HAS_EARLYSUSPEND
+#include <linux/earlysuspend.h>
+#endif
 
-#define	OMAP_CONTROL_GODIGITAL      (1 << 6)
-#define	OMAP_CONTROL_GOLCD          (1 << 5)
-#define	OMAP_CONTROL_DIGITALENABLE  (1 << 1)
-#define	OMAP_CONTROL_LCDENABLE      (1 << 0)
+#define unref__ __attribute__ ((unused))
 
-#define OMAPLCD_INTMASK_VSYNC       (1 << 1)
-#define OMAPLCD_INTMASK_OFF		0
+typedef void *       OMAPLFB_HANDLE;
 
-typedef void *       OMAP_HANDLE;
+typedef bool OMAPLFB_BOOL, *OMAPLFB_PBOOL;
+#define	OMAPLFB_FALSE false
+#define OMAPLFB_TRUE true
 
-typedef enum tag_omap_bool
-{
-	OMAP_FALSE = 0,
-	OMAP_TRUE  = 1,
-} OMAP_BOOL, *OMAP_PBOOL;
+typedef	atomic_t	OMAPLFB_ATOMIC_BOOL;
+
+typedef atomic_t	OMAPLFB_ATOMIC_INT;
 
 typedef struct OMAPLFB_BUFFER_TAG
 {
-	struct list_head		list;
-
-	unsigned long                ulBufferSize;
-
-	
-	
-
-	IMG_SYS_PHYADDR              sSysAddr;
-	IMG_CPU_VIRTADDR             sCPUVAddr;
-	PVRSRV_SYNC_DATA            *psSyncData;
-
 	struct OMAPLFB_BUFFER_TAG	*psNext;
+	struct OMAPLFB_DEVINFO_TAG	*psDevInfo;
 
-	OMAP_HANDLE			hCmdCookie;
+	struct work_struct sWork;
+
+	
+	unsigned long		     	ulYOffset;
+
+	
+	
+	IMG_SYS_PHYADDR              	sSysAddr;
+	IMG_CPU_VIRTADDR             	sCPUVAddr;
+	PVRSRV_SYNC_DATA            	*psSyncData;
+
+	OMAPLFB_HANDLE      		hCmdComplete;
+	unsigned long    		ulSwapInterval;
 } OMAPLFB_BUFFER;
 
-typedef struct OMAPLFB_VSYNC_FLIP_ITEM_TAG
+typedef struct OMAPLFB_SWAPCHAIN_TAG
 {
 	
-
-
-	OMAP_HANDLE      hCmdComplete;
-	
-	unsigned long    ulSwapInterval;
-	
-	OMAP_BOOL        bValid;
-	
-	OMAP_BOOL        bFlipped;
-	
-	OMAP_BOOL        bCmdCompleted;
+	unsigned int			uiSwapChainID;
 
 	
-	
+	unsigned long       		ulBufferCount;
 
 	
-	IMG_SYS_PHYADDR* sSysAddr;
-} OMAPLFB_VSYNC_FLIP_ITEM;
-
-typedef struct PVRPDP_SWAPCHAIN_TAG
-{
-	
-	unsigned long       ulBufferCount;
-	
-	OMAPLFB_BUFFER     *psBuffer;
-	
-	OMAPLFB_VSYNC_FLIP_ITEM	*psVSyncFlips;
+	OMAPLFB_BUFFER     		*psBuffer;
 
 	
-	unsigned long       ulInsertIndex;
-	
-	
-	unsigned long       ulRemoveIndex;
+	struct workqueue_struct   	*psWorkQueue;
 
 	
-	void *pvRegs;
+	OMAPLFB_BOOL			bNotVSynced;
 
 	
-	PVRSRV_DC_DISP2SRV_KMJTABLE	*psPVRJTable;
+	int				iBlankEvents;
 
 	
-	OMAP_BOOL           bFlushCommands;
-
-	
-	unsigned long       ulSetFlushStateRefCount;
-
-	
-	OMAP_BOOL           bBlanked;
-
-	
-	spinlock_t         *psSwapChainLock;
+	unsigned int            	uiFBDevID;
 } OMAPLFB_SWAPCHAIN;
 
 typedef struct OMAPLFB_FBINFO_TAG
@@ -156,6 +107,8 @@ typedef struct OMAPLFB_FBINFO_TAG
 	unsigned long       ulWidth;
 	unsigned long       ulHeight;
 	unsigned long       ulByteStride;
+	unsigned long       ulPhysicalWidthmm;
+	unsigned long       ulPhysicalHeightmm;
 
 	
 	
@@ -168,7 +121,14 @@ typedef struct OMAPLFB_FBINFO_TAG
 
 typedef struct OMAPLFB_DEVINFO_TAG
 {
-	IMG_UINT32          uDeviceID;
+	
+	unsigned int            uiFBDevID;
+
+	
+	unsigned int            uiPVRDevID;
+
+	
+	struct mutex		sCreateSwapChainMutex;
 
 	
 	OMAPLFB_BUFFER          sSystemBuffer;
@@ -183,13 +143,13 @@ typedef struct OMAPLFB_DEVINFO_TAG
 	OMAPLFB_FBINFO          sFBInfo;
 
 	
-	unsigned long           ulRefCount;
-
-	
 	OMAPLFB_SWAPCHAIN      *psSwapChain;
 
 	
-	OMAP_BOOL               bFlushCommands;
+	unsigned int		uiSwapChainID;
+
+	
+	OMAPLFB_ATOMIC_BOOL     sFlushCommands;
 
 	
 	struct fb_info         *psLINFBInfo;
@@ -198,16 +158,10 @@ typedef struct OMAPLFB_DEVINFO_TAG
 	struct notifier_block   sLINNotifBlock;
 
 	
-	OMAP_BOOL               bDeviceSuspended;
-
-	
-	spinlock_t             sSwapChainLock;
-
-	
 	
 
 	
-	IMG_DEV_VIRTADDR		sDisplayDevVAddr;
+	IMG_DEV_VIRTADDR	sDisplayDevVAddr;
 
 	DISPLAY_INFO            sDisplayInfo;
 
@@ -217,17 +171,26 @@ typedef struct OMAPLFB_DEVINFO_TAG
 	
 	DISPLAY_DIMS            sDisplayDim;
 
-	struct list_head	active_list;
-	struct mutex		active_list_lock;
-	struct work_struct	active_work;
-	struct workqueue_struct *workq;
+	
+	OMAPLFB_ATOMIC_BOOL	sBlanked;
+
+	
+	OMAPLFB_ATOMIC_INT	sBlankEvents;
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	
+	OMAPLFB_ATOMIC_BOOL	sEarlySuspendFlag;
+
+	struct early_suspend    sEarlySuspend;
+#endif
+
+#if defined(SUPPORT_DRI_DRM)
+	OMAPLFB_ATOMIC_BOOL     sLeaveVT;
+#endif
+
 }  OMAPLFB_DEVINFO;
 
 #define	OMAPLFB_PAGE_SIZE 4096
-#define	OMAPLFB_PAGE_MASK (OMAPLFB_PAGE_SIZE - 1)
-#define	OMAPLFB_PAGE_TRUNC (~OMAPLFB_PAGE_MASK)
-
-#define	OMAPLFB_PAGE_ROUNDUP(x) (((x) + OMAPLFB_PAGE_MASK) & OMAPLFB_PAGE_TRUNC)
 
 #ifdef	DEBUG
 #define	DEBUG_PRINTK(x) printk x
@@ -240,41 +203,67 @@ typedef struct OMAPLFB_DEVINFO_TAG
 #define	DEVNAME	DRVNAME
 #define	DRIVER_PREFIX DRVNAME
 
-typedef enum _OMAP_ERROR_
+typedef enum _OMAPLFB_ERROR_
 {
-	OMAP_OK                             =  0,
-	OMAP_ERROR_GENERIC                  =  1,
-	OMAP_ERROR_OUT_OF_MEMORY            =  2,
-	OMAP_ERROR_TOO_FEW_BUFFERS          =  3,
-	OMAP_ERROR_INVALID_PARAMS           =  4,
-	OMAP_ERROR_INIT_FAILURE             =  5,
-	OMAP_ERROR_CANT_REGISTER_CALLBACK   =  6,
-	OMAP_ERROR_INVALID_DEVICE           =  7,
-	OMAP_ERROR_DEVICE_REGISTER_FAILED   =  8
-} OMAP_ERROR;
+	OMAPLFB_OK                             =  0,
+	OMAPLFB_ERROR_GENERIC                  =  1,
+	OMAPLFB_ERROR_OUT_OF_MEMORY            =  2,
+	OMAPLFB_ERROR_TOO_FEW_BUFFERS          =  3,
+	OMAPLFB_ERROR_INVALID_PARAMS           =  4,
+	OMAPLFB_ERROR_INIT_FAILURE             =  5,
+	OMAPLFB_ERROR_CANT_REGISTER_CALLBACK   =  6,
+	OMAPLFB_ERROR_INVALID_DEVICE           =  7,
+	OMAPLFB_ERROR_DEVICE_REGISTER_FAILED   =  8,
+	OMAPLFB_ERROR_SET_UPDATE_MODE_FAILED   =  9
+} OMAPLFB_ERROR;
 
+typedef enum _OMAPLFB_UPDATE_MODE_
+{
+	OMAPLFB_UPDATE_MODE_UNDEFINED			= 0,
+	OMAPLFB_UPDATE_MODE_MANUAL			= 1,
+	OMAPLFB_UPDATE_MODE_AUTO			= 2,
+	OMAPLFB_UPDATE_MODE_DISABLED			= 3
+} OMAPLFB_UPDATE_MODE;
 
 #ifndef UNREFERENCED_PARAMETER
 #define	UNREFERENCED_PARAMETER(param) (param) = (param)
 #endif
 
-OMAP_ERROR OMAPLFBInit(void);
-OMAP_ERROR OMAPLFBDeinit(void);
+OMAPLFB_ERROR OMAPLFBInit(void);
+OMAPLFB_ERROR OMAPLFBDeInit(void);
 
+OMAPLFB_DEVINFO *OMAPLFBGetDevInfoPtr(unsigned uiFBDevID);
+unsigned OMAPLFBMaxFBDevIDPlusOne(void);
 void *OMAPLFBAllocKernelMem(unsigned long ulSize);
 void OMAPLFBFreeKernelMem(void *pvMem);
-OMAP_ERROR OMAPLFBGetLibFuncAddr(char *szFunctionName, PFN_DC_GET_PVRJTABLE *ppfnFuncTable);
-OMAP_ERROR OMAPLFBInstallVSyncISR (OMAPLFB_SWAPCHAIN *psSwapChain);
-OMAP_ERROR OMAPLFBUninstallVSyncISR(OMAPLFB_SWAPCHAIN *psSwapChain);
-OMAP_BOOL OMAPLFBVSyncIHandler(OMAPLFB_SWAPCHAIN *psSwapChain);
-void OMAPLFBEnableVSyncInterrupt(OMAPLFB_SWAPCHAIN *psSwapChain);
-void OMAPLFBDisableVSyncInterrupt(OMAPLFB_SWAPCHAIN *psSwapChain);
-void OMAPLFBEnableDisplayRegisterAccess(void);
-void OMAPLFBDisableDisplayRegisterAccess(void);
-void OMAPLFBSync(void);
-void OMAPLFBFlip(OMAPLFB_SWAPCHAIN *psSwapChain, unsigned long paddr);
-void OMAPLFBDisplayInit(void);
-void OMAPLFBDriverSuspend(void);
-void OMAPLFBDriverResume(void);
+OMAPLFB_ERROR OMAPLFBGetLibFuncAddr(char *szFunctionName, PFN_DC_GET_PVRJTABLE *ppfnFuncTable);
+OMAPLFB_ERROR OMAPLFBCreateSwapQueue (OMAPLFB_SWAPCHAIN *psSwapChain);
+void OMAPLFBDestroySwapQueue(OMAPLFB_SWAPCHAIN *psSwapChain);
+void OMAPLFBInitBufferForSwap(OMAPLFB_BUFFER *psBuffer);
+void OMAPLFBSwapHandler(OMAPLFB_BUFFER *psBuffer);
+void OMAPLFBQueueBufferForSwap(OMAPLFB_SWAPCHAIN *psSwapChain, OMAPLFB_BUFFER *psBuffer);
+void OMAPLFBFlip(OMAPLFB_DEVINFO *psDevInfo, OMAPLFB_BUFFER *psBuffer);
+OMAPLFB_UPDATE_MODE OMAPLFBGetUpdateMode(OMAPLFB_DEVINFO *psDevInfo);
+OMAPLFB_BOOL OMAPLFBSetUpdateMode(OMAPLFB_DEVINFO *psDevInfo, OMAPLFB_UPDATE_MODE eMode);
+OMAPLFB_BOOL OMAPLFBWaitForVSync(OMAPLFB_DEVINFO *psDevInfo);
+OMAPLFB_BOOL OMAPLFBManualSync(OMAPLFB_DEVINFO *psDevInfo);
+OMAPLFB_BOOL OMAPLFBCheckModeAndSync(OMAPLFB_DEVINFO *psDevInfo);
+OMAPLFB_ERROR OMAPLFBUnblankDisplay(OMAPLFB_DEVINFO *psDevInfo);
+OMAPLFB_ERROR OMAPLFBEnableLFBEventNotification(OMAPLFB_DEVINFO *psDevInfo);
+OMAPLFB_ERROR OMAPLFBDisableLFBEventNotification(OMAPLFB_DEVINFO *psDevInfo);
+void OMAPLFBCreateSwapChainLockInit(OMAPLFB_DEVINFO *psDevInfo);
+void OMAPLFBCreateSwapChainLockDeInit(OMAPLFB_DEVINFO *psDevInfo);
+void OMAPLFBCreateSwapChainLock(OMAPLFB_DEVINFO *psDevInfo);
+void OMAPLFBCreateSwapChainUnLock(OMAPLFB_DEVINFO *psDevInfo);
+void OMAPLFBAtomicBoolInit(OMAPLFB_ATOMIC_BOOL *psAtomic, OMAPLFB_BOOL bVal);
+void OMAPLFBAtomicBoolDeInit(OMAPLFB_ATOMIC_BOOL *psAtomic);
+void OMAPLFBAtomicBoolSet(OMAPLFB_ATOMIC_BOOL *psAtomic, OMAPLFB_BOOL bVal);
+OMAPLFB_BOOL OMAPLFBAtomicBoolRead(OMAPLFB_ATOMIC_BOOL *psAtomic);
+void OMAPLFBAtomicIntInit(OMAPLFB_ATOMIC_INT *psAtomic, int iVal);
+void OMAPLFBAtomicIntDeInit(OMAPLFB_ATOMIC_INT *psAtomic);
+void OMAPLFBAtomicIntSet(OMAPLFB_ATOMIC_INT *psAtomic, int iVal);
+int OMAPLFBAtomicIntRead(OMAPLFB_ATOMIC_INT *psAtomic);
+void OMAPLFBAtomicIntInc(OMAPLFB_ATOMIC_INT *psAtomic);
 
-#endif
+#endif 
+
