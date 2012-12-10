@@ -28,7 +28,6 @@
 #endif
 
 #include <plat/display.h>
-#include <plat/vrfb.h>
 
 #ifdef DEBUG
 extern unsigned int omapfb_debug;

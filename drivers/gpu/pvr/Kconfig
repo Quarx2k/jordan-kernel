@@ -89,10 +89,6 @@ config SGX_540_BUILD_DEBUG
 
 endchoice
 
-config SGX_DEBUG_DISPLAY_DRIVER
-       depends on SGX530 || SGX540
-       bool "Enable Debug Messages in the 3rd Party Display Driver"
-
 config SGX_PDUMP
 	depends on SGX530 || SGX540
 	bool "PowerVR SGX Parameter Dump"
