@@ -37,6 +37,7 @@
 #include <plat/clock.h>
 #include <plat/omap-pm.h>
 #include <plat/common.h>
+#include <plat/cpu.h>
 
 #include <mach/hardware.h>
 
@@ -420,8 +421,13 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
 	}
 
 	omap_cpufreq_cooling_init();
-	/* FIXME: what's the actual transition time? */
-	policy->cpuinfo.transition_latency = 300 * 1000;
+
+	/* XXX: This is almost certainly papering over a bug elsewhere */
+	if (cpu_is_omap3630() && omap_rev() < OMAP3630_REV_ES1_2)
+		policy->cpuinfo.transition_latency = 30 * 1000;
+	else
+		/* FIXME: what's the actual transition time? */
+		policy->cpuinfo.transition_latency = 300 * 1000;
 
 	return 0;
 
