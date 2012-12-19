@@ -278,7 +278,7 @@ int rprm_regulator_request(struct rprm_elem *e, struct rprm_regulator *obj)
 	int ret;
 	struct rprm_regulator_depot *rd;
 	char *reg_name;
-
+		
 	if (obj->id > REGULATOR_MAX) {
 		pr_err("Invalid regulator %d\n", obj->id);
 		return -EINVAL;
@@ -290,6 +290,7 @@ int rprm_regulator_request(struct rprm_elem *e, struct rprm_regulator *obj)
 		return -ENOMEM;
 
 	reg_name = regulator_name[obj->id - 1];
+	printk("RPMSG Requesting regulator %s\n",reg_name);
 	rd->reg_p = regulator_get_exclusive(NULL, reg_name);
 	if (IS_ERR_OR_NULL(rd->reg_p)) {
 		pr_err("%s: error providing regulator %s\n", __func__, reg_name);

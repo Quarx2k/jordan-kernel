@@ -4138,6 +4138,7 @@ static struct omap_hwmod_ocp_if *omap44xx_mcpdm_slaves[] = {
 static struct omap_hwmod omap44xx_mcpdm_hwmod = {
 	.name		= "mcpdm",
 	.class		= &omap44xx_mcpdm_hwmod_class,
+	.flags		= HWMOD_EXT_OPT_MAIN_CLK,
 	.mpu_irqs	= omap44xx_mcpdm_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(omap44xx_mcpdm_irqs),
 	.sdma_reqs	= omap44xx_mcpdm_sdma_reqs,

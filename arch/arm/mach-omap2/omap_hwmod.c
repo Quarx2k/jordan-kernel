@@ -1281,6 +1281,9 @@ static int _enable(struct omap_hwmod *oh)
 		return -EINVAL;
 	}
 
+	if (oh->flags & HWMOD_EXT_OPT_MAIN_CLK)
+		return -EPERM;
+
 	pr_debug("omap_hwmod: %s: enabling\n", oh->name);
 
 	/*
