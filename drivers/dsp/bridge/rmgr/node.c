@@ -1408,6 +1408,13 @@ DSP_STATUS NODE_Create(struct NODE_OBJECT *hNode)
 			}
 		}
 	}
+
+	 if (DSP_FAILED(status) && hNode->fLoaded) {
+		hNodeMgr->nldrFxns.pfnUnload(hNode->hNldrNode,
+							NLDR_CREATE);
+		hNode->fLoaded = false;
+	}
+
 	/*  Phase II/Overlays: Create, execute, delete phases  possibly in
 	 *  different files/sections. */
 	if (hNode->fLoaded && hNode->fPhaseSplit) {
