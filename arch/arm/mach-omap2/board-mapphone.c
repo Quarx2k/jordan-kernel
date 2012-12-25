@@ -467,7 +467,7 @@ static void mapphone_legacy_qtouch_init(void)
 			__func__);
 		goto mapphone_legacy_qtouch_init_ret;
 	}
-
+#ifndef CONFIG_KOBE_BOARD
 	touch_prop = of_get_property(touch_node, DT_PROP_TOUCH_KEYMAP, &len);
 	if (touch_prop && len && (0 == len % sizeof(struct vkey))) {
 			mapphone_ts_platform_data.vkeys.count =
@@ -475,7 +475,7 @@ static void mapphone_legacy_qtouch_init(void)
 			mapphone_ts_platform_data.vkeys.keys =
 				(struct vkey *)touch_prop;
 	}
-
+#endif
 	touch_prop = of_get_property(touch_node, DT_PROP_TOUCH_I2C_ADDRESS,
 		&len);
 	if (touch_prop) {
@@ -553,7 +553,7 @@ static void mapphone_legacy_qtouch_init(void)
 	touch_val = of_get_property(touch_node, DT_PROP_TOUCH_Y_DELTA, &len);
 	if (touch_val && len)
 		mapphone_ts_platform_data.y_delta = *touch_val;
-
+#ifndef CONFIG_KOBE_BOARD
 	touch_prop = of_get_property(touch_node, DT_PROP_TOUCH_T15, &len);
 	if (touch_prop) {
 		mapphone_ts_platform_data.key_array.cfg =
@@ -571,7 +571,7 @@ static void mapphone_legacy_qtouch_init(void)
 		DT_PROP_TOUCH_KEY_ARRAY_COUNT, &len);
 	if (touch_val && len)
 		mapphone_ts_platform_data.key_array.num_keys = *touch_val;
-
+#endif
 	touch_prop = of_get_property(touch_node, DT_PROP_TOUCH_T7, &len);
 	if (touch_prop) {
 		mapphone_ts_platform_data.power_cfg =
@@ -970,7 +970,7 @@ static void __init mapphone_als_init(void)
 	gpio_direction_input(lm3530_int_gpio);
 	omap_cfg_reg(AC27_34XX_GPIO92);
 }
-
+#ifndef CONFIG_KOBE_BOARD
 static struct vkey mapphone_touch_vkeys[] = {
 	{
 		.code		= KEY_BACK,
@@ -1001,7 +1001,31 @@ static struct vkey mapphone_touch_vkeys[] = {
 		.height		= 57,
 	},
 };
-
+#else
+static struct vkey mapphone_touch_vkeys[] = {
+	{
+		.code		= KEY_BACK,
+		.center_x	= 376,
+		.center_y	= 906,
+		.width		= 36,
+		.height		= 57,
+	},
+	{
+		.code		= KEY_MENU,
+		.center_x	= 104,
+		.center_y	= 906,
+		.width		= 36,
+		.height		= 57,
+	},
+	{
+		.code		= KEY_HOME,
+		.center_x	= 240,
+		.center_y	= 906,
+		.width		= 36,
+		.height		= 57,
+	},
+};
+#endif
 static struct qtm_touch_keyarray_cfg mapphone_key_array_data[] = {
 	{
 		.ctrl		= 0,
@@ -1631,8 +1655,11 @@ static int initialize_i2c_bus_info
 			prop_name, NULL);
 	if (NULL != feat_prop) {
 	if (bus_num==3) {
+#ifndef CONFIG_KOBE_BOARD
 		device_names = "camise,HP_GEN_LENS,lm3554_led,mt9p012";
-
+#else
+		device_names = "camise";
+#endif
 	} else {
 		device_names = (char *)feat_prop;
 	}

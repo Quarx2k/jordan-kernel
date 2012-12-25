@@ -115,7 +115,9 @@
 static void mapphone_camera_lines_safe_mode(void);
 static void mapphone_camera_lines_func_mode(void);
 static void mapphone_camera_mipi_lines_safe_mode(void);
+#ifdef CONFIG_VIDEO_OV5650
 static void mapphone_camera_mipi_lines_func_mode(void);
+#endif
 static int  mapphone_camera_reg_power(bool);
 static void mapphone_init_reg_list(void);
 static void mapphone_init_flash_list(void);
@@ -130,6 +132,24 @@ static int cam_standby_gpio = -1;
 static int sensor_power_config = SENSOR_POWER_STANDBY;
 static u8 cam_flags;
 static unsigned int is_smart_cam;
+
+static void mapphone_lock_cpufreq(int lock)
+{
+	static struct device ov_dev;
+	static int flag;
+
+	if (lock == 1) {
+		resource_request("vdd1_opp",
+			&ov_dev, omap_pm_get_max_vdd1_opp());
+		flag = 1;
+	} else {
+		if (flag == 1) {
+			resource_release("vdd1_opp", &ov_dev);
+			flag = 0;
+		}
+	}
+}
+
 
 #ifdef CONFIG_VIDEO_OMAP3_HPLENS
 static int hplens_power_set(enum v4l2_power power)
@@ -328,22 +348,6 @@ out:
 	return 0;
 }
 
-static void mapphone_lock_cpufreq(int lock)
-{
-	static struct device ov_dev;
-	static int flag;
-
-	if (lock == 1) {
-		resource_request("vdd1_opp",
-			&ov_dev, omap_pm_get_max_vdd1_opp());
-		flag = 1;
-	} else {
-		if (flag == 1) {
-			resource_release("vdd1_opp", &ov_dev);
-			flag = 0;
-		}
-	}
-}
 
 static u8 mapphone_get_config_flags(void)
 {
@@ -364,7 +368,6 @@ struct mt9p012_platform_data mapphone_mt9p012_platform_data = {
 };
 
 #endif /* #ifdef CONFIG_VIDEO_MT9P012 || CONFIG_VIDEO_MT9P012_MODULE */
-
 
 #if defined(CONFIG_VIDEO_OV8810)
 
@@ -595,7 +598,7 @@ struct camise_capture_size {
 	unsigned long width;
 	unsigned long height;
 };
-
+#ifndef CONFIG_KOBE_BOARD
 const static struct camise_capture_size camise_sizes_1[] = {
 	{  176, 144 }, /* QCIF for Video Recording */
 	{  320, 240 }, /* QVGA for Preview and Video Recording */
@@ -607,7 +610,20 @@ const static struct camise_capture_size camise_sizes_1[] = {
 	{  640, 2048}, /* JPEG Catpure Resolution */
 	{  848, 480 }, /* Support for WVGA preview */
 };
-
+#else
+const static struct camise_capture_size camise_sizes_1[] = {
+/*	{  160, 120 }, */
+	{  176, 144 }, /* QCIF for Video Recording */
+	{  320, 240 }, /* QVGA for Preview and Video Recording */
+	{  352, 288 }, /* CIF for Video Recording */
+	{  480, 360 }, /* Bigger Viewfinder */
+	{  512, 1024}, /* Jpeg Capture Resolution */
+	{  640, 480 },	 /* 4X BINNING */
+/*	{ 1280, 960 },*/ /* 2X BINNING */
+	{ 768, 1024},	 /* JPEG Catpure Resolution */
+/*	{ 2048, 1536},	/ * 3 MP */
+};
+#endif
 const static struct camise_capture_size camise_sizes_2[] = {
 	{  176, 144 }, /* QCIF for Video Recording */
 	{  320, 240 }, /* QVGA for Preview and Video Recording */
@@ -1325,7 +1341,7 @@ void mapphone_camera_mipi_lines_safe_mode(void)
 	omap_ctrl_writew(CAM_IOMUX_SAFE_MODE, 0x0126);
 	omap_ctrl_writew(CAM_IOMUX_SAFE_MODE, 0x0128);
 }
-
+#if defined(CONFIG_VIDEO_OV5650)
 void mapphone_camera_mipi_lines_func_mode(void)
 {
 	omap_writew(0x061C, 0x480020D0);	/* CONTROL_PADCONF_GPMC_WAIT2 */
@@ -1334,7 +1350,7 @@ void mapphone_camera_mipi_lines_func_mode(void)
 	omap_ctrl_writew(CAM_IOMUX_FUNC_MODE, 0x0126);
 	omap_ctrl_writew(CAM_IOMUX_FUNC_MODE, 0x0128);
 }
-
+#endif
 void mapphone_init_reg_list()
 {
 #ifdef CONFIG_ARM_OF
