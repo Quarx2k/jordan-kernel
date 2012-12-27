@@ -63,8 +63,8 @@ static u32 inet6_synq_hash(const struct in6_addr *raddr, const __be16 rport,
 	u32 b = (__force u32)raddr->s6_addr32[1];
 	u32 c = (__force u32)raddr->s6_addr32[2];
 
-	a += JHASH_GOLDEN_RATIO;
-	b += JHASH_GOLDEN_RATIO;
+	a += JHASH_INITVAL;
+	b += JHASH_INITVAL;
 	c += rnd;
 	__jhash_mix(a, b, c);
 

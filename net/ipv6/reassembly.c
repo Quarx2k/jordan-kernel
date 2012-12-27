@@ -109,8 +109,8 @@ unsigned int inet6_hash_frag(__be32 id, const struct in6_addr *saddr,
 	b = (__force u32)saddr->s6_addr32[1];
 	c = (__force u32)saddr->s6_addr32[2];
 
-	a += JHASH_GOLDEN_RATIO;
-	b += JHASH_GOLDEN_RATIO;
+	a += JHASH_INITVAL;
+	b += JHASH_INITVAL;
 	c += rnd;
 	__jhash_mix(a, b, c);
 
