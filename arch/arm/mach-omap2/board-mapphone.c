@@ -2146,7 +2146,7 @@ static void mapphone_pm_init(void)
 		mapphone_pm_set_reset(0);
 #else
 	/* set cold reset, will move to warm reset once ready */
-	mapphone_pm_set_reset(0);
+	mapphone_pm_set_reset(1);
 #endif
 	register_reboot_notifier(&mapphone_pm_reboot_notifier);
 }
