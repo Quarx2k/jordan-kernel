@@ -504,6 +504,11 @@ static int dss_suspend_device(struct device *dev, void *data)
 	int r;
 	struct omap_dss_device *dssdev = to_dss_device(dev);
 
+	/* don't work on suspended displays */
+	if (dssdev->state == OMAP_DSS_DISPLAY_SUSPENDED)
+		return 0;
+
+
 	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE) {
 		dssdev->activate_after_resume = false;
 		return 0;
@@ -544,10 +549,21 @@ static int dss_resume_device(struct device *dev, void *data)
 	int r;
 	struct omap_dss_device *dssdev = to_dss_device(dev);
 
-	if (dssdev->activate_after_resume && dssdev->resume) {
-		r = dssdev->resume(dssdev);
-		if (r)
+	/* don't work on non-suspended displays */
+	if (dssdev->state != OMAP_DSS_DISPLAY_SUSPENDED)
+		return 0;
+
+	if (dssdev->activate_after_resume && dssdev->driver->resume) {
+		r = dssdev->driver->resume(dssdev);
+		if (r) {
+			DSSERR("Failed to resume %s device (%d), disabling\n",
+				 dssdev->name, r);
+			dssdev->driver->disable(dssdev);
 			return r;
+		}
+	} else {
+		/* disabled may not be the same as suspended so call handler */
+		dssdev->driver->disable(dssdev);
 	}
 
 	dssdev->activate_after_resume = false;
