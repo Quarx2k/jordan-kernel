@@ -141,7 +141,7 @@ static void cam_misc_enableClk(unsigned long clock)
 
 static int cam_misc_suspend(struct platform_device *pdev, pm_message_t state)
 {
-	dbg_print("------------- MOT CAM _ SUSPEND CALLED ---------");
+	dbg_print("------------- MOT CAM _ SUSPEND CALLED ---------\n");
 
 	/* Checking to make sure that camera is on */
 	if (bHavePowerDownGpio && (gpio_get_value(gpio_powerdown) == 0)) {
@@ -157,7 +157,7 @@ static int cam_misc_suspend(struct platform_device *pdev, pm_message_t state)
 		/* Need to make sure that all encounters of the
 		   isp clocks are disabled*/
 		cam_misc_disableClk();
-		dbg_print("CAMERA_MISC turned off MCLK done");
+		dbg_print("CAMERA_MISC turned off MCLK done\n");
 	}
 
 	_camera_lines_lowpower_mode();
@@ -183,25 +183,25 @@ static int camera_dev_ioctl(struct inode *inode, struct file *file,
 	int rc = 0;
 
 	if (!bHaveResetGpio) {
-		ddbg_print("Requesting reset gpio");
+		ddbg_print("Requesting reset gpio\n");
 		rc = gpio_request(gpio_reset, "camera reset");
 		if (!rc)
 			bHaveResetGpio = 1;
 	}
 	if (!bHavePowerDownGpio) {
-		ddbg_print("Requesting powerdown gpio");
+		ddbg_print("Requesting powerdown gpio\n");
 		rc = gpio_request(gpio_powerdown, "camera powerdown");
 		if (!rc)
 			bHavePowerDownGpio = 1;
 	}
-	ddbg_print("ioctl cmd = %u, arg = %lu", cmd, arg);
+	ddbg_print("camera ioctl cmd = %u, arg = %lu\n", cmd, arg);
 
 	switch (cmd) {
 	case CAMERA_RESET_WRITE:
 		if (bHaveResetGpio) {
 			gpio_direction_output(gpio_reset, 0);
 			gpio_set_value(gpio_reset, (arg ? 1 : 0));
-			dbg_print("CAMERA_MISC set RESET line to %u",
+			dbg_print("CAMERA_MISC set RESET line to %u\n",
 				(arg ? 1 : 0));
 		}
 
@@ -214,32 +214,16 @@ static int camera_dev_ioctl(struct inode *inode, struct file *file,
 
 	case CAMERA_POWERDOWN_WRITE:
 		if (bHavePowerDownGpio) {
-			/* doublecheck the GPIO64 reg (camera powerdown)
-	                   it can be altered by the mt9p012 probes */
-			u16 w;
-			w = omap_readw(0x480020D0);
-			if (w != 0x1C && gpio_powerdown) {
-				pr_warning("camera_misc: reconfigure altered"
-				          " GPIO64 reg 0x%hx to 0x1c\n", w);
-				gpio_free(gpio_powerdown);
-				gpio_request(gpio_powerdown, "camera powerdown");
-
-				omap_writew(0x1C, 0x480020D0);
-			}
-
 			gpio_direction_output(gpio_powerdown, 0);
 			if (0 == arg)
 				gpio_set_value(gpio_powerdown, 0);
 			else
 				gpio_set_value(gpio_powerdown, 1);
-			dbg_print("CAMERA_MISC set POWERDOWN line to %u",
+			dbg_print("CAMERA_MISC set POWERDOWN line to %u\n",
 				(arg ? 1 : 0));
-
-			w = omap_readw(0x480020D0);
-			pr_info("camera_misc: GPIO64 is now 0x%hx\n", w);
 		}
 		if (!bHavePowerDownGpio) {
-			err_print("CAMERA_MISC: gpio_request() failed. \
+			err_print ("CAMERA_MISC: gpio_request () failed. \
 				rc = %d; cmd = %u; arg = %lu", rc, cmd, arg);
 			return -EIO;
 		}
@@ -247,12 +231,12 @@ static int camera_dev_ioctl(struct inode *inode, struct file *file,
 
 	case CAMERA_CLOCK_DISABLE:
 		cam_misc_disableClk();
-		dbg_print("CAMERA_MISC turned off MCLK done");
+		dbg_print("CAMERA_MISC turned off MCLK done\n");
 		break;
 
 	case CAMERA_CLOCK_ENABLE:
 		cam_misc_enableClk(arg);
-		dbg_print("CAMERA_MISC set MCLK to %d", (int) arg);
+		dbg_print("CAMERA_MISC set MCLK to %d\n", (int) arg);
 		break;
 	case CAMERA_AVDD_POWER_ENABLE:
 	case CAMERA_AVDD_POWER_DISABLE:
@@ -300,6 +284,10 @@ static int __init camera_misc_probe(struct platform_device *device)
 {
 	printk(KERN_INFO "camera_misc_probe - probe function called\n");
 
+	/* put the GPIO64 (camera powerdown) to default state
+	Its getting altered by Jordan aptina sensor probe */
+	omap_writew(0x001C, 0x480020D0);
+
 	gpio_reset = get_gpio_by_name("gpio_cam_reset");
 	gpio_powerdown = get_gpio_by_name("gpio_cam_pwdn");
 	ddbg_print("gpio_cam_reset=%d gpio_cam_pwdn=%d", gpio_reset,
@@ -317,7 +305,7 @@ static int __init camera_misc_probe(struct platform_device *device)
 	}
 
 	if (misc_register(&cam_misc_device0)) {
-		err_print("unable to register camera misc device!\n");
+		err_print("error in register camera misc device!\n");
 		return -EIO;
 	}
 
