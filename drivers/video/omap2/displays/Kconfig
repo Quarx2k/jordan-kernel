@@ -60,4 +60,9 @@ config PANEL_SIL9022
 	tristate "HDMI interface"
 	help
 		HDMI interface used in the Zoom board
+
+config PANEL_MAPPHONE
+	tristate "Mapphone Panel"
+	help
+	  LCD Panel used in Mapphone
 endmenu
