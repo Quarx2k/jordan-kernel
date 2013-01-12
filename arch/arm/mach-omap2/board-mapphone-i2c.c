@@ -11,10 +11,18 @@
 
 #include <plat/common.h>
 #include <mach/board-mapphone.h>
+#include <linux/gpio_mapping.h>
 
 #include "dt_path.h"
 
 #define MAPPHONE_LM_3530_INT_GPIO	92
+
+static struct i2c_board_info __initdata
+	mapphone_i2c_bus1_board_info[I2C_BUS_MAX_DEVICES];
+static struct i2c_board_info __initdata
+	mapphone_i2c_bus2_board_info[I2C_BUS_MAX_DEVICES];
+static struct i2c_board_info __initdata
+	mapphone_i2c_bus3_board_info[I2C_BUS_MAX_DEVICES];
 
 static struct lm3530_platform_data omap3430_als_light_data = {
 	.power_up_gen_config = 0x0b,
@@ -46,8 +54,8 @@ static struct lm3530_platform_data omap3430_als_light_data;
 void __init mapphone_als_init(void)
 {
 	int lm3530_int_gpio = MAPPHONE_LM_3530_INT_GPIO;
-#ifdef CONFIG_ARM_OF
 	struct device_node *als_node;
+	int lm3530_reset_gpio;
 	const u8 *als_val;
 	int len = 0;
 	als_node = of_find_node_by_path(DT_LCD_BACKLIGHT);
@@ -201,9 +209,9 @@ void __init mapphone_als_init(void)
 		printk(KERN_DEBUG"mapphone_als_init: cann't get lm3530_int from device_tree\n");
 		lm3530_int_gpio = MAPPHONE_LM_3530_INT_GPIO;
 	} else {
-		mapphone_i2c_bus1_master_board_info[1].irq =
+		mapphone_i2c_bus1_board_info[1].irq =
 				 OMAP_GPIO_IRQ(lm3530_int_gpio);
-		mapphone_i2c_bus2_master_board_info[3].irq =
+		mapphone_i2c_bus2_board_info[3].irq =
 				 OMAP_GPIO_IRQ(lm3530_int_gpio);
 	}
 	lm3530_reset_gpio = get_gpio_by_name("lm3530_reset");
@@ -212,7 +220,7 @@ void __init mapphone_als_init(void)
 		gpio_direction_output(lm3530_reset_gpio, 1);
 		msleep(10);
 	}
-#endif
+
 	printk(KERN_INFO "%s:Initializing\n", __func__);
 	gpio_request(lm3530_int_gpio, "mapphone als int");
 	gpio_direction_input(lm3530_int_gpio);
@@ -319,14 +327,6 @@ static int initialize_i2c_bus_info
 	}
 	return dev_cnt;
 }
-
-
-static struct i2c_board_info __initdata
-	mapphone_i2c_bus1_board_info[I2C_BUS_MAX_DEVICES];
-static struct i2c_board_info __initdata
-	mapphone_i2c_bus2_board_info[I2C_BUS_MAX_DEVICES];
-static struct i2c_board_info __initdata
-	mapphone_i2c_bus3_board_info[I2C_BUS_MAX_DEVICES];
 
 static struct i2c_board_info __initdata
 	mapphone_i2c_1_boardinfo[] = {
