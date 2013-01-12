@@ -433,7 +433,7 @@ static struct omapfb_platform_data mapphone_fb_data = {
 
 static struct omap_dss_device *mapphone_dss_devices[] = {
 	&mapphone_lcd_device,
-	&mapphone_hdtv_device,
+	//&mapphone_hdtv_device,
 };
 
 static struct omap_dss_board_info mapphone_dss_data = {
@@ -1160,10 +1160,12 @@ static int __init mapphone_dt_panel_init(void)
 		} else if (mapphone_dt_get_panel_feature() != 0) {
 			PANELERR("failed to parse panel feature info\n");
 			ret = -ENODEV;
+/*
 		} else if (mapphone_feature_hdmi &&
 				mapphone_dt_get_hdtv_info() != 0) {
 			PANELERR("failed to parse hdtv info\n");
 			ret = -ENODEV;
+*/
 		} else {
 			mapphone_panel_device_read_dt = true;
 		}
@@ -1391,6 +1393,7 @@ void __init mapphone_panel_init(void)
 		gpio_direction_output(mapphone_displ_lvds_wp_e, 1);
 	}
 
+#if 0
 	if (mapphone_feature_hdmi) {
 		/* Set the bits to disable "internal pullups" for the DDC
 		 * clk and data lines.  This is required for ES2.3 parts
@@ -1405,6 +1408,7 @@ void __init mapphone_panel_init(void)
 		/* Remove HDTV from the DSS device list */
 		mapphone_dss_data.num_devices--;
 	}
+#endif
 
 	platform_device_register(&omap_panel_device);
 	omap_display_init(&mapphone_dss_data);
