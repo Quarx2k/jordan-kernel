@@ -4160,8 +4160,7 @@ static void mapphone_panel_disable(struct omap_dss_device *dssdev)
 
 	mutex_lock(&mp_data->lock);
 	/*TODO: clean up dssdev->state*/
-	if ((dssdev->state == OMAP_DSS_DISPLAY_ACTIVE) ||
-	    (dssdev->state == OMAP_DSS_DISPLAY_TRANSITION))
+	if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE)
 		mapphone_panel_stop(dssdev, false);
 
 	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
@@ -4364,8 +4363,7 @@ static int mapphone_panel_suspend(struct omap_dss_device *dssdev)
 
 	mutex_lock(&mp_data->lock);
 	/*Todo: clean up dssdev state*/
-	if ((dssdev->state == OMAP_DSS_DISPLAY_ACTIVE) ||
-		(dssdev->state == OMAP_DSS_DISPLAY_TRANSITION))
+	if ((dssdev->state == OMAP_DSS_DISPLAY_ACTIVE))
 		mapphone_panel_stop(dssdev, false);
 
 	dssdev->state = OMAP_DSS_DISPLAY_SUSPENDED;
@@ -4731,7 +4729,6 @@ static struct omap_dss_driver mapphone_panel_driver = {
 	.remove		= mapphone_panel_remove,
 
 	.enable		= mapphone_panel_enable,
-	.framedone	= mapphone_panel_display_on,
 	.disable	= mapphone_panel_disable,
 	.suspend	= mapphone_panel_suspend,
 	.resume		= mapphone_panel_resume,
@@ -4748,11 +4745,9 @@ static struct omap_dss_driver mapphone_panel_driver = {
 	.set_timings	= mapphone_panel_set_timings,
 
 	/*.hs_mode_timing		= mapphone_panel_get_hs_mode_timing,*/
-	.support_te             = mapphone_panel_support_te,
 	.enable_te		= mapphone_panel_enable_te,
 	.get_te			= mapphone_panel_get_te,
 
-	.manual_te_trigger	= mapphone_panel_manual_te_trigger,
 	.set_rotate		= mapphone_panel_rotate,
 	.get_rotate		= mapphone_panel_get_rotate,
 	.set_mirror		= mapphone_panel_mirror,
@@ -4761,9 +4756,6 @@ static struct omap_dss_driver mapphone_panel_driver = {
 	.get_timings		= mapphone_panel_get_timings,
 	.set_timings		= mapphone_panel_set_timings,
 	.check_timings		= mapphone_panel_check_timings,
-	.reg_read		= mapphone_panel_reg_read,
-	.reg_write		= mapphone_panel_reg_write,
-	.get_dsi_vc_chnls	= mapphone_get_vc_channels,
 
 	.driver = {
 		.name = "mapphone-panel",

@@ -130,7 +130,6 @@ static struct omap_dss_device mapphone_lcd_device = {
 	.clocks.dispc.dispc_fclk_src = OMAP_DSS_CLK_SRC_DSI_PLL_HSDIV_DISPC,
 	.clocks.dsi.lp_clk_div = 7,
 	.phy.dsi.type = OMAP_DSS_DSI_TYPE_CMD_MODE,
-	.manual_power_control = OMAP_DSS_MPC_DISABLED,
 	.platform_enable = mapphone_panel_enable,
 	.platform_disable = mapphone_panel_disable,
 };
@@ -182,11 +181,8 @@ static struct omap_dss_device mapphone_hdtv_device = {
 	},
 	.hpd_gpio = 63,
 	.channel = OMAP_DSS_CHANNEL_DIGIT,
-	.manual_power_control  = OMAP_DSS_MPC_DISABLED,
 	.platform_enable       = mapphone_panel_enable_hdtv,
 	.platform_disable      = mapphone_panel_disable_hdtv,
-	.platform_enable_hpd   = mapphone_panel_enable_hpd_hdtv,
-	.platform_disable_hpd  = mapphone_panel_disable_hpd_hdtv,
 
 #ifdef CONFIG_DEBUG_FS
 	/* Used as a simple engineering test interface */
