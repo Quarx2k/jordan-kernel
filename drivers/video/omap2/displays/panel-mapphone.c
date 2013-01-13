@@ -4032,6 +4032,9 @@ static void set_vc_channels(struct omap_dss_device *dssdev)
 {
 	if ((dsi_vc_cmd == 0) && (dsi_vc_video == 0)) {
 		switch (dssdev->panel.panel_id) {
+		// TODO Martin / Quarx: are the first two cases required?
+		case MOT_DISP_MIPI_CM_480_854:
+		case MOT_DISP_MIPI_CM_370_480_854:
 		case MOT_DISP_LVDS_MIPI_VM_1007_1280_800:
 			dsi_vc_cmd = 1;
 			dsi_vc_video = 0;
@@ -4041,6 +4044,8 @@ static void set_vc_channels(struct omap_dss_device *dssdev)
 			dsi_vc_video = 1;
 			break;
 		}
+
+		DBG("dsi_vc_cmd = %d, dsi_vc_video = %d\n", dsi_vc_cmd, dsi_vc_video);
 	}
 }
 
