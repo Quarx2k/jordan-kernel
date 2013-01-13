@@ -855,21 +855,29 @@ end:
 static u16 read_supplier_id(struct omap_dss_device *dssdev)
 {
 	static u16 id = INVALID_VALUE;
+	int read_len;
+	int r;
 	u8 data[2];
 
 	if (id != INVALID_VALUE)
 		goto end;
 
-	if (dsi_vc_set_max_rx_packet_size(dssdev, dsi_vc_cmd, 2))
+	r = dsi_vc_set_max_rx_packet_size(dssdev, dsi_vc_cmd, 2);
+	if (r) {
+		printk(KERN_ERR "Mapphone panel: failed to update dsi_vc_set_max_rx_packet_size: %d\n",
+					r);
 		goto end;
+	}
 
-	if (dsi_vc_dcs_read(dssdev, dsi_vc_cmd,
-			    EDISCO_CMD_READ_DDB_START, data, 2) == 2) {
+	read_len = dsi_vc_dcs_read(dssdev, dsi_vc_cmd,
+			    EDISCO_CMD_READ_DDB_START, data, 2);
+	if (read_len == 2) {
 		id = (data[0] << 8) | data[1];
 		printk(KERN_INFO "Mapphone panel: controller supplier id(A1h)=0x%x\n",
 			 id);
 	} else
-		printk(KERN_ERR "Mapphone panel: failed to read controller supplier ID\n");
+		printk(KERN_ERR "Mapphone panel: failed to read controller supplier ID: %d\n",
+					read_len);
 
 	dsi_vc_set_max_rx_packet_size(dssdev, dsi_vc_cmd, 1);
 end:
@@ -4756,8 +4764,6 @@ static struct omap_dss_driver mapphone_panel_driver = {
 
 	.get_resolution		= mapphone_panel_get_resolution,
 	.get_recommended_bpp	= omapdss_default_get_recommended_bpp,
-
-	.set_timings	= mapphone_panel_set_timings,
 
 	/*.hs_mode_timing		= mapphone_panel_get_hs_mode_timing,*/
 	.enable_te		= mapphone_panel_enable_te,
