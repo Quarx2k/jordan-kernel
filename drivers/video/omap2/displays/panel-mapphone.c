@@ -852,29 +852,31 @@ end:
 static u16 read_supplier_id(struct omap_dss_device *dssdev)
 {
 	static u16 id = INVALID_VALUE;
-	int read_len;
 	int r;
-	u8 data[2];
+	u8 data[CTL_SUPPLIER_ID_LEN];
 
 	if (id != INVALID_VALUE)
 		goto end;
 
-	r = dsi_vc_set_max_rx_packet_size(dssdev, dsi_vc_cmd, 2);
+	r = dsi_vc_set_max_rx_packet_size(dssdev, dsi_vc_cmd, CTL_SUPPLIER_ID_LEN);
 	if (r) {
 		printk(KERN_ERR "Mapphone panel: failed to update dsi_vc_set_max_rx_packet_size: %d\n",
 					r);
 		goto end;
 	}
 
-	read_len = dsi_vc_dcs_read(dssdev, dsi_vc_cmd,
-			    EDISCO_CMD_READ_DDB_START, data, 2);
-	if (read_len == 2) {
+	// Wait a bit because dsi_vc_set_max_rx_packet_size is async!
+	msleep(20);
+
+	r = dsi_vc_dcs_read(dssdev, dsi_vc_cmd,
+			    EDISCO_CMD_READ_DDB_START, data, CTL_SUPPLIER_ID_LEN);
+	if (r == CTL_SUPPLIER_ID_LEN) {
 		id = (data[0] << 8) | data[1];
 		printk(KERN_INFO "Mapphone panel: controller supplier id(A1h)=0x%x\n",
 			 id);
 	} else
 		printk(KERN_ERR "Mapphone panel: failed to read controller supplier ID: %d\n",
-					read_len);
+					r);
 
 	dsi_vc_set_max_rx_packet_size(dssdev, dsi_vc_cmd, 1);
 end:
@@ -1774,6 +1776,9 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 
 	DBG("dsi_mipi_cm_480_854_panel_enable()\n");
 
+	/* 120ms delay for internal stabilization */
+	msleep(120);
+
 	/* Check if the display we are using is actually a TMD display */
 	if (dssdev->panel.panel_id == MOT_DISP_MIPI_CM_370_480_854) {
 		if (read_supplier_id(dssdev) ==  CTL_SUPPLIER_ID_TMD) {
@@ -1793,6 +1798,8 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 	if (ret)
 		printk(KERN_ERR "failed to send SET_MCS\n");
 
+
+	msleep(10);
 
 	/* enable lane setting and test registers*/
 	data[0] = 0xef;
@@ -1830,6 +1837,8 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 	if (ret)
 		printk(KERN_ERR "failed to send LANE_CONFIG\n");
 
+	msleep(10);
+
 	/* Forcing display inversion off for hardware issue
 	 * on some phones (observed inverted color, ~1% of powerups fail)
 	 */
@@ -1841,6 +1850,8 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 				0x00, EDISCO_CMD_SET_INVERSION_OFF);
 	if (ret)
 		printk(KERN_ERR "failed to send EDISCO_CMD_SET_INVERSION_OFF \n");
+
+	msleep(10);
 
 	/* 2nd param 0 = WVGA; 1 = WQVGA */
 	data[0] = EDISCO_CMD_SET_DISPLAY_MODE;
@@ -1854,6 +1865,8 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 
 	if (ret)
 		printk(KERN_ERR "failed to send SET_DISPLAY_MODE\n");
+
+	msleep(10);
 
 	/* Set dynamic backlight control and PWM; D[7:4] = PWM_DIV[3:0];*/
 	/* D[3]=0 (PWM OFF);
@@ -1879,6 +1892,8 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 	if (ret)
 		printk(KERN_ERR "failed to send CABC/PWM\n");
 
+	msleep(10);
+
 	data[0] = EDISCO_CMD_EXIT_SLEEP_MODE;
 	ret = mapphone_panel_lp_cmd_wrt_sync(dssdev,
 			true, 0x0,
@@ -1891,7 +1906,7 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 		goto error;
 	}
 
-	mdelay(200);
+	msleep(200);
 
 	printk(KERN_INFO "done EDISCO CTRL ENABLE\n");
 
@@ -4278,13 +4293,15 @@ static int mapphone_panel_enable_te_locked(struct omap_dss_device *dssdev,
 
 	} else {
 		data[0] = EDISCO_CMD_SET_TEAR_OFF;
-		r = dsi_vc_dcs_write(dssdev, dsi_vc_cmd, data, 1);
+		data[1] = 0x00; // the 2.6.32 kernel has this 2 bytes long.
+		r = dsi_vc_dcs_write(dssdev, dsi_vc_cmd, data, 2);
 
 		if (r) {
 			printk(KERN_ERR "Failed to send EDISCO_CMD_SET_TEAR_OFF: %d\n", r);
 			goto error;
 		}
 	}
+
 	r = omapdss_dsi_enable_te(dssdev, panel_data->te_type);
 
 error:
