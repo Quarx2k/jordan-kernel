@@ -33,8 +33,11 @@ static unsigned int panel_debug;
 
 #define EDISCO_CMD_SOFT_RESET		0x01
 #define EDISCO_CMD_GET_POWER_MODE       0x0A
+#define EDISCO_CMD_READ_DISPLAY_IMAGE_MODE	0x0D
 #define EDISCO_CMD_ENTER_SLEEP_MODE	0x10
 #define EDISCO_CMD_EXIT_SLEEP_MODE	0x11
+#define EDISCO_CMD_SET_INVERSION_OFF	0x20
+#define EDISCO_CMD_SET_INVERSION_ON	0x21
 #define EDISCO_CMD_SET_DISPLAY_ON	0x29
 #define EDISCO_CMD_SET_DISPLAY_OFF	0x28
 #define EDISCO_CMD_SET_COLUMN_ADDRESS	0x2A
@@ -1809,6 +1812,18 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 
 	if (ret)
 		printk(KERN_ERR "failed to send LANE_CONFIG\n");
+
+	/* Forcing display inversion off for hardware issue
+	 * on some phones (observed inverted color, ~1% of powerups fail)
+	 */
+	data[0] = EDISCO_CMD_SET_INVERSION_OFF;
+	ret = mapphone_panel_lp_cmd_wrt_sync(dssdev,
+				true, 0,
+				data, 1,
+				EDISCO_CMD_READ_DISPLAY_IMAGE_MODE, 1,
+				0x00, EDISCO_CMD_SET_INVERSION_OFF);
+	if (ret)
+		printk(KERN_ERR "failed to send EDISCO_CMD_SET_INVERSION_OFF \n");
 
 	/* 2nd param 0 = WVGA; 1 = WQVGA */
 	data[0] = EDISCO_CMD_SET_DISPLAY_MODE;
