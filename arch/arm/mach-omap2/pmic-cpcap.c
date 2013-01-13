@@ -14,6 +14,7 @@
 #include <linux/kernel.h>
 #include "pm.h"
 #include "vc.h"
+#include "voltage.h"
 
 /**
  * omap_cpcap_vsel_to_vdc - convert CPCAP VSEL value to microvolts DC
@@ -42,6 +43,7 @@ unsigned char omap_cpcap_uv_to_vsel(unsigned long uv)
 		uv = 600000;
 	else if (uv > 1450000)
 		uv = 1450000;
+	printk("Uv:%d, Set vsel: %d\n",uv,DIV_ROUND_UP(uv - 600000, 12500));
 	return DIV_ROUND_UP(uv - 600000, 12500);
 }
 
@@ -49,26 +51,21 @@ unsigned char omap_cpcap_uv_to_vsel(unsigned long uv)
 static struct omap_voltdm_pmic omap_cpcap_core = {
 	.slew_rate		= 4000,
 	.step_size		= 12500,
-	.on_volt		= 1300000,
-	.onlp_volt		= 1300000,
-	.ret_volt		= 837500,
+	.on_volt		= 1200000,
+	.onlp_volt		= 1000000,
+	.ret_volt		= 975000,
 	.off_volt		= 600000,
-	.volt_setup_time	= 0,
+	.volt_setup_time	= 0xfff,
 	.switch_on_time		= 1000,
-	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
-	.vp_vstepmin		= OMAP4_VP_VSTEPMIN_VSTEPMIN,
-	.vp_vstepmax		= OMAP4_VP_VSTEPMAX_VSTEPMAX,
-	.vp_vddmin		= 900000,
-	.vp_vddmax		= 1350000,
-	.vp_timeout_us		= 0x200,
-	.i2c_slave_addr		= 0x02,
-	.volt_reg_addr		= 0x00,
-	.cmd_reg_addr		= 0x01,
-	.i2c_high_speed		= false,
-	.i2c_scll_low		= 0x60,
-	.i2c_scll_high		= 0x26,
-	.i2c_hscll_low		= 0x0B,
-	.i2c_hscll_high		= 0x00,
+	.vp_erroroffset		= OMAP3_VP_CONFIG_ERROROFFSET,
+	.vp_vstepmin		= OMAP3_VP_VSTEPMIN_VSTEPMIN,
+	.vp_vstepmax		= OMAP3_VP_VSTEPMAX_VSTEPMAX,
+	.vp_vddmin		= OMAP3630_VP2_VLIMITTO_VDDMIN,
+	.vp_vddmax		= OMAP3630_VP2_VLIMITTO_VDDMAX,
+	.vp_timeout_us		= OMAP3_VP_VLIMITTO_TIMEOUT_US,
+	.i2c_slave_addr		= OMAP3_SRI2C_SLAVE_ADDR,
+	.volt_reg_addr		= OMAP3_VDD_CORE_SR_CONTROL_REG,
+	.i2c_high_speed		= true,
 	.vsel_to_uv		= omap_cpcap_vsel_to_uv,
 	.uv_to_vsel		= omap_cpcap_uv_to_vsel,
 };
@@ -76,34 +73,30 @@ static struct omap_voltdm_pmic omap_cpcap_core = {
 /* For CPCAP IVA */
 
 static struct omap_voltdm_pmic omap_cpcap_iva = {
-	.slew_rate              = 4000,
-	.step_size              = 12500,
-	.on_volt                = 1125000,
-	.onlp_volt              = 1125000,
-	.ret_volt               = 837500,
-	.off_volt               = 600000,
-	.volt_setup_time        = 0,
+	.slew_rate		= 4000,
+	.step_size		= 12500,
+	.on_volt		= 1200000,
+	.onlp_volt		= 1000000,
+	.ret_volt		= 975000,
+	.off_volt		= 600000,
+	.volt_setup_time	= 0xfff,
 	.switch_on_time         = 1000,
-	.vp_erroroffset         = OMAP4_VP_CONFIG_ERROROFFSET,
-	.vp_vstepmin            = OMAP4_VP_VSTEPMIN_VSTEPMIN,
-	.vp_vstepmax            = OMAP4_VP_VSTEPMAX_VSTEPMAX,
-	.vp_vddmin              = 900000,
-	.vp_vddmax              = 1350000,
-	.vp_timeout_us          = 0x200,
-	.i2c_slave_addr         = 0x44,
-	.volt_reg_addr          = 0x0,
-	.cmd_reg_addr           = 0x01,
-	.i2c_high_speed         = false,
-	.i2c_scll_low           = 0x60,
-	.i2c_scll_high          = 0x26,
-	.i2c_hscll_low          = 0x0B,
-	.i2c_hscll_high         = 0x00,
+	.vp_erroroffset		= OMAP3_VP_CONFIG_ERROROFFSET,
+	.vp_vstepmin		= OMAP3_VP_VSTEPMIN_VSTEPMIN,
+	.vp_vstepmax		= OMAP3_VP_VSTEPMAX_VSTEPMAX,
+	.vp_vddmin		= OMAP3630_VP2_VLIMITTO_VDDMIN,
+	.vp_vddmax		= OMAP3630_VP2_VLIMITTO_VDDMAX,
+	.vp_timeout_us          = OMAP3_VP_VLIMITTO_TIMEOUT_US,
+	.i2c_slave_addr         = OMAP3_SRI2C_SLAVE_ADDR,
+	.volt_reg_addr          = OMAP3_VDD_CORE_SR_CONTROL_REG,
+	.i2c_high_speed         = true,
 	.vsel_to_uv             = omap_cpcap_vsel_to_uv,
 	.uv_to_vsel             = omap_cpcap_uv_to_vsel,
 };
 
 
 static __initdata struct omap_pmic_map cpcap_map[] = {
+
 	{
 		.name = "core",
 		.omap_chip = OMAP_CHIP_INIT(CHIP_IS_OMAP3XXX),
