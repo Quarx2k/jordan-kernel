@@ -290,6 +290,11 @@ void dsi_uninit_platform_driver(void);
 int dsi_runtime_get(struct platform_device *dsidev);
 void dsi_runtime_put(struct platform_device *dsidev);
 
+#ifdef CONFIG_PANEL_MAPPHONE
+int dsi_from_dss_runtime_get(struct omap_dss_device *dssdev);
+void dsi_from_dss_runtime_put(struct omap_dss_device *dssdev);
+#endif
+
 void dsi_dump_clocks(struct seq_file *s);
 void dsi_create_debugfs_files_irq(struct dentry *debugfs_dir,
 		const struct file_operations *debug_fops);
@@ -325,7 +330,16 @@ static inline int dsi_runtime_get(struct platform_device *dsidev)
 {
 	return 0;
 }
+#ifdef CONFIG_PANEL_MAPPHONE
 static inline void dsi_runtime_put(struct platform_device *dsidev)
+{
+}
+static inline int dsi_from_dss_runtime_get(struct omap_dss_device *dssdev)
+{
+	return 0;
+}
+#endif
+static inline void dsi_from_dss_runtime_put(struct omap_dss_device *dssdev)
 {
 }
 static inline unsigned long dsi_get_pll_hsdiv_dispc_rate(struct platform_device *dsidev)

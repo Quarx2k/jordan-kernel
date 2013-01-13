@@ -1114,6 +1114,22 @@ void dsi_runtime_put(struct platform_device *dsidev)
 	mutex_unlock(&dsi->runtime_lock);
 }
 
+#ifdef CONFIG_PANEL_MAPPHONE
+int dsi_from_dss_runtime_get(struct omap_dss_device *dssdev)
+{
+	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
+
+	return dsi_runtime_get(dsidev);
+}
+
+void dsi_from_dss_runtime_put(struct omap_dss_device *dssdev)
+{
+	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
+
+	dsi_runtime_put(dsidev);
+}
+#endif
+
 /* source clock for DSI PLL. this could also be PCLKFREE */
 static inline void dsi_enable_pll_clock(struct platform_device *dsidev,
 		bool enable)
