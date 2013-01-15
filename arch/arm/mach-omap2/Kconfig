@@ -307,6 +307,11 @@ config MACH_OMAP_MAPPHONE
 	default y
 	select OMAP_PACKAGE_CBP
 
+config MACH_OMAP_MAPPHONE_DEFY
+	bool "Defy (MB525/MB526) MAPPHONE boards (Motorola)"
+	depends on MACH_OMAP_MAPPHONE
+	default y
+
 config MACH_TI8168EVM
 	bool "TI8168 Evaluation Module"
 	depends on SOC_OMAPTI816X
