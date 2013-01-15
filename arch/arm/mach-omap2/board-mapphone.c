@@ -226,6 +226,7 @@ static void __init omap_mapphone_init(void)
 		pr_err("failed to create board_properties\n");
 
 	mapphone_bp_model_init();
+	mapphone_padconf_init();
 	mapphone_voltage_init();
 	mapphone_gpio_mapping_init();
 	mapphone_i2c_init();
