@@ -324,7 +324,7 @@ static int __init _omap2_init_reprogram_sdrc(void)
 
 	rate = clk_get_rate(dpll3_m2_ck);
 	pr_info("Reprogramming SDRC clock to %ld Hz\n", rate);
-	v = clk_set_rate(dpll3_m2_ck, rate);
+	v = clk_set_rate(dpll3_m2_ck, /*rate*/200000000); //TODO: Fix in hboot.
 	if (v)
 		pr_err("dpll3_m2_clk rate change failed: %d\n", v);
 
