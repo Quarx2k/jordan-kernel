@@ -6,18 +6,21 @@
  * published by the Free Software Foundation.
  */
 
-#include <linux/gpio.h>
-#include <linux/led-lm3530.h>
-
 #include <plat/common.h>
 #include <mach/board-mapphone.h>
+#include <linux/gpio.h>
 #include <linux/gpio_mapping.h>
+#include <linux/regulator/consumer.h>
 
 #include "dt_path.h"
+
+#include <linux/led-lm3530.h>
+#include <linux/kxtf9.h>
 
 #define MAPPHONE_LM_3530_INT_GPIO	92
 #define MAPPHONE_AKM8973_INT_GPIO	175
 #define MAPPHONE_AKM8973_RESET_GPIO	28
+#define MAPPHONE_KXTF9_INT_GPIO		22
 
 static struct i2c_board_info __initdata
 	mapphone_i2c_bus1_board_info[I2C_BUS_MAX_DEVICES];
@@ -25,6 +28,11 @@ static struct i2c_board_info __initdata
 	mapphone_i2c_bus2_board_info[I2C_BUS_MAX_DEVICES];
 static struct i2c_board_info __initdata
 	mapphone_i2c_bus3_board_info[I2C_BUS_MAX_DEVICES];
+
+/*
+ * LM3530
+ */
+
 
 static struct lm3530_platform_data omap3430_als_light_data = {
 	.power_up_gen_config = 0x0b,
@@ -228,6 +236,10 @@ void __init mapphone_als_init(void)
 	gpio_direction_input(lm3530_int_gpio);
 }
 
+/*
+ * AKM8973
+ */
+
 static void __init mapphone_akm8973_init(void)
 {
 	gpio_request(MAPPHONE_AKM8973_RESET_GPIO, "akm8973 reset");
@@ -237,6 +249,164 @@ static void __init mapphone_akm8973_init(void)
 	gpio_direction_input(MAPPHONE_AKM8973_INT_GPIO);
 }
 
+/*
+ * KXTF9
+ */
+
+static struct regulator *mapphone_kxtf9_regulator;
+static int mapphone_kxtf9_initialization(void)
+{
+	struct regulator *reg;
+	reg = regulator_get(NULL, "vhvio");
+	if (IS_ERR(reg))
+		return PTR_ERR(reg);
+	mapphone_kxtf9_regulator = reg;
+	return 0;
+}
+
+static void mapphone_kxtf9_exit(void)
+{
+	regulator_put(mapphone_kxtf9_regulator);
+}
+
+static int mapphone_kxtf9_power_on(void)
+{
+	return regulator_enable(mapphone_kxtf9_regulator);
+}
+
+static int mapphone_kxtf9_power_off(void)
+{
+	if (mapphone_kxtf9_regulator)
+		return regulator_disable(mapphone_kxtf9_regulator);
+	return 0;
+}
+
+struct kxtf9_platform_data mapphone_kxtf9_data = {
+	.init = mapphone_kxtf9_initialization,
+	.exit = mapphone_kxtf9_exit,
+	.power_on = mapphone_kxtf9_power_on,
+	.power_off = mapphone_kxtf9_power_off,
+
+	.min_interval	= 2,
+	.poll_interval	= 200,
+
+	.g_range	= KXTF9_G_8G,
+
+	.axis_map_x	= 0,
+	.axis_map_y	= 1,
+	.axis_map_z	= 2,
+
+	.negate_x	= 0,
+	.negate_y	= 0,
+	.negate_z	= 0,
+
+	.data_odr_init		= ODR12_5,
+	.ctrl_reg1_init		= RES_12BIT | KXTF9_G_2G | TPE | WUFE | TDTE,
+	.int_ctrl_init		= IEA | IEN,
+	.tilt_timer_init	= 0x03,
+	.engine_odr_init	= OTP12_5 | OWUF50 | OTDT400,
+	.wuf_timer_init		= 0x0A,
+	.wuf_thresh_init	= 0x20,
+	.tdt_timer_init		= 0x78,
+	.tdt_h_thresh_init	= 0xB6,
+	.tdt_l_thresh_init	= 0x1A,
+	.tdt_tap_timer_init	= 0xA2,
+	.tdt_total_timer_init	= 0x24,
+	.tdt_latency_timer_init	= 0x28,
+	.tdt_window_timer_init	= 0xA0,
+
+	.gpio = MAPPHONE_KXTF9_INT_GPIO,
+	.gesture = 0,
+	.sensitivity_low = {
+		0x50, 0xFF, 0xB8, 0x32, 0x09, 0x0A, 0xA0,
+	},
+	.sensitivity_medium = {
+		0x50, 0xFF, 0x68, 0x32, 0x09, 0x0A, 0xA0,
+	},
+	.sensitivity_high = {
+		0x78, 0xB6, 0x1A, 0xA2, 0x24, 0x28, 0xA0,
+	},
+};
+
+static ssize_t kxtf9_sysfs_show(struct class *dev,
+	struct class_attribute *attr, char *buf)
+{
+	int data;
+	char *str = buf;
+	ssize_t count;
+
+	data = gpio_get_value(MAPPHONE_KXTF9_INT_GPIO);
+	str += sprintf(str, "%d\n", data);
+	count = (ssize_t) (str - buf);
+	return count;
+}
+
+static CLASS_ATTR(kxtf9, S_IRUGO, kxtf9_sysfs_show, NULL );
+
+static void __init mapphone_kxtf9_init(void)
+{
+	struct class *class;
+
+	struct device_node *node;
+	const void *prop;
+	int len = 0;
+
+	node = of_find_node_by_path(DT_PATH_ACCELEROMETER);
+	if (node) {
+		prop = of_get_property(node,
+				DT_PROP_ACCELEROMETER_AXIS_MAP_X, &len);
+		if (prop && len)
+			mapphone_kxtf9_data.axis_map_x = *(u8 *)prop;
+		prop = of_get_property(node,
+				DT_PROP_ACCELEROMETER_AXIS_MAP_Y, &len);
+		if (prop && len)
+			mapphone_kxtf9_data.axis_map_y = *(u8 *)prop;
+		prop = of_get_property(node,
+				DT_PROP_ACCELEROMETER_AXIS_MAP_Z, &len);
+		if (prop && len)
+			mapphone_kxtf9_data.axis_map_z = *(u8 *)prop;
+		prop = of_get_property(node,
+				DT_PROP_ACCELEROMETER_NEGATE_X, &len);
+		if (prop && len)
+			mapphone_kxtf9_data.negate_x = *(u8 *)prop;
+		prop = of_get_property(node,
+				DT_PROP_ACCELEROMETER_NEGATE_Y, &len);
+		if (prop && len)
+			mapphone_kxtf9_data.negate_y = *(u8 *)prop;
+		prop = of_get_property(node,
+				DT_PROP_ACCELEROMETER_NEGATE_Z, &len);
+		if (prop && len)
+			mapphone_kxtf9_data.negate_z = *(u8 *)prop;
+		prop = of_get_property(node,
+				DT_PROP_ACCELEROMETER_SENS_LOW, &len);
+		if (prop && len)
+				memcpy(mapphone_kxtf9_data.sensitivity_low,
+						(u8 *)prop, len);
+		prop = of_get_property(node,
+				DT_PROP_ACCELEROMETER_SENS_MEDIUM, &len);
+		if (prop && len)
+				memcpy(mapphone_kxtf9_data.sensitivity_medium,
+						(u8 *)prop, len);
+		prop = of_get_property(node,
+				DT_PROP_ACCELEROMETER_SENS_HIGH, &len);
+		if (prop && len)
+				memcpy(mapphone_kxtf9_data.sensitivity_high,
+						(u8 *)prop, len);
+		of_node_put(node);
+	}
+
+	gpio_request(MAPPHONE_KXTF9_INT_GPIO, "kxtf9 accelerometer int");
+	gpio_direction_input(MAPPHONE_KXTF9_INT_GPIO);
+
+	class = class_create(THIS_MODULE, "kxtf9");
+	if (IS_ERR(class))
+		printk(KERN_ERR "kxtf9 can't register class\n");
+	else if (class_create_file(class, &class_attr_kxtf9)) {
+		printk(KERN_ERR "kxtf9: can't create sysfs\n");
+		class_destroy(class);
+	}
+
+}
 
 /* Init I2C Bus Interfaces */
 
@@ -355,6 +525,10 @@ static struct i2c_board_info __initdata
 		I2C_BOARD_INFO("akm8973", 0x1C),
 		.irq = OMAP_GPIO_IRQ(MAPPHONE_AKM8973_INT_GPIO),
 	},
+	{
+		I2C_BOARD_INFO("kxtf9", 0x0F),
+		.platform_data = &mapphone_kxtf9_data,
+	},
 };
 
 static struct i2c_board_info __initdata
@@ -423,6 +597,7 @@ void __init mapphone_i2c_init(void)
 			mapphone_i2c_bus3_board_info, i2c_bus_devices);
 
 	mapphone_akm8973_init();
+	mapphone_kxtf9_init();
 
 }
 
