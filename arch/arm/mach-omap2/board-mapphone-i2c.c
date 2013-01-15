@@ -16,6 +16,8 @@
 #include "dt_path.h"
 
 #define MAPPHONE_LM_3530_INT_GPIO	92
+#define MAPPHONE_AKM8973_INT_GPIO	175
+#define MAPPHONE_AKM8973_RESET_GPIO	28
 
 static struct i2c_board_info __initdata
 	mapphone_i2c_bus1_board_info[I2C_BUS_MAX_DEVICES];
@@ -226,6 +228,16 @@ void __init mapphone_als_init(void)
 	gpio_direction_input(lm3530_int_gpio);
 }
 
+static void __init mapphone_akm8973_init(void)
+{
+	gpio_request(MAPPHONE_AKM8973_RESET_GPIO, "akm8973 reset");
+	gpio_direction_output(MAPPHONE_AKM8973_RESET_GPIO, 1);
+
+	gpio_request(MAPPHONE_AKM8973_INT_GPIO, "akm8973 irq");
+	gpio_direction_input(MAPPHONE_AKM8973_INT_GPIO);
+}
+
+
 /* Init I2C Bus Interfaces */
 
 static struct i2c_board_info *get_board_info
@@ -339,8 +351,12 @@ static struct i2c_board_info __initdata
 
 static struct i2c_board_info __initdata
 	mapphone_i2c_2_boardinfo[] = {
-
+	{
+		I2C_BOARD_INFO("akm8973", 0x1C),
+		.irq = OMAP_GPIO_IRQ(MAPPHONE_AKM8973_INT_GPIO),
+	},
 };
+
 static struct i2c_board_info __initdata
 	mapphone_i2c_3_boardinfo[] = {
 
@@ -405,6 +421,8 @@ void __init mapphone_i2c_init(void)
 			ARRAY_SIZE(mapphone_i2c_3_boardinfo));
 	omap_register_i2c_bus(3, 400,
 			mapphone_i2c_bus3_board_info, i2c_bus_devices);
+
+	mapphone_akm8973_init();
 
 }
 

@@ -55,3 +55,5 @@ obj-$(CONFIG_OMAP_DIE_TEMP_SENSOR)	+= omap_temp_sensor.o
 obj-$(CONFIG_OMAP4_DUTY_CYCLE)  += omap4_duty_cycle.o
 obj-$(CONFIG_TWL6040_VIB)	+= twl6040-vib.o
 obj-$(CONFIG_GC_CORE)		+= gc-core/
+obj-$(CONFIG_SENSORS_AKM8973_AKMD)	+= akm8973_akmd.o
+

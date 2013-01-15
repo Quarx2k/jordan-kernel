@@ -548,6 +548,13 @@ config OMAP4_DUTY_CYCLE
 	If you are going to use OPP_NITRO with high level of leakage which.
 	could pontentially sustain a thermal runaway, say Y here.
 
+config SENSORS_AKM8973_AKMD
+	tristate "AKM8973 Magnetometer"
+	default n
+	depends on I2C
+	help
+	 Support for the AKM8973 tri-axis magnetometer (compass)
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
