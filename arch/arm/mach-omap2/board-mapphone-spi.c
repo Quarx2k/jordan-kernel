@@ -21,9 +21,7 @@
 #include <plat/mcspi.h>
 #include <plat/gpio.h>
 #include <plat/mux.h>
-//#include <plat/resource.h>
 #include <plat/omap34xx.h>
-#define CONFIG_ARM_OF
 #include "dt_path.h"
 #include <linux/of.h>
 
@@ -450,7 +448,6 @@ static struct spi_board_info mapphone_spi_board_info[] __initdata = {
 	},
 };
 
-#ifdef CONFIG_ARM_OF
 struct omap_spi_init_entry {
 	u32 reg;
 	u32 data;
@@ -652,7 +649,6 @@ static void __init cpcap_of_init(void)
 	of_node_put(node);
 	return;
 }
-#endif
 
 void __init mapphone_spi_init(void)
 {
@@ -660,9 +656,7 @@ void __init mapphone_spi_init(void)
 	int ret;
 	int i;
 
-#ifdef CONFIG_ARM_OF
 	cpcap_of_init();
-#endif
 
 	for (i = 0; i < CPCAP_REG_SIZE; i++) {
 		if (mapphone_cpcap_spi_init[i].reg == CPCAP_REG_UNUSED)

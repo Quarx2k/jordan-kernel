@@ -24,7 +24,6 @@
 
 #include <plat/hardware.h>
 #include <plat/board-mapphone-padconf.h>
-#define CONFIG_ARM_OF
 #include "dt_path.h"
 #include <asm/prom.h>
 #include <asm/bootinfo.h>
@@ -1711,7 +1710,6 @@ static __initdata struct {
 		    OMAP343X_PADCONF_PULL_UP |
 		    OMAP343X_PADCONF_PUD_ENABLED | OMAP343X_PADCONF_MUXMODE0},};
 
-#ifdef CONFIG_ARM_OF
 static void __init mux_pad_callback(const void *p_data)
 {
 	struct mux_conf_entry *p = (struct mux_conf_entry *)p_data;
@@ -1820,7 +1818,6 @@ void __init mux_setting_init(void)
 	op.name_size = 2;
 	dt_prop_or_init(&op);
 }
-#endif
 
 /* 	touch_int_fix: prevent spurious touch interrupt in charging mode
 	by turning on pullup resistor on CAM_D10

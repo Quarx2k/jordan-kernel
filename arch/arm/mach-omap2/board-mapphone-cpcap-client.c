@@ -17,7 +17,6 @@
 #include <linux/pm_dbg.h>
 #include <mach/gpio.h>
 #include <plat/mux.h>
-//#include <plat/resource.h>
 #include <plat/omap34xx.h>
 #include <linux/leds-cpcap-abmode.h>
 #include <linux/leds-cpcap-adb.h>
@@ -25,11 +24,9 @@
 #include <linux/leds-cpcap-kpb.h>
 #include <linux/leds-cpcap-mdb.h>
 #include <linux/leds-cpcap-rgb.h>
-#define CONFIG_ARM_OF
-#ifdef CONFIG_ARM_OF
 #include "dt_path.h"
 #include <linux/of.h>
-#endif
+
 /*
  * CPCAP devcies are common for different HW Rev.
  *
@@ -226,7 +223,6 @@ static struct platform_device cpcap_rgb_led = {
 	},
 };
 
-#ifdef CONFIG_ARM_OF
 static int __init led_cpcap_lm3554_init(void)
 {
 	u8 device_available;
@@ -614,8 +610,6 @@ static void get_pm_dbg_drvdata(void)
 	}
 }
 #endif
-
-#endif /* CONFIG_ARM_OF */
 
 
 void __init mapphone_cpcap_client_init(void)

@@ -21,7 +21,6 @@
 
 #ifndef __BOARD_MAPPHONE_PADCONF_H
 #define __BOARD_MAPPHONE_PADCONF_H
-#define CONFIG_ARM_OF
 /* core control module padconf registers are at 0x48002030 - 0x480021E2 */
 #define OMAP343X_PADCONF_CORE_CTRL_BASE (OMAP343X_CTRL_BASE + 0x030)
 #define OMAP343X_PADCONF_CORE_CTRL_TOP  (OMAP343X_CTRL_BASE + 0x1E2)
@@ -92,7 +91,6 @@
 		OMAP343X_PADCONF_MUXMODE7)
 
 
-#ifdef CONFIG_ARM_OF
 #define OMAP343X_PAD_MASK (OMAP343X_PADCONF_MUXMODE7 | \
 		OMAP343X_PADCONF_INPUT_ENABLED | \
 		OMAP343X_PADCONF_PUD_ENABLED | \
@@ -134,6 +132,5 @@ struct mux_offmode_conf_entry {
 	u8 offpull_type;
 	u8 offwkup_en;
 } __attribute__ ((__packed__));
-#endif
 
 #endif
