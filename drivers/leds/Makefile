@@ -61,4 +61,4 @@ obj-$(CONFIG_LEDS_CPCAP)		+= leds-cpcap-adb.o \
 					   leds-cpcap-kpb.o \
 					   leds-cpcap-mdb.o \
 					   leds-cpcap-rgb.o
-
+obj-$(CONFIG_LEDS_LM3554)		+= led-cpcap-lm3554.o

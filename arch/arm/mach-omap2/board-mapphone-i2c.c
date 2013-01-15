@@ -13,8 +13,10 @@
 #include <linux/regulator/consumer.h>
 
 #include "dt_path.h"
+#include <linux/of.h>
 
 #include <linux/led-lm3530.h>
+#include <linux/led-cpcap-lm3554.h>
 #include <linux/kxtf9.h>
 
 #define MAPPHONE_LM_3530_INT_GPIO	92
@@ -408,6 +410,39 @@ static void __init mapphone_kxtf9_init(void)
 
 }
 
+/*
+ * LM3554
+ */
+
+static struct lm3554_platform_data mapphone_camera_flash_3554 = {
+	.flags	= 0x0,
+	.torch_brightness_def = 0xa0,
+	.flash_brightness_def = 0x30,//0x78, GB Devtree doesn't have this value, it can cause burn the flashlight. So set this value as in froyo devtree.
+	.flash_duration_def = 0x28,
+	.config_reg_1_def = 0xe0,
+	.config_reg_2_def = 0xf0,
+	.vin_monitor_def = 0x00,
+	.gpio_reg_def = 0x0,
+};
+
+
+static void __init mapphone_lm3554_init(void) {
+	struct device_node *node;
+	int len = 0;
+	const uint32_t *val;
+
+	node = of_find_node_by_path(DT_PATH_LM3554);
+	if (node != NULL) {
+		val =
+			of_get_property(node, "device_available", &len);
+		if (val && len)
+			mapphone_camera_flash_3554.flags = *val;
+		val = of_get_property(node, "flash_duration_def", &len);
+		if (val && len)
+			mapphone_camera_flash_3554.flash_duration_def = *val;
+	}
+}
+
 /* Init I2C Bus Interfaces */
 
 static struct i2c_board_info *get_board_info
@@ -533,7 +568,10 @@ static struct i2c_board_info __initdata
 
 static struct i2c_board_info __initdata
 	mapphone_i2c_3_boardinfo[] = {
-
+	{
+		I2C_BOARD_INFO("lm3554_led", 0x53),
+		.platform_data = &mapphone_camera_flash_3554,
+	},
 };
 static void __init omap_i2c_hwspinlock_init(int bus_id, int spinlock_id,
 				struct omap_i2c_bus_board_data *pdata)
@@ -598,6 +636,6 @@ void __init mapphone_i2c_init(void)
 
 	mapphone_akm8973_init();
 	mapphone_kxtf9_init();
-
+	mapphone_lm3554_init();
 }
 

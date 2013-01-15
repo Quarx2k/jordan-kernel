@@ -141,6 +141,12 @@ config LEDS_CPCAP
 	help
 	  This option enables support for LEDs on CPCAP.
 
+config LEDS_LM3554
+	tristate "LM3554 driver"
+	depends on LEDS_CLASS && I2C && MFD_CPCAP
+	help
+	  This option enables support for the LM3554 .
+
 config LEDS_SUNFIRE
 	tristate "LED support for SunFire servers."
 	depends on LEDS_CLASS
