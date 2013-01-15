@@ -24,11 +24,15 @@
 #include "../dss/dss.h"
 
 /* Define this Macro for factory board level test only */
-
-#define DEBUG 1
+/* #define DEBUG 1 */
+/*
+ * NOTE: DEBUG may be defined in dss.h already
+ * (when CONFIG_OMAP2_DSS_DEBUG_SUPPORT is enabled).
+ */
 
 static unsigned int panel_debug;
 #define DBG(format, ...) \
+	if (panel_debug) \
 		printk(KERN_DEBUG "mapphone-panel: " format, ## __VA_ARGS__); \
 
 #define EDISCO_CMD_SOFT_RESET		0x01
@@ -419,8 +423,11 @@ static void mapphone_framedone_cb(int err, void *data)
 	struct omap_dss_device *dssdev = data;
 	struct mapphone_data *mp_data = dev_get_drvdata(&dssdev->dev);
 
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	/* Turn on display when framedone */
 	mapphone_panel_display_on(dssdev);
+#endif
+
 	if (mp_data->force_update)
 		queue_work(mp_data->te_wq, &mp_data->te_framedone_work);
 }
@@ -497,11 +504,23 @@ static int mapphone_panel_update(struct omap_dss_device *dssdev,
 		goto err;
 
 	if (dssdev->phy.dsi.type == OMAP_DSS_DSI_TYPE_CMD_MODE) {
+#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+		/**
+		 * On Defy we have to disable highspeed mode before
+		 * sending EDISCO commands.
+		 */
+		omapdss_dsi_vc_enable_hs(dssdev, dsi_vc_cmd, false);
+#endif
+
 		/* Only command mode can do partial update */
 		rr = mapphone_set_update_window(mp_data, x, y, w, h);
 		if (rr)
 			dev_err(&dssdev->dev,
 				"mapphone_set_update_window failed:%d\n", rr);
+
+#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+		omapdss_dsi_vc_enable_hs(dssdev, dsi_vc_cmd, true);
+#endif
 	}
 
 	if (mp_data->te_enabled && panel_data->use_ext_te &&
@@ -515,6 +534,10 @@ static int mapphone_panel_update(struct omap_dss_device *dssdev,
 					msecs_to_jiffies(250));
 		atomic_set(&mp_data->do_update, 1);
 	} else {
+#if 0
+		r = omap_dsi_update(dssdev, dsi_vc_video, x, y, w, h,
+					mapphone_framedone_cb, dssdev);
+#else
 		/* We use VC(1) for VideoPort Data and VC(0) for L4 data */
 		if (cpu_is_omap44xx())
 			r = omap_dsi_update(dssdev, dsi_vc_video, x, y, w, h,
@@ -522,6 +545,7 @@ static int mapphone_panel_update(struct omap_dss_device *dssdev,
 		else
 			r = omap_dsi_update(dssdev, dsi_vc_cmd, x, y, w, h,
 					mapphone_framedone_cb, dssdev);
+#endif
 		if (r)
 			goto err;
 	}
@@ -747,8 +771,14 @@ static int dsi_mipi_cm_panel_on(struct omap_dss_device *dssdev)
 		udelay(24);
 		break;
 	}
+
+#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+	/* Defy doesn't call this in interrupt context so we can send it sync. */
+	return dsi_vc_dcs_write(dssdev, dsi_vc_cmd, &data, 1);
+#else
 	/* Called in interrupt context, send cmd without sync */
 	return dsi_vc_dcs_write_nosync(dssdev, dsi_vc_cmd, &data, 1);
+#endif
 }
 
 
@@ -4002,7 +4032,14 @@ static int mapphone_panel_power_on(struct omap_dss_device *dssdev)
 	mp_data->enabled = true;
 	mp_data->som_enabled = false;
 
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+	/*
+	 * We have to enable highspeed mode later for the Defy,
+	 * because otherwise mapphone_panel_enable_te_locked
+	 * will get SoT errors!
+	 */
 	omapdss_dsi_vc_enable_hs(dssdev, dsi_vc_cmd, true);
+#endif
 
 	if (dssdev->phy.dsi.type == OMAP_DSS_DSI_TYPE_VIDEO_MODE) {
 		if (!dssdev->skip_init)
@@ -4023,6 +4060,17 @@ static int mapphone_panel_power_on(struct omap_dss_device *dssdev)
 		 */
 		dsi_from_dss_runtime_put(dssdev);
 	}
+
+#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+	ret = mapphone_panel_display_on(dssdev);
+	if (ret) {
+		printk(KERN_ERR "%s: failed to mapphone_panel_display_on (%d).\n",
+					__func__, ret);
+		goto err;
+	}
+
+	omapdss_dsi_vc_enable_hs(dssdev, dsi_vc_cmd, true);
+#endif
 
 	printk(KERN_INFO "Mapphone Display is ENABLE\n");
 	return 0;
@@ -4047,9 +4095,11 @@ static void set_vc_channels(struct omap_dss_device *dssdev)
 {
 	if ((dsi_vc_cmd == 0) && (dsi_vc_video == 0)) {
 		switch (dssdev->panel.panel_id) {
+#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 		// TODO Martin / Quarx: are the first two cases required?
 		case MOT_DISP_MIPI_CM_480_854:
 		case MOT_DISP_MIPI_CM_370_480_854:
+#endif
 		case MOT_DISP_LVDS_MIPI_VM_1007_1280_800:
 			dsi_vc_cmd = 1;
 			dsi_vc_video = 0;
@@ -4064,6 +4114,8 @@ static void set_vc_channels(struct omap_dss_device *dssdev)
 	}
 }
 
+#if 0
+/* see mapphone_panel_driver struct declaration. */
 static int mapphone_get_vc_channels(struct omap_dss_device *dssdev,
 		u8 *dsi_vc_cmd_chnl, u8 *dsi_vc_video_chnl)
 {
@@ -4078,6 +4130,7 @@ static int mapphone_get_vc_channels(struct omap_dss_device *dssdev,
 
 	return 0;
 }
+#endif
 
 static int mapphone_panel_start(struct omap_dss_device *dssdev)
 {
@@ -4231,7 +4284,7 @@ static bool mapphone_panel_support_te(struct omap_dss_device *dssdev)
 static int amoled_cmoste_wr(struct omap_dss_device *dssdev)
 {
 	struct mapphone_dsi_panel_data *panel_data = get_panel_data(dssdev);
-	int r;
+	int r = 0;
 	u8 data[6];
 
 	if ((panel_data->te_type == OMAP_DSI_TE_CMOS_TE_0) &&
@@ -4313,6 +4366,8 @@ static int mapphone_panel_enable_te(struct omap_dss_device *dssdev, bool enable)
 	int r = 0;
 	struct mapphone_data *map_data = dev_get_drvdata(&dssdev->dev);
 
+	DBG("%s()\n", __func__);
+
 	if (dssdev->phy.dsi.type == OMAP_DSS_DSI_TYPE_CMD_MODE) {
 		mutex_lock(&map_data->lock);
 
@@ -4346,11 +4401,14 @@ static int mapphone_panel_enable_te(struct omap_dss_device *dssdev, bool enable)
 	return r;
 }
 
+#if 0
+/* see mapphone_panel_driver struct declaration. */
 static bool mapphone_panel_manual_te_trigger(struct omap_dss_device *dssdev)
 {
 	struct mapphone_dsi_panel_data *panel_data = get_panel_data(dssdev);
 	return panel_data->manual_te_trigger;
 }
+#endif
 
 static int mapphone_panel_rotate(struct omap_dss_device *display, u8 rotate)
 {
@@ -4479,6 +4537,8 @@ static enum omap_dss_update_mode mapphone_panel_get_update_mode(
 		return OMAP_DSS_UPDATE_MANUAL;
 }
 
+#if 0
+/* see mapphone_panel_driver struct declaration. */
 static int mapphone_panel_reg_read(struct omap_dss_device *dssdev,
 				u8 address, u16 size, u8 *buf,
 				u8 use_hs_mode)
@@ -4552,6 +4612,7 @@ end:
 	DBG("write reg done, r = %d\n", r);
 	return r;
 }
+#endif
 
 static u8 amoled_bl_data_ws[][26] = {
 	{0xfa, 0x02, 0x20, 0x00, 0x20, 0xa0, 0x00, 0xa0, 0xd2, 0xa0,
@@ -4811,6 +4872,21 @@ static struct omap_dss_driver mapphone_panel_driver = {
 	.get_timings		= mapphone_panel_get_timings,
 	.set_timings		= mapphone_panel_set_timings,
 	.check_timings		= mapphone_panel_check_timings,
+
+#if 0
+	/*
+	 * These are not supported in the DSS version in 3.0.8,
+	 * but they might be interesting later ;-).
+	 * Then you may also need to remove the #ifdef
+	 * in mapphone_framedone_cb!
+	 */
+	.framedone		= mapphone_panel_display_on,
+	.support_te		= mapphone_panel_support_te,
+	.manual_te_trigger	= mapphone_panel_manual_te_trigger,
+	.reg_read		= mapphone_panel_reg_read,
+	.reg_write		= mapphone_panel_reg_write,
+	.get_dsi_vc_chnls	= mapphone_get_vc_channels,
+#endif
 
 	.driver = {
 		.name = "mapphone-panel",
