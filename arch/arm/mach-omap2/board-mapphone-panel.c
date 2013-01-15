@@ -34,10 +34,17 @@
 
 #include "pm.h"
 /*#define DISABLED_FOR_BRINGUP*/
-#define DEBUG
+/*#define DEBUG*/
+#ifdef DEBUG
+static unsigned int board_panel_debug;
 #define PANELDBG(format, ...) \
+	if (board_panel_debug) \
 			printk(KERN_DEBUG "board_panel: " format, \
 					## __VA_ARGS__)
+#else /* DEBUG */
+#define PANELDBG(format, ...)
+#endif
+
 #define PANELERR(format, ...) \
 	printk(KERN_ERR "board_panel ERR: " format, ## __VA_ARGS__)
 
@@ -433,7 +440,9 @@ static struct omapfb_platform_data mapphone_fb_data = {
 
 static struct omap_dss_device *mapphone_dss_devices[] = {
 	&mapphone_lcd_device,
-	//&mapphone_hdtv_device,
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+	&mapphone_hdtv_device,
+#endif
 };
 
 static struct omap_dss_board_info mapphone_dss_data = {
@@ -1160,12 +1169,12 @@ static int __init mapphone_dt_panel_init(void)
 		} else if (mapphone_dt_get_panel_feature() != 0) {
 			PANELERR("failed to parse panel feature info\n");
 			ret = -ENODEV;
-/*
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 		} else if (mapphone_feature_hdmi &&
 				mapphone_dt_get_hdtv_info() != 0) {
 			PANELERR("failed to parse hdtv info\n");
 			ret = -ENODEV;
-*/
+#endif
 		} else {
 			mapphone_panel_device_read_dt = true;
 		}
@@ -1393,7 +1402,7 @@ void __init mapphone_panel_init(void)
 		gpio_direction_output(mapphone_displ_lvds_wp_e, 1);
 	}
 
-#if 0
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	if (mapphone_feature_hdmi) {
 		/* Set the bits to disable "internal pullups" for the DDC
 		 * clk and data lines.  This is required for ES2.3 parts
