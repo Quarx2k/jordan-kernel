@@ -331,7 +331,6 @@ static int mapphone_panel_power_on(struct omap_dss_device *dssdev);
 
 static void mapphone_esd_work(struct work_struct *work)
 {
-
 	struct mapphone_data *mp_data = container_of(work, struct mapphone_data,
 			esd_work.work);
 	struct omap_dss_device *dssdev = mp_data->dssdev;
@@ -341,6 +340,9 @@ static void mapphone_esd_work(struct work_struct *work)
 	int r;
 	struct omap_dss_driver *dssdrv = dssdev->driver;
 	u16 w, h;
+
+	DBG("%s()\n", __func__);
+
 	mutex_lock(&mp_data->lock);
 
 	if (!mp_data->enabled) {
@@ -645,8 +647,11 @@ static void te_work_callback(struct work_struct *work)
 	struct mapphone_data *mp_data = container_of(work, struct mapphone_data,
 						te_framedone_work);
 	struct omap_dss_device *dssdev = mp_data->dssdev;
+
 	u16 x_res = dssdev->panel.timings.x_res;
 	u16 y_res = dssdev->panel.timings.y_res;
+
+	DBG("%s()\n", __func__);
 
 	mapphone_panel_update(dssdev, 0, 0, x_res, y_res);
 }
@@ -660,6 +665,8 @@ static int mapphone_panel_memory_read(struct omap_dss_device *dssdev,
 	int plen;
 	unsigned buf_used = 0;
 	struct mapphone_data *mp_data = dev_get_drvdata(&dssdev->dev);
+
+	DBG("%s()\n", __func__);
 
 	if (size < w * h * 3)
 		return -ENOMEM;
