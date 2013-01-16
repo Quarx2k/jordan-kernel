@@ -346,6 +346,7 @@ static void mapphone_esd_work(struct work_struct *work)
 	mutex_lock(&mp_data->lock);
 
 	if (!mp_data->enabled) {
+		DBG("%s: ignoring because display is disabled\n", __func__);
 		mutex_unlock(&mp_data->lock);
 		return;
 	}
@@ -353,12 +354,20 @@ static void mapphone_esd_work(struct work_struct *work)
 	dsi_bus_lock(dssdev);
 	dsi_from_dss_runtime_get(dssdev);
 
+#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+	omapdss_dsi_vc_enable_hs(dssdev, dsi_vc_cmd, false);
+#endif
+
 	r = dsi_vc_dcs_read(dssdev, dsi_vc_cmd, EDISCO_CMD_GET_POWER_MODE,
 			&power_mode, 1);
 	if (r != 1) {
 		dev_err(&dssdev->dev, "Failed to get power mode, r = %d\n", r);
 		goto err;
 	}
+
+#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+	omapdss_dsi_vc_enable_hs(dssdev, dsi_vc_cmd, true);
+#endif
 
 	if (atomic_read(&panel_data->state) == PANEL_ON)
 		expected_mode = 0x9c;
@@ -510,10 +519,6 @@ static int mapphone_panel_update(struct omap_dss_device *dssdev,
 
 	if (dssdev->phy.dsi.type == OMAP_DSS_DSI_TYPE_CMD_MODE) {
 #ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
-		/**
-		 * On Defy we have to disable highspeed mode before
-		 * sending EDISCO commands.
-		 */
 		omapdss_dsi_vc_enable_hs(dssdev, dsi_vc_cmd, false);
 #endif
 
@@ -692,6 +697,10 @@ static int mapphone_panel_memory_read(struct omap_dss_device *dssdev,
 	else
 		plen = 2;
 
+#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+	omapdss_dsi_vc_enable_hs(dssdev, dsi_vc_cmd, false);
+#endif
+
 	mapphone_set_update_window(mp_data, x, y, w, h);
 
 	r = dsi_vc_set_max_rx_packet_size(dssdev, dsi_vc_cmd, plen);
@@ -730,6 +739,10 @@ static int mapphone_panel_memory_read(struct omap_dss_device *dssdev,
 err3:
 	dsi_vc_set_max_rx_packet_size(dssdev, dsi_vc_cmd, 1);
 err2:
+#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+	omapdss_dsi_vc_enable_hs(dssdev, dsi_vc_cmd, true);
+#endif
+
 	dsi_bus_unlock(dssdev);
 err1:
 	mutex_unlock(&mp_data->lock);
