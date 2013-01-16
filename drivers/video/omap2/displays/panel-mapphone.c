@@ -890,9 +890,6 @@ static u16 read_supplier_id(struct omap_dss_device *dssdev)
 		goto end;
 	}
 
-	// Wait a bit because dsi_vc_set_max_rx_packet_size is async!
-	msleep(20);
-
 	r = dsi_vc_dcs_read(dssdev, dsi_vc_cmd,
 			    EDISCO_CMD_READ_DDB_START, data, CTL_SUPPLIER_ID_LEN);
 	if (r == CTL_SUPPLIER_ID_LEN) {
@@ -1801,9 +1798,6 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 
 	DBG("dsi_mipi_cm_480_854_panel_enable()\n");
 
-	/* 120ms delay for internal stabilization */
-	msleep(120);
-
 	/* Check if the display we are using is actually a TMD display */
 	if (dssdev->panel.panel_id == MOT_DISP_MIPI_CM_370_480_854) {
 		if (read_supplier_id(dssdev) ==  CTL_SUPPLIER_ID_TMD) {
@@ -1822,9 +1816,6 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 						EDISCO_CMD_MCS_OFF, 0x3);
 	if (ret)
 		printk(KERN_ERR "failed to send SET_MCS\n");
-
-
-	msleep(10);
 
 	/* enable lane setting and test registers*/
 	data[0] = 0xef;
@@ -1862,8 +1853,6 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 	if (ret)
 		printk(KERN_ERR "failed to send LANE_CONFIG\n");
 
-	msleep(10);
-
 	/* Forcing display inversion off for hardware issue
 	 * on some phones (observed inverted color, ~1% of powerups fail)
 	 */
@@ -1875,8 +1864,6 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 				0x00, EDISCO_CMD_SET_INVERSION_OFF);
 	if (ret)
 		printk(KERN_ERR "failed to send EDISCO_CMD_SET_INVERSION_OFF \n");
-
-	msleep(10);
 
 	/* 2nd param 0 = WVGA; 1 = WQVGA */
 	data[0] = EDISCO_CMD_SET_DISPLAY_MODE;
@@ -1890,8 +1877,6 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 
 	if (ret)
 		printk(KERN_ERR "failed to send SET_DISPLAY_MODE\n");
-
-	msleep(10);
 
 	/* Set dynamic backlight control and PWM; D[7:4] = PWM_DIV[3:0];*/
 	/* D[3]=0 (PWM OFF);
@@ -1916,8 +1901,6 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 	printk("EDISCO_CMD_SET_BCKLGHT_PWM\n");
 	if (ret)
 		printk(KERN_ERR "failed to send CABC/PWM\n");
-
-	msleep(10);
 
 	data[0] = EDISCO_CMD_EXIT_SLEEP_MODE;
 	ret = mapphone_panel_lp_cmd_wrt_sync(dssdev,
