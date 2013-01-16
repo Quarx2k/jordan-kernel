@@ -1,26 +1,26 @@
 /**********************************************************************
  *
- * Copyright (C) Imagination Technologies Ltd. All rights reserved.
- * 
+ * Copyright(c) 2008 Imagination Technologies Ltd. All rights reserved.
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
  * version 2, as published by the Free Software Foundation.
- * 
- * This program is distributed in the hope it will be useful but, except 
- * as otherwise stated in writing, without any warranty; without even the 
- * implied warranty of merchantability or fitness for a particular purpose. 
+ *
+ * This program is distributed in the hope it will be useful but, except
+ * as otherwise stated in writing, without any warranty; without even the
+ * implied warranty of merchantability or fitness for a particular purpose.
  * See the GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License along with
  * this program; if not, write to the Free Software Foundation, Inc.,
  * 51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
- * 
+ *
  * The full GNU General Public License is included in this distribution in
  * the file called "COPYING".
  *
  * Contact Information:
  * Imagination Technologies Ltd. <gpl-support@imgtec.com>
- * Home Park Estate, Kings Langley, Herts, WD4 8LZ, UK 
+ * Home Park Estate, Kings Langley, Herts, WD4 8LZ, UK
  *
  ******************************************************************************/
 
@@ -50,15 +50,15 @@ PRIVATEHOTKEYDATA    g_PrivateHotKeyData;
 
 IMG_VOID ReadInHotKeys(IMG_VOID)
 {
-	g_PrivateHotKeyData.ui32ScanCode = 0x58;	
+	g_PrivateHotKeyData.ui32ScanCode = 0x58;
 	g_PrivateHotKeyData.ui32ShiftState = 0x0;
 
-	
+
 
 #if 0
 	if (_RegOpenKey(HKEY_LOCAL_MACHINE,pszRegPath,&hKey) == ERROR_SUCCESS)
 	{
-		
+
 
 		QueryReg(hKey,"ui32ScanCode",&g_PrivateHotKeyData.ui32ScanCode);
 		QueryReg(hKey,"ui32ShiftState",&g_PrivateHotKeyData.ui32ShiftState);
@@ -83,11 +83,11 @@ IMG_VOID RegisterKeyPressed(IMG_UINT32 dwui32ScanCode, PHOTKEYINFO pInfo)
 
 		if (!g_bHotKeyPressed)
 		{
-			
+
 
 			g_ui32HotKeyFrame = psStream->psCtrl->ui32Current + 2;
 
-			
+
 
 			g_bHotKeyPressed = IMG_TRUE;
 		}
@@ -96,11 +96,11 @@ IMG_VOID RegisterKeyPressed(IMG_UINT32 dwui32ScanCode, PHOTKEYINFO pInfo)
 
 IMG_VOID ActivateHotKeys(PDBG_STREAM psStream)
 {
-	
+
 
 	ReadInHotKeys();
 
-	
+
 
 	if (!g_PrivateHotKeyData.sHotKeyInfo.hHotKey)
 	{
@@ -108,7 +108,7 @@ IMG_VOID ActivateHotKeys(PDBG_STREAM psStream)
 		{
 			PVR_DPF((PVR_DBG_MESSAGE,"Activate HotKey for PDUMP.\n"));
 
-			
+
 
 			g_PrivateHotKeyData.sHotKeyInfo.pvStream = psStream;
 

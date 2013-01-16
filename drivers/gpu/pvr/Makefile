@@ -93,7 +93,6 @@ pvrsrvkm-y := \
 	perproc.o \
 	lists.o \
 	refcount.o \
-	sysfs.o \
 	sgx/bridged_sgx_bridge.o \
 	sgx/sgxinit.o \
 	sgx/sgxpower.o \
