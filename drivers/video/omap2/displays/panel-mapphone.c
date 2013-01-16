@@ -4187,6 +4187,10 @@ static void mapphone_panel_disable_local(struct omap_dss_device *dssdev)
 
 	atomic_set(&panel_data->state, PANEL_OFF);
 
+#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+	omapdss_dsi_vc_enable_hs(dssdev, dsi_vc_cmd, false);
+#endif
+
 	/*
 	 * Change panel power down sequence to be aligned with spec.
 	 * The cmd order has to be 10h  and then 28h, inverting them may
@@ -4202,6 +4206,9 @@ static void mapphone_panel_disable_local(struct omap_dss_device *dssdev)
 
 	msleep(120);
 
+#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+	omapdss_dsi_vc_enable_hs(dssdev, dsi_vc_cmd, true);
+#endif
 }
 
 static void mapphone_panel_power_off(struct omap_dss_device *dssdev,
@@ -4383,12 +4390,19 @@ static int mapphone_panel_enable_te(struct omap_dss_device *dssdev, bool enable)
 				map_data->te_enabled = enable;
 				DBG("Changed TE state in SO,TE=%d\n", enable);
 			} else {
+#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+				omapdss_dsi_vc_enable_hs(dssdev, dsi_vc_cmd, false);
+#endif
 				r = mapphone_panel_enable_te_locked(dssdev,
 					 enable);
 				if (!r) {
 					map_data->te_enabled = enable;
 					DBG("Changed TE state,TE=%d\n", enable);
 				}
+
+#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+				omapdss_dsi_vc_enable_hs(dssdev, dsi_vc_cmd, true);
+#endif
 			}
 
 			dsi_from_dss_runtime_put(dssdev);
