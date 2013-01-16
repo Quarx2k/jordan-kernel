@@ -534,10 +534,6 @@ static int mapphone_panel_update(struct omap_dss_device *dssdev,
 					msecs_to_jiffies(250));
 		atomic_set(&mp_data->do_update, 1);
 	} else {
-#if 0
-		r = omap_dsi_update(dssdev, dsi_vc_video, x, y, w, h,
-					mapphone_framedone_cb, dssdev);
-#else
 		/* We use VC(1) for VideoPort Data and VC(0) for L4 data */
 		if (cpu_is_omap44xx())
 			r = omap_dsi_update(dssdev, dsi_vc_video, x, y, w, h,
@@ -545,7 +541,6 @@ static int mapphone_panel_update(struct omap_dss_device *dssdev,
 		else
 			r = omap_dsi_update(dssdev, dsi_vc_cmd, x, y, w, h,
 					mapphone_framedone_cb, dssdev);
-#endif
 		if (r)
 			goto err;
 	}
