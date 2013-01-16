@@ -210,7 +210,7 @@ static int mapphone_hsmmc_late_init(struct device *dev)
 		pdata->slots[0].set_power = emmc_set_power;
 		pdata->slots[0].set_sleep = emmc_set_sleep;
 	} else if (pdev->id == 2)
-		pdata->slots[0].set_power = 0;//wifi_set_power; TODO
+		pdata->slots[0].set_power = wifi_set_power;
 	return ret;
 }
 

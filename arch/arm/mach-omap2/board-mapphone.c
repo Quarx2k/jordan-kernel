@@ -19,6 +19,7 @@
 #include <linux/of_fdt.h>
 #include <linux/of.h>
 #include <linux/led-lm3530.h>
+#include <linux/wl12xx.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -39,6 +40,7 @@
 #include "omap_ion.h"
 #include "dt_path.h"
 #include "pm.h"
+#include "hsmmc.h"
 
 #ifdef CONFIG_EMU_UART_DEBUG
 #include <plat/board-mapphone-emu_uart.h>
@@ -46,6 +48,8 @@
 #include <../drivers/w1/w1_family.h> /* for W1_EEPROM_DS2502 */
 
 #define MAPPHONE_POWER_OFF_GPIO 176
+#define MAPPHONE_WIFI_PMENA_GPIO 186
+#define MAPPHONE_WIFI_IRQ_GPIO 65
 
 char *bp_model = "CDMA";
 static char boot_mode[BOOT_MODE_MAX_LEN+1];
@@ -110,6 +114,44 @@ static int __init omap_hdq_init(void)
 {
 	omap_hdq_dev.dev.platform_data = &mapphone_hdq_data;
 	return platform_device_register(&omap_hdq_dev);
+}
+
+static struct wl12xx_platform_data mapphone_wlan_data __initdata = {
+	.irq = -1, /* OMAP_GPIO_IRQ(GPIO_WIFI_IRQ),*/
+	.board_ref_clock = WL12XX_REFCLOCK_26,
+	.board_tcxo_clock = 1,
+};
+
+int wifi_set_power(struct device *dev, int slot, int power_on, int vdd)
+{
+	static int power_state;
+	pr_debug("Powering %s wifi", (power_on ? "on" : "off"));
+	if (power_on == power_state)
+		return 0;
+	power_state = power_on;
+	if (power_on) {
+		gpio_set_value(MAPPHONE_WIFI_IRQ_GPIO, 1);
+		mdelay(15);
+		gpio_set_value(MAPPHONE_WIFI_IRQ_GPIO, 0);
+		mdelay(1);
+		gpio_set_value(MAPPHONE_WIFI_IRQ_GPIO, 1);
+		mdelay(70);
+	} else
+		gpio_set_value(MAPPHONE_WIFI_PMENA_GPIO, 0);
+	return 0;
+}
+static void mapphone_wifi_init(void)
+{
+	int ret;
+	ret = gpio_request(MAPPHONE_WIFI_PMENA_GPIO, "wifi_pmena");
+	if (ret < 0)
+		goto out;
+	gpio_direction_output(MAPPHONE_WIFI_PMENA_GPIO, 0);
+	mapphone_wlan_data.irq = OMAP_GPIO_IRQ(MAPPHONE_WIFI_IRQ_GPIO);
+	if (wl12xx_set_platform_data(&mapphone_wlan_data))
+		pr_err("Error setting wl12xx data\n");
+out:
+	return;
 }
 
 static void __init mapphone_bp_model_init(void)
@@ -232,13 +274,13 @@ static void __init omap_mapphone_init(void)
 	mapphone_i2c_init();
 	mapphone_panel_init();
 	mapphone_als_init();
-	mapphone_hsmmc_init();
+	mapphone_wifi_init();
 	mapphone_cpcap_client_init();
 	mapphone_spi_init();
 	omap_register_ion();
 	omap_hdq_init();
-
 	mapphone_power_off_init();
+	mapphone_hsmmc_init();
 	//omap3_mux_init(board_mux, OMAP_PACKAGE_CBP);
 	//omap_board_config = sdp_config;
 	//omap_board_config_size = ARRAY_SIZE(sdp_config);

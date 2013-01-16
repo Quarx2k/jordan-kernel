@@ -8,6 +8,7 @@
 
 #include <asm/mach/mmc.h>
 
+
 struct mmc_card;
 
 typedef int (*mmc_card_detect_func)(struct device *dev, int slot);
@@ -48,3 +49,5 @@ static inline void omap2_hsmmc_init(struct omap2_hsmmc_info *info)
 }
 
 #endif
+
+extern int wifi_set_power(struct device *dev, int slot, int power_on, int vdd);
