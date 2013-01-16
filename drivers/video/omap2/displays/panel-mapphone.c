@@ -426,6 +426,8 @@ static void mapphone_framedone_cb(int err, void *data)
 #ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	/* Turn on display when framedone */
 	mapphone_panel_display_on(dssdev);
+#else
+	dsi_bus_unlock(dssdev);
 #endif
 
 	if (mp_data->force_update)
@@ -495,6 +497,7 @@ static int mapphone_panel_update(struct omap_dss_device *dssdev,
 	dsi_from_dss_runtime_get(dssdev);
 
 	if (!mp_data->enabled) {
+		DBG("Got update for disabled panel\n");
 		r = 0;
 		goto err;
 	}
@@ -558,6 +561,8 @@ err:
 static int mapphone_panel_sync(struct omap_dss_device *dssdev)
 {
 	struct mapphone_data *mp_data = dev_get_drvdata(&dssdev->dev);
+
+	DBG("%s()\n", __func__);
 
 	mutex_lock(&mp_data->lock);
 	dsi_bus_lock(dssdev);
