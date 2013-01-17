@@ -1537,28 +1537,7 @@ static void mapphone_panel_remove(struct omap_dss_device *dssdev)
 
 	return;
 }
-int dsi_vc_write(struct omap_dss_device *dssdev, int channel,
-		 u8 data_type, u8 *data, int len)
-{
-	int r;
 
-	// Validate the given data_type against the length.
-	if (data_type == EDISCO_LONG_WRITE) {
-		WARN_ON(len <= 2);
-	} else if (data_type == EDISCO_SHORT_WRITE_1) {
-		WARN_ON(len != 2);
-	} else if (data_type == EDISCO_SHORT_WRITE_0) {
-		WARN_ON(len < 0 || len > 1);
-	} else {
-		printk(KERN_WARNING "%s: Unknown data type %d given\n",
-		       __func__, data_type);
-	}
-
-	/* TODO: Can we really ignore data_type? */
-	r = dsi_vc_dcs_write(dssdev, channel, data, len);
-
-	return r;
-}
 /* - In the LP mode, some panels have problems to receive command correctly
  * so we will send command out and read it back to make sure the write
  * command is accepted

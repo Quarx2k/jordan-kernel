@@ -295,6 +295,12 @@ int dsi_vc_gen_write(struct omap_dss_device *dssdev, int channel,
 int dsi_vc_set_max_rx_packet_size(struct omap_dss_device *dssdev, int channel,
 		u16 len);
 int dsi_vc_send_null(struct omap_dss_device *dssdev, int channel);
+#ifdef CONFIG_PANEL_MAPPHONE
+int dsi_vc_write_nosync(struct omap_dss_device *dssdev, int channel, u8 data_type,
+			u8 *data, int len);
+int dsi_vc_write(struct omap_dss_device *dssdev, int channel, u8 data_type,
+		 u8 *data, int len);
+#endif
 int dsi_vc_send_bta_sync(struct omap_dss_device *dssdev, int channel);
 
 int dsi_video_mode_enable(struct omap_dss_device *dssdev, u8 data_type);

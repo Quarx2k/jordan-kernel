@@ -2753,7 +2753,9 @@ static int dsi_sync_vc(struct platform_device *dsidev, int channel)
 
 	WARN_ON(!dsi_bus_is_locked(dsidev));
 
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	WARN_ON(in_interrupt());
+#endif
 
 	if (!dsi_vc_is_enabled(dsidev, channel))
 		return 0;
@@ -3203,6 +3205,44 @@ int dsi_vc_send_null(struct omap_dss_device *dssdev, int channel)
 		4, 0);
 }
 EXPORT_SYMBOL(dsi_vc_send_null);
+
+#ifdef CONFIG_PANEL_MAPPHONE
+int dsi_vc_write_nosync(struct omap_dss_device *dssdev, int channel, u8 data_type,
+			u8 *data, int len)
+{
+	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
+	int r;
+
+	BUG_ON(len == 0);
+
+	if (len == 1)
+		r = dsi_vc_send_short(dsidev, channel, data_type, data[0], 0);
+	else if (len == 2)
+		r = dsi_vc_send_short(dsidev, channel, data_type,
+				data[0] | (data[1] << 8), 0);
+	else
+		r = dsi_vc_send_long(dsidev, channel, data_type, data, len, 0);
+
+	return r;
+}
+EXPORT_SYMBOL(dsi_vc_write_nosync);
+
+int dsi_vc_write(struct omap_dss_device *dssdev, int channel, u8 data_type,
+		 u8 *data, int len)
+{
+	int r;
+
+	r = dsi_vc_write_nosync(dssdev, channel, data_type, data, len);
+	if (r)
+		return r;
+
+	r = dsi_vc_send_bta_sync(dssdev, channel);
+
+	return r;
+
+}
+EXPORT_SYMBOL(dsi_vc_write);
+#endif
 
 int dsi_vc_dcs_write_nosync(struct omap_dss_device *dssdev, int channel,
 		u8 *data, int len)
