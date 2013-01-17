@@ -611,7 +611,6 @@ static int mapphone_isl29030_init(void)
 	return err;
 }
 
-
 /* Init I2C Bus Interfaces */
 
 static struct i2c_board_info *get_board_info
@@ -717,6 +716,15 @@ static int initialize_i2c_bus_info
 static struct i2c_board_info __initdata
 	mapphone_i2c_1_boardinfo[] = {
 	{
+		I2C_BOARD_INFO("invalid_touch_panel", 0x11),
+		.platform_data = NULL,
+		.irq = OMAP_GPIO_IRQ(99),  /* Legacy val */
+	},
+	{
+		I2C_BOARD_INFO("invalid_touch_btn", 0x11),
+		.platform_data = NULL,
+	},
+	{
 		I2C_BOARD_INFO(LD_LM3530_NAME, 0x38),
 		.platform_data = &omap3430_als_light_data,
 		.irq = OMAP_GPIO_IRQ(MAPPHONE_LM_3530_INT_GPIO),
@@ -771,6 +779,10 @@ static struct omap_i2c_bus_board_data __initdata mapphone_i2c_3_bus_pdata;
 void __init mapphone_i2c_init(void)
 {
 	int i2c_bus_devices = 0;
+
+	/* touch_init() must run before i2c_init() */
+	mapphone_touch_panel_init(&mapphone_i2c_1_boardinfo[0]);
+	mapphone_touch_btn_init(&mapphone_i2c_1_boardinfo[1]);
 
 	omap_i2c_hwspinlock_init(1, 0, &mapphone_i2c_1_bus_pdata);
 	omap_i2c_hwspinlock_init(2, 1, &mapphone_i2c_2_bus_pdata);

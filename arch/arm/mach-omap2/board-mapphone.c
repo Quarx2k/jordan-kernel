@@ -96,15 +96,6 @@ static int __init parse_tag_flat_dev_tree_address(const struct tag *tag)
 
 __tagtable(ATAG_FLAT_DEV_TREE_ADDRESS, parse_tag_flat_dev_tree_address);
 
-static struct attribute *mapphone_properties_attrs[] = {
-	//&mapphone_virtual_keys_attr.attr,
-	NULL,
-};
-
-static struct attribute_group mapphone_properties_attr_group = {
-	.attrs = mapphone_properties_attrs,
-};
-
 static struct omap2_hdq_platform_config mapphone_hdq_data = {
 	.mode = OMAP_SDQ_MODE,
 	.id = W1_EEPROM_DS2502,
@@ -258,15 +249,6 @@ static void __init omap_mapphone_init_early(void)
 
 static void __init omap_mapphone_init(void)
 {
-	struct kobject *properties_kobj = NULL;
-	int ret = 0;
-	properties_kobj = kobject_create_and_add("board_properties", NULL);
-	if (properties_kobj)
-		ret = sysfs_create_group(properties_kobj,
-				 &mapphone_properties_attr_group);
-	if (!properties_kobj || ret)
-		pr_err("failed to create board_properties\n");
-
 	mapphone_bp_model_init();
 	mapphone_voltage_init();
 	mapphone_gpio_mapping_init();
@@ -282,10 +264,6 @@ static void __init omap_mapphone_init(void)
 	mapphone_power_off_init();
 	mapphone_hsmmc_init();
 	omap_enable_smartreflex_on_init();
-	//omap3_mux_init(board_mux, OMAP_PACKAGE_CBP);
-	//omap_board_config = sdp_config;
-	//omap_board_config_size = ARRAY_SIZE(sdp_config);
-	//enable_board_wakeup_source();
 	//usbhs_init(&usbhs_bdata);
 #ifdef CONFIG_EMU_UART_DEBUG
 	/* emu-uart function will override devtree iomux setting */
