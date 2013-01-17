@@ -18,6 +18,7 @@
 #include <linux/led-lm3530.h>
 #include <linux/led-cpcap-lm3554.h>
 #include <linux/kxtf9.h>
+#include <linux/isl29030.h>
 
 #define MAPPHONE_LM_3530_INT_GPIO	92
 #define MAPPHONE_AKM8973_INT_GPIO	175
@@ -443,6 +444,174 @@ static void __init mapphone_lm3554_init(void) {
 	}
 }
 
+/*
+ * ISL29030
+ */
+
+struct isl29030_platform_data isl29030_pdata = {
+	.configure = 0x62,
+	.interrupt_cntrl = 0x20,
+	.prox_lower_threshold = 0x1e,
+	.prox_higher_threshold = 0x32,
+	.crosstalk_vs_covered_threshold = 0x30,
+	.default_prox_noise_floor = 0x30,
+	.num_samples_for_noise_floor = 0x05,
+	.lens_percent_t = 20,
+	.regulator_name = {0},
+};
+
+static ssize_t isl29030_sysfs_show(struct class *dev,
+	struct class_attribute *attr, char *buf)
+{
+	int data;
+	char *str = buf;
+	ssize_t count;
+	int gpio = get_gpio_by_name("als_int");
+
+	if (gpio < 0) {
+		printk(KERN_DEBUG "can't retrieve als_int.\n");
+		return -ENODEV;
+	}
+
+	data = gpio_get_value(gpio);
+	str += sprintf(str, "%d\n", data);
+	count = (ssize_t) (str - buf);
+	return count;
+}
+
+static CLASS_ATTR(isl29030, S_IRUGO, isl29030_sysfs_show, NULL);
+
+static int mapphone_isl29030_init(void)
+{
+	int err = 0;
+	struct device_node *prox_node = NULL;
+	const void *prop = NULL;
+	const char *prop_str = NULL;
+	int len = 0;
+	int i;
+	int gpio = 0;
+	struct class *class;
+	prox_node = of_find_node_by_path(DT_PATH_PROX);
+	if (prox_node != NULL) {
+		pr_err("%s - opened node %s from device tree\n",
+			__func__, DT_PATH_PROX);
+
+		prop_str = DT_PROP_ISL29030_CONF;
+		prop = of_get_property(prox_node, prop_str, &len);
+		if ((prop == NULL) || (len == 0)) {
+			pr_err("%s - unable to read %s from device tree\n",
+				 __func__, prop_str);
+			err = -1;
+		} else
+			isl29030_pdata.configure = *(u8 *)prop;
+
+		prop_str = DT_PROP_ISL29030_INT_CNTL;
+		prop = of_get_property(prox_node, prop_str, &len);
+		if ((prop == NULL) || (len == 0)) {
+			pr_err("%s - unable to read %s from device tree\n",
+					 __func__, prop_str);
+			err = -1;
+		} else
+			isl29030_pdata.interrupt_cntrl = *(u8 *)prop;
+
+		prop_str = DT_PROP_ISL29030_PROX_LOW_TH;
+		prop = of_get_property(prox_node, prop_str, &len);
+		if ((prop == NULL) || (len == 0)) {
+			pr_err("%s - unable to read %s from device tree\n",
+				 __func__, prop_str);
+			err = -1;
+		} else
+			isl29030_pdata.prox_lower_threshold = *(u8 *)prop;
+
+		prop_str = DT_PROP_ISL29030_PROX_HIGH_TH;
+		prop = of_get_property(prox_node, prop_str, &len);
+		if ((prop == NULL) || (len == 0)) {
+			pr_err("%s - unable to read %s from device tree\n",
+				 __func__, prop_str);
+			err = -1;
+		} else
+			isl29030_pdata.prox_higher_threshold = *(u8 *)prop;
+
+		prop_str = DT_PROP_ISL29030_XTALK_V_COV_TH;
+		prop = of_get_property(prox_node, prop_str, &len);
+		if ((prop == NULL) || (len == 0)) {
+			pr_err("%s - unable to read %s from device tree\n",
+				 __func__, prop_str);
+			err = -1;
+		} else
+			isl29030_pdata.crosstalk_vs_covered_threshold =
+				*(u8 *)prop;
+
+		prop_str = DT_PROP_ISL29030_DEF_PROX_NOISE;
+		prop = of_get_property(prox_node, prop_str, &len);
+		if ((prop == NULL) || (len == 0)) {
+			pr_err("%s - unable to read %s from device tree\n",
+				 __func__, prop_str);
+			err = -1;
+		} else
+			isl29030_pdata.default_prox_noise_floor = *(u8 *)prop;
+
+		prop_str = DT_PROP_ISL29030_NUM_SAMP_NOISE;
+		prop = of_get_property(prox_node, prop_str, &len);
+		if ((prop == NULL) || (len == 0)) {
+			pr_err("%s - unable to read %s from device tree\n",
+				 __func__, prop_str);
+			err = -1;
+		} else
+			isl29030_pdata.num_samples_for_noise_floor =
+				*(u8 *)prop;
+
+		prop_str = DT_PROP_ISL29030_LENS_PERCENT;
+		prop = of_get_property(prox_node, prop_str, &len);
+		if ((prop == NULL) || (len == 0)) {
+			pr_err("%s - unable to read %s from device tree\n",
+				 __func__, prop_str);
+			err = -1;
+		} else
+			isl29030_pdata.lens_percent_t = *(u8 *)prop;
+
+		prop_str = DT_PROP_ISL29030_REGULATOR;
+		prop = of_get_property(prox_node, prop_str, &len);
+		if ((prop == NULL) || (len == 0)) {
+			pr_info("%s - unable to read %s from device tree\n",
+				 __func__, prop_str);
+		} else {
+			if (len > ISL29030_REGULATOR_NAME_LENGTH) {
+				pr_err("%s - %s entry %s too long\n",
+					__func__, prop_str, (char *)prop);
+				/* Truncation should cause driver to err out,
+				 * unless truncated name is valid */
+				len = ISL29030_REGULATOR_NAME_LENGTH - 1;
+			}
+			for (i = 0; i < len; i++)
+				isl29030_pdata.regulator_name[i] =
+					((char *)prop)[i];
+		}
+
+		of_node_put(prox_node);
+	} else {
+		pr_err("%s - unable to read %s node from device tree.\n",
+			__func__, DT_PATH_PROX);
+		err = -1;
+	}
+
+	gpio = get_gpio_by_name("als_int");
+	if (gpio >= 0) {
+		isl29030_pdata.irq = gpio_to_irq(gpio);
+		gpio_request(gpio, "isl29030 proximity int");
+		gpio_direction_input(gpio);
+		class = class_create(THIS_MODULE, "isl29030");
+		if (IS_ERR(class))
+			printk(KERN_ERR "isl29030 can't register class\n");
+		else if (class_create_file(class, &class_attr_isl29030) != 0) {
+			printk(KERN_ERR "isl29030: can't create sysfs\n");
+			class_destroy(class);
+		}
+	}
+	return err;
+}
+
+
 /* Init I2C Bus Interfaces */
 
 static struct i2c_board_info *get_board_info
@@ -552,6 +721,10 @@ static struct i2c_board_info __initdata
 		.platform_data = &omap3430_als_light_data,
 		.irq = OMAP_GPIO_IRQ(MAPPHONE_LM_3530_INT_GPIO),
 	},
+	{
+		I2C_BOARD_INFO(LD_ISL29030_NAME, 0x44),
+		.platform_data = &isl29030_pdata,
+	},
 };
 
 static struct i2c_board_info __initdata
@@ -637,5 +810,6 @@ void __init mapphone_i2c_init(void)
 	mapphone_akm8973_init();
 	mapphone_kxtf9_init();
 	mapphone_lm3554_init();
+	mapphone_isl29030_init();
 }
 
