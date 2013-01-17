@@ -4336,7 +4336,7 @@ static int mapphone_panel_enable_te_locked(struct omap_dss_device *dssdev,
 		}
 	}
 
-	r = omapdss_dsi_enable_te(dssdev, panel_data->te_type);
+	r = omapdss_dsi_enable_te(dssdev, enable);
 
 error:
 	return r;
