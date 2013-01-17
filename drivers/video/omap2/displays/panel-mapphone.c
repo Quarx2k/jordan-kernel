@@ -912,6 +912,11 @@ static u16 read_supplier_id(struct omap_dss_device *dssdev)
 		goto end;
 	}
 
+#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+	/* Wait a bit because dsi_vc_set_max_rx_packet_size is async. */
+	msleep(20);
+#endif
+
 	r = dsi_vc_dcs_read(dssdev, dsi_vc_cmd,
 			    EDISCO_CMD_READ_DDB_START, data, CTL_SUPPLIER_ID_LEN);
 	if (r == CTL_SUPPLIER_ID_LEN) {
