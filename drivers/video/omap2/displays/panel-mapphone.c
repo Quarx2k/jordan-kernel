@@ -447,7 +447,7 @@ static void mapphone_framedone_cb(int err, void *data)
 		queue_work(mp_data->te_wq, &mp_data->te_framedone_work);
 }
 
-static int mapphone_set_update_window(struct mapphone_data *mp_data,
+static int mapphone_set_update_window(struct omap_dss_device *dssdev,
 					u16 x, u16 y, u16 w, u16 h)
 {
 	u8 buf[5];
@@ -457,6 +457,8 @@ static int mapphone_set_update_window(struct mapphone_data *mp_data,
 	u16 x2 = x + column_address_offset + w - 1;
 	u16 y1 = y;
 	u16 y2 = y + h - 1;
+
+	DBG("Setting update window %d %d %d %d\n", x1, x2, y1, y2);
 
 	/*
 	 * set page, column address cmd using dsi_vc_dcs_write()
@@ -472,7 +474,7 @@ static int mapphone_set_update_window(struct mapphone_data *mp_data,
 	buf[2] = (x1 >> 0) & 0xff;
 	buf[3] = (x2 >> 8) & 0xff;
 	buf[4] = (x2 >> 0) & 0xff;
-	ret = dsi_vc_dcs_write_nosync(mp_data->dssdev, dsi_vc_cmd, buf, 5);
+	ret = dsi_vc_dcs_write_nosync(dssdev, dsi_vc_cmd, buf, 5);
 	if (ret)
 		goto err;
 
@@ -481,7 +483,7 @@ static int mapphone_set_update_window(struct mapphone_data *mp_data,
 	buf[2] = (y1 >> 0) & 0xff;
 	buf[3] = (y2 >> 8) & 0xff;
 	buf[4] = (y2 >> 0) & 0xff;
-	ret = dsi_vc_dcs_write(mp_data->dssdev, dsi_vc_cmd, buf, 5);
+	ret = dsi_vc_dcs_write(dssdev, dsi_vc_cmd, buf, 5);
 	if (ret)
 		goto err;
 
@@ -503,6 +505,8 @@ static int mapphone_panel_update(struct omap_dss_device *dssdev,
 	struct mapphone_dsi_panel_data *panel_data = get_panel_data(dssdev);
 	int r, rr = 0;
 
+	WARN_ON(dssdev != mp_data->dssdev);
+
 	DBG("update %d, %d, %d x %d\n", x, y, w, h);
 
 	mutex_lock(&mp_data->lock);
@@ -515,6 +519,8 @@ static int mapphone_panel_update(struct omap_dss_device *dssdev,
 		goto err;
 	}
 
+	DBG("starting to prepare update...\n");
+
 	r = omap_dsi_prepare_update(dssdev, &x, &y, &w, &h, true);
 	if (r)
 		goto err;
@@ -525,7 +531,7 @@ static int mapphone_panel_update(struct omap_dss_device *dssdev,
 #endif
 
 		/* Only command mode can do partial update */
-		rr = mapphone_set_update_window(mp_data, x, y, w, h);
+		rr = mapphone_set_update_window(dssdev, x, y, w, h);
 		if (rr)
 			dev_err(&dssdev->dev,
 				"mapphone_set_update_window failed:%d\n", rr);
@@ -555,6 +561,8 @@ static int mapphone_panel_update(struct omap_dss_device *dssdev,
 					mapphone_framedone_cb, dssdev);
 		if (r)
 			goto err;
+
+		DBG("Update successfully triggered\n");
 	}
 
 	/* note: no bus_unlock here. unlock is in framedone_cb */
@@ -673,6 +681,8 @@ static int mapphone_panel_memory_read(struct omap_dss_device *dssdev,
 	unsigned buf_used = 0;
 	struct mapphone_data *mp_data = dev_get_drvdata(&dssdev->dev);
 
+	WARN_ON(dssdev != mp_data->dssdev);
+
 	DBG("%s()\n", __func__);
 
 	if (size < w * h * 3)
@@ -703,11 +713,14 @@ static int mapphone_panel_memory_read(struct omap_dss_device *dssdev,
 	omapdss_dsi_vc_enable_hs(dssdev, dsi_vc_cmd, false);
 #endif
 
-	mapphone_set_update_window(mp_data, x, y, w, h);
+	mapphone_set_update_window(dssdev, x, y, w, h);
 
 	r = dsi_vc_set_max_rx_packet_size(dssdev, dsi_vc_cmd, plen);
-	if (r)
+	if (r) {
+		dev_err(&dssdev->dev, "%s: Setting dsi_vc_set_max_rx_packet_size"
+				" to %d failed.\n", __func__, plen);
 		goto err2;
+	}
 
 	while (buf_used < size) {
 		u8 dcs_cmd = first ? 0x2e : 0x3e;
