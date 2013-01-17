@@ -268,19 +268,20 @@ static void __init omap_mapphone_init(void)
 		pr_err("failed to create board_properties\n");
 
 	mapphone_bp_model_init();
-	mapphone_padconf_init();
 	mapphone_voltage_init();
 	mapphone_gpio_mapping_init();
 	mapphone_i2c_init();
+	mapphone_padconf_init();
+	omap_register_ion();
+	mapphone_spi_init();
+	mapphone_cpcap_client_init();
 	mapphone_panel_init();
 	mapphone_als_init();
-	mapphone_wifi_init();
-	mapphone_cpcap_client_init();
-	mapphone_spi_init();
-	omap_register_ion();
 	omap_hdq_init();
+	mapphone_wifi_init();
 	mapphone_power_off_init();
 	mapphone_hsmmc_init();
+	omap_enable_smartreflex_on_init();
 	//omap3_mux_init(board_mux, OMAP_PACKAGE_CBP);
 	//omap_board_config = sdp_config;
 	//omap_board_config_size = ARRAY_SIZE(sdp_config);
