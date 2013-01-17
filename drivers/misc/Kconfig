@@ -574,6 +574,12 @@ config SENSORS_KXTF9
 	 Say yes here if you wish to include the Kionix
 	 KXTF9 accelerometer driver.
 
+config INPUT_HALLEFFECT_BU52014HV
+	tristate "BU52014HV Hall Effect Sensor"
+	help
+	  Say Y here if you wish to include support for the BU52014HV hall
+	  effect sensor.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"

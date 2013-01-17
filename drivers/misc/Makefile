@@ -58,4 +58,5 @@ obj-$(CONFIG_TWL6040_VIB)	+= twl6040-vib.o
 obj-$(CONFIG_GC_CORE)		+= gc-core/
 obj-$(CONFIG_SENSORS_AKM8973_AKMD)	+= akm8973_akmd.o
 obj-$(CONFIG_SENSORS_KXTF9)	+= kxtf9.o
+obj-$(CONFIG_INPUT_HALLEFFECT_BU52014HV) += bu52014hfv.o
 

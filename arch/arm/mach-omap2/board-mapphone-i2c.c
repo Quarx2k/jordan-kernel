@@ -19,6 +19,7 @@
 #include <linux/led-cpcap-lm3554.h>
 #include <linux/kxtf9.h>
 #include <linux/isl29030.h>
+#include <linux/bu52014hfv.h>
 
 #define MAPPHONE_LM_3530_INT_GPIO	92
 #define MAPPHONE_AKM8973_INT_GPIO	175
@@ -611,6 +612,50 @@ static int mapphone_isl29030_init(void)
 	return err;
 }
 
+/*
+ * BU52014HFV
+ */
+
+#define MAPPHONE_HF_NORTH_GPIO		10
+#define MAPPHONE_HF_SOUTH_GPIO		111
+
+static struct bu52014hfv_platform_data bu52014hfv_platform_data = {
+	.docked_north_gpio = MAPPHONE_HF_NORTH_GPIO,
+	.docked_south_gpio = MAPPHONE_HF_SOUTH_GPIO,
+	.north_is_desk = 1,
+};
+
+static void mapphone_bu52014hfv_init(void)
+{
+	struct device_node *node;
+	const void *prop;
+
+	node = of_find_node_by_path(DT_HALLEFFECT_DOCK);
+
+	if (node == NULL)
+		return;
+
+	prop = of_get_property(node, DT_PROP_DEV_NORTH_IS_DESK, NULL);
+
+	if (prop)
+		bu52014hfv_platform_data.north_is_desk = *(u8 *)prop;
+
+	of_node_put(node);
+	gpio_request(MAPPHONE_HF_NORTH_GPIO, "mapphone dock north");
+	gpio_direction_input(MAPPHONE_HF_NORTH_GPIO);
+
+	gpio_request(MAPPHONE_HF_SOUTH_GPIO, "mapphone dock south");
+	gpio_direction_input(MAPPHONE_HF_SOUTH_GPIO);
+}
+
+static struct platform_device omap3430_hall_effect_dock = {
+	.name	= BU52014HFV_MODULE_NAME,
+	.id	= -1,
+	.dev	= {
+		.platform_data  = &bu52014hfv_platform_data,
+	},
+};
+
 /* Init I2C Bus Interfaces */
 
 static struct i2c_board_info *get_board_info
@@ -823,5 +868,8 @@ void __init mapphone_i2c_init(void)
 	mapphone_kxtf9_init();
 	mapphone_lm3554_init();
 	mapphone_isl29030_init();
+	mapphone_bu52014hfv_init();
+	platform_device_register(&omap3430_hall_effect_dock);
+
 }
 
