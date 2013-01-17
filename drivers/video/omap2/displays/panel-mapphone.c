@@ -434,10 +434,12 @@ static void mapphone_framedone_cb(int err, void *data)
 	struct omap_dss_device *dssdev = data;
 	struct mapphone_data *mp_data = dev_get_drvdata(&dssdev->dev);
 
-#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+	DBG("%s()\n", __func__);
+
 	/* Turn on display when framedone */
 	mapphone_panel_display_on(dssdev);
-#else
+
+#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	dsi_bus_unlock(dssdev);
 #endif
 
@@ -792,13 +794,8 @@ static int dsi_mipi_cm_panel_on(struct omap_dss_device *dssdev)
 		break;
 	}
 
-#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
-	/* Defy doesn't call this in interrupt context so we can send it sync. */
-	return dsi_vc_dcs_write(dssdev, dsi_vc_cmd, &data, 1);
-#else
 	/* Called in interrupt context, send cmd without sync */
 	return dsi_vc_dcs_write_nosync(dssdev, dsi_vc_cmd, &data, 1);
-#endif
 }
 
 
@@ -4044,13 +4041,6 @@ static int mapphone_panel_power_on(struct omap_dss_device *dssdev)
 	}
 
 #ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
-	ret = mapphone_panel_display_on(dssdev);
-	if (ret) {
-		printk(KERN_ERR "%s: failed to mapphone_panel_display_on (%d).\n",
-					__func__, ret);
-		goto err;
-	}
-
 	omapdss_dsi_vc_enable_hs(dssdev, dsi_vc_cmd, true);
 #endif
 
