@@ -132,7 +132,6 @@ static void __exit_signal(struct task_struct *tsk)
 	 */
 	flush_sigqueue(&tsk->pending);
 
-	tsk->signal = NULL;
 	tsk->sighand = NULL;
 	spin_unlock(&sighand->siglock);
 
@@ -146,7 +145,6 @@ static void __exit_signal(struct task_struct *tsk)
 		 * see account_group_exec_runtime().
 		 */
 		task_rq_unlock_wait(tsk);
-		__cleanup_signal(sig);
 	}
 }
 

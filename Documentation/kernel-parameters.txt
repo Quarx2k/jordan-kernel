@@ -1622,6 +1622,8 @@ and is between 256 and 4096 characters. It is defined in the file
 	nobats		[PPC] Do not use BATs for mapping kernel lowmem
 			on "Classic" PPC cores.
 
+	noautogroup  	Disable scheduler automatic task group creation.
+
 	nocache		[ARM]
 
 	noclflush	[BUGS=X86] Don't use the CLFLUSH instruction
