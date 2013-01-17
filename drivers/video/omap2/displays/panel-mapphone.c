@@ -1827,14 +1827,14 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 
 	/* turn off mcs register acces protection */
 	data[0] = EDISCO_CMD_SET_MCS;
-	data[1] = 0x00;
+	data[1] = EDISCO_CMD_MCS_OFF;
 	ret = mapphone_panel_lp_cmd_wrt_sync(dssdev,
 						false, EDISCO_SHORT_WRITE_1,
 						data, 2,
 						EDISCO_CMD_SET_MCS, 1,
 						EDISCO_CMD_MCS_OFF, 0x3);
 	if (ret)
-		printk(KERN_ERR "failed to send SET_MCS\n");
+		printk(KERN_ERR "failed to send SET_MCS OFF\n");
 
 	/* enable lane setting and test registers*/
 	data[0] = 0xef;
@@ -1920,6 +1920,17 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 	printk("EDISCO_CMD_SET_BCKLGHT_PWM\n");
 	if (ret)
 		printk(KERN_ERR "failed to send CABC/PWM\n");
+
+	/* turn on mcs register acces protection */
+	data[0] = EDISCO_CMD_SET_MCS;
+	data[1] = EDISCO_CMD_MCS_ON;
+	ret = mapphone_panel_lp_cmd_wrt_sync(dssdev,
+						false, EDISCO_SHORT_WRITE_1,
+						data, 2,
+						EDISCO_CMD_SET_MCS, 1,
+						EDISCO_CMD_MCS_ON, 0x3);
+	if (ret)
+		printk(KERN_ERR "failed to send SET_MCS ON\n");
 
 	data[0] = EDISCO_CMD_EXIT_SLEEP_MODE;
 	ret = mapphone_panel_lp_cmd_wrt_sync(dssdev,
