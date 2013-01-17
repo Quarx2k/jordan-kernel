@@ -2251,8 +2251,13 @@ static void dsi_cio_timings(struct platform_device *dsidev)
 	/* min 40ns + 4*UI	max 85ns + 6*UI */
 	ths_prepare = ns2ddr(dsidev, 70) + 2;
 
+#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+	/* 2.6.32 has different latency here! */
+	ths_prepare_ths_zero = ns2ddr(dsidev, 454) + 2;
+#else
 	/* min 145ns + 10*UI */
 	ths_prepare_ths_zero = ns2ddr(dsidev, 175) + 2;
+#endif
 
 	/* min max(8*UI, 60ns+4*UI) */
 	ths_trail = ns2ddr(dsidev, 60) + 5;

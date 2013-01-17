@@ -354,20 +354,12 @@ static void mapphone_esd_work(struct work_struct *work)
 	dsi_bus_lock(dssdev);
 	dsi_from_dss_runtime_get(dssdev);
 
-#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
-	omapdss_dsi_vc_enable_hs(dssdev, dsi_vc_cmd, false);
-#endif
-
 	r = dsi_vc_dcs_read(dssdev, dsi_vc_cmd, EDISCO_CMD_GET_POWER_MODE,
 			&power_mode, 1);
 	if (r != 1) {
 		dev_err(&dssdev->dev, "Failed to get power mode, r = %d\n", r);
 		goto err;
 	}
-
-#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
-	omapdss_dsi_vc_enable_hs(dssdev, dsi_vc_cmd, true);
-#endif
 
 	if (atomic_read(&panel_data->state) == PANEL_ON)
 		expected_mode = 0x9c;
@@ -526,19 +518,11 @@ static int mapphone_panel_update(struct omap_dss_device *dssdev,
 		goto err;
 
 	if (dssdev->phy.dsi.type == OMAP_DSS_DSI_TYPE_CMD_MODE) {
-#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
-		omapdss_dsi_vc_enable_hs(dssdev, dsi_vc_cmd, false);
-#endif
-
 		/* Only command mode can do partial update */
 		rr = mapphone_set_update_window(dssdev, x, y, w, h);
 		if (rr)
 			dev_err(&dssdev->dev,
 				"mapphone_set_update_window failed:%d\n", rr);
-
-#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
-		omapdss_dsi_vc_enable_hs(dssdev, dsi_vc_cmd, true);
-#endif
 	}
 
 	if (mp_data->te_enabled && panel_data->use_ext_te &&
@@ -709,10 +693,6 @@ static int mapphone_panel_memory_read(struct omap_dss_device *dssdev,
 	else
 		plen = 2;
 
-#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
-	omapdss_dsi_vc_enable_hs(dssdev, dsi_vc_cmd, false);
-#endif
-
 	mapphone_set_update_window(dssdev, x, y, w, h);
 
 	r = dsi_vc_set_max_rx_packet_size(dssdev, dsi_vc_cmd, plen);
@@ -754,10 +734,6 @@ static int mapphone_panel_memory_read(struct omap_dss_device *dssdev,
 err3:
 	dsi_vc_set_max_rx_packet_size(dssdev, dsi_vc_cmd, 1);
 err2:
-#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
-	omapdss_dsi_vc_enable_hs(dssdev, dsi_vc_cmd, true);
-#endif
-
 	dsi_bus_unlock(dssdev);
 err1:
 	mutex_unlock(&mp_data->lock);
@@ -4040,14 +4016,7 @@ static int mapphone_panel_power_on(struct omap_dss_device *dssdev)
 	mp_data->enabled = true;
 	mp_data->som_enabled = false;
 
-#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
-	/*
-	 * We have to enable highspeed mode later for the Defy,
-	 * because otherwise mapphone_panel_enable_te_locked
-	 * will get SoT errors!
-	 */
 	omapdss_dsi_vc_enable_hs(dssdev, dsi_vc_cmd, true);
-#endif
 
 	if (dssdev->phy.dsi.type == OMAP_DSS_DSI_TYPE_VIDEO_MODE) {
 		if (!dssdev->skip_init)
@@ -4068,10 +4037,6 @@ static int mapphone_panel_power_on(struct omap_dss_device *dssdev)
 		 */
 		dsi_from_dss_runtime_put(dssdev);
 	}
-
-#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
-	omapdss_dsi_vc_enable_hs(dssdev, dsi_vc_cmd, true);
-#endif
 
 	printk(KERN_INFO "Mapphone Display is ENABLE\n");
 	return 0;
@@ -4188,10 +4153,6 @@ static void mapphone_panel_disable_local(struct omap_dss_device *dssdev)
 
 	atomic_set(&panel_data->state, PANEL_OFF);
 
-#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
-	omapdss_dsi_vc_enable_hs(dssdev, dsi_vc_cmd, false);
-#endif
-
 	/*
 	 * Change panel power down sequence to be aligned with spec.
 	 * The cmd order has to be 10h  and then 28h, inverting them may
@@ -4206,10 +4167,6 @@ static void mapphone_panel_disable_local(struct omap_dss_device *dssdev)
 	dsi_vc_dcs_write_nosync(dssdev, dsi_vc_cmd, data, 1);
 
 	msleep(120);
-
-#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
-	omapdss_dsi_vc_enable_hs(dssdev, dsi_vc_cmd, true);
-#endif
 }
 
 static void mapphone_panel_power_off(struct omap_dss_device *dssdev,
@@ -4391,19 +4348,12 @@ static int mapphone_panel_enable_te(struct omap_dss_device *dssdev, bool enable)
 				map_data->te_enabled = enable;
 				DBG("Changed TE state in SO,TE=%d\n", enable);
 			} else {
-#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
-				omapdss_dsi_vc_enable_hs(dssdev, dsi_vc_cmd, false);
-#endif
 				r = mapphone_panel_enable_te_locked(dssdev,
 					 enable);
 				if (!r) {
 					map_data->te_enabled = enable;
 					DBG("Changed TE state,TE=%d\n", enable);
 				}
-
-#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
-				omapdss_dsi_vc_enable_hs(dssdev, dsi_vc_cmd, true);
-#endif
 			}
 
 			dsi_from_dss_runtime_put(dssdev);
