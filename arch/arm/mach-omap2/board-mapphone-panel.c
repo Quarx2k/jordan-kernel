@@ -108,7 +108,11 @@ static struct mapphone_dsi_panel_data mapphone_panel_data = {
 	.use_esd_check		= true,
 	.set_backlight		= NULL,
 	.te_support		= true,
+#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+	.te_scan_line		= 0x300,
+#else
 	.te_scan_line		= 300,
+#endif
 	.te_type		= OMAP_DSI_TE_MIPI_PHY,
 	.cmoste_wr		= false,
 	.ftr_support.som	= false,
