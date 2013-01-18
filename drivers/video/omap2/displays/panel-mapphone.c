@@ -4336,7 +4336,12 @@ static int mapphone_panel_enable_te_locked(struct omap_dss_device *dssdev,
 		}
 	}
 
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	r = omapdss_dsi_enable_te(dssdev, enable);
+#else
+	/* On 2.6.32 TE was always disabled. */
+	r = omapdss_dsi_enable_te(dssdev, false);
+#endif
 
 error:
 	return r;
