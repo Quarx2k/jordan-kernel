@@ -1351,7 +1351,7 @@ static void mapphone_panel_print_config(struct omap_dss_device *dssdev)
 	printk(KERN_INFO"DT: te_support=%d, te_type=%d\n",
 		panel_data->te_support,  panel_data->te_type);
 
-	printk(KERN_INFO"DT: number of power supplies=%d",
+	printk(KERN_INFO"DT: number of power supplies=%d\n",
 		panel_data->num_pwr_supply);
 	for (i = 0; i < panel_data->num_pwr_supply; i++) {
 		supply = &(panel_data->disp_vol_supply[i]);
@@ -1825,13 +1825,13 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 	data[2] = 0x01;
 	data[3] = 0x00;
 	ret = dsi_vc_write(dssdev, dsi_vc_cmd, EDISCO_LONG_WRITE, data, 4);
-	printk("/* enable lane setting and test registers*/\n");
+	DBG("/* enable lane setting and test registers: %d*/\n", ret);
 	/* 2nd param 61 = 1 line; 63 = 2 lanes */
 	data[0] = 0xef;
 	data[1] = 0x60;
 	data[2] = 0x63;
 	data[3] = 0x00;
-	printk("/* 2nd param 61 = 1 line; 63 = 2 lanes */\n");
+	DBG("/* 2nd param 61 = 1 line; 63 = 2 lanes */\n");
 	if (dssdev->panel.panel_id == MOT_DISP_MIPI_CM_480_854) {
 		/* Reading lane_config and it will return
 		* 0x63 or 2-lanes, 0x60 for 1-lane (1st source displ only)*/
@@ -1840,7 +1840,7 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 					data, 4,
 					0xef, 1,
 					0x63, 0x63);
-		printk("0x63 or 2-lanes, 0x60 for 1-lane (1st source displ only)*/\n");
+		DBG("0x63 or 2-lanes, 0x60 for 1-lane (1st source displ only)*/\n");
 	} else {
 		/* Reading lane_config and it will return
 		* 0x1 for 2-lanes, 0x0 for 1-lane (2nd source displ only)*/
@@ -1849,7 +1849,7 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 					data, 4,
 					EDISCO_CMD_DATA_LANE_CONFIG, 1,
 					0x1, 0x1);
-		printk("0x1 for 2-lanes, 0x0 for 1-lane (2nd source displ only)*/\n");
+		DBG("0x1 for 2-lanes, 0x0 for 1-lane (2nd source displ only)*/\n");
 	}
 
 	if (ret)
@@ -1879,7 +1879,7 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 					data, 2,
 					EDISCO_CMD_SET_DISPLAY_MODE, 1,
 					data[1], 0x01);
-	printk("/* 2nd param 0 = WVGA; 1 = WQVGA */\n");
+	DBG("/* 2nd param 0 = WVGA; 1 = WQVGA */\n");
 
 	if (ret)
 		printk(KERN_ERR "failed to send SET_DISPLAY_MODE\n");
@@ -1906,7 +1906,7 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 					data, 2,
 					EDISCO_CMD_SET_BCKLGHT_PWM, 1,
 					data[1], 0x1f);
-	printk("EDISCO_CMD_SET_BCKLGHT_PWM\n");
+	DBG("EDISCO_CMD_SET_BCKLGHT_PWM\n");
 	if (ret)
 		printk(KERN_ERR "failed to send CABC/PWM\n");
 
@@ -1931,7 +1931,7 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 			data, 1,
 			EDISCO_CMD_GET_POWER_MODE, 1,
 			EDISCO_CMD_SLEEP_MODE_OUT, EDISCO_CMD_SLEEP_MODE_OUT);
-	printk("EDISCO_CMD_GET_POWER_MODE\n");
+	DBG("EDISCO_CMD_GET_POWER_MODE\n");
 	if (ret) {
 		printk(KERN_ERR "failed to send EXIT_SLEEP_MODE\n");
 		goto error;
