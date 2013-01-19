@@ -110,7 +110,7 @@ void __init mapphone_touch_panel_init(struct i2c_board_info *i2c_info)
 		/* Normally this is a fatal error */
 		mapphone_legacy_qtouch_init(i2c_info);  /* Legacy support */
 		mapphone_legacy_qtouch_gpio_init(i2c_info);  /* Legacy support */
-		/* The properties group register in board-44xx-identity.c*/
+		/* The properties group register in board-mapphone.c*/
 		mapphone_touch_vkey_prop_attr_group =
 			&mapphone_legacy_qtouch_properties_attr_group;
 		goto legacy_qtouch_complete;  /* Legacy support */

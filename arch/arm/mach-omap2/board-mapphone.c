@@ -230,6 +230,28 @@ static void __init mapphone_voltage_init(void)
 	omap_cpcap_init();
 }
 
+void __init mapphone_create_board_props(void)
+{
+	struct kobject *board_props_kobj;
+	int ret = 0;
+
+	board_props_kobj = kobject_create_and_add("board_properties", NULL);
+	if (!board_props_kobj)
+		goto err_board_obj;
+
+	if (mapphone_touch_vkey_prop_attr_group) {
+		ret = sysfs_create_group(board_props_kobj,
+				mapphone_touch_vkey_prop_attr_group);
+		if (ret)
+			goto err_board_obj;
+	}
+
+err_board_obj:
+	if (!board_props_kobj || ret)
+		pr_err("failed to create board_properties\n");
+
+}
+
 static void __init omap_mapphone_init_early(void)
 {
 	omap2_init_common_infrastructure();
@@ -264,7 +286,7 @@ static void __init omap_mapphone_init(void)
 	mapphone_power_off_init();
 	mapphone_hsmmc_init();
 	omap_enable_smartreflex_on_init();
-	//usbhs_init(&usbhs_bdata);
+	mapphone_create_board_props();
 #ifdef CONFIG_EMU_UART_DEBUG
 	/* emu-uart function will override devtree iomux setting */
 	activate_emu_uart();
