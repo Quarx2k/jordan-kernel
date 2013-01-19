@@ -432,6 +432,7 @@ static void mapphone_framedone_cb(int err, void *data)
 	mapphone_panel_display_on(dssdev);
 
 #ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+	dsi_from_dss_runtime_put(dssdev);
 	dsi_bus_unlock(dssdev);
 #endif
 
