@@ -4786,8 +4786,15 @@ int omapdss_dsi_display_enable(struct omap_dss_device *dssdev)
 		dsi_enable_pll_clock(dsidev, 1);
 
 	/* Soft reset */
+#ifndef CONFIG_FB_OMAP_BOOTLOADER_INIT
 	REG_FLD_MOD(dsidev, DSI_SYSCONFIG, 1, 1, 1);
 	_dsi_wait_reset(dsidev);
+#else
+	msleep(1); /* short delay for clk to be stable */
+	if (!dssdev->skip_init)
+		dsi_vc_enable(dsidev, 0, 0);
+	dsi_vc_enable(dsidev, 1, 0);
+#endif
 
 
 	_dsi_initialize_irq(dsidev);

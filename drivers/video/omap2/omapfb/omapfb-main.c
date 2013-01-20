@@ -2248,7 +2248,9 @@ static int omapfb_init_display(struct omapfb2_device *fbdev,
 	}
 
 	if (dssdev->caps & OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE) {
+#ifndef CONFIG_FB_OMAP_BOOTLOADER_INIT
 		u16 w, h;
+#endif
 		if (dssdrv->enable_te) {
 			r = dssdrv->enable_te(dssdev, 1);
 			if (r) {
@@ -2266,7 +2268,7 @@ static int omapfb_init_display(struct omapfb2_device *fbdev,
 				return r;
 			}
 		}
-
+#ifndef CONFIG_FB_OMAP_BOOTLOADER_INIT
 		dssdrv->get_resolution(dssdev, &w, &h);
 		r = dssdrv->update(dssdev, 0, 0, w, h);
 		if (r) {
@@ -2274,6 +2276,7 @@ static int omapfb_init_display(struct omapfb2_device *fbdev,
 					"Failed to update display\n");
 			return r;
 		}
+#endif
 	} else {
 		if (dssdrv->set_update_mode) {
 			r = dssdrv->set_update_mode(dssdev,
