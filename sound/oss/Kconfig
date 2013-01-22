@@ -539,5 +539,12 @@ config SOUND_KAHLUA
 	tristate "XpressAudio Sound Blaster emulation"
 	depends on SOUND_SB
 
+config SOUND_CPCAP_OMAP
+	bool "Audio driver for OMAP3430 with CPCAP"
+	depends on MFD_CPCAP
+	default n
+	help
+	  Audio driver for products using OMAP3430 and CPCAP.
+
 endif	# SOUND_OSS
 

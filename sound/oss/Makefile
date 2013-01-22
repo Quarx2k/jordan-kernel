@@ -27,6 +27,7 @@ obj-$(CONFIG_SOUND_MSNDPIN)	+= msnd.o msnd_pinnacle.o
 obj-$(CONFIG_SOUND_VWSND)	+= vwsnd.o
 obj-$(CONFIG_SOUND_BCM_CS4297A)	+= swarm_cs4297a.o
 
+obj-$(CONFIG_SOUND_CPCAP_OMAP)	+= omap34xx_audio_driver.o cpcap_audio_driver.o
 obj-$(CONFIG_DMASOUND)		+= dmasound/
 
 # Declare multi-part drivers.

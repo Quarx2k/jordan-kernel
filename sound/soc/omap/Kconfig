@@ -179,3 +179,13 @@ config SND_OMAP_SOC_IGEP0020
 	select SND_SOC_TWL4030
 	help
 	  Say Y if you want to add support for Soc audio on IGEP v2 board.
+
+config SND_OMAP_SOC_MOTSND
+	tristate "SoC Audio support for Motorola Android Platform"
+	depends on SND_OMAP_SOC && MACH_MAPPHONE
+	select SND_OMAP_SOC_MCBSP
+	select SND_OMAP_SOC_MCASP
+	select SND_OMAP_SOC_ABE
+	select SND_OMAP_SOC_ABE_DSP
+	help
+	  Say Y if building Motorola Android Platform
