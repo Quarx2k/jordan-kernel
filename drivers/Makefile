@@ -129,3 +129,5 @@ obj-$(CONFIG_REMOTE_PROC)	+= remoteproc/
 obj-$(CONFIG_DMM_OMAP)		+= media/
 obj-$(CONFIG_TILER_OMAP)	+= media/
 obj-$(CONFIG_OMAP_HSI)		+= omap_hsi/
+obj-$(CONFIG_SIM)               += sim/
+
