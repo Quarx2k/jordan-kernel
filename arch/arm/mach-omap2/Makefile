@@ -191,7 +191,9 @@ obj-$(CONFIG_ARCH_OMAP4)		+= omap_hwmod_44xx_data.o
 obj-$(CONFIG_OMAP3_EMU)			+= emu.o
 
 # L3 interconnect
-#obj-$(CONFIG_ARCH_OMAP3)		+= omap_l3_smx.o
+ifneq ($(CONFIG_MACH_OMAP_MAPPHONE),y)
+obj-$(CONFIG_ARCH_OMAP3)		+= omap_l3_smx.o
+endif
 obj-$(CONFIG_ARCH_OMAP4)		+= omap_l3_noc.o
 
 # LDO stuff
@@ -351,7 +353,9 @@ obj-$(CONFIG_OMAP_HSI_DEVICE)		+= omap_hsi.o
 obj-$(CONFIG_ION_OMAP)			+= omap_ion.o
 obj-$(CONFIG_ARCH_OMAP4)		+= omap_dmm.o
 obj-$(CONFIG_OMAP_FIQ_DEBUGGER)		+= omap_fiq_debugger.o
+ifneq ($(CONFIG_MACH_OMAP_MAPPHONE),y)
 obj-$(CONFIG_ARCH_OMAP3)		+= twl4030.o
+endif
 
 ifeq ($(CONFIG_OMAP_REBOOT_REASON),y)
 obj-$(CONFIG_ARCH_OMAP4)		+= omap4-reboot-reason.o
