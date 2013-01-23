@@ -182,7 +182,7 @@ config SND_OMAP_SOC_IGEP0020
 
 config SND_OMAP_SOC_MOTSND
 	tristate "SoC Audio support for Motorola Android Platform"
-	depends on SND_OMAP_SOC && MACH_MAPPHONE
+	depends on SND_OMAP_SOC && MACH_OMAP_MAPPHONE
 	select SND_OMAP_SOC_MCBSP
 	select SND_OMAP_SOC_MCASP
 	select SND_OMAP_SOC_ABE
