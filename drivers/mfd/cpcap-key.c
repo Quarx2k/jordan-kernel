@@ -22,8 +22,8 @@
 #include <linux/input.h>
 #include <linux/spi/cpcap.h>
 #include <linux/spi/cpcap-regbits.h>
+#include <linux/spi/spi.h>
 #include <linux/slab.h>
-
 
 struct cpcap_key_data {
 	struct input_dev *input_dev;
@@ -95,8 +95,14 @@ void cpcap_broadcast_key_event(struct cpcap_device *cpcap,
 {
 	struct cpcap_key_data *key = cpcap_get_keydata(cpcap);
 
-	if (key && key->input_dev)
+	if (key && key->input_dev) {
+		if (code == KEY_END)
+			dev_info(&cpcap->spi->dev,
+				"Power key press, value = %d\n",
+					value);
 		input_report_key(key->input_dev, code, value);
+		input_sync(key->input_dev);
+	}
 }
 EXPORT_SYMBOL(cpcap_broadcast_key_event);
 
