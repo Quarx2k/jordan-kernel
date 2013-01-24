@@ -20,6 +20,7 @@
 #include <linux/of.h>
 #include <linux/led-lm3530.h>
 #include <linux/wl12xx.h>
+#include <linux/regulator/machine.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -324,6 +325,13 @@ static void __init omap_mapphone_init_early(void)
 
 static void __init omap_mapphone_init(void)
 {
+	/*
+	 * This will git show
+gg. This flag
+	 * should be set in the board file. Before regulators are registered.
+	 */
+	regulator_has_full_constraints();
+
 	mapphone_bp_model_init();
 	mapphone_voltage_init();
 	mapphone_gpio_mapping_init();
