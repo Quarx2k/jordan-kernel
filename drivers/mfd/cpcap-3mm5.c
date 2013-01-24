@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2010 Motorola, Inc.
+ * Copyright (C) 2009-2011 Motorola, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -44,6 +44,7 @@ struct cpcap_3mm5_data {
 	unsigned char audio_low_pwr_det;
 	unsigned char audio_low_pwr_mac13;
 	struct delayed_work work;
+	struct delayed_work work_mb2_en;
 };
 
 static ssize_t print_name(struct switch_dev *sdev, char *buf)
@@ -80,12 +81,16 @@ static void audio_low_power_clear(struct cpcap_3mm5_data *data,
 
 static void send_key_event(struct cpcap_3mm5_data *data, unsigned int state)
 {
-	dev_info(&data->cpcap->spi->dev, "Headset key event: old=%d, new=%d\n",
+	dev_info(&data->cpcap->spi->dev,
+		 "Headset key event: old=%d, new=%d\n",
 		 data->key_state, state);
 
 	if (data->key_state != state) {
 		data->key_state = state;
 		cpcap_broadcast_key_event(data->cpcap, KEY_MEDIA, state);
+	} else if (data->key_state == 0) {
+		cpcap_broadcast_key_event(data->cpcap, KEY_MEDIA, 1);
+		cpcap_broadcast_key_event(data->cpcap, KEY_MEDIA, 0);
 	}
 }
 
@@ -97,6 +102,8 @@ static void hs_handler(enum cpcap_irqs irq, void *data)
 	if (irq != CPCAP_IRQ_HS)
 		return;
 
+	cancel_delayed_work_sync(&data_3mm5->work_mb2_en);
+
 	/* HS sense of 1 means no headset present, 0 means headset attached. */
 	if (cpcap_irq_sense(data_3mm5->cpcap, CPCAP_IRQ_HS, 1) == 1) {
 		cpcap_regacc_write(data_3mm5->cpcap, CPCAP_REG_TXI, 0,
@@ -106,16 +113,13 @@ static void hs_handler(enum cpcap_irqs irq, void *data)
 		audio_low_power_set(data_3mm5, &data_3mm5->audio_low_pwr_det);
 
 		cpcap_irq_mask(data_3mm5->cpcap, CPCAP_IRQ_MB2);
-		cpcap_irq_mask(data_3mm5->cpcap, CPCAP_IRQ_UC_PRIMACRO_5);
 
 		cpcap_irq_clear(data_3mm5->cpcap, CPCAP_IRQ_MB2);
-		cpcap_irq_clear(data_3mm5->cpcap, CPCAP_IRQ_UC_PRIMACRO_5);
 
 		cpcap_irq_unmask(data_3mm5->cpcap, CPCAP_IRQ_HS);
 
-		send_key_event(data_3mm5, 0);
-
-		cpcap_uc_stop(data_3mm5->cpcap, CPCAP_MACRO_5);
+		if (data_3mm5->key_state)
+			send_key_event(data_3mm5, 0);
 	} else {
 		cpcap_regacc_write(data_3mm5->cpcap, CPCAP_REG_TXI,
 				   (CPCAP_BIT_MB_ON2 | CPCAP_BIT_PTT_CMP_EN),
@@ -125,29 +129,34 @@ static void hs_handler(enum cpcap_irqs irq, void *data)
 				   CPCAP_BIT_ST_HS_CP_EN);
 		audio_low_power_clear(data_3mm5, &data_3mm5->audio_low_pwr_det);
 
-		/* Give PTTS time to settle 10ms */
+		/* Give PTTS time to settle */
 		msleep(11);
 
 		if (cpcap_irq_sense(data_3mm5->cpcap, CPCAP_IRQ_PTT, 1) <= 0) {
 			/* Headset without mic and MFB is detected. (May also
 			 * be a headset with the MFB pressed.) */
 			new_state = HEADSET_WITHOUT_MIC;
-		} else
-			new_state = HEADSET_WITH_MIC;
+			schedule_delayed_work(&data_3mm5->work_mb2_en,
+					      msecs_to_jiffies(200));
+		} else if (cpcap_irq_sense(data_3mm5->cpcap, CPCAP_IRQ_MB2, 1)
+			  == 0) {
+			/* Headset with unsupported mic and/or key(s) */
+			new_state = HEADSET_WITHOUT_MIC;
 
-		cpcap_irq_clear(data_3mm5->cpcap, CPCAP_IRQ_MB2);
-		cpcap_irq_clear(data_3mm5->cpcap, CPCAP_IRQ_UC_PRIMACRO_5);
+			dev_info(&data_3mm5->cpcap->spi->dev,
+				 "Headset with unsupported MIC and/or keys\n");
+		} else {
+			new_state = HEADSET_WITH_MIC;
+			schedule_delayed_work(&data_3mm5->work_mb2_en,
+					      msecs_to_jiffies(200));
+		}
 
 		cpcap_irq_unmask(data_3mm5->cpcap, CPCAP_IRQ_HS);
-		cpcap_irq_unmask(data_3mm5->cpcap, CPCAP_IRQ_MB2);
-		cpcap_irq_unmask(data_3mm5->cpcap, CPCAP_IRQ_UC_PRIMACRO_5);
-
-		cpcap_uc_start(data_3mm5->cpcap, CPCAP_MACRO_5);
 	}
 
 	switch_set_state(&data_3mm5->sdev, new_state);
 	if (data_3mm5->cpcap->h2w_new_state)
-		data_3mm5->cpcap->h2w_new_state(new_state);
+		data_3mm5->cpcap->h2w_new_state(data_3mm5->cpcap, new_state);
 
 	dev_info(&data_3mm5->cpcap->spi->dev, "New headset state: %d\n",
 		 new_state);
@@ -157,7 +166,7 @@ static void key_handler(enum cpcap_irqs irq, void *data)
 {
 	struct cpcap_3mm5_data *data_3mm5 = data;
 
-	if ((irq != CPCAP_IRQ_MB2) && (irq != CPCAP_IRQ_UC_PRIMACRO_5))
+	if (irq != CPCAP_IRQ_MB2)
 		return;
 
 	if ((cpcap_irq_sense(data_3mm5->cpcap, CPCAP_IRQ_HS, 1) == 1) ||
@@ -167,21 +176,21 @@ static void key_handler(enum cpcap_irqs irq, void *data)
 	}
 
 	if ((cpcap_irq_sense(data_3mm5->cpcap, CPCAP_IRQ_MB2, 0) == 0) ||
-	    (cpcap_irq_sense(data_3mm5->cpcap, CPCAP_IRQ_PTT, 0) == 0)) {
+	    (cpcap_irq_sense(data_3mm5->cpcap, CPCAP_IRQ_PTT, 0) == 0))
 		send_key_event(data_3mm5, 1);
-
-		/* If macro not available, only short presses are supported */
-		if (!cpcap_uc_status(data_3mm5->cpcap, CPCAP_MACRO_5)) {
-			send_key_event(data_3mm5, 0);
-
-			/* Attempt to restart the macro for next time. */
-			cpcap_uc_start(data_3mm5->cpcap, CPCAP_MACRO_5);
-		}
-	} else
+	else
 		send_key_event(data_3mm5, 0);
 
 	cpcap_irq_unmask(data_3mm5->cpcap, CPCAP_IRQ_MB2);
-	cpcap_irq_unmask(data_3mm5->cpcap, CPCAP_IRQ_UC_PRIMACRO_5);
+}
+
+static void mb2_work(struct work_struct *work)
+{
+	struct cpcap_3mm5_data *data_3mm5 =
+		container_of(work, struct cpcap_3mm5_data, work_mb2_en.work);
+
+	cpcap_irq_clear(data_3mm5->cpcap, CPCAP_IRQ_MB2);
+	cpcap_irq_unmask(data_3mm5->cpcap, CPCAP_IRQ_MB2);
 }
 
 static void mac13_work(struct work_struct *work)
@@ -243,6 +252,7 @@ static int __init cpcap_3mm5_probe(struct platform_device *pdev)
 	data->sdev.print_name = print_name;
 	switch_dev_register(&data->sdev);
 	INIT_DELAYED_WORK(&data->work, mac13_work);
+	INIT_DELAYED_WORK(&data->work_mb2_en, mb2_work);
 	platform_set_drvdata(pdev, data);
 
 	data->regulator = regulator_get(NULL, "vaudio");
@@ -256,7 +266,6 @@ static int __init cpcap_3mm5_probe(struct platform_device *pdev)
 
 	retval  = cpcap_irq_clear(data->cpcap, CPCAP_IRQ_HS);
 	retval |= cpcap_irq_clear(data->cpcap, CPCAP_IRQ_MB2);
-	retval |= cpcap_irq_clear(data->cpcap, CPCAP_IRQ_UC_PRIMACRO_5);
 	retval |= cpcap_irq_clear(data->cpcap, CPCAP_IRQ_UC_PRIMACRO_13);
 	if (retval)
 		goto reg_put;
@@ -271,17 +280,12 @@ static int __init cpcap_3mm5_probe(struct platform_device *pdev)
 	if (retval)
 		goto free_hs;
 
-	retval = cpcap_irq_register(data->cpcap, CPCAP_IRQ_UC_PRIMACRO_5,
-				    key_handler, data);
-	if (retval)
-		goto free_mb2;
-
 	if (data->cpcap->vendor == CPCAP_VENDOR_ST) {
 		retval = cpcap_irq_register(data->cpcap,
 					    CPCAP_IRQ_UC_PRIMACRO_13,
 					    mac13_handler, data);
 		if (retval)
-			goto free_mac5;
+			goto free_mb2;
 
 		cpcap_uc_start(data->cpcap, CPCAP_MACRO_13);
 	}
@@ -290,8 +294,6 @@ static int __init cpcap_3mm5_probe(struct platform_device *pdev)
 
 	return 0;
 
-free_mac5:
-	cpcap_irq_free(data->cpcap, CPCAP_IRQ_UC_PRIMACRO_5);
 free_mb2:
 	cpcap_irq_free(data->cpcap, CPCAP_IRQ_MB2);
 free_hs:
@@ -309,10 +311,10 @@ static int __exit cpcap_3mm5_remove(struct platform_device *pdev)
 	struct cpcap_3mm5_data *data = platform_get_drvdata(pdev);
 
 	cancel_delayed_work_sync(&data->work);
+	cancel_delayed_work_sync(&data->work_mb2_en);
 
 	cpcap_irq_free(data->cpcap, CPCAP_IRQ_MB2);
 	cpcap_irq_free(data->cpcap, CPCAP_IRQ_HS);
-	cpcap_irq_free(data->cpcap, CPCAP_IRQ_UC_PRIMACRO_5);
 	cpcap_irq_free(data->cpcap, CPCAP_IRQ_UC_PRIMACRO_13);
 
 	switch_dev_unregister(&data->sdev);
@@ -326,7 +328,7 @@ static struct platform_driver cpcap_3mm5_driver = {
 	.probe		= cpcap_3mm5_probe,
 	.remove		= __exit_p(cpcap_3mm5_remove),
 #ifdef CONFIG_PM
-	.suspend		= cpcap_3mm5_suspend,
+	.suspend       	= cpcap_3mm5_suspend,
 	.resume		= cpcap_3mm5_resume,
 #endif
 	.driver		= {
@@ -348,6 +350,6 @@ static void __exit cpcap_3mm5_exit(void)
 module_exit(cpcap_3mm5_exit);
 
 MODULE_ALIAS("platform:cpcap_3mm5");
-MODULE_DESCRIPTION("CPCAP USB detection driver");
+MODULE_DESCRIPTION("CPCAP 3.5 mm headset detection driver");
 MODULE_AUTHOR("Motorola");
 MODULE_LICENSE("GPL");

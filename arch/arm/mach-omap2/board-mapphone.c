@@ -20,6 +20,7 @@
 #include <linux/of.h>
 #include <linux/led-lm3530.h>
 #include <linux/wl12xx.h>
+#include <linux/regulator/machine.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -48,8 +49,8 @@
 #include <../drivers/w1/w1_family.h> /* for W1_EEPROM_DS2502 */
 
 #define MAPPHONE_POWER_OFF_GPIO 176
-#define MAPPHONE_WIFI_PMENA_GPIO 186
-#define MAPPHONE_WIFI_IRQ_GPIO 65
+static unsigned long mapphone_wifi_pmena_gpio = 186;
+static unsigned long mapphone_wifi_irq_gpio = 65;
 
 char *bp_model = "CDMA";
 static char boot_mode[BOOT_MODE_MAX_LEN+1];
@@ -116,31 +117,40 @@ static struct wl12xx_platform_data mapphone_wlan_data __initdata = {
 int wifi_set_power(struct device *dev, int slot, int power_on, int vdd)
 {
 	static int power_state;
-	pr_debug("Powering %s wifi", (power_on ? "on" : "off"));
-	if (power_on == power_state)
+	printk("Powering %s wifi\n", (power_on ? "on" : "off"));
+	if (power_on == power_state) {
 		return 0;
+	}
 	power_state = power_on;
 	if (power_on) {
-		gpio_set_value(MAPPHONE_WIFI_IRQ_GPIO, 1);
+		gpio_set_value(mapphone_wifi_irq_gpio, 1);
 		mdelay(15);
-		gpio_set_value(MAPPHONE_WIFI_IRQ_GPIO, 0);
+		gpio_set_value(mapphone_wifi_irq_gpio, 0);
 		mdelay(1);
-		gpio_set_value(MAPPHONE_WIFI_IRQ_GPIO, 1);
+		gpio_set_value(mapphone_wifi_irq_gpio, 1);
 		mdelay(70);
-	} else
-		gpio_set_value(MAPPHONE_WIFI_PMENA_GPIO, 0);
+	} else {
+		gpio_set_value(mapphone_wifi_pmena_gpio, 0);
+	}
+
 	return 0;
 }
 static void mapphone_wifi_init(void)
 {
 	int ret;
-	ret = gpio_request(MAPPHONE_WIFI_PMENA_GPIO, "wifi_pmena");
-	if (ret < 0)
+	printk("mapphone_wifi_init\n");
+	ret = gpio_request(mapphone_wifi_pmena_gpio, "wifi_pmena");
+	if (ret < 0) {
+	printk("mapphone_wifi_init fail\n");
 		goto out;
-	gpio_direction_output(MAPPHONE_WIFI_PMENA_GPIO, 0);
-	mapphone_wlan_data.irq = OMAP_GPIO_IRQ(MAPPHONE_WIFI_IRQ_GPIO);
+	}
+	gpio_direction_output(mapphone_wifi_pmena_gpio, 0);
+	mapphone_wlan_data.irq = OMAP_GPIO_IRQ(mapphone_wifi_irq_gpio);
 	if (wl12xx_set_platform_data(&mapphone_wlan_data))
+	{
 		pr_err("Error setting wl12xx data\n");
+	}
+	printk("Wifi init done\n");
 out:
 	return;
 }
@@ -315,6 +325,13 @@ static void __init omap_mapphone_init_early(void)
 
 static void __init omap_mapphone_init(void)
 {
+	/*
+	 * This will git show
+gg. This flag
+	 * should be set in the board file. Before regulators are registered.
+	 */
+	regulator_has_full_constraints();
+
 	mapphone_bp_model_init();
 	mapphone_voltage_init();
 	mapphone_gpio_mapping_init();

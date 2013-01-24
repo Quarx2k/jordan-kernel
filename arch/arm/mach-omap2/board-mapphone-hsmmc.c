@@ -209,8 +209,10 @@ static int mapphone_hsmmc_late_init(struct device *dev)
 		}
 		pdata->slots[0].set_power = emmc_set_power;
 		pdata->slots[0].set_sleep = emmc_set_sleep;
-	} else if (pdev->id == 2)
+	} else if (pdev->id == 2) {
 		pdata->slots[0].set_power = wifi_set_power;
+		printk("set_power = wifi_set_power\n");
+	}
 	return ret;
 }
 
@@ -310,16 +312,21 @@ int __init mapphone_hsmmc_init(void)
 				tiwlan_mmc_controller =
 					*(int *)mmc_prop;
 				is_found = 1;
+				printk("wifi controller id = %d\n",*(int *)mmc_prop);
 			}
 	}
-	if (!is_found)
-		tiwlan_mmc_controller = 5;
-	if (tiwlan_mmc_controller > 0 &&
-			tiwlan_mmc_controller <= 5)
-		mmc_controllers[2].mmc = tiwlan_mmc_controller;
-	else
-		tiwlan_mmc_controller = 0;
 
+	if (!is_found) {
+		tiwlan_mmc_controller = 5;
+	}
+	if (tiwlan_mmc_controller > 0 &&
+			tiwlan_mmc_controller <= 5) {
+		mmc_controllers[2].mmc = tiwlan_mmc_controller;
+	} else {
+		tiwlan_mmc_controller = 0;
+	}
+	
+//	mmc_controllers[2].mmc = 3;
 	/* set sd_det_n */
 	sd_det_n = get_gpio_by_name("sd_det_n");
 	if (sd_det_n >= 0)

@@ -20,11 +20,17 @@
 #ifndef CPCAP_AUDIO_PLATFORM_DATA_H
 #define CPCAP_AUDIO_PLATFORM_DATA_H
 
+enum cpcap_audio_data_voice_type {
+	VOICE_TYPE_NOT_SUPPORT = 0, /* Not supported voice type */
+	VOICE_TYPE_QC_ANALOG = 1,
+	VOICE_TYPE_QC = 2,
+	VOICE_TYPE_STE = 3,
+	VOICE_TYPE_MOT = 4,
+};
 struct cpcap_audio_pdata {
-	int analog_downlink;
 	int stereo_loudspeaker;
 	int mic3;
-	int i2s_bp;
+	enum cpcap_audio_data_voice_type voice_type;
 };
 
 void cpcap_audio_set_platform_config(struct cpcap_audio_pdata *pdata);
@@ -32,9 +38,6 @@ void cpcap_audio_set_platform_config(struct cpcap_audio_pdata *pdata);
 /*is the Bluetooth audio path for voice calls completely separate
   from CPCAP phone codec, or must CPCAP provide bus clocking?*/
 int cpcap_audio_has_independent_bt(void);
-
-/*is the downlink speech path analog or digital?*/
-int cpcap_audio_has_analog_downlink(void);
 
 /*does this product have two independent loudspeakers?*/
 int cpcap_audio_has_stereo_loudspeaker(void);
