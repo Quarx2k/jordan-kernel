@@ -40,8 +40,11 @@
 #endif
 
 #define ABE_BYPASS
+
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 #define MOTSND_CONFIG_ENABLE_ABE
 #define MOTSND_CONFIG_ENABLE_SPDIF
+#endif
 
 #ifdef MOTSND_CONFIG_ENABLE_ABE
 #include "omap-abe.h"
@@ -631,6 +634,7 @@ static struct snd_soc_dai_link motsnd_dai[] = {
 	.ignore_suspend = 1,
 },
 #ifdef ABE_BYPASS
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 {
 	.name = "Multimedia LP",
 	.stream_name = "Multimedia",
@@ -643,6 +647,7 @@ static struct snd_soc_dai_link motsnd_dai[] = {
 //	.fe_playback_channels = 2,
 	.ignore_suspend = 1,
 },
+#endif
 #endif
 #ifdef MOTSND_CONFIG_ENABLE_ABE
 {
