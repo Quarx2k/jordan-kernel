@@ -1,0 +1,26 @@
+#
+# TI's shared transport line discipline and the protocol
+# drivers (BT, FM and GPS)
+#
+menu "Texas Instruments shared transport line discipline"
+config TI_ST
+	tristate "Shared transport core driver"
+	depends on NET && GPIOLIB
+	select FW_LOADER
+	help
+	  This enables the shared transport core driver for TI
+	  BT / FM and GPS combo chips. This enables protocol drivers
+	  to register themselves with core and send data, the responses
+	  are returned to relevant protocol drivers based on their
+	  packet types.
+
+config ST_HCI
+	tristate "HCI TTY emulation driver for Bluetooth"
+	depends on TI_ST
+	help
+	  This enables the TTY device like emulation for HCI used by
+	  user-space Bluetooth stacks.
+	  It will provide a character device for user space Bluetooth stack to
+	  send/receive data over shared transport.
+
+endmenu 

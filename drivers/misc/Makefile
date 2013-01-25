@@ -52,4 +52,4 @@ obj-$(CONFIG_SYSPANIC)		+= syspanic.o
 obj-$(CONFIG_TCMD_DRIVER)	+= tcmd_driver.o
 obj-$(CONFIG_OMAP_DEV_TYPE_DRV) += omap_dev_type.o
 obj-$(CONFIG_CAMERA_MISC)	+= camera_misc/
-
+obj-y				+= ti-st/

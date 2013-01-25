@@ -56,7 +56,10 @@
 #include <plat/hdq.h>
 #include <mach/system.h>
 #include <linux/wakelock.h>
-
+#ifdef CONFIG_ST_HCI
+#include <linux/ti_wilink_st.h>
+#include <linux/skbuff.h>
+#endif
 #include "cm-regbits-34xx.h"
 
 #ifdef CONFIG_ARM_OF
@@ -116,6 +119,8 @@
 #define MAPPHONE_BPWAKE_STROBE_GPIO	157
 #define MAPPHONE_APWAKE_TRIGGER_GPIO	141
 #define MAPPHONE_AIRC_INT_GPIO        180
+#define MAPPHONE_BT_RESET_GPIO 21 //get_gpio_by_name("bt_reset_b")
+#define WILINK_UART_DEV_NAME "/dev/ttyS1"
 
 #define MAPPHONE_MMCPROBE_ENABLED 0
 
@@ -1628,6 +1633,7 @@ static int __init omap_hdq_init(void)
 	return platform_device_register(&omap_hdq_device);
 }
 
+#ifndef CONFIG_BT_WILINK
 static int mapphone_wl1271_init(void);
 
 static struct wl127x_rfkill_platform_data mapphone_wl1271_pdata = {
@@ -1687,8 +1693,33 @@ static void __init mapphone_bt_init(void)
 
 	platform_device_register(&mapphone_wl1271_device);
 }
+#else
 
+/* wl127x BT, FM, GPS connectivity chip */
+struct ti_st_plat_data wilink_pdata = {
+	.nshutdown_gpio = MAPPHONE_BT_RESET_GPIO, 
+	.dev_name = WILINK_UART_DEV_NAME,
+	.flow_cntrl = 1,
+	.baud_rate = 3686400,
+	.suspend = 0,
+	.resume = 0,
+};
+static struct platform_device wl127x_device = {
+	.name           = "kim",
+	.id             = -1,
+	.dev.platform_data = &wilink_pdata,
+};
+static struct platform_device btwilink_device = {
+	.name = "btwilink",
+	.id = -1,
+};
 
+static struct platform_device *mapphone_devices[] __initdata = {
+	&wl127x_device,
+	&btwilink_device,
+};
+
+#endif
 
 #ifdef CONFIG_ANDROID_RAM_CONSOLE
 #define RAM_CONSOLE_START   0x8E000000
@@ -1826,7 +1857,11 @@ static void __init mapphone_init(void)
 	mapphone_ehci_init();
 	mapphone_pm_init();
 	omap_hdq_init();
+#ifndef CONFIG_BT_WILINK
 	mapphone_bt_init();
+#else
+	platform_add_devices(mapphone_devices, ARRAY_SIZE(mapphone_devices));
+#endif
 	mapphone_hsmmc_init();
 	mapphone_sgx_init();
 	mapphone_power_off_init();
