@@ -19,6 +19,10 @@
 #include <linux/of_fdt.h>
 #include <linux/of.h>
 #include <linux/led-lm3530.h>
+#include <linux/skbuff.h>
+#include <linux/ti_wilink_st.h>
+#include <plat/omap-serial.h>
+#include <plat/omap_hsi.h>
 #include <linux/wl12xx.h>
 #include <linux/regulator/machine.h>
 
@@ -48,6 +52,7 @@
 #endif
 #include <../drivers/w1/w1_family.h> /* for W1_EEPROM_DS2502 */
 
+#define WILINK_UART_DEV_NAME "/dev/ttyO3"
 #define MAPPHONE_POWER_OFF_GPIO 176
 static unsigned long mapphone_wifi_pmena_gpio = 186;
 static unsigned long mapphone_wifi_irq_gpio = 65;
@@ -108,8 +113,70 @@ static int __init omap_hdq_init(void)
 	return platform_device_register(&omap_hdq_dev);
 }
 
+static bool uart_req;
+static struct wake_lock st_wk_lock;
+
+static int plat_uart_disable(void)
+{
+	int port_id = 0;
+	int err = 0;
+	if (uart_req) {
+		sscanf(WILINK_UART_DEV_NAME, "/dev/ttyO%d", &port_id);
+		err = omap_serial_ext_uart_disable(port_id);
+		if (!err)
+			uart_req = false;
+	}
+	wake_unlock(&st_wk_lock);
+	return err;
+}
+
+/* Call the uart enable of serial driver */
+static int plat_uart_enable(void)
+{
+	int port_id = 0;
+	int err = 0;
+	if (!uart_req) {
+		sscanf(WILINK_UART_DEV_NAME, "/dev/ttyO%d", &port_id);
+		err = omap_serial_ext_uart_enable(port_id);
+		if (!err)
+			uart_req = true;
+	}
+	wake_lock(&st_wk_lock);
+	return err;
+}
+
+
+/* wl128x BT, FM, GPS connectivity chip */
+static struct ti_st_plat_data wilink_pdata = {
+	.nshutdown_gpio = 174, //TODO: Need check this value on defy!
+	.dev_name = WILINK_UART_DEV_NAME,
+	.flow_cntrl = 1,
+	.baud_rate = 3686400,
+	.suspend = 0,
+	.resume = 0,
+	.chip_asleep = plat_uart_disable,
+	.chip_awake  = plat_uart_enable,
+	.chip_enable = plat_uart_enable,
+	.chip_disable = plat_uart_disable,
+};
+
+static struct platform_device wl128x_device = {
+	.name		= "kim",
+	.id		= -1,
+	.dev.platform_data = &wilink_pdata,
+};
+
+static struct platform_device btwilink_device = {
+	.name = "btwilink",
+	.id = -1,
+};
+
+static struct platform_device *mapphone_devices[] __initdata = {
+	&wl128x_device,
+	&btwilink_device,
+};
+
 static struct wl12xx_platform_data mapphone_wlan_data __initdata = {
-	.irq = -1, /* OMAP_GPIO_IRQ(GPIO_WIFI_IRQ),*/
 	.board_ref_clock = WL12XX_REFCLOCK_26,
 	.board_tcxo_clock = 1,
 };
@@ -338,6 +405,7 @@ gg. This flag
 	mapphone_i2c_init();
 	mapphone_padconf_init();
 	omap_register_ion();
+	platform_add_devices(mapphone_devices, ARRAY_SIZE(mapphone_devices));
 	mapphone_spi_init();
 	mapphone_cpcap_client_init();
 	mapphone_panel_init();
