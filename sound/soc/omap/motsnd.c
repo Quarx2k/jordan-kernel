@@ -34,7 +34,10 @@
 #include <plat/gpio.h>
 #include <plat/mcbsp.h>
 #include <plat/clock.h>
+
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 #include "../../../arch/arm/mach-omap2/board-mapphone.h"
+#endif
 
 #define ABE_BYPASS
 #define MOTSND_CONFIG_ENABLE_ABE
@@ -171,6 +174,7 @@ static struct snd_soc_ops motsnd_voice_ops = {
 
 static int motsnd_incall_startup(struct snd_pcm_substream *substream)
 {
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_codec *codec = rtd->codec_dai->codec;
 	struct platform_device *pdev = container_of(codec->dev,
@@ -178,15 +182,19 @@ static int motsnd_incall_startup(struct snd_pcm_substream *substream)
 	struct cpcap_audio_pdata *pdata = pdev->dev.platform_data;
 
 	MOTSND_DEBUG_LOG("%s: entered\n", __func__);
+
 	if (pdata->voice_type == VOICE_TYPE_STE) {
 		/* STE_M570 */
 		mcbsp3_i2s1_pin_mux_switch(1);
 	}
+#endif
+
 	return 0;
 }
 
 static void motsnd_incall_shutdown(struct snd_pcm_substream *substream)
 {
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_codec *codec = rtd->codec_dai->codec;
 	struct platform_device *pdev = container_of(codec->dev,
@@ -194,10 +202,12 @@ static void motsnd_incall_shutdown(struct snd_pcm_substream *substream)
 	struct cpcap_audio_pdata *pdata = pdev->dev.platform_data;
 
 	MOTSND_DEBUG_LOG("%s: entered\n", __func__);
+
 	if (pdata->voice_type == VOICE_TYPE_STE) {
 		/* STE_M570 */
 		mcbsp3_i2s1_pin_mux_switch(0);
 	}
+#endif
 }
 static int motsnd_incall_hw_params(struct snd_pcm_substream *substream,
 				   struct snd_pcm_hw_params *params)
