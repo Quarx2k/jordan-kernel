@@ -580,6 +580,10 @@ config INPUT_HALLEFFECT_BU52014HV
 	  Say Y here if you wish to include support for the BU52014HV hall
 	  effect sensor.
 
+config VIB_GPIO
+	bool "GPIO Vibrator"
+	default n
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
