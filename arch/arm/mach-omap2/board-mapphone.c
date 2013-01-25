@@ -406,6 +406,7 @@ static void __init omap_mapphone_init(void)
 	mapphone_padconf_init();
 	omap_register_ion();
 	platform_add_devices(mapphone_devices, ARRAY_SIZE(mapphone_devices));
+	wake_lock_init(&st_wk_lock, WAKE_LOCK_SUSPEND, "st_wake_lock");
 	mapphone_spi_init();
 	mapphone_cpcap_client_init();
 	mapphone_panel_init();
