@@ -393,12 +393,11 @@ static void __init omap_mapphone_init_early(void)
 static void __init omap_mapphone_init(void)
 {
 	/*
-	 * This will git show
-gg. This flag
+	 * This will allow unused regulator to be shutdown. This flag
 	 * should be set in the board file. Before regulators are registered.
 	 */
 	regulator_has_full_constraints();
-	
+
 	omap_serial_init();
 	mapphone_bp_model_init();
 	mapphone_voltage_init();
