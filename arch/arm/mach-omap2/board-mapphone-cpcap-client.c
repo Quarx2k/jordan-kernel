@@ -27,6 +27,15 @@
 #include "dt_path.h"
 #include <linux/of.h>
 
+/* TODO: Remove after implementing RIL. */
+#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+#define MAPPHONE_BP_QSC6085	0x001E0000
+#define MAPPHONE_BP_MDM6600	0x001E0001
+#define MAPPHONE_BP_MDM9600	0x001E0002
+#define MAPPHONE_BP_STE_M570	0x00240000
+#define MAPPHONE_BP_W3GLTE	0x0003000F
+#endif
+
 /*
  * CPCAP devcies are common for different HW Rev.
  *
@@ -66,7 +75,7 @@ static struct platform_device cpcap_tta_det_device = {
 #endif
 
 
-#ifdef CONFIG_SOUND_CPCAP_OMAP
+#if defined(CONFIG_SOUND_CPCAP_OMAP) || defined(CONFIG_SND_SOC_CPCAP)
 static struct platform_device cpcap_audio_device = {
 	.name           = "cpcap_audio",
 	.id             = -1,
@@ -109,7 +118,7 @@ static struct platform_device *cpcap_devices[] = {
 	&cpcap_usb_device,
 	&cpcap_usb_det_device,
 #endif
-#ifdef CONFIG_SOUND_CPCAP_OMAP
+#if defined(CONFIG_SOUND_CPCAP_OMAP) || defined(CONFIG_SND_SOC_CPCAP)
 	&cpcap_audio_device,
 #endif
 	&cpcap_3mm5_device,
@@ -287,7 +296,25 @@ int is_cpcap_vio_supply_converter(void)
 	return 1;
 }
 
-#ifdef CONFIG_SOUND_CPCAP_OMAP
+#if defined(CONFIG_SOUND_CPCAP_OMAP) || defined(CONFIG_SND_SOC_CPCAP)
+static int cpcap_bp_get_type(void)
+{
+	int ret = 0;
+	struct device_node *node;
+	const void *prop;
+	int size;
+
+	node = of_find_node_by_path("/System@0/Modem@0");
+	if (node) {
+		prop = of_get_property(node, \
+		DT_PROP_MODEM_TYPE, &size);
+		if (prop && size)
+			ret = *(u32 *)prop;
+		of_node_put(node);
+	}
+	return ret;
+}
+
 static void get_cpcap_audio_data(void)
 {
 	struct device_node *node;
@@ -296,20 +323,31 @@ static void get_cpcap_audio_data(void)
 
 	cpcap_audio_device.dev.platform_data = (void *)&data;
 
+	/* read modem-type from device tree to setup data.voice_type */
+	switch (cpcap_bp_get_type()) {
+	case MAPPHONE_BP_MDM6600:
+	case MAPPHONE_BP_MDM9600:
+		data.voice_type = VOICE_TYPE_QC;
+		break;
+	case MAPPHONE_BP_QSC6085:
+		data.voice_type = VOICE_TYPE_QC_ANALOG;
+		break;
+	case MAPPHONE_BP_STE_M570:
+		data.voice_type = VOICE_TYPE_STE;
+		break;
+	case MAPPHONE_BP_W3GLTE:
+		data.voice_type = VOICE_TYPE_MOT;
+		break;
+	default:
+		data.voice_type = VOICE_TYPE_NOT_SUPPORT;
+		break;
+	}
+
 	node = of_find_node_by_path(DT_PATH_AUDIO);
 	if (!node) {
 		pr_err("Unable to read node %s from device tree!\n",
 			DT_PATH_AUDIO);
 		return;
-	}
-
-	prop = of_get_property(node, DT_PROP_AUDIO_ANALOG_DOWNLINK, NULL);
-	if (prop)
-		data.analog_downlink = (*(int *)prop > 0 ? 1 : 0);
-	else {
-		data.analog_downlink = 0;
-		pr_err("Read property %s error!\n",
-			DT_PROP_AUDIO_ANALOG_DOWNLINK);
 	}
 
 	prop = of_get_property(node, DT_PROP_AUDIO_STEREO_LOUDSPEAKER, NULL);
@@ -329,15 +367,8 @@ static void get_cpcap_audio_data(void)
 		pr_err("Read property %s error!\n",
 			DT_PROP_AUDIO_MIC3);
 	}
-	prop = of_get_property(node, DT_PROP_AUDIO_I2S_BP, NULL);
-	if (prop)
-		data.i2s_bp = (*(int *)prop > 0 ? 1 : 0);
-	else {
-		data.i2s_bp = 0;
-		pr_err("Read property %s error!\n",
-			DT_PROP_AUDIO_I2S_BP);
-	}
 	of_node_put(node);
+
 }
 #endif
 
@@ -616,7 +647,7 @@ void __init mapphone_cpcap_client_init(void)
 {
 	int i;
 
-#ifdef CONFIG_SOUND_CPCAP_OMAP
+#if defined(CONFIG_SOUND_CPCAP_OMAP) || defined(CONFIG_SND_SOC_CPCAP)
 	get_cpcap_audio_data();
 #endif
 
