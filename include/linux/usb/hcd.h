@@ -414,6 +414,9 @@ extern irqreturn_t usb_hcd_irq(int irq, void *__hcd);
 extern void usb_hc_died(struct usb_hcd *hcd);
 extern void usb_hcd_poll_rh_status(struct usb_hcd *hcd);
 
+extern void usb_hcd_start_port_resume(struct usb_bus *bus, int portnum);
+extern void usb_hcd_end_port_resume(struct usb_bus *bus, int portnum);
+
 /* The D0/D1 toggle bits ... USE WITH CAUTION (they're almost hcd-internal) */
 #define usb_gettoggle(dev, ep, out) (((dev)->toggle[out] >> (ep)) & 1)
 #define	usb_dotoggle(dev, ep, out)  ((dev)->toggle[out] ^= (1 << (ep)))
