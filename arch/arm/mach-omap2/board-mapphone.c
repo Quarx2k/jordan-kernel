@@ -398,7 +398,8 @@ gg. This flag
 	 * should be set in the board file. Before regulators are registered.
 	 */
 	regulator_has_full_constraints();
-
+	
+	omap_serial_init();
 	mapphone_bp_model_init();
 	mapphone_voltage_init();
 	mapphone_gpio_mapping_init();
