@@ -20,11 +20,13 @@
 #include <linux/kxtf9.h>
 #include <linux/isl29030.h>
 #include <linux/bu52014hfv.h>
+#include <linux/vib-gpio.h>
 
 #define MAPPHONE_LM_3530_INT_GPIO	92
 #define MAPPHONE_AKM8973_INT_GPIO	175
 #define MAPPHONE_AKM8973_RESET_GPIO	28
 #define MAPPHONE_KXTF9_INT_GPIO		22
+#define MAPPHONE_VIBRATOR_GPIO		181
 
 static struct i2c_board_info __initdata
 	mapphone_i2c_bus1_board_info[I2C_BUS_MAX_DEVICES];
@@ -656,6 +658,78 @@ static struct platform_device omap3430_hall_effect_dock = {
 	},
 };
 
+/*
+ * Vibe
+ */
+
+static struct regulator *mapphone_vibrator_regulator;
+static int mapphone_vibrator_initialization(void)
+{
+	struct regulator *reg;
+	reg = regulator_get(NULL, "vvib");
+	if (IS_ERR(reg))
+		return PTR_ERR(reg);
+	mapphone_vibrator_regulator = reg;
+	return 0;
+}
+
+static void mapphone_vibrator_exit(void)
+{
+	regulator_put(mapphone_vibrator_regulator);
+}
+
+static int mapphone_vibrator_power_on(void)
+{
+	regulator_set_voltage(mapphone_vibrator_regulator, 3000000, 3000000);
+	return regulator_enable(mapphone_vibrator_regulator);
+}
+
+static int mapphone_vibrator_power_off(void)
+{
+	if (mapphone_vibrator_regulator)
+		return regulator_disable(mapphone_vibrator_regulator);
+	return 0;
+}
+
+static struct vib_gpio_platform_data mapphone_vib_gpio_data = {
+	.gpio = MAPPHONE_VIBRATOR_GPIO,
+	.max_timeout = 15000,
+	.active_low = 0,
+	.initial_vibrate = 0,
+
+	.init = mapphone_vibrator_initialization,
+	.exit = mapphone_vibrator_exit,
+	.power_on = mapphone_vibrator_power_on,
+	.power_off = mapphone_vibrator_power_off,
+};
+
+static struct platform_device mapphone_vib_gpio = {
+	.name           = "vib-gpio",
+	.id             = -1,
+	.dev            = {
+		.platform_data  = &mapphone_vib_gpio_data,
+	},
+};
+
+static void mapphone_vibrator_init(void)
+{
+	int vibrator_gpio = MAPPHONE_VIBRATOR_GPIO;
+
+	vibrator_gpio = get_gpio_by_name("vib_control_en");
+	if (vibrator_gpio < 0) {
+		printk(KERN_DEBUG
+			"cannot retrieve vib_control_en from device tree\n");
+		vibrator_gpio = MAPPHONE_VIBRATOR_GPIO;
+	}
+	mapphone_vib_gpio_data.gpio = vibrator_gpio;
+	if (gpio_request(mapphone_vib_gpio_data.gpio, "vib_ctrl_en")) {
+		printk(KERN_ERR "vib_control_en GPIO request failed!\n");
+		return;
+	}
+
+	gpio_direction_output(vibrator_gpio, 0);
+}
+
 /* Init I2C Bus Interfaces */
 
 static struct i2c_board_info *get_board_info
@@ -849,6 +923,9 @@ void __init mapphone_i2c_init(void)
 	mapphone_isl29030_init();
 	mapphone_bu52014hfv_init();
 	platform_device_register(&omap3430_hall_effect_dock);
+
+	mapphone_vibrator_init();
+	platform_device_register(&mapphone_vib_gpio);
 
 }
 
