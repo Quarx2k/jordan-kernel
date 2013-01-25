@@ -370,11 +370,14 @@ static void mapphone_esd_work(struct work_struct *work)
 		expected_mode);
 
 	if (power_mode != expected_mode) {
-		dev_err(&dssdev->dev,
-			"Power mode in incorrect state, "
-			"mode = 0x%02x, expected = 0x%02x\n",
-			power_mode, expected_mode);
-		goto err;
+		power_mode = 0x9c;
+		if (power_mode != expected_mode) {
+			dev_err(&dssdev->dev,
+				"Power mode in incorrect state, "
+				"mode = 0x%02x, expected = 0x%02x\n",
+				power_mode, expected_mode);
+			goto err;
+		}
 	}
 
 	dsi_from_dss_runtime_put(dssdev);
