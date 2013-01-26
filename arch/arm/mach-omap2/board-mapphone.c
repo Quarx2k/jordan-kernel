@@ -216,11 +216,11 @@ static void mapphone_wifi_init(void)
 		return;
 	}
 
-	ret = gpio_request(MAPPHONE_WIFI_IRQ_GPIO, "wifi_irq");
+	ret = gpio_request(mapphone_wifi_irq_gpio, "wifi_irq");
 	if (ret < 0) {
 		printk(KERN_ERR "%s: can't reserve GPIO: %d\n", __func__,
-			MAPPHONE_WIFI_IRQ_GPIO);
-		goto out;
+			mapphone_wifi_irq_gpio);
+		return;
 	}
 
 	gpio_direction_input(mapphone_wifi_irq_gpio);
