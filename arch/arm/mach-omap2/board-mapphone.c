@@ -177,6 +177,7 @@ static struct platform_device *mapphone_devices[] __initdata = {
 };
 
 static struct wl12xx_platform_data mapphone_wlan_data __initdata = {
+	.irq = -1, /* OMAP_GPIO_IRQ(GPIO_WIFI_IRQ),*/
 	.board_ref_clock = WL12XX_REFCLOCK_26,
 	.board_tcxo_clock = 1,
 };
@@ -190,11 +191,11 @@ int wifi_set_power(struct device *dev, int slot, int power_on, int vdd)
 	}
 	power_state = power_on;
 	if (power_on) {
-		gpio_set_value(mapphone_wifi_irq_gpio, 1);
+		gpio_set_value(mapphone_wifi_pmena_gpio, 1);
 		mdelay(15);
-		gpio_set_value(mapphone_wifi_irq_gpio, 0);
+		gpio_set_value(mapphone_wifi_pmena_gpio, 0);
 		mdelay(1);
-		gpio_set_value(mapphone_wifi_irq_gpio, 1);
+		gpio_set_value(mapphone_wifi_pmena_gpio, 1);
 		mdelay(70);
 	} else {
 		gpio_set_value(mapphone_wifi_pmena_gpio, 0);
@@ -202,24 +203,35 @@ int wifi_set_power(struct device *dev, int slot, int power_on, int vdd)
 
 	return 0;
 }
+
 static void mapphone_wifi_init(void)
 {
 	int ret;
 	printk("mapphone_wifi_init\n");
+
 	ret = gpio_request(mapphone_wifi_pmena_gpio, "wifi_pmena");
 	if (ret < 0) {
-	printk("mapphone_wifi_init fail\n");
-		goto out;
+		printk(KERN_ERR "%s: can't reserve GPIO: %ld\n", __func__,
+			mapphone_wifi_pmena_gpio);
+		return;
 	}
+
+	ret = gpio_request(mapphone_wifi_irq_gpio, "wifi_irq");
+	if (ret < 0) {
+		printk(KERN_ERR "%s: can't reserve GPIO: %d\n", __func__,
+			mapphone_wifi_irq_gpio);
+		return;
+	}
+
+	gpio_direction_input(mapphone_wifi_irq_gpio);
 	gpio_direction_output(mapphone_wifi_pmena_gpio, 0);
 	mapphone_wlan_data.irq = OMAP_GPIO_IRQ(mapphone_wifi_irq_gpio);
+
 	if (wl12xx_set_platform_data(&mapphone_wlan_data))
 	{
 		pr_err("Error setting wl12xx data\n");
 	}
 	printk("Wifi init done\n");
-out:
-	return;
 }
 
 static void __init mapphone_bp_model_init(void)
