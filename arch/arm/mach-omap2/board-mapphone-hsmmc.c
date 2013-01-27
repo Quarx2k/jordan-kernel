@@ -228,6 +228,19 @@ static __init void mapphone_hsmmc_set_late_init(struct device *dev)
 	pdata->init = mapphone_hsmmc_late_init;
 }
 
+static void wl12xx_init_card(struct mmc_card *card)
+{
+	card->quirks |= MMC_TYPE_SDIO;
+	card->cccr.wide_bus = 1;
+	card->cccr.low_speed = 0;
+	card->cccr.high_power = 0;
+	card->cccr.high_speed = 0;
+	card->cis.vendor = 0x104c;
+	card->cis.device = 0x9066;
+	card->cis.blksize = 512;
+	card->cis.max_dtr = 24000000;
+}
+
 static struct omap2_hsmmc_info mmc_controllers[] = {
 	/*
 	 * keep the sequence:
@@ -260,8 +273,9 @@ static struct omap2_hsmmc_info mmc_controllers[] = {
 		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_POWER_OFF_CARD,
 		.gpio_cd	= -EINVAL,
 		.gpio_wp	= -EINVAL,
-		.ocr_mask	= MMC_VDD_165_195,
-		.nonremovable   = true,
+		.ocr_mask	= MMC_VDD_32_33 | MMC_VDD_33_34 |
+					MMC_VDD_165_195,
+		.init_card	= wl12xx_init_card,
 	},
 	{}	/* Terminator */
 };
