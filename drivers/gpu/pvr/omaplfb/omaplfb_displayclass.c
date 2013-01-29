@@ -950,6 +950,17 @@ void OMAPLFBSwapHandler(OMAPLFB_BUFFER *psBuffer)
 	psDevInfo->sPVRJTable.pfnPVRSRVCmdComplete((IMG_HANDLE)psBuffer->hCmdComplete, IMG_TRUE);
 }
 
+void sgx_idle_log_flip(void);
+
+static void dsscomp_proxy_cmdcomplete(void * cookie, int i)
+{
+#ifdef SYS_SUPPORTS_SGX_IDLE_CALLBACK
+	sgx_idle_log_flip();
+#endif
+	/* XXX: assumes that there is only one display */
+	gapsDevInfo[0]->sPVRJTable.pfnPVRSRVCmdComplete(cookie, i);
+}
+
 /* Triggered by PVRSRVSwapToDCBuffer */
 static IMG_BOOL ProcessFlipV1(IMG_HANDLE hCmdCookie,
 							  OMAPLFB_DEVINFO *psDevInfo,
@@ -1039,7 +1050,7 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 		return IMG_FALSE;
 	}
 
-	if(psDssData->num_ovls == 0 || ui32NumMemInfos == 0)
+	if(ui32NumMemInfos == 0)
 	{
 		WARN(1, "must have at least one layer");
 		return IMG_FALSE;
@@ -1060,7 +1071,7 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 		psDevInfo->sPVRJTable.pfnPVRSRVDCMemInfoGetCpuPAddr(ppsMemInfos[i], 0, &phyAddr);
 
 		/* TILER buffers do not need meminfos */
-		if(is_tiler_addr((u32)phyAddr.uiAddr))
+		if (cpu_is_omap44xx() && is_tiler_addr((u32)phyAddr.uiAddr))
 		{
 			asMemInfo[k].uiAddr = phyAddr.uiAddr;
 			if(tiler_fmt((u32)phyAddr.uiAddr) == TILFMT_8BIT)
@@ -1068,6 +1079,12 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 				psDevInfo->sPVRJTable.pfnPVRSRVDCMemInfoGetCpuPAddr(ppsMemInfos[i], (uByteSize * 2) / 3, &phyAddr);
 				asMemInfo[k].uiUVAddr = phyAddr.uiAddr;
 			}
+			continue;
+		}
+
+		if (cpu_is_omap3630() && (psDssData->ovls[k].\
+				cfg.color_mode == OMAP_DSS_COLOR_YUV2)) {
+			asMemInfo[k].uiAddr = phyAddr.uiAddr;
 			continue;
 		}
 
@@ -1132,13 +1149,23 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 		apsTilerPAs[i] = asMemInfo[ix].psTilerInfo;
 	}
 
-	dsscomp_gralloc_queue(psDssData, apsTilerPAs, false,
-						  (void *)psDevInfo->sPVRJTable.pfnPVRSRVCmdComplete,
-						  (void *)hCmdCookie);
+	if (psDssData->num_ovls == 0)
+		dsscomp_proxy_cmdcomplete((void *)hCmdCookie, IMG_TRUE);
+	else
+		dsscomp_gralloc_queue(psDssData, apsTilerPAs, false,
+						dsscomp_proxy_cmdcomplete,
+						(void *)hCmdCookie);
 
 	for(i = 0; i < k; i++)
 	{
-		tiler_pa_free(apsTilerPAs[i]);
+		if (cpu_is_omap44xx()) {
+			tiler_pa_free(apsTilerPAs[i]);
+		} else if (cpu_is_omap3630()) {
+			if (apsTilerPAs[i])
+				kfree(apsTilerPAs[i]->mem);
+			kfree(apsTilerPAs[i]);
+		}
+
 	}
 
 	return IMG_TRUE;
@@ -1298,7 +1325,8 @@ static OMAPLFB_ERROR OMAPLFBInitFBDev(OMAPLFB_DEVINFO *psDevInfo)
 	/* Additional implementation specific information */
 	OMAPLFBPrintInfo(psDevInfo);
 
-#if 0// defined(CONFIG_DSSCOMP)
+#if defined(CONFIG_DSSCOMP)
+	if (cpu_is_omap44xx())
 	{
 		/* for some reason we need at least 3 buffers in the swap chain */
 		int n = FBSize / RoundUpToMultiple(psLINFBInfo->fix.line_length * psLINFBInfo->var.yres, ulLCM);
@@ -1378,7 +1406,9 @@ static OMAPLFB_ERROR OMAPLFBInitFBDev(OMAPLFB_DEVINFO *psDevInfo)
 			}
 		}
 	}
-#else /* defined(CONFIG_DSSCOMP) */
+	else
+#endif /* defined(CONFIG_DSSCOMP) */
+	{
 	/* System Surface */
 	psPVRFBInfo->sSysAddr.uiAddr = psLINFBInfo->fix.smem_start;
 	psPVRFBInfo->sCPUVAddr = psLINFBInfo->screen_base;
@@ -1387,7 +1417,7 @@ static OMAPLFB_ERROR OMAPLFBInitFBDev(OMAPLFB_DEVINFO *psDevInfo)
 	psPVRFBInfo->ulHeight = psLINFBInfo->var.yres;
 	psPVRFBInfo->ulByteStride =  psLINFBInfo->fix.line_length;
 	psPVRFBInfo->ulFBSize = FBSize;
-#endif /* defined(CONFIG_DSSCOMP) */
+	}
 
 	psPVRFBInfo->ulBufferSize = psPVRFBInfo->ulHeight * psPVRFBInfo->ulByteStride;
 
