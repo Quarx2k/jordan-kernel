@@ -27,3 +27,12 @@ config FB_OMAP2_NUM_FBS
 	help
 	  Select the number of framebuffers created. OMAP2/3 has 3 overlays
 	  so normally this would be 3.
+
+config FB_OMAP2_VSYNC_SYSFS
+	depends on FB_OMAP2
+	bool "Use sysfs_notify for vsync notification"
+	default y
+	---help---
+	  Saying 'Y' here will use sysfs_notify instead of the default uevent for
+	  notification of vsync events to userspace.
+

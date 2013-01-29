@@ -518,6 +518,17 @@ static ssize_t show_virt(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%p\n", ofbi->region->vaddr);
 }
 
+#ifdef CONFIG_FB_OMAP2_VSYNC_SYSFS
+static ssize_t omapfb_vsync_time(struct device *dev,
+                struct device_attribute *attr, char *buf)
+{
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct omapfb_info *ofbi = FB2OFB(fbi);
+	struct omapfb2_device *fbdev = ofbi->fbdev;
+	return snprintf(buf, PAGE_SIZE, "%llu", ktime_to_ns(fbdev->vsync_timestamp));
+}
+#endif
+
 static struct device_attribute omapfb_attrs[] = {
 	__ATTR(rotate_type, S_IRUGO | S_IWUSR, show_rotate_type,
 			store_rotate_type),
@@ -528,6 +539,9 @@ static struct device_attribute omapfb_attrs[] = {
 			store_overlays_rotate),
 	__ATTR(phys_addr, S_IRUGO, show_phys, NULL),
 	__ATTR(virt_addr, S_IRUGO, show_virt, NULL),
+#ifdef CONFIG_FB_OMAP2_VSYNC_SYSFS
+	__ATTR(vsync_time, S_IRUGO, omapfb_vsync_time, NULL),
+#endif
 };
 
 int omapfb_create_sysfs(struct omapfb2_device *fbdev)

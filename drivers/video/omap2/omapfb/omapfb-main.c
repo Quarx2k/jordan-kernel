@@ -2305,10 +2305,25 @@ static int omapfb_init_display(struct omapfb2_device *fbdev,
 	return 0;
 }
 
+#ifdef CONFIG_FB_OMAP2_VSYNC_SYSFS
+int omapfb_notify_vsync(struct omapfb2_device *fbdev)
+{
+	if (fbdev) {
+		sysfs_notify(&fbdev->fbs[0]->dev->kobj, NULL, "vsync_time");
+		return 0;
+	}
+	return -1;
+}
+#endif
+
+
 static void omapfb_send_vsync_work(struct work_struct *work)
 {
 	struct omapfb2_device *fbdev =
 		container_of(work, typeof(*fbdev), vsync_work);
+#ifdef CONFIG_FB_OMAP2_VSYNC_SYSFS
+	omapfb_notify_vsync(fbdev);
+#else
 	char buf[64];
 	char *envp[2];
 
@@ -2317,6 +2332,7 @@ static void omapfb_send_vsync_work(struct work_struct *work)
 	envp[0] = buf;
 	envp[1] = NULL;
 	kobject_uevent_env(&fbdev->dev->kobj, KOBJ_CHANGE, envp);
+#endif
 }
 static void omapfb_vsync_isr(void *data, u32 mask)
 {
