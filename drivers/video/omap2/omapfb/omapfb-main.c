@@ -2330,6 +2330,10 @@ int omapfb_enable_vsync(struct omapfb2_device *fbdev)
 	int r;
 	/* TODO: should determine correct IRQ like dss_mgr_wait_for_vsync does*/
 	r = omap_dispc_register_isr(omapfb_vsync_isr, fbdev, DISPC_IRQ_VSYNC);
+#ifdef CONFIG_OMAP2_DSS_FAKE_VSYNC
+	fbdev->vsync_timestamp = ktime_get();
+	schedule_work(&fbdev->vsync_work);
+#endif
 	return r;
 }
 
