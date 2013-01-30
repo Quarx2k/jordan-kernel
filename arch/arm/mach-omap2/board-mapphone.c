@@ -46,6 +46,7 @@
 #include "dt_path.h"
 #include "pm.h"
 #include "hsmmc.h"
+#include "timer-gp.h"
 
 #ifdef CONFIG_EMU_UART_DEBUG
 #include <plat/board-mapphone-emu_uart.h>
@@ -390,6 +391,7 @@ static void __init omap_mapphone_init_early(void)
 	omap2_init_common_infrastructure();
 	omap2_init_common_devices(JEDEC_JESD209A_sdrc_params,
 				   JEDEC_JESD209A_sdrc_params);
+	omap2_gp_clockevent_set_gptimer(1);
 
 	if (fdt_start_address) {
 		void *mem;
