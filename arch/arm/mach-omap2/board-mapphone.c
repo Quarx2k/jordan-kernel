@@ -46,17 +46,18 @@
 #include "dt_path.h"
 #include "pm.h"
 #include "hsmmc.h"
-#include "timer-gp.h"
 
 #ifdef CONFIG_EMU_UART_DEBUG
 #include <plat/board-mapphone-emu_uart.h>
 #endif
 #include <../drivers/w1/w1_family.h> /* for W1_EEPROM_DS2502 */
 
-#define WILINK_UART_DEV_NAME "/dev/ttyO3"
+#define WILINK_UART_DEV_NAME "/dev/ttyO3" //Need Check it.
+
 #define MAPPHONE_POWER_OFF_GPIO 176
-static unsigned long mapphone_wifi_pmena_gpio = 186;
-static unsigned long mapphone_wifi_irq_gpio = 65;
+#define MAPPHONE_WIFI_PMENA_GPIO 186
+#define MAPPHONE_WIFI_IRQ_GPIO 65
+#define MAPPHONE_BT_RESET_GPIO 21 //get_gpio_by_name("bt_reset_b")
 
 char *bp_model = "CDMA";
 static char boot_mode[BOOT_MODE_MAX_LEN+1];
@@ -114,73 +115,42 @@ static int __init omap_hdq_init(void)
 	return platform_device_register(&omap_hdq_dev);
 }
 
-static bool uart_req;
-static struct wake_lock st_wk_lock;
-
-static int plat_uart_disable(void)
+static int plat_kim_suspend(struct platform_device *pdev, pm_message_t state)
 {
-	int port_id = 0;
-	int err = 0;
-	if (uart_req) {
-		sscanf(WILINK_UART_DEV_NAME, "/dev/ttyO%d", &port_id);
-		err = omap_serial_ext_uart_disable(port_id);
-		if (!err)
-			uart_req = false;
-	}
-	wake_unlock(&st_wk_lock);
-	return err;
+	return 0;
+}
+static int plat_kim_resume(struct platform_device *pdev)
+{
+	return 0;
 }
 
-/* Call the uart enable of serial driver */
-static int plat_uart_enable(void)
-{
-	int port_id = 0;
-	int err = 0;
-	if (!uart_req) {
-		sscanf(WILINK_UART_DEV_NAME, "/dev/ttyO%d", &port_id);
-		err = omap_serial_ext_uart_enable(port_id);
-		if (!err)
-			uart_req = true;
-	}
-	wake_lock(&st_wk_lock);
-	return err;
-}
-
-
-/* wl128x BT, FM, GPS connectivity chip */
-static struct ti_st_plat_data wilink_pdata = {
-	.nshutdown_gpio = 174, //TODO: Need check this value on defy!
+/* wl127x BT, FM, GPS connectivity chip */
+struct ti_st_plat_data wilink_pdata = {
+	.nshutdown_gpio = OMAP_GPIO_IRQ(MAPPHONE_BT_RESET_GPIO), 
 	.dev_name = WILINK_UART_DEV_NAME,
 	.flow_cntrl = 1,
-	.baud_rate = 3686400,
-	.suspend = 0,
-	.resume = 0,
-	.chip_asleep = plat_uart_disable,
-	.chip_awake  = plat_uart_enable,
-	.chip_enable = plat_uart_enable,
-	.chip_disable = plat_uart_disable,
+	.baud_rate = 3000000,
+	.suspend = plat_kim_suspend,
+	.resume = plat_kim_resume,
 };
-
-static struct platform_device wl128x_device = {
-	.name		= "kim",
-	.id		= -1,
+static struct platform_device wl127x_device = {
+	.name           = "kim",
+	.id             = -1,
 	.dev.platform_data = &wilink_pdata,
 };
-
 static struct platform_device btwilink_device = {
 	.name = "btwilink",
 	.id = -1,
 };
 
 static struct platform_device *mapphone_devices[] __initdata = {
-	&wl128x_device,
+	&wl127x_device,
 	&btwilink_device,
 };
 
 static struct wl12xx_platform_data mapphone_wlan_data __initdata = {
-	.irq = -1, /* OMAP_GPIO_IRQ(GPIO_WIFI_IRQ),*/
-	.board_ref_clock = WL12XX_REFCLOCK_26,
-	.board_tcxo_clock = 1,
+	.irq = OMAP_GPIO_IRQ(MAPPHONE_WIFI_IRQ_GPIO),
+	.board_ref_clock = WL12XX_REFCLOCK_38,
 };
 
 int wifi_set_power(struct device *dev, int slot, int power_on, int vdd)
@@ -192,16 +162,10 @@ int wifi_set_power(struct device *dev, int slot, int power_on, int vdd)
 	}
 	power_state = power_on;
 	if (power_on) {
-		gpio_set_value(mapphone_wifi_pmena_gpio, 1);
-		mdelay(15);
-		gpio_set_value(mapphone_wifi_pmena_gpio, 0);
-		mdelay(1);
-		gpio_set_value(mapphone_wifi_pmena_gpio, 1);
-		mdelay(70);
+		gpio_set_value(MAPPHONE_WIFI_PMENA_GPIO, 1);
 	} else {
-		gpio_set_value(mapphone_wifi_pmena_gpio, 0);
+		gpio_set_value(MAPPHONE_WIFI_PMENA_GPIO, 0);
 	}
-
 	return 0;
 }
 
@@ -210,23 +174,13 @@ static void mapphone_wifi_init(void)
 	int ret;
 	printk("mapphone_wifi_init\n");
 
-	ret = gpio_request(mapphone_wifi_pmena_gpio, "wifi_pmena");
-	if (ret < 0) {
-		printk(KERN_ERR "%s: can't reserve GPIO: %ld\n", __func__,
-			mapphone_wifi_pmena_gpio);
-		return;
-	}
-
-	ret = gpio_request(mapphone_wifi_irq_gpio, "wifi_irq");
+	ret = gpio_request(MAPPHONE_WIFI_PMENA_GPIO, "wifi_pmena");
 	if (ret < 0) {
 		printk(KERN_ERR "%s: can't reserve GPIO: %d\n", __func__,
-			mapphone_wifi_irq_gpio);
+			MAPPHONE_WIFI_PMENA_GPIO);
 		return;
 	}
-
-	gpio_direction_input(mapphone_wifi_irq_gpio);
-	gpio_direction_output(mapphone_wifi_pmena_gpio, 0);
-	mapphone_wlan_data.irq = OMAP_GPIO_IRQ(mapphone_wifi_irq_gpio);
+	gpio_direction_output(MAPPHONE_WIFI_PMENA_GPIO, 0);
 
 	if (wl12xx_set_platform_data(&mapphone_wlan_data))
 	{
@@ -420,7 +374,6 @@ static void __init omap_mapphone_init(void)
 	mapphone_padconf_init();
 	omap_register_ion();
 	platform_add_devices(mapphone_devices, ARRAY_SIZE(mapphone_devices));
-	wake_lock_init(&st_wk_lock, WAKE_LOCK_SUSPEND, "st_wake_lock");
 	mapphone_spi_init();
 	mapphone_cpcap_client_init();
 	mapphone_panel_init();
