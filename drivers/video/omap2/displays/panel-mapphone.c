@@ -90,6 +90,26 @@ static unsigned int panel_debug;
 
 #define INVALID_VALUE	0xFFFF
 
+#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+/**
+ * RDDPM (Read Display Power Mode) - response to EDISCO_CMD_GET_POWER_MODE.
+ * D7: Step up circuit Voltage Status (0 = off or fault, 1 = on/working)
+ * D6: Idle Mode (0 = off, 1 = on)
+ * D5: Partial Mode (0 = off, 1 = on)
+ * D4: Wake/Sleep Mode (0 = "sleep in"/sleeping, 1 = "sleep out"/awake)
+ * D3: Display Normal Mode (0 = off, 1 = on)
+ * D2: Display Status (0 = off, 1 = on)
+ * D1: Reserved - always 0
+ * D0: Reserved - always 0
+ */
+#define REG_DPM_STEP_UP_CIRCUIT	(1 << 7)
+#define REG_DPM_IDLE_MODE	(1 << 6)
+#define REG_DPM_PARTIAL_MODE	(1 << 5)
+#define REG_DPM_WAKE_MODE	(1 << 4)
+#define REG_DPM_NORMAL_MODE	(1 << 3)
+#define REG_DPM_DISPLAY_STATUS	(1 << 2)
+#endif
+
 /*
  *This must match with schema.xml section "device-id-value"
  *Name convention:
@@ -361,9 +381,12 @@ static void mapphone_esd_work(struct work_struct *work)
 		goto err;
 	}
 
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	if (atomic_read(&panel_data->state) == PANEL_ON)
+		/* REG_DPM_STEP_UP_CIRCUIT | REG_DPM_DISPLAY_STATUS | REG_DPM_NORMAL_MODE | REG_DPM_WAKE_MODE */
 		expected_mode = 0x9c;
 	else
+		/* REG_DPM_STEP_UP_CIRCUIT | REG_DPM_NORMAL_MODE | REG_DPM_WAKE_MODE */
 		expected_mode = 0x98;
 
 	DBG("ESD Check - read mode = 0x%02x, expected = 0x%02x\n", power_mode,
@@ -376,6 +399,26 @@ static void mapphone_esd_work(struct work_struct *work)
 			power_mode, expected_mode);
 		goto err;
 	}
+#else
+	/* Some Defy/Milestone displays don't have REG_DPM_STEP_UP_CIRCUIT set. */
+	if (atomic_read(&panel_data->state) == PANEL_ON)
+		/* 0x1c */
+		expected_mode = REG_DPM_DISPLAY_STATUS | REG_DPM_NORMAL_MODE | REG_DPM_WAKE_MODE;
+	else
+		/* 0x18 */
+		expected_mode = REG_DPM_NORMAL_MODE | REG_DPM_WAKE_MODE;
+
+	DBG("ESD Check - read mode = 0x%02x, expected to match = 0x%02x\n",
+	        power_mode, expected_mode);
+
+	if (!(power_mode & expected_mode)) {
+		dev_err(&dssdev->dev,
+			"Power mode in incorrect state, "
+			"mode = 0x%02x, expected to match = 0x%02x\n",
+			power_mode, expected_mode);
+		goto err;
+	}
+#endif
 
 	dsi_from_dss_runtime_put(dssdev);
 	dsi_bus_unlock(dssdev);
