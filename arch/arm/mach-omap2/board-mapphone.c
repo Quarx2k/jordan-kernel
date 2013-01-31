@@ -127,7 +127,7 @@ static int plat_kim_resume(struct platform_device *pdev)
 
 /* wl127x BT, FM, GPS connectivity chip */
 struct ti_st_plat_data wilink_pdata = {
-	.nshutdown_gpio = OMAP_GPIO_IRQ(MAPPHONE_BT_RESET_GPIO), 
+	.nshutdown_gpio = MAPPHONE_BT_RESET_GPIO, 
 	.dev_name = WILINK_UART_DEV_NAME,
 	.flow_cntrl = 1,
 	.baud_rate = 3000000,
