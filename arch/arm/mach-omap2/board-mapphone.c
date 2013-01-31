@@ -46,6 +46,7 @@
 #include "dt_path.h"
 #include "pm.h"
 #include "hsmmc.h"
+#include "timer-gp.h"
 
 #ifdef CONFIG_EMU_UART_DEBUG
 #include <plat/board-mapphone-emu_uart.h>
