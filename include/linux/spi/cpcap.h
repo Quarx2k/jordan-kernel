@@ -530,6 +530,13 @@ enum cpcap_batt_usb_model {
 	CPCAP_BATT_USB_MODEL_FACTORY,
 };
 
+enum cpcap_batt_ac_model {
+	CPCAP_BATT_AC_NONE,
+	CPCAP_BATT_AC_CABLE,
+	CPCAP_BATT_AC_IND,
+	CPCAP_BATT_AC_SMARTDOCK,
+};
+
 struct cpcap_spi_init_data {
 	enum cpcap_reg reg;
 	unsigned short data;
@@ -608,6 +615,7 @@ struct cpcap_batt_data {
 
 struct cpcap_batt_ac_data {
 	int online;
+	enum cpcap_batt_ac_model model;
 };
 
 struct cpcap_batt_usb_data {
@@ -819,7 +827,8 @@ int cpcap_adc_async_read(struct cpcap_device *cpcap,
 
 void cpcap_adc_phase(struct cpcap_device *cpcap, struct cpcap_adc_phase *phase);
 
-void cpcap_batt_set_ac_prop(struct cpcap_device *cpcap, int online);
+void cpcap_batt_set_ac_prop(struct cpcap_device *cpcap, int online,
+				    enum cpcap_batt_ac_model model);
 
 void cpcap_batt_set_usb_prop_online(struct cpcap_device *cpcap, int online,
 				    enum cpcap_batt_usb_model model);

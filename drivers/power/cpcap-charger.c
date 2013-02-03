@@ -46,14 +46,14 @@ static int cpcap_chgr_probe(struct platform_device *pdev)
 
 	cpcap = pdev->dev.platform_data;
 	platform_set_drvdata(pdev, cpcap);
-	cpcap_batt_set_ac_prop(cpcap, 1);
+	cpcap_batt_set_ac_prop(cpcap, 1, CPCAP_BATT_AC_CABLE);
 	return ret;
 }
 
 static int cpcap_chgr_remove(struct platform_device *pdev)
 {
 	struct cpcap_device *cpcap = platform_get_drvdata(pdev);
-	cpcap_batt_set_ac_prop(cpcap, 0);
+	cpcap_batt_set_ac_prop(cpcap, 0, CPCAP_BATT_AC_NONE);
 
 	return 0;
 }

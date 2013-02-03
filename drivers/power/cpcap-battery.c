@@ -98,7 +98,9 @@ static enum power_supply_property cpcap_batt_props[] = {
 
 static enum power_supply_property cpcap_batt_ac_props[] =
 {
-	POWER_SUPPLY_PROP_ONLINE
+	POWER_SUPPLY_PROP_ONLINE,
+	POWER_SUPPLY_PROP_MODEL_NAME
+
 };
 
 static enum power_supply_property cpcap_batt_usb_props[] =
@@ -316,6 +318,10 @@ static long cpcap_batt_ioctl(struct file *file,
 	return ret;
 }
 
+static char *cpcap_batt_chrg_models[] = {
+	"none", "cable", "inductive", "smartdock"
+};
+
 static int cpcap_batt_ac_get_property(struct power_supply *psy,
 				      enum power_supply_property psp,
 				      union power_supply_propval *val)
@@ -327,6 +333,9 @@ static int cpcap_batt_ac_get_property(struct power_supply *psy,
 	switch (psp) {
 	case POWER_SUPPLY_PROP_ONLINE:
 		val->intval = sply->ac_state.online;
+		break;
+	case POWER_SUPPLY_PROP_MODEL_NAME:
+		val->strval = cpcap_batt_chrg_models[sply->ac_state.model];
 		break;
 	default:
 		ret = -EINVAL;
@@ -450,6 +459,7 @@ static int cpcap_batt_probe(struct platform_device *pdev)
 	sply->batt_state.batt_capacity_one = 100;
 
 	sply->ac_state.online = 0;
+	sply->ac_state.model = CPCAP_BATT_AC_NONE;
 
 	sply->usb_state.online = 0;
 	sply->usb_state.current_now = 0;
@@ -611,7 +621,8 @@ static int cpcap_batt_resume(struct platform_device *pdev)
 	return 0;
 }
 
-void cpcap_batt_set_ac_prop(struct cpcap_device *cpcap, int online)
+void cpcap_batt_set_ac_prop(struct cpcap_device *cpcap, int online,
+			     enum cpcap_batt_ac_model model)
 {
 	struct cpcap_batt_ps *sply = cpcap->battdata;
 	struct spi_device *spi = cpcap->spi;
@@ -619,6 +630,7 @@ void cpcap_batt_set_ac_prop(struct cpcap_device *cpcap, int online)
 
 	if (sply != NULL) {
 		sply->ac_state.online = online;
+		sply->ac_state.model = model;
 		power_supply_changed(&sply->ac);
 
 		if (data->ac_changed)
