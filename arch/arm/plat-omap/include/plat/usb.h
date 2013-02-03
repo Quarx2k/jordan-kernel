@@ -46,6 +46,13 @@ struct usbhs_omap_board_data {
 	 * for low power mode entry
 	 */
 	struct clk			*transceiver_clk[OMAP3_HS_USB_PORTS];
+
+	/* Suspend Functions for USB PHYs */
+	int	(*ohci_phy_suspend) (int on);
+
+	/* Set this if Vbus pin of the HS USB PHY is open */
+	unsigned			ehci_phy_vbus_not_used:1;
+
 };
 
 struct ehci_hcd_omap_platform_data {
@@ -58,11 +65,17 @@ struct ehci_hcd_omap_platform_data {
 	 * for low power mode entry
 	 */
 	struct clk			*transceiver_clk[OMAP3_HS_USB_PORTS];
+
+	/* Set this if Vbus pin of the HS USB PHY is open */
+	unsigned			ehci_phy_vbus_not_used:1;
 };
 
 struct ohci_hcd_omap_platform_data {
 	enum usbhs_omap_port_mode	port_mode[OMAP3_HS_USB_PORTS];
 	unsigned			es2_compatibility:1;
+	/* Suspend Functions for USB PHYs */
+	int	(*ohci_phy_suspend) (int on);
+
 };
 
 struct usbhs_omap_platform_data {
@@ -70,6 +83,23 @@ struct usbhs_omap_platform_data {
 
 	struct ehci_hcd_omap_platform_data	*ehci_data;
 	struct ohci_hcd_omap_platform_data	*ohci_data;
+
+	/* have to be valid if phy_reset is true and portx is in phy mode */
+	int	reset_gpio_port[OMAP3_HS_USB_PORTS];
+
+	/* Set this to true for ES2.x silicon */
+	unsigned			es2_compatibility:1;
+
+	unsigned			phy_reset:1;
+
+	/* Regulators for USB PHYs.
+	 * Each PHY can have a separate regulator.
+	 */
+	struct regulator        *regulator[OMAP3_HS_USB_PORTS];
+
+	/* Suspend Functions for USB PHYs */
+	int	(*ohci_phy_suspend) (int on);
+
 };
 /*-------------------------------------------------------------------------*/
 
@@ -308,3 +338,6 @@ extern void omap4_trigger_ioctrl(void);
 #define USBHS_OHCI_HWMODNAME    "usbhs_ohci"
 
 #endif	/* __ASM_ARCH_OMAP_USB_H */
+
+extern int sar_needs_ehci_saving;
+#define save_usb_sar_regs() do {sar_needs_ehci_saving = 1; } while (0);

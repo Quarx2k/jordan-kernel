@@ -280,7 +280,8 @@ obj-$(CONFIG_MACH_OMAP_MAPPHONE)	   += board-mapphone.o \
 					   wakeup-timer.o \
 					   board-mapphone-padconf.o \
 					   board-mapphone-touch.o \
-					   #board-mapphone-usb.o
+					   board-mapphone-usb.o \
+
 obj-$(CONFIG_EMU_UART_DEBUG)		+= board-mapphone-emu_uart.o
 obj-$(CONFIG_MACH_CM_T35)		+= board-cm-t35.o \
 					   hsmmc.o

@@ -10,6 +10,11 @@
 #ifndef __LINUX_USB_MUSB_H
 #define __LINUX_USB_MUSB_H
 
+#include <linux/platform_device.h>
+#include <linux/wakelock.h>
+#include <linux/pm_qos_params.h>
+#include <plat/omap_hwmod.h>
+#include <plat/omap-pm.h>
 /* The USB role is defined by the connector used on the board, so long as
  * standards are being followed.  (Developer boards sometimes won't.)
  */
@@ -120,11 +125,42 @@ struct musb_hdrc_platform_data {
 	/* Power the device on or off */
 	int		(*set_power)(int state);
 
+	/* Turn device clock on or off */
+	int		(*set_clock)(struct clk *clock, int is_on);
+
 	/* MUSB configuration-specific details */
 	struct musb_hdrc_config	*config;
 
 	/* Architecture specific board data	*/
 	void		*board_data;
+
+	/* check usb device active state*/
+	int		(*is_usb_active)(struct device *dev);
+
+	/* omap hwmod data structure	 */
+	struct	omap_hwmod *oh;
+
+	/* enable clocks and set sysconfig register*/
+	int		(*device_enable)(struct platform_device *pdev);
+
+	/* Disable clock and reset the sysconfig register settings*/
+	int		(*device_idle)(struct platform_device *pdev);
+
+	/* set the enable wakeup bit of sysconfig register */
+	int		(*enable_wakeup)(struct omap_device *od);
+
+	/* Clear the enable wakeup bit  of sysconfig register */
+	int		(*disable_wakeup)(struct omap_device *od);
+
+	/* This is used for L3 constrint */
+	int		(*set_min_bus_tput)(struct device *dev,
+						u8 agent_id, long r);
+
+	/* This is used for C state constraint */
+	struct pm_qos_request_list *musb_qos_request;
+
+	/* This is used for holding a wakelock */
+	struct wake_lock musb_lock;
 
 	/* Platform specific struct musb_ops pointer */
 	const void	*platform_ops;

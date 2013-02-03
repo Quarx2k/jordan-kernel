@@ -81,16 +81,6 @@ enum cpcap_det_state {
 	FACTORY,
 };
 
-enum cpcap_accy {
-	CPCAP_ACCY_USB,
-	CPCAP_ACCY_FACTORY,
-	CPCAP_ACCY_CHARGER,
-	CPCAP_ACCY_NONE,
-
-	/* Used while debouncing the accessory. */
-	CPCAP_ACCY_UNKNOWN,
-};
-
 struct cpcap_usb_det_data {
 	struct cpcap_device *cpcap;
 	struct delayed_work work;

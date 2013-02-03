@@ -85,6 +85,9 @@ struct otg_transceiver {
 	int	(*init)(struct otg_transceiver *otg);
 	void	(*shutdown)(struct otg_transceiver *otg);
 
+	/* for enabling and disabling the transciever clocks*/
+	int	(*set_clk)(struct otg_transceiver *otg,
+					int on);
 	/* bind/unbind the host controller */
 	int	(*set_host)(struct otg_transceiver *otg,
 				struct usb_bus *host);
@@ -241,6 +244,15 @@ otg_set_suspend(struct otg_transceiver *otg, int suspend)
 {
 	if (otg->set_suspend != NULL)
 		return otg->set_suspend(otg, suspend);
+	else
+		return 0;
+}
+
+static inline int
+otg_set_clk(struct otg_transceiver *otg, int on)
+{
+	if (otg->set_clk != NULL)
+		return otg->set_clk(otg, on);
 	else
 		return 0;
 }

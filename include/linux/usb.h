@@ -349,6 +349,7 @@ struct usb_bus {
 	struct mon_bus *mon_bus;	/* non-null when associated */
 	int monitored;			/* non-zero when monitored */
 #endif
+	int connection_change;
 };
 
 /* ----------------------------------------------------------------------- */
@@ -491,6 +492,7 @@ struct usb_device {
 #endif
 	struct wusb_dev *wusb_dev;
 	int slot_id;
+	int lazy_resume;
 };
 #define	to_usb_device(d) container_of(d, struct usb_device, dev)
 

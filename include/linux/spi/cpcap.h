@@ -629,6 +629,19 @@ struct cpcap_rtc_time_cnt {
 	unsigned short count;
 };
 
+enum cpcap_accy {
+	CPCAP_ACCY_USB,
+	CPCAP_ACCY_FACTORY,
+	CPCAP_ACCY_CHARGER,
+	CPCAP_ACCY_WHISPER_PPD,
+	CPCAP_ACCY_WHISPER_SMART,
+	CPCAP_ACCY_USB_DEVICE,
+	CPCAP_ACCY_NONE,
+
+	/* Used while debouncing the accessory. */
+	CPCAP_ACCY_UNKNOWN,
+};
+
 struct cpcap_device;
 
 #ifdef __KERNEL__

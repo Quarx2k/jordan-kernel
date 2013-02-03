@@ -31,6 +31,7 @@
 #include "usb.h"
 
 /* if we are in debug mode, always announce new devices */
+#define DEBUG 1
 #ifdef DEBUG
 #ifndef CONFIG_USB_ANNOUNCE_NEW_DEVICES
 #define CONFIG_USB_ANNOUNCE_NEW_DEVICES
@@ -793,8 +794,11 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 			 * Do not disable USB3 protocol ports.
 			 */
 			if (!hub_is_superspeed(hdev)) {
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+			printk("!hub_is_superspeed\n")
 				clear_port_feature(hdev, port1,
 						   USB_PORT_FEAT_ENABLE);
+#endif
 				portstatus &= ~USB_PORT_STAT_ENABLE;
 			} else {
 				/* Pretend that power was lost for USB3 devs */
@@ -805,26 +809,37 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 		/* Clear status-change flags; we'll debounce later */
 		if (portchange & USB_PORT_STAT_C_CONNECTION) {
 			need_debounce_delay = true;
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+			printk("USB_PORT_STAT_C_CONNECTION\n")
 			clear_port_feature(hub->hdev, port1,
 					USB_PORT_FEAT_C_CONNECTION);
+#endif
 		}
 		if (portchange & USB_PORT_STAT_C_ENABLE) {
 			need_debounce_delay = true;
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+			printk("USB_PORT_STAT_C_ENABLE\n")
 			clear_port_feature(hub->hdev, port1,
 					USB_PORT_FEAT_C_ENABLE);
+#endif
 		}
 		if (portchange & USB_PORT_STAT_C_LINK_STATE) {
 			need_debounce_delay = true;
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+			printk("USB_PORT_STAT_C_LINK_STATE\n")
 			clear_port_feature(hub->hdev, port1,
 					USB_PORT_FEAT_C_PORT_LINK_STATE);
+#endif
 		}
 
 		/* We can forget about a "removed" device when there's a
 		 * physical disconnect or the connect status changes.
 		 */
 		if (!(portstatus & USB_PORT_STAT_CONNECTION) ||
-				(portchange & USB_PORT_STAT_C_CONNECTION))
-			clear_bit(port1, hub->removed_bits);
+				(portchange & USB_PORT_STAT_C_CONNECTION)) {
+			printk("forget about removed device\n");
+//			clear_bit(port1, hub->removed_bits);
+		}
 
 		if (!udev || udev->state == USB_STATE_NOTATTACHED) {
 			/* Tell khubd to disconnect the device or
@@ -2827,7 +2842,11 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 
 	/* Reset the device; full speed may morph to high speed */
 	/* FIXME a USB 2.0 device may morph into SuperSpeed on reset. */
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	retval = hub_port_reset(hub, port1, udev, delay);
+#else
+	retval = 0;
+#endif
 	if (retval < 0)		/* error or disconnect */
 		goto fail;
 	/* success, speed is known */
@@ -2839,6 +2858,11 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 		goto fail;
 	}
 	oldspeed = udev->speed;
+
+#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+	udev->speed = USB_SPEED_HIGH;
+	udev->state = USB_STATE_UNAUTHENTICATED;
+#endif
 
 	/* USB 2.0 section 5.5.3 talks about ep0 maxpacket ...
 	 * it's fixed size except for full speed devices.
@@ -2932,7 +2956,11 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 			 */
 			for (j = 0; j < 3; ++j) {
 				buf->bMaxPacketSize0 = 0;
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 				r = usb_control_msg(udev, usb_rcvaddr0pipe(),
+#else
+				r = usb_control_msg(udev, (PIPE_CONTROL << 30) | (0x02 << 8) | USB_DIR_IN,
+#endif
 					USB_REQ_GET_DESCRIPTOR, USB_DIR_IN,
 					USB_DT_DEVICE << 8, 0,
 					buf, GET_DESCRIPTOR_BUFSIZE,
@@ -2957,7 +2985,11 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 					buf->bMaxPacketSize0;
 			kfree(buf);
 
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 			retval = hub_port_reset(hub, port1, udev, delay);
+#else
+			retval = 0;
+#endif
 			if (retval < 0)		/* error or disconnect */
 				goto fail;
 			if (oldspeed != udev->speed) {
@@ -2982,12 +3014,21 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
  		 * authorization will assign the final address.
  		 */
 		if (udev->wusb == 0) {
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 			for (j = 0; j < SET_ADDRESS_TRIES; ++j) {
 				retval = hub_set_address(udev, devnum);
 				if (retval >= 0)
 					break;
 				msleep(200);
 			}
+#else
+			/* Make device use proper address. */
+			update_devnum(udev, devnum);
+
+			usb_set_device_state(udev, USB_STATE_ADDRESS);
+			usb_ep0_reinit(udev);
+			retval = 0;
+#endif
 			if (retval < 0) {
 				dev_err(&udev->dev,
 					"device not accepting address %d, error %d\n",

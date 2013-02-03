@@ -138,4 +138,11 @@ config FSL_USB2_OTG
 	help
 	  Enable this to support Freescale USB OTG transceiver.
 
+config CPCAP_USB
+	tristate "CPCAP USB Transceiver Driver"
+	select USB_OTG_UTILS
+	help
+	  Enable this to support the USB OTG transceiver on the
+	  Motorola CPCAP PMIC
+
 endif # USB || OTG

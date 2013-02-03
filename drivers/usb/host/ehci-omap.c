@@ -47,7 +47,7 @@
 #include <plat/usb.h>
 #include <plat/clock.h>
 #include <plat/omap-pm.h>
-
+#include <asm/gpio.h>
 /* EHCI Register Set */
 #define EHCI_INSNREG04					(0xA0)
 #define EHCI_INSNREG04_DISABLE_UNSUSPEND		(1 << 5)

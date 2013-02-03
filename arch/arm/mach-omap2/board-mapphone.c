@@ -116,6 +116,43 @@ static int __init omap_hdq_init(void)
 	return platform_device_register(&omap_hdq_dev);
 }
 
+static struct omap_musb_board_data musb_board_data = {
+	.interface_type         = MUSB_INTERFACE_ULPI,
+#ifdef CONFIG_USB_MUSB_OTG
+	.mode                   = MUSB_OTG,
+#elif defined(CONFIG_USB_MUSB_HDRC_HCD)
+	.mode                   = MUSB_HOST,
+#elif defined(CONFIG_USB_GADGET_MUSB_HDRC)
+	.mode                   = MUSB_PERIPHERAL,
+#endif
+	.power                  = 100,
+};
+
+static void __init mapphone_musb_init(void)
+{
+	struct device_node *node;
+	const void *prop;
+	int size;
+	u16 power = 0;
+	node = of_find_node_by_path(DT_HIGH_LEVEL_FEATURE);
+
+	node = of_find_node_by_path(DT_PATH_CHOSEN);
+	if (node) {
+		prop = of_get_property(node,
+				DT_PROP_CHOSEN_MUSBHS_EXTPOWER, &size);
+		if (prop && size) {
+			power = *(u16 *)prop;
+			pr_debug("Current supplied by ext power: %d\n", power);
+		}
+		of_node_put(node);
+	}
+
+//	if (power > 100 && power <= 500 )
+//		musb_board_data.power = power;
+
+	usb_musb_init(&musb_board_data);
+}
+
 static int plat_kim_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	return 0;
@@ -212,6 +249,26 @@ static void __init mapphone_bp_model_init(void)
              clk_enable(clkp);
              printk("sad2d_ick enabled\n");
 	}
+#if 0
+	clkp = clk_get(NULL, "l3_ick");
+		if (clkp) {
+             clk_enable(clkp);
+             printk("l3_ick enabled\n");
+	}
+
+	clkp = clk_get(NULL, "core_l3_ick");
+		if (clkp) {
+             clk_enable(clkp);
+             printk("core_l3_ick enabled\n");
+	}
+
+
+	clkp = clk_get(NULL, "hsotgusb_ick");
+		if (clkp) {
+             clk_enable(clkp);
+             printk("hsotgusb_ick enabled\n");
+	}
+#endif
 #endif
 }
 
@@ -381,10 +438,16 @@ static void __init omap_mapphone_init(void)
 	mapphone_als_init();
 	omap_hdq_init();
 	mapphone_wifi_init();
+
+	usb_musb_init(NULL);
+	mapphone_usbhost_init();
+
+
 	mapphone_power_off_init();
 	mapphone_hsmmc_init();
 	omap_enable_smartreflex_on_init();
 	mapphone_create_board_props();
+	mapphone_gadget_init();
 	mapphone_sim_init();
 #ifdef CONFIG_EMU_UART_DEBUG
 	/* emu-uart function will override devtree iomux setting */

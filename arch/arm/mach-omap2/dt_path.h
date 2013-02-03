@@ -28,12 +28,18 @@
 #define DT_PATH_CHOSEN		"/Chosen@0"
 #define DT_PROP_CHOSEN_BP	"bp_model"
 #define DT_PROP_CHOSEN_BP_LEN	16
+#define DT_PROP_CHOSEN_BP_COUNT "bp_count"
 #define DT_PROP_CHOSEN_OMAP3630REV       "omap3630_rev"
 #define DT_PROP_CHOSEN_USB_PROD_NAME "usb_id_prod_name"
 #define DT_PROP_CHOSEN_USB_PIDS "usb_pids"
 #define DT_PROP_CHOSEN_USB_NLUNS "usb_nluns"
 #define DT_PROP_CHOSEN_USB_CDROM_LUN_NUM "usb_cdrom_lun_num"
 #define DT_PROP_CHOSEN_MODEM_IFACE_NUM "modem_interface_num"
+#define DT_PROP_CHOSEN_USBHS_PORT0 "usbhs_port0_mode"
+#define DT_PROP_CHOSEN_USBHS_PORT1 "usbhs_port1_mode"
+#define DT_PROP_CHOSEN_USBHS_PORT2 "usbhs_port2_mode"
+#define DT_PROP_CHOSEN_IPC_USB_TS_CLK_SRC "ipc_usb_ts_clk_src_num"
+#define DT_PROP_CHOSEN_MUSBHS_EXTPOWER "musbhs_ext_pwr_limit"
 
 /* Keypad Node */
 #define DT_PATH_KEYPAD		"/System@0/Keypad@0"

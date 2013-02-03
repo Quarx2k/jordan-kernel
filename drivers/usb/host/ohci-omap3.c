@@ -46,7 +46,10 @@ static int ohci_omap3_init(struct usb_hcd *hcd)
 static int ohci_omap3_bus_suspend(struct usb_hcd *hcd)
 {
 	struct device *dev = hcd->self.controller;
+	struct ohci_hcd_omap_platform_data  *pdata;
+#ifndef CONFIG_USB_OOBWAKE
 	struct omap_hwmod	*oh;
+#endif
 	int ret = 0;
 
 	dev_dbg(dev, "ohci_omap3_bus_suspend\n");
@@ -64,12 +67,23 @@ static int ohci_omap3_bus_suspend(struct usb_hcd *hcd)
 		return ret;
 	}
 
+	disable_irq(hcd->irq);
+	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+
+#ifndef CONFIG_USB_OOBWAKE
 	oh = omap_hwmod_lookup(USBHS_OHCI_HWMODNAME);
 
-	omap_hwmod_enable_ioring_wakeup(oh);
+	if (oh)
+		omap_hwmod_enable_ioring_wakeup(oh);
+#endif
 
 	if (dev->parent)
 		pm_runtime_put_sync(dev->parent);
+
+	/* Disable Any External Transceiver */
+	pdata = dev->platform_data;
+	if (pdata->ohci_phy_suspend)
+		pdata->ohci_phy_suspend(1);
 
 	return ret;
 }
@@ -78,11 +92,20 @@ static int ohci_omap3_bus_suspend(struct usb_hcd *hcd)
 static int ohci_omap3_bus_resume(struct usb_hcd *hcd)
 {
 	struct device *dev = hcd->self.controller;
+	struct ohci_hcd_omap_platform_data  *pdata;
 
 	dev_dbg(dev, "ohci_omap3_bus_resume\n");
 
+	/* Re-enable any external transceiver */
+	pdata = dev->platform_data;
+	if (pdata->ohci_phy_suspend)
+		pdata->ohci_phy_suspend(0);
+
 	if (dev->parent)
 		pm_runtime_get_sync(dev->parent);
+
+	set_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+	enable_irq(hcd->irq);
 
 	return ohci_bus_resume(hcd);
 }
@@ -196,7 +219,7 @@ static int __devinit ohci_hcd_omap3_probe(struct platform_device *pdev)
 
 	res = platform_get_resource_byname(pdev,
 				IORESOURCE_MEM, "ohci");
-	if (!ret) {
+	if (!res) {
 		dev_err(dev, "UHH OHCI get resource failed\n");
 		return -ENOMEM;
 	}
@@ -271,6 +294,10 @@ static int __devexit ohci_hcd_omap3_remove(struct platform_device *pdev)
 static void ohci_hcd_omap3_shutdown(struct platform_device *pdev)
 {
 	struct usb_hcd *hcd = dev_get_drvdata(&pdev->dev);
+	struct device *dev = hcd->self.controller;
+
+	if (dev->parent)
+		pm_runtime_get_sync(dev->parent);
 
 	if (hcd->driver->shutdown)
 		hcd->driver->shutdown(hcd);

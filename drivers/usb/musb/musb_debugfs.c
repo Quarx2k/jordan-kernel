@@ -36,6 +36,7 @@
 #include <linux/sched.h>
 #include <linux/init.h>
 #include <linux/list.h>
+#include <linux/kobject.h>
 #include <linux/platform_device.h>
 #include <linux/io.h>
 #include <linux/debugfs.h>

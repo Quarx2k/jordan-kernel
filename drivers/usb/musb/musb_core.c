@@ -115,6 +115,8 @@
 #define MUSB_DRIVER_NAME "musb-hdrc"
 const char musb_driver_name[] = MUSB_DRIVER_NAME;
 
+struct musb *g_musb;
+unsigned musb_debug;
 MODULE_DESCRIPTION(DRIVER_INFO);
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_LICENSE("GPL");
@@ -510,10 +512,7 @@ static irqreturn_t musb_stage0_irq(struct musb *musb, u8 int_usb,
 		 *  - ... to A_WAIT_BCON.
 		 * a_wait_vrise_tmout triggers VBUS_ERROR transitions
 		 */
-		musb_writeb(mbase, MUSB_DEVCTL, MUSB_DEVCTL_SESSION);
 		musb->ep0_stage = MUSB_EP0_START;
-		musb->xceiv->state = OTG_STATE_A_IDLE;
-		MUSB_HST_MODE(musb);
 		musb_platform_set_vbus(musb, 1);
 
 		handled = IRQ_HANDLED;
@@ -727,12 +726,11 @@ b_host:
 				MUSB_MODE(musb), devctl);
 		handled = IRQ_HANDLED;
 
-		/* Release the wakelock */
-		wake_unlock(&musb->musb_wakelock);
 		switch (musb->xceiv->state) {
 #ifdef CONFIG_USB_MUSB_HDRC_HCD
 		case OTG_STATE_A_HOST:
 		case OTG_STATE_A_SUSPEND:
+		case OTG_STATE_A_WAIT_BCON:
 			usb_hcd_resume_root_hub(musb_to_hcd(musb));
 			musb_root_disconnect(musb);
 			if (musb->a_wait_bcon != 0 && is_otg_enabled(musb))
@@ -795,9 +793,6 @@ b_host:
 		} else if (is_peripheral_capable()) {
 			dev_dbg(musb->controller, "BUS RESET as %s\n",
 				otg_state_string(musb->xceiv->state));
-
-			/* Hold a wakelock */
-			wake_lock(&musb->musb_wakelock);
 			switch (musb->xceiv->state) {
 #ifdef CONFIG_USB_OTG
 			case OTG_STATE_A_SUSPEND:
@@ -935,7 +930,6 @@ void musb_start(struct musb *musb)
 			musb->is_active = 1;
 		else if (musb->xceiv->last_event == USB_EVENT_ID)
 			devctl |= MUSB_DEVCTL_SESSION;
-
 	} else if (is_host_enabled(musb)) {
 		/* assume ID pin is hard-wired to ground */
 		devctl |= MUSB_DEVCTL_SESSION;
@@ -1025,9 +1019,8 @@ static void musb_shutdown(struct platform_device *pdev)
  * We don't currently use dynamic fifo setup capability to do anything
  * more than selecting one of a bunch of predefined configurations.
  */
-#if defined(CONFIG_USB_MUSB_TUSB6010) || defined(CONFIG_USB_MUSB_OMAP2PLUS) \
-	|| defined(CONFIG_USB_MUSB_AM35X)
-static ushort __initdata fifo_mode = 4;
+#if defined(CONFIG_USB_MUSB_TUSB6010) || defined(CONFIG_USB_MUSB_OMAP2PLUS)
+static ushort fifo_mode = 4;
 #elif defined(CONFIG_USB_MUSB_UX500)
 static ushort __initdata fifo_mode = 5;
 #else
@@ -1082,7 +1075,7 @@ static struct musb_fifo_cfg __initdata mode_3_cfg[] = {
 };
 
 /* mode 4 - fits in 16KB */
-static struct musb_fifo_cfg __initdata mode_4_cfg[] = {
+static struct musb_fifo_cfg  mode_4_cfg[] = {
 { .hw_ep_num =  1, .style = FIFO_TX,   .maxpacket = 512, },
 { .hw_ep_num =  1, .style = FIFO_RX,   .maxpacket = 512, },
 { .hw_ep_num =  2, .style = FIFO_TX,   .maxpacket = 512, },
@@ -1101,16 +1094,57 @@ static struct musb_fifo_cfg __initdata mode_4_cfg[] = {
 { .hw_ep_num =  8, .style = FIFO_RX,   .maxpacket = 512, },
 { .hw_ep_num =  9, .style = FIFO_TX,   .maxpacket = 512, },
 { .hw_ep_num =  9, .style = FIFO_RX,   .maxpacket = 512, },
-{ .hw_ep_num = 10, .style = FIFO_TX,   .maxpacket = 256, },
-{ .hw_ep_num = 10, .style = FIFO_RX,   .maxpacket = 64, },
-{ .hw_ep_num = 11, .style = FIFO_TX,   .maxpacket = 256, },
-{ .hw_ep_num = 11, .style = FIFO_RX,   .maxpacket = 64, },
-{ .hw_ep_num = 12, .style = FIFO_TX,   .maxpacket = 256, },
-{ .hw_ep_num = 12, .style = FIFO_RX,   .maxpacket = 64, },
-{ .hw_ep_num = 13, .style = FIFO_RXTX, .maxpacket = 4096, },
+{ .hw_ep_num = 10, .style = FIFO_TX,   .maxpacket = 512, },
+{ .hw_ep_num = 10, .style = FIFO_RX,   .maxpacket = 512, },
+{ .hw_ep_num = 11, .style = FIFO_TX,   .maxpacket = 512, },
+{ .hw_ep_num = 11, .style = FIFO_RX,   .maxpacket = 512, },
+{ .hw_ep_num = 12, .style = FIFO_TX,   .maxpacket = 512, },
+{ .hw_ep_num = 12, .style = FIFO_RX,   .maxpacket = 512, },
+{ .hw_ep_num = 13, .style = FIFO_RXTX, .maxpacket = 1024, },
 { .hw_ep_num = 14, .style = FIFO_RXTX, .maxpacket = 1024, },
 { .hw_ep_num = 15, .style = FIFO_RXTX, .maxpacket = 1024, },
 };
+
+/* mode 4 for host - fits in 16KB */
+/* Reasons to config ep3 and ep4 fifo size to 64:
+ * 1) Compare with endpoint number, MUSB DMA channel is not sufficient.
+ * 2) Because of kernel memory limitation and allocation algorithm,
+ *    When kernel allocates Bulk urb transfer buffer, it doesn't map them
+ *    to virtual address.
+ * So Bulk usb transfers must use DMA.
+ *
+ * To ensure bulk transfer always use DMA:
+ * 1) Config ep3 and ep4 fifo size to 64, So Interrupt transfer is always
+ *    scheduled to 64 fifo size endpoints. And bulk transfer is always scheduled
+ *    to 512 fifo size endpoints.
+ * 2) in musb_ep_program() don't allocate dma channle for interrrupt transfer.
+ *
+ * Outcome:
+ * Bulk transfer can be always scheduled on 512 fifo size endpoints and these
+ * endpoints has DMA channel. So bulk transfer always use DMA.
+ * Interrupt transfer can be always scheduled on 64 fifo size endpoints
+ * and these endpoints don't have DMA channel.
+ * So interrupt transfer always use PIO.
+ */
+static struct musb_fifo_cfg mode_4h_cfg[] = {
+{ .hw_ep_num =  1, .style = FIFO_TX,   .maxpacket = 512, },
+{ .hw_ep_num =  1, .style = FIFO_RX,   .maxpacket = 512, },
+{ .hw_ep_num =  2, .style = FIFO_TX,   .maxpacket = 512, },
+{ .hw_ep_num =  2, .style = FIFO_RX,   .maxpacket = 512, },
+{ .hw_ep_num =  3, .style = FIFO_TX,   .maxpacket = 64, },
+{ .hw_ep_num =  3, .style = FIFO_RX,   .maxpacket = 64, },
+{ .hw_ep_num =  4, .style = FIFO_TX,   .maxpacket = 64, },
+{ .hw_ep_num =  4, .style = FIFO_RX,   .maxpacket = 64, },
+{ .hw_ep_num =  5, .style = FIFO_TX,   .maxpacket = 512, },
+{ .hw_ep_num =  5, .style = FIFO_RX,   .maxpacket = 512, },
+{ .hw_ep_num =  6, .style = FIFO_TX,   .maxpacket = 512, },
+{ .hw_ep_num =  6, .style = FIFO_RX,   .maxpacket = 512, },
+{ .hw_ep_num =  7, .style = FIFO_RXTX, .maxpacket = 512, },
+{ .hw_ep_num =  8, .style = FIFO_RXTX, .maxpacket = 512, },
+{ .hw_ep_num =  9, .style = FIFO_RXTX, .maxpacket = 4096, },
+{ .hw_ep_num = 10, .style = FIFO_RXTX, .maxpacket = 4096, },
+};
+
 
 /* mode 5 - fits in 8KB */
 static struct musb_fifo_cfg __initdata mode_5_cfg[] = {
@@ -1149,7 +1183,7 @@ static struct musb_fifo_cfg __initdata mode_5_cfg[] = {
  *
  * returns negative errno or offset for next fifo.
  */
-static int __init
+static int
 fifo_setup(struct musb *musb, struct musb_hw_ep  *hw_ep,
 		const struct musb_fifo_cfg *cfg, u16 offset)
 {
@@ -1192,12 +1226,14 @@ fifo_setup(struct musb *musb, struct musb_hw_ep  *hw_ep,
 		musb_write_txfifoadd(mbase, c_off);
 		hw_ep->tx_double_buffered = !!(c_size & MUSB_FIFOSZ_DPB);
 		hw_ep->max_packet_sz_tx = maxpacket;
+		hw_ep->is_shared_fifo = false;
 		break;
 	case FIFO_RX:
 		musb_write_rxfifosz(mbase, c_size);
 		musb_write_rxfifoadd(mbase, c_off);
 		hw_ep->rx_double_buffered = !!(c_size & MUSB_FIFOSZ_DPB);
 		hw_ep->max_packet_sz_rx = maxpacket;
+		hw_ep->is_shared_fifo = false;
 		break;
 	case FIFO_RXTX:
 		musb_write_txfifosz(mbase, c_size);
@@ -1222,11 +1258,11 @@ fifo_setup(struct musb *musb, struct musb_hw_ep  *hw_ep,
 	return offset + (maxpacket << ((c_size & MUSB_FIFOSZ_DPB) ? 1 : 0));
 }
 
-static struct musb_fifo_cfg __initdata ep0_cfg = {
+static struct musb_fifo_cfg ep0_cfg = {
 	.style = FIFO_RXTX, .maxpacket = 64,
 };
 
-static int __init ep_config_from_table(struct musb *musb)
+int ep_config_from_table(struct musb *musb)
 {
 	const struct musb_fifo_cfg	*cfg;
 	unsigned		i, n;
@@ -1260,8 +1296,13 @@ static int __init ep_config_from_table(struct musb *musb)
 		n = ARRAY_SIZE(mode_3_cfg);
 		break;
 	case 4:
-		cfg = mode_4_cfg;
-		n = ARRAY_SIZE(mode_4_cfg);
+		if (is_host_active(musb)) {
+			cfg = mode_4h_cfg;
+			n = ARRAY_SIZE(mode_4h_cfg);
+		} else {
+			cfg = mode_4_cfg;
+			n = ARRAY_SIZE(mode_4_cfg);
+		}
 		break;
 	case 5:
 		cfg = mode_5_cfg;
@@ -1388,12 +1429,20 @@ static int __init musb_core_init(u16 musb_type, struct musb *musb)
 		musb->dyn_fifo = true;
 	}
 	if (reg & MUSB_CONFIGDATA_MPRXE) {
-		strcat(aInfo, ", bulk combine");
+ 		strcat(aInfo, ", bulk combine");
+#ifdef C_MP_RX
 		musb->bulk_combine = true;
+#else
+		strcat(aInfo, " (X) ");
+#endif
 	}
 	if (reg & MUSB_CONFIGDATA_MPTXE) {
 		strcat(aInfo, ", bulk split");
+#ifdef C_MP_TX
 		musb->bulk_split = true;
+#else
+		strcat(aInfo, " (X) ");
+#endif
 	}
 	if (reg & MUSB_CONFIGDATA_HBRXE) {
 		strcat(aInfo, ", HB-ISO Rx");
@@ -1913,7 +1962,7 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 	int			status;
 	struct musb		*musb;
 	struct musb_hdrc_platform_data *plat = dev->platform_data;
-
+	printk("musb_init_controller\n");
 	/* The driver might handle more features than the board; OK.
 	 * Fail when the board needs a feature that's not enabled.
 	 */
@@ -1922,13 +1971,19 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 		status = -ENODEV;
 		goto fail0;
 	}
+		printk("musb pdata ok\n");
 
 	/* allocate */
 	musb = allocate_instance(dev, plat->config, ctrl);
 	if (!musb) {
 		status = -ENOMEM;
+				printk("musb allocate instance FAILED\n");
 		goto fail0;
 	}
+
+#if defined(CONFIG_USB_MOT_ANDROID) && defined(CONFIG_USB_MUSB_OTG)
+	g_musb = musb;
+#endif
 
 	pm_runtime_use_autosuspend(musb->controller);
 	pm_runtime_set_autosuspend_delay(musb->controller, 200);
@@ -1939,6 +1994,23 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 	musb->board_set_power = plat->set_power;
 	musb->min_power = plat->min_power;
 	musb->ops = plat->platform_ops;
+
+        /* Clock usage is chip-specific ... functional clock (DaVinci,
+         * OMAP2430), or PHY ref (some TUSB6010 boards).  All this core
+         * code does is make sure a clock handle is available; platform
+         * code manages it during start/stop and suspend/resume.
+         */
+#if 0
+        if (plat->clock) {
+                musb->clock = clk_get(NULL, "hsotgusb_ick"); // clk_get(dev, plat->clock);
+                if (IS_ERR(musb->clock)) {
+			printk("musb clock FAILED\n");
+                        status = PTR_ERR(musb->clock);
+                        musb->clock = NULL;
+                        goto fail1;
+                }
+        }
+#endif
 
 	/* The musb_platform_init() call:
 	 *   - adjusts musb->mregs and musb->isr if needed,
@@ -1952,12 +2024,16 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 	 * isp1504, non-OTG, etc) mostly hooking up through ULPI.
 	 */
 	musb->isr = generic_interrupt;
+	printk ("musb before plat init \n");
 	status = musb_platform_init(musb);
 	if (status < 0)
 		goto fail1;
 
+	printk ("after \n");
+
 	if (!musb->isr) {
 		status = -ENODEV;
+		printk("musb isr FAILED\n");
 		goto fail3;
 	}
 
@@ -1988,8 +2064,10 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 	status = musb_core_init(plat->config->multipoint
 			? MUSB_CONTROLLER_MHDRC
 			: MUSB_CONTROLLER_HDRC, musb);
-	if (status < 0)
+	if (status < 0) {
+		printk("musb core_init FAILED\n");
 		goto fail3;
+		}
 
 #ifdef CONFIG_USB_MUSB_OTG
 	setup_timer(&musb->otg_timer, musb_otg_timer_func, (unsigned long) musb);
@@ -2039,7 +2117,7 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 	 */
 	if (!is_otg_enabled(musb) && is_host_enabled(musb)) {
 		struct usb_hcd	*hcd = musb_to_hcd(musb);
-
+		printk("musb host only role\n");
 		status = usb_add_hcd(musb_to_hcd(musb), -1, 0);
 
 		hcd->self.uses_pio_for_control = 1;
@@ -2051,7 +2129,7 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 				? 'B' : 'A'));
 
 	} else /* peripheral is enabled */ {
-
+		printk("musb gadget role\n");
 		status = musb_gadget_setup(musb);
 
 		dev_dbg(musb->controller, "%s mode, status %d, dev%02x\n",
@@ -2060,8 +2138,10 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 			musb_readb(musb->mregs, MUSB_DEVCTL));
 
 	}
-	if (status < 0)
+	if (status < 0) {
+		printk("role setup FAILED\n");
 		goto fail3;
+	}
 
 	if (is_otg_enabled(musb) || is_host_enabled(musb))
 		wake_lock_init(&musb->musb_wakelock, WAKE_LOCK_SUSPEND,
@@ -2070,13 +2150,17 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 	pm_runtime_put(musb->controller);
 
 	status = musb_init_debugfs(musb);
-	if (status < 0)
+	if (status < 0) {
+		printk("musb debugfs FAILED\n");
 		goto fail4;
+	}
 
 #ifdef CONFIG_SYSFS
 	status = sysfs_create_group(&musb->controller->kobj, &musb_attr_group);
-	if (status)
+	if (status) {
+		printk("musb sysfs FAILED\n");
 		goto fail5;
+	}
 #endif
 
 	dev_info(dev, "USB %s mode controller at %p using %s, IRQ %d\n",
@@ -2154,6 +2238,7 @@ static int __init musb_probe(struct platform_device *pdev)
 	/* clobbered by use_dma=n */
 	orig_dma_mask = dev->dma_mask;
 #endif
+	printk("musb_probe irq %d \n", irq);
 	status = musb_init_controller(dev, irq, base);
 	if (status < 0)
 		iounmap(base);
@@ -2255,7 +2340,6 @@ static void musb_save_context(struct musb *musb)
 				musb_read_rxhubport(musb_base, i);
 		}
 	}
-	musb_platform_save_context(musb);
 }
 
 static void musb_restore_context(struct musb *musb)
@@ -2264,8 +2348,6 @@ static void musb_restore_context(struct musb *musb)
 	void __iomem *musb_base = musb->mregs;
 	void __iomem *ep_target_regs;
 	void __iomem *epio;
-
-	musb_platform_restore_context(musb);
 
 	if (is_host_enabled(musb)) {
 		musb_writew(musb_base, MUSB_FRAME, musb->context.frame);

@@ -343,6 +343,12 @@ struct hc_driver {
 		 * address is set
 		 */
 	int	(*update_device)(struct usb_hcd *, struct usb_device *);
+		/*
+		 * Notifies the HCD after a device is disconnected and its
+		 * drivers are unloaded
+		 */
+	int	(*update_device_disconnect)(struct usb_hcd *,
+				unsigned port_num);
 };
 
 extern int usb_hcd_link_urb_to_ep(struct usb_hcd *hcd, struct urb *urb);

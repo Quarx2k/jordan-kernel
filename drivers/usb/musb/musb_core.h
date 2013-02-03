@@ -390,12 +390,6 @@ struct musb_csr_regs {
 
 struct musb_context_registers {
 
-#if defined(CONFIG_ARCH_OMAP2430) || defined(CONFIG_ARCH_OMAP3) || \
-defined(CONFIG_ARCH_OMAP4)
-	u32 otg_sysconfig, otg_forcestandby;
-	u32 ctl_dev_conf;
-	u32 usbotg_control;
-#endif
 	u8 power;
 	u16 intrtxe, intrrxe;
 	u8 intrusbe;
@@ -408,22 +402,13 @@ defined(CONFIG_ARCH_OMAP4)
 	struct musb_csr_regs index_regs[MUSB_C_NUM_EPS];
 };
 
-#if defined(CONFIG_ARCH_OMAP2430) || defined(CONFIG_ARCH_OMAP3) || \
-defined(CONFIG_ARCH_OMAP4)
-extern void musb_platform_save_context(struct musb *musb);
-extern void musb_platform_restore_context(struct musb *musb);
-
-#else
-#define musb_platform_save_context(m)	do {} while (0)
-#define musb_platform_restore_context(m)	do {} while (0)
-#endif
-
 /*
  * struct musb - Driver instance data.
  */
 struct musb {
 	/* device lock */
 	spinlock_t		lock;
+	struct clk		*clock;
 
 	const struct musb_platform_ops *ops;
 	struct musb_context_registers context;
@@ -460,6 +445,10 @@ struct musb {
 	struct timer_list	otg_timer;
 #endif
 	struct notifier_block	nb;
+	/* called with IRQs blocked; ON/nonzero implies starting a session,
+	 * and waiting at least a_wait_vrise_tmout.
+	 */
+	void			(*board_set_vbus)(struct musb *, int is_on);
 
 	struct dma_controller	*dma_controller;
 
@@ -493,6 +482,8 @@ struct musb {
 
 	u8 board_mode;		/* enum musb_mode */
 	int			(*board_set_power)(int state);
+
+	int			(*set_clock)(struct clk *clk, int is_active);
 
 	u8			min_power;	/* vbus for periph, in mA/2 */
 
@@ -566,12 +557,19 @@ struct musb {
 #endif
 };
 
+extern struct musb *g_musb;
+extern int ep_config_from_table(struct musb *musb);
+
 struct musb_otg_work {
 	struct work_struct	work;
 	enum usb_xceiv_events	xceiv_event;
 	struct musb		*musb;
 };
 
+static inline void musb_set_vbus(struct musb *musb, int is_on)
+{
+	musb->ops->set_vbus(musb, is_on);
+}
 #ifdef CONFIG_USB_GADGET_MUSB_HDRC
 static inline struct musb *gadget_to_musb(struct usb_gadget *g)
 {
@@ -652,6 +650,7 @@ extern const char musb_driver_name[];
 
 extern void musb_start(struct musb *musb);
 extern void musb_stop(struct musb *musb);
+extern int musb_gadget_pullup(struct usb_gadget *gadget, int is_on);
 
 extern void musb_write_fifo(struct musb_hw_ep *ep, u16 len, const u8 *src);
 extern void musb_read_fifo(struct musb_hw_ep *ep, u16 len, u8 *dst);
