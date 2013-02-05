@@ -43,7 +43,7 @@ unsigned char omap_cpcap_uv_to_vsel(unsigned long uv)
 		uv = 600000;
 	else if (uv > 1450000)
 		uv = 1450000;
-	printk("Uv:%ld, Set vsel: %ld\n",uv,DIV_ROUND_UP(uv - 607700, 12600) + 1);
+//	printk("Uv:%ld, Set vsel: %ld\n",uv,DIV_ROUND_UP(uv - 607700, 12600) + 1);
 	return DIV_ROUND_UP(uv - 607700, 12600) + 1;
 }
 
