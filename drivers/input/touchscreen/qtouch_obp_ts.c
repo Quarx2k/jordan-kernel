@@ -875,8 +875,10 @@ static int qtouch_do_cmd_proc_msg(struct qtouch_ts_data *ts,
 				ts->eeprom_checksum = checksum;
 				ts->checksum_cnt = 0;
 			} else {
+#ifdef CONFIG_TOUCHSCREEN_DEBUG
 				pr_info("%s:EEPROM checksum mismatch 0x%8X\n",
 					 __func__, checksum);
+#endif
 				ret = qtouch_hw_init(ts);
 				if (ret != 0)
 					pr_err("%s:Cannot init the touch IC\n",
@@ -1674,11 +1676,11 @@ static int qtouch_process_info_block(struct qtouch_ts_data *ts)
 
 		entry.size++;
 		entry.num_inst++;
-
+#ifdef CONFIG_TOUCHSCREEN_DEBUG
 		pr_info("%s: Object %d @ 0x%04x (%d) insts %d rep_ids %d\n",
 			__func__, entry.type, entry.addr, entry.size,
 			entry.num_inst, entry.num_rids);
-
+#endif
 		if (entry.type >= QTM_OBP_MAX_OBJECT_NUM) {
 			pr_warning("%s: Unknown object type (%d) encountered\n",
 				   __func__, entry.type);
@@ -1733,11 +1735,12 @@ static int qtouch_process_info_block(struct qtouch_ts_data *ts)
 		(checksum[2] << (BITS_PER_BYTE << 1)));
 
 	their_csum = __le32_to_cpu(their_csum);
+#ifdef CONFIG_TOUCHSCREEN_DEBUG
 	if (our_csum != their_csum) {
 		pr_warning("%s: Checksum mismatch (0x%08x != 0x%08x)\n",
 			   __func__, our_csum, their_csum);
 	}
-
+#endif
 	pr_info("%s: %s found. family 0x%x, variant 0x%x, ver 0x%x, "
 		"build 0x%x, matrix %dx%d, %d objects.\n", __func__,
 		QTOUCH_TS_NAME, qtm_info.family_id, qtm_info.variant_id,
@@ -2450,7 +2453,6 @@ static int qtouch_ts_suspend(struct i2c_client *client, pm_message_t mesg)
 static int qtouch_ts_resume(struct i2c_client *client)
 {
 	struct qtouch_ts_data *ts = i2c_get_clientdata(client);
-	int ret;
 	int i;
 
 	if (qtouch_tsdebug & 4)
