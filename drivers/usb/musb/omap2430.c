@@ -43,7 +43,7 @@
 #include "omap2430.h"
 
 #define DEBUG
-#define MUSB_WORKQUEUE
+#undef MUSB_WORKQUEUE
 
 static DEFINE_MUTEX(mpu_lat_mutex);
 struct omap2430_glue {
@@ -265,61 +265,41 @@ void cpcap_musb_notifier_call(unsigned long event)
 		DBG(1, "VBUS Connect\n");
 		DBG(1, "MUSB - Hold L3 Bus and C State Constraint \n");
 		pm_runtime_get_sync(musb->controller);
-	printk("a\n");
 		/* Hold a c-state constraint */
-	printk("b\n");
 		mutex_lock(&mpu_lat_mutex);
-	printk("c\n");
 		pdata->musb_qos_request = kmalloc(sizeof(struct pm_qos_request_list), GFP_ATOMIC);
-	printk("d\n");
 		memset(pdata->musb_qos_request, 0, sizeof(struct pm_qos_request_list));
-	printk("e\n");
 		pm_qos_add_request(pdata->musb_qos_request, PM_QOS_CPU_DMA_LATENCY, 10);
-	printk("f\n");
 		mutex_unlock(&mpu_lat_mutex);
-	printk("g\n");
 		/* Hold a L3 constraint for better throughput */
 		if (pdata->set_min_bus_tput) {
 		printk("h\n");
 			pdata->set_min_bus_tput(musb->controller,
 				OCP_INITIATOR_AGENT, (200*1000*4));
 			}
-	printk("i\n");
 
 		/* configure musb into smartidle with wakeup enabled
 		 * smart standby mode.
 		 */
 
-	printk("j\n");
 		musb_writel(musb->mregs, OTG_FORCESTDBY, 0);
-	printk("k\n");
 		val = musb_readl(musb->mregs, OTG_SYSCONFIG);
-	printk("l\n");
 		if (cpu_is_omap44xx())
 			val |= SMARTIDLEWKUP | SMARTSTDBY | ENABLEWAKEUP;
 		else
 			val |= SMARTIDLE | SMARTSTDBY | ENABLEWAKEUP;
 		musb_writel(musb->mregs, OTG_SYSCONFIG, val);
-	printk("m\n");
 
 		if (data->interface_type == MUSB_INTERFACE_UTMI) {
-	printk("n\n");
 			//phy_init();
-	printk("o\n");
 			otg_init(musb->xceiv);
-	printk("p\n");
 			if (!hostmode) {
 				/* Enable VBUS Valid, AValid. Clear SESSEND.*/
-	printk("q\n");
 			//	__raw_writel(IDDIG | AVALID | VBUSVALID, ctrl_base + USBOTGHS_CONTROL);
-		printk("r\n");
 			}
 		}
-			printk("s\n");
 		musb->xceiv->last_event = USB_EVENT_VBUS;
-	printk("t\n");
 		musb->xceiv->state = OTG_STATE_B_IDLE;
-	printk("u\n");
 		break;
 
 	case USB_EVENT_NONE:
@@ -332,34 +312,25 @@ void cpcap_musb_notifier_call(unsigned long event)
 			 * not enabled then DISCONNECT interrupt will not be
 			 * reached to mentor
 			 */
-printk("a");
 			otg_set_clk(musb->xceiv, 1);
 			__raw_writel(SESSEND | IDDIG, ctrl_base +
 							USBOTGHS_CONTROL);
-printk("b");
 			if (musb->xceiv->set_vbus) {
-		printk("c");
 				otg_set_vbus(musb->xceiv, 0);
 			}
-			printk("d");
 			otg_shutdown(musb->xceiv);
-		printk("e");
 			//phy_shutdown();
-		printk("f");
 		}
 		/* configure in force idle/ standby */
-		printk("g");
 		musb_writel(musb->mregs, OTG_FORCESTDBY, 1);
 		val = musb_readl(musb->mregs, OTG_SYSCONFIG);
 		val &= ~(SMARTIDLEWKUP | SMARTSTDBY | ENABLEWAKEUP);
 		val |= FORCEIDLE | FORCESTDBY;
-		printk("h");
 		musb_writel(musb->mregs, OTG_SYSCONFIG, val);
 
 		DBG(1, "MUSB - Release L3 Bus and C State Constraint \n");
 		/* Release c-state constraint */
 		mutex_lock(&mpu_lat_mutex);
-		printk("i");
 		pm_qos_remove_request(pdata->musb_qos_request);
 		kfree(pdata->musb_qos_request);
 		mutex_unlock(&mpu_lat_mutex);
@@ -369,11 +340,9 @@ printk("b");
 				OCP_INITIATOR_AGENT, -1);
 
 		if (data->interface_type == MUSB_INTERFACE_UTMI) {
-			printk("j");
 			val = __raw_readl(phymux_base +
 					USBA0_OTG_CE_PAD1_USBA0_OTG_DP);
 
-			printk("k");
 			val &= ~DP_WAKEUPENABLE;
 			__raw_writel(val, phymux_base +
 						USBA0_OTG_CE_PAD1_USBA0_OTG_DP);

@@ -47,9 +47,8 @@ static int ohci_omap3_bus_suspend(struct usb_hcd *hcd)
 {
 	struct device *dev = hcd->self.controller;
 	struct ohci_hcd_omap_platform_data  *pdata;
-#ifndef CONFIG_USB_OOBWAKE
 	struct omap_hwmod	*oh;
-#endif
+
 	int ret = 0;
 
 	dev_dbg(dev, "ohci_omap3_bus_suspend\n");
@@ -70,12 +69,10 @@ static int ohci_omap3_bus_suspend(struct usb_hcd *hcd)
 	disable_irq(hcd->irq);
 	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
 
-#ifndef CONFIG_USB_OOBWAKE
 	oh = omap_hwmod_lookup(USBHS_OHCI_HWMODNAME);
 
 	if (oh)
 		omap_hwmod_enable_ioring_wakeup(oh);
-#endif
 
 	if (dev->parent)
 		pm_runtime_put_sync(dev->parent);

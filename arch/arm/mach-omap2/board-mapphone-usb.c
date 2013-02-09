@@ -42,107 +42,17 @@
 #define DIE_ID_REG_OFFSET		0x218
 
 void cpcap_musb_notifier_call(unsigned long event);
-#if defined(CONFIG_USB_MUSB_OTG)
-
-struct cpcap_accy_platform_data {
-	enum cpcap_accy accy;
-};
-#endif
-
-
-static struct device_pid mot_android_pid[MAX_DEVICE_TYPE_NUM] = {
-	{"mtp,usbnet",		0},
-	{"mtp,usbnet,adb",	0},
-	{"ptp",			0},
-	{"ptp,adb",		0},
-	{"rndis",		0},
-	{"rndis,adb",		0},
-	{"cdrom",               0},
-	{"mass_storage",        0},
-	{"mass_storage,adb",    0},
-	{"cdrom2",              0},
-	{}
-};
-
-static struct android_usb_platform_data andusb_plat = {
-	.vendor			= "Motorola",
-	.product_name		= "Android",
-	.android_pid		= mot_android_pid,
-	.nluns			= 1,
-	.cdrom_lun_num          = 0,
-};
-
-static void set_usb_performance_mode(struct device *dev, bool enabled)
-{
-	struct device *mpu_dev;
-	dev_dbg(dev, "Performance Mode %s\n", enabled ? "Set" : "Cleared");
-	mpu_dev = omap2_get_mpuss_device();
-
-	if (!mpu_dev) {
-		pr_warning("%s: unable to get the mpu device\n", __func__);
-		return;
-	}
-
-	if (enabled) {
-		if (andusb_plat.bp_tools_mode)
-			omap_device_scale(dev, mpu_dev, 800000000);
-		else
-			omap_device_scale(dev, mpu_dev, 600000000);
-	} else {
-		omap_device_scale(dev, mpu_dev, 300000000);
-	}
-}
-
 
 static struct platform_device android_usb_platform_device = {
 	.name	= "android_gadget",
 	.id	= -1,
 	.dev	= {
-		.platform_data = &andusb_plat,
 	},
 };
-#if 0
+
 static int cpcap_usb_connected_probe(struct platform_device *pdev)
 {
-	struct cpcap_accy_platform_data *pdata = pdev->dev.platform_data;
-#if defined(CONFIG_USB_MUSB_OTG)
-#if 0
-	if (pdata->accy == CPCAP_ACCY_USB_DEVICE) {
-		printk(KERN_INFO "SW:CPCAP_ACCY_USB_DEVICE %d Connected\n", pdata->accy);
-
-		/*
-		 * First time connection in host mode fails in several
-		 * cases due to dock issues. Retrying again fixes the issue.
-		 */
-		cpcap_musb_notifier_call(USB_EVENT_ID);
-		msleep(5);
-		cpcap_musb_notifier_call(USB_EVENT_NONE);
-		msleep(5);
-		cpcap_musb_notifier_call(USB_EVENT_ID);
-
-	} else {
-#endif
-		printk(KERN_INFO "SW:CPCAP_ACCY %d Connected\n",pdata->accy);
-		android_usb_set_connected(1, pdata->accy); 
-		cpcap_musb_notifier_call(USB_EVENT_VBUS);
-#endif
-	return 0;
-}
-
-static int cpcap_usb_connected_remove(struct platform_device *pdev)
-{
-	struct cpcap_accy_platform_data *pdata = pdev->dev.platform_data;
-
-		printk(KERN_INFO "SW:CPCAP_ACCY %d removed\n",pdata->accy); 
-		android_usb_set_connected(0, pdata->accy);
-	cpcap_musb_notifier_call(USB_EVENT_NONE);
-	return 0;
-}
-#endif
-static int cpcap_usb_connected_probe(struct platform_device *pdev)
-{
-printk("USB Connected!\n");
-android_usb_set_connected(1,0);//usb
+	printk("USB Connected!\n");
 	cpcap_musb_notifier_call(USB_EVENT_VBUS);
 return 0;
 }
@@ -150,7 +60,6 @@ return 0;
 static int cpcap_usb_connected_remove(struct platform_device *pdev)
 {
 printk("USB Disconnected!\n");
-android_usb_set_connected(0,3); //None
 	cpcap_musb_notifier_call(USB_EVENT_NONE);
 return 0;
 }
@@ -186,111 +95,6 @@ int i;
 	printk(KERN_ERR "Gadget Driver - usb function name is too long!\n");
 }
 
-void android_usb_set_pid(char *fname, u16 usb_pid)
-{
-	int j;
-
-	for (j = 0; j < MAX_DEVICE_TYPE_NUM; j++) {
-		if (andusb_plat.android_pid[j].name == NULL)
-			break;
-
-		if (strncmp(andusb_plat.android_pid[j].name, fname,
-			MAX_DEVICE_NAME_SIZE) == 0) {
-			andusb_plat.android_pid[j].pid = usb_pid;
-			break;
-		}
-	}
-
-	if (j == MAX_DEVICE_TYPE_NUM)
-		printk(KERN_ERR
-			"Unable to find a match for the DT entry %s\n",
-			fname);
-	else
-		printk(KERN_INFO
-			"USB PID overwritten for  %s with 0x%4x\n",
-			andusb_plat.android_pid[j].name,
-			andusb_plat.android_pid[j].pid);
-}
-
-void __init usb_pid_mapping_init(void)
-{
-	struct device_node *node;
-	const void *prop;
-	int i, size, unit_size;
-	char name[USB_FUNC_NAME_SIZE];
-
-	node = of_find_node_by_path(DT_PATH_CHOSEN);
-	if (node == NULL) {
-		printk(KERN_ERR
-			"Unable to read node %s from device tree!\n",
-			DT_PATH_CHOSEN);
-		return;
-	}
-
-	unit_size = sizeof(struct omap_usb_pid_entry);
-	prop = of_get_property(node, DT_PROP_CHOSEN_USB_PIDS, &size);
-	if ((!prop) || (size % unit_size)) {
-		printk(KERN_ERR "Read property %s error!\n",
-			DT_PROP_CHOSEN_USB_PIDS);
-			of_node_put(node);
-		return;
-	}
-
-	for (i = 0; i < size / unit_size; i++) {
-		struct omap_usb_pid_entry *p =
-		(struct omap_usb_pid_entry *) prop;
-		memcpy((void *) name, p->name, USB_FUNC_NAME_SIZE);
-		trim_usb_name_string(name);
-		android_usb_set_pid(name, p->usb_pid);
-		prop += unit_size;
-	}
-
-	of_node_put(node);
-	printk(KERN_INFO "DT overwrite of  USB PID's done!\n");
-}
-
-void mapphone_init_cdrom_lun_num(void)
-{
-	struct device_node *node;
-	const void *prop;
-
-	node = of_find_node_by_path(DT_PATH_CHOSEN);
-	if (node == NULL) {
-		pr_err("Unable to read node %s from device tree!\n",
-			DT_PATH_CHOSEN);
-		return;
-	}
-	prop = of_get_property(node, DT_PROP_CHOSEN_USB_CDROM_LUN_NUM, NULL);
-	if (prop) {
-		pr_err("USB Overwrite nLuns %d\n", *(char *)prop);
-		andusb_plat.cdrom_lun_num = *(char *)prop;
-	}
-
-	of_node_put(node);
-	return;
-}
-
-void mapphone_init_nluns(void)
-{
-	struct device_node *node;
-	const void *prop;
-
-	node = of_find_node_by_path(DT_PATH_CHOSEN);
-	if (node == NULL) {
-		pr_err("Unable to read node %s from device tree!\n",
-			DT_PATH_CHOSEN);
-		return;
-	}
-	prop = of_get_property(node, DT_PROP_CHOSEN_USB_NLUNS, NULL);
-	if (prop) {
-		pr_err("USB Overwrite nLuns %d\n", *(char *)prop);
-		andusb_plat.nluns = *(char *)prop;
-	}
-
-	of_node_put(node);
-	return;
-}
-
 #define MODELNO_MAX_LEN 16
 char cmdline_modelno[MODELNO_MAX_LEN] = {};
 
@@ -301,67 +105,8 @@ int __init board_modelno_init(char *s)
 }
 __setup("androidboot.modelno=", board_modelno_init);
 
-void mapphone_get_product_name(void)
-{
-	struct device_node *node;
-	const void *prop;
-
-	if (strlen(cmdline_modelno)) {
-		andusb_plat.product_name = (char *)cmdline_modelno;
-	} else {
-		node = of_find_node_by_path(DT_PATH_CHOSEN);
-		if (node == NULL) {
-			pr_err("Unable to read node %s from device tree!\n",
-				DT_PATH_CHOSEN);
-			return;
-		}
-
-	prop = of_get_property(node, DT_PROP_CHOSEN_USB_PROD_NAME, NULL);
-	if (prop) {
-		andusb_plat.product_name = (char *)prop;
-	} else {
-		pr_err("Read property %s error!\n",
-		       DT_PROP_CHOSEN_USB_PROD_NAME);
-	}
-
-	of_node_put(node);
-	}
-
-	return;
-}
-
-void mapphone_get_serial_number(void)
-{
-	unsigned int val[2];
-	unsigned int reg;
-
-	reg = DIE_ID_REG_BASE + DIE_ID_REG_OFFSET;
-
-	//val[0] = omap_readl(reg); //crashes with another data abort
-	
-	//val[1] = omap_readl(reg + 4);
-
-	val[1] = 0x12345678;
-	val[0] = 0x90abcdef;
-
-	snprintf(andusb_plat.device_serial, MAX_USB_SERIAL_NUM, "%08X%08X",
-					val[1], val[0]);
-
-}
-
 void mapphone_gadget_init(void)
 {
-
-	andusb_plat.performance_mode = set_usb_performance_mode;
-
-	mapphone_get_serial_number();
-	mapphone_get_product_name();
-	/* Initialize the USB nluns from device tree */
-	mapphone_init_nluns();
-	mapphone_init_cdrom_lun_num();
-	/* Initialize the USB PID's from the device tree */
-	usb_pid_mapping_init();
-
 	platform_device_register(&android_usb_platform_device);
 	platform_driver_register(&cpcap_usb_connected_driver);
 

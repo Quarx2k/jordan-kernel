@@ -20,7 +20,6 @@
 #include <linux/spi/spi.h>
 #include <plat/mcspi.h>
 #include <plat/gpio.h>
-#include <plat/mux.h>
 #include <plat/omap34xx.h>
 #include "dt_path.h"
 #include <linux/of.h>
@@ -378,16 +377,9 @@ static struct cpcap_adc_ato mapphone_cpcap_adc_ato = {
 	.atox_ps_factor_out = 0,
 };
 
-static void ac_changed(struct power_supply *ac,
-		       struct cpcap_batt_ac_data *ac_state)
-{
-	return 0; //TODO
-}
-
 static void batt_changed(struct power_supply *batt,
 			 struct cpcap_batt_data *batt_state)
 {
-	return 0; //TODO
 }
 
 static struct cpcap_leds mapphone_cpcap_leds = {
@@ -674,8 +666,7 @@ void __init mapphone_spi_init(void)
 	}
 
 	irq = gpio_to_irq(CPCAP_GPIO);
-	//set_irq_type(irq, IRQ_TYPE_EDGE_RISING);
-	//omap_cfg_reg(AF26_34XX_GPIO0);
+	irq_set_irq_type(irq, IRQ_TYPE_EDGE_RISING);
 
 	mapphone_spi_board_info[0].irq = irq;
 	spi_register_board_info(mapphone_spi_board_info,

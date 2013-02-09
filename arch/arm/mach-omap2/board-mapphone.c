@@ -7,22 +7,12 @@
  */
 
 #include <linux/bootmem.h>
-#include <linux/kernel.h>
-#include <linux/init.h>
 #include <linux/platform_device.h>
 #include <linux/spi/cpcap.h>
-#include <linux/spi/cpcap-regbits.h>
-#include <linux/input.h>
-#include <linux/clk.h>
 #include <linux/gpio.h>
-#include <linux/mtd/nand.h>
 #include <linux/of_fdt.h>
-#include <linux/of.h>
-#include <linux/led-lm3530.h>
 #include <linux/skbuff.h>
 #include <linux/ti_wilink_st.h>
-#include <plat/omap-serial.h>
-#include <plat/omap_hsi.h>
 #include <linux/wl12xx.h>
 #include <linux/regulator/machine.h>
 
@@ -30,17 +20,13 @@
 #include <asm/mach/arch.h>
 
 #include <plat/common.h>
-#include <plat/board.h>
-#include <plat/gpmc-smc91x.h>
 #include <plat/usb.h>
 #include <plat/system.h>
-#include <plat/mux.h>
 #include <plat/hdq.h>
+#include <plat/omap-serial.h>
 
 #include <mach/board-mapphone.h>
 
-#include "board-flash.h"
-#include "mux.h"
 #include "sdram-toshiba-hynix-numonyx.h"
 #include "omap_ion.h"
 #include "dt_path.h"
@@ -60,6 +46,8 @@
 #define MAPPHONE_WIFI_IRQ_GPIO 65
 #define MAPPHONE_BT_RESET_GPIO 21 //get_gpio_by_name("bt_reset_b")
 
+#define ATAG_FLAT_DEV_TREE_ADDRESS 0xf100040A
+
 char *bp_model = "CDMA";
 static char boot_mode[BOOT_MODE_MAX_LEN+1];
 
@@ -72,8 +60,6 @@ int __init board_boot_mode_init(char *s)
 }
 __setup("androidboot.mode=", board_boot_mode_init);
 
-/* Flat dev tree address */
-#define ATAG_FLAT_DEV_TREE_ADDRESS 0xf100040A
 struct tag_flat_dev_tree_address {
 	u32 address;
 	u32 size;
@@ -93,7 +79,6 @@ static int __init parse_tag_flat_dev_tree_address(const struct tag *tag)
 		fdt_size = fdt_addr->size;
 	}
 
-	/*have_of = 1;*/
 	printk(KERN_INFO
 		"flat_dev_tree_virt_address=0x%08x, flat_dev_tree_address=0x%08x, flat_dev_tree_size == 0x%08X\n",
 		fdt_start_address,
@@ -127,31 +112,6 @@ static struct omap_musb_board_data musb_board_data = {
 #endif
 	.power                  = 100,
 };
-
-static void __init mapphone_musb_init(void)
-{
-	struct device_node *node;
-	const void *prop;
-	int size;
-	u16 power = 0;
-	node = of_find_node_by_path(DT_HIGH_LEVEL_FEATURE);
-
-	node = of_find_node_by_path(DT_PATH_CHOSEN);
-	if (node) {
-		prop = of_get_property(node,
-				DT_PROP_CHOSEN_MUSBHS_EXTPOWER, &size);
-		if (prop && size) {
-			power = *(u16 *)prop;
-			pr_debug("Current supplied by ext power: %d\n", power);
-		}
-		of_node_put(node);
-	}
-
-//	if (power > 100 && power <= 500 )
-//		musb_board_data.power = power;
-
-	usb_musb_init(&musb_board_data);
-}
 
 /* wl127x BT, FM, GPS connectivity chip */
 struct ti_st_plat_data wilink_pdata = {
@@ -240,26 +200,6 @@ static void __init mapphone_bp_model_init(void)
              clk_enable(clkp);
              printk("sad2d_ick enabled\n");
 	}
-#if 0
-	clkp = clk_get(NULL, "l3_ick");
-		if (clkp) {
-             clk_enable(clkp);
-             printk("l3_ick enabled\n");
-	}
-
-	clkp = clk_get(NULL, "core_l3_ick");
-		if (clkp) {
-             clk_enable(clkp);
-             printk("core_l3_ick enabled\n");
-	}
-
-
-	clkp = clk_get(NULL, "hsotgusb_ick");
-		if (clkp) {
-             clk_enable(clkp);
-             printk("hsotgusb_ick enabled\n");
-	}
-#endif
 #endif
 }
 
@@ -429,11 +369,8 @@ static void __init omap_mapphone_init(void)
 	mapphone_als_init();
 	omap_hdq_init();
 	mapphone_wifi_init();
-
-	usb_musb_init(NULL);
+	usb_musb_init(&musb_board_data);
 	mapphone_usbhost_init();
-
-
 	mapphone_power_off_init();
 	mapphone_hsmmc_init();
 	omap_enable_smartreflex_on_init();
