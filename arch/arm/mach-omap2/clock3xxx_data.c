@@ -3357,7 +3357,7 @@ static struct omap_clk omap3xxx_clks[] = {
 	CLK(NULL,	"usb_l4_ick",	&usb_l4_ick,	CK_3430ES1),
 	CLK(NULL,	"security_l4_ick2", &security_l4_ick2, CK_34XX | CK_36XX),
 	CLK(NULL,	"aes1_ick",	&aes1_ick,	CK_34XX | CK_36XX),
-	CLK("omap_rng",	"ick",		&rng_ick,	CK_34XX | CK_36XX),
+	CLK(NULL,	"rng_ick",		&rng_ick,	CK_34XX | CK_36XX),
 	CLK(NULL,	"sha11_ick",	&sha11_ick,	CK_34XX | CK_36XX),
 	CLK(NULL,	"des1_ick",	&des1_ick,	CK_34XX | CK_36XX),
 	CLK("omapdss_dss",	"fck",		&dss1_alwon_fck_3430es1, CK_3430ES1),
