@@ -212,8 +212,42 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 	int					i;
 	char					supply[7];
 
+#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+
+	/* FIXME: Find proper defines for the addresses */
+
+	/* We need to get the interrupts in order */
+	printk(KERN_INFO "EHCI-OMAP: Fixing after 2nd-boot\n");
+
+	/* Mask IRQs */
+	omap_writel(0x2000, 0x482000cc);
+
+	/* Reset USBINTR */
+	omap_writel(0x00, 0x48064818);
+
+	/* Set ERROR status on everything (this may not be necessary) */
+	omap_writel(0x3f, 0x48064814);
+
+	/* Clear HCINTERRUPTSTATUS */
+	omap_writel(0x4000007f, 0x4806440c);
+
+	/* Clear HCINTERRUPTDISABLE */
+	omap_writel(0xc000007f, 0x48064414);
+
+#endif
+
 	if (usb_disabled())
 		return -ENODEV;
+
+#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+
+	/* Enable IRQs */
+	omap_writel(0x0, 0x4806201c);
+
+	/* Set them to event pending */
+	omap_writel(0x7, 0x48062018);
+
+#endif
 
 	if (!dev->parent) {
 		dev_err(dev, "Missing parent device\n");
@@ -281,13 +315,13 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 	 */
 	ehci_write(regs, EHCI_INSNREG04,
 				EHCI_INSNREG04_DISABLE_UNSUSPEND);
-
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	/* Soft reset the PHY using PHY reset command over ULPI */
 	if (pdata->port_mode[0] == OMAP_EHCI_PORT_MODE_PHY)
 		omap_ehci_soft_phy_reset(pdev, 0);
 	if (pdata->port_mode[1] == OMAP_EHCI_PORT_MODE_PHY)
 		omap_ehci_soft_phy_reset(pdev, 1);
-
+#endif
 	omap_ehci = hcd_to_ehci(hcd);
 	omap_ehci->sbrn = 0x20;
 
