@@ -53,7 +53,7 @@
 #endif
 #include <../drivers/w1/w1_family.h> /* for W1_EEPROM_DS2502 */
 
-#define WILINK_UART_DEV_NAME "/dev/ttyO3" //Need Check it.
+#define WILINK_UART_DEV_NAME "/dev/ttyO1"
 
 #define MAPPHONE_POWER_OFF_GPIO 176
 #define MAPPHONE_WIFI_PMENA_GPIO 186
@@ -153,23 +153,14 @@ static void __init mapphone_musb_init(void)
 	usb_musb_init(&musb_board_data);
 }
 
-static int plat_kim_suspend(struct platform_device *pdev, pm_message_t state)
-{
-	return 0;
-}
-static int plat_kim_resume(struct platform_device *pdev)
-{
-	return 0;
-}
-
 /* wl127x BT, FM, GPS connectivity chip */
 struct ti_st_plat_data wilink_pdata = {
 	.nshutdown_gpio = MAPPHONE_BT_RESET_GPIO, 
 	.dev_name = WILINK_UART_DEV_NAME,
 	.flow_cntrl = 1,
-	.baud_rate = 3000000,
-	.suspend = plat_kim_suspend,
-	.resume = plat_kim_resume,
+	.baud_rate = 3686400,
+	.suspend = 0,
+	.resume = 0,
 };
 static struct platform_device wl127x_device = {
 	.name           = "kim",
