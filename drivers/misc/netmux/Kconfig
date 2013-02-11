@@ -1,0 +1,15 @@
+#
+# Netmux configuration
+#
+
+menu "Motorola netmux driver"
+
+config NETMUX_DRIVER
+        tristate "Motorola netmux driver"
+        default m
+
+config DEBUG_NETMUX
+        bool "Builds netmux proc logging Interface"
+        default n
+
+endmenu
