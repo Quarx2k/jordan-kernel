@@ -419,6 +419,15 @@ config OMAP_REBOOT_REASON
 	depends on ARCH_OMAP4
 	bool
 
+config OMAP3_EXPORT_DIE_ID
+       bool "Export DIE ID code under /proc/socinfo"
+       depends on ARCH_OMAP3
+       default n
+       help
+         Say Y here if you need DIE ID code to be exported via /proc/socinfo
+         in production systems. You will need also to explicitly flag it by
+         appending the "omap3_die_id" parameter to your boot command line.
+
 config OMAP_RAM_CONSOLE
         bool "Enable OMAP support for Android RAM console"
         depends on ANDROID_RAM_CONSOLE

@@ -67,3 +67,10 @@ config PROC_PAGE_MONITOR
 	  /proc/pid/smaps, /proc/pid/clear_refs, /proc/pid/pagemap,
 	  /proc/kpagecount, and /proc/kpageflags. Disabling these
           interfaces will reduce the size of the kernel by approximately 4kb.
+
+config PROC_SOCINFO
+       default y
+       depends on PROC_FS
+       bool "Enable /proc/socinfo" if EMBEDDED
+       help
+         Say Y here if you need to see information about the your System on
