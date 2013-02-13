@@ -444,6 +444,9 @@ static void __init mapphone_lm3554_init(void) {
 		val = of_get_property(node, "flash_duration_def", &len);
 		if (val && len)
 			mapphone_camera_flash_3554.flash_duration_def = *val;
+		val = of_get_property(node, "flash_brightness_def", &len);
+		if (val && len)
+			mapphone_camera_flash_3554.flash_brightness_def = *val;
 	}
 }
 
