@@ -108,7 +108,7 @@ static struct mapphone_dsi_panel_data mapphone_panel_data = {
 	.use_esd_check		= true,
 	.set_backlight		= NULL,
 	.te_support		= true,
-#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY 
 	.te_scan_line		= 0x300,
 #else
 	.te_scan_line		= 300,
@@ -161,6 +161,8 @@ static int mapphone_displ_lvds_wp_e = -1;
 static struct powerdomain *dss_pwrdm;
 
 static int  mapphone_feature_hdmi;
+
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 static int  mapphone_hdmi_5v_enable;       /* 0 by default */
 static int  mapphone_hdmi_platform_hpd_en; /* 0 by default */
 static int  mapphone_hdmi_5v_force_off;    /* 0 by default */
@@ -169,12 +171,15 @@ static char mapphone_hdmi_dac_reg_name[HDMI_DAC_REGULATOR_NAME_SIZE + 1];
 struct regulator *mapphone_hdmi_dac_reg;
 struct regulator *mapphone_hdmi_5v_reg;
 
+
 static int  mapphone_panel_hdmi_5v_enable(void);
 static int  mapphone_panel_hdmi_5v_disable(void);
 static int  mapphone_panel_enable_hdtv(struct omap_dss_device *dssdev);
 static void mapphone_panel_disable_hdtv(struct omap_dss_device *dssdev);
+
 static int  mapphone_panel_enable_hpd_hdtv(struct omap_dss_device *dssdev);
 static void mapphone_panel_disable_hpd_hdtv(struct omap_dss_device *dssdev);
+
 static int  mapphone_panel_hdtv_test(struct omap_dss_device *dssdev, int level);
 
 static struct omap_dss_device mapphone_hdtv_device = {
@@ -200,6 +205,7 @@ static struct omap_dss_device mapphone_hdtv_device = {
 	.set_backlight         = mapphone_panel_hdtv_test,
 #endif
 };
+
 
 struct regulator_consumer_supply hdmi_hpd_consumers =
 	REGULATOR_SUPPLY("hdmi_5V_en", NULL);
@@ -274,6 +280,7 @@ static int mapphone_panel_hdmi_5v_disable(void)
 	}
 	return rc;
 }
+#endif
 
 static void mapphone_panel_reset(bool enable)
 {
@@ -901,8 +908,6 @@ static int mapphone_dt_get_panel_feature(void)
 	if (panel_prop != NULL)
 		panel_data->ftr_support.som = *(bool *)panel_prop;
 
-end:
-	of_node_put(panel_node);
 err:
 	return r;
 
@@ -1017,12 +1022,11 @@ static int mapphone_dt_get_lvds_panel_info(void)
 	return 0;
 }
 
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 static int mapphone_dt_get_hdtv_info(void)
 {
 	struct device_node *panel_node;
 	const void *panel_prop;
-	struct omap_ovl2mgr_mapping *read_ovl2mgr_mapping = NULL;
-	int len = 0, i = 0;
 
 	PANELDBG("dt_get_hdtv_info()\n");
 
@@ -1071,6 +1075,7 @@ static int mapphone_dt_get_hdtv_info(void)
 	of_node_put(panel_node);
 	return 0;
 }
+#endif
 
 static int mapphone_dt_get_feature_info(void)
 {
@@ -1188,7 +1193,7 @@ static int __init mapphone_dt_panel_init(void)
 	return ret;
 }
 
-
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 static int mapphone_panel_enable_hdtv(struct omap_dss_device *dssdev)
 {
 	int rc = 0;
@@ -1254,6 +1259,7 @@ static void mapphone_panel_disable_hpd_hdtv(struct omap_dss_device *dssdev)
 	mapphone_panel_hdmi_5v_disable();
 }
 
+
 static int mapphone_panel_hdtv_test(struct omap_dss_device *not_used, int tst)
 {
 	if (tst == 0) {
@@ -1267,16 +1273,19 @@ static int mapphone_panel_hdtv_test(struct omap_dss_device *not_used, int tst)
 	}
 	return 0;
 }
+#endif
 
 static struct platform_device omap_panel_device = {
 	.name = "omap-panel",
 	.id = -1,
 };
 
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 static struct platform_device omap_dssmgr_device = {
 	.name = "omap-dssmgr",
 	.id = -1,
 };
+#endif
 
 static void mapphone_panel_get_fb_info(void)
 {
@@ -1428,8 +1437,6 @@ void __init mapphone_panel_init(void)
 
 	return;
 
-failed_hdmi_5v:
-	gpio_free(mapphone_displ_lvds_wp_e);
 failed_req_lvds_wp_e:
 	gpio_free(mapphone_displ_lvds_wp_g);
 failed_req_lvds_wp_g:

@@ -28,6 +28,9 @@
 #define MAPPHONE_KXTF9_INT_GPIO		22
 #define MAPPHONE_VIBRATOR_GPIO		181
 
+extern void __init mapphone_touch_panel_init(struct i2c_board_info *i2c_info);
+extern void __init mapphone_touch_btn_init(struct i2c_board_info *i2c_info);
+
 static struct i2c_board_info __initdata
 	mapphone_i2c_bus1_board_info[I2C_BUS_MAX_DEVICES];
 static struct i2c_board_info __initdata

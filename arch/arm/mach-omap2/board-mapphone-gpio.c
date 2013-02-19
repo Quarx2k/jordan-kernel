@@ -244,7 +244,6 @@ void __init mapphone_gpio_mapping_init(void)
 	const void *prop;
 	int i, j, size, unit_size;
 	char name[GPIO_MAP_NAME_SIZE];
-	u32 base = 0;
 
 	node = of_find_node_by_path(DT_PATH_GPIO);
 	if (node == NULL) {

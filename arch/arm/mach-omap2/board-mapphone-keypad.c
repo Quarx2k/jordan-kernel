@@ -18,7 +18,6 @@
 #include <linux/platform_device.h>
 #include <linux/input.h>
 #include <linux/gpio_event.h>
-#include <linux/keyreset.h>
 
 #include <plat/mux.h>
 #include <plat/gpio.h>
@@ -118,15 +117,6 @@ static struct gpio_event_direct_entry mapphone_keypad_switch_map[] = {
 	{GPIO_SLIDER,		SW_LID}
 };
 
-
-static int fixup(int index)
-{
-       int slide_open = gpio_get_value(mapphone_keypad_switch_map[0].gpio);
-       if (!slide_open)
-		return mapphone_keymap_closed[index];
-       return 1;
-}
-
 static struct gpio_event_matrix_info mapphone_keypad_matrix_info = {
 	.info.func = gpio_event_matrix_func,
 	.keymap = mapphone_p3_keymap,
@@ -163,28 +153,6 @@ static struct platform_device mapphone_keypad_device = {
 	.dev		= {
 		.platform_data	= &mapphone_keypad_data,
 	},
-};
-
-static int mapphone_reset_keys_up[] = {
-	BTN_MOUSE,		/* XXX */
-	0
-};
-
-static int mapphone_reset_keys_down[] = {
-	KEY_LEFTSHIFT,
-	KEY_RIGHTALT,
-	KEY_BACKSPACE,
-	0
-};
-
-static struct keyreset_platform_data mapphone_reset_keys_pdata = {
-	.keys_up = mapphone_reset_keys_up,
-	.keys_down = mapphone_reset_keys_down,
-};
-
-struct platform_device mapphone_reset_keys_device = {
-	.name = KEYRESET_NAME,
-	.dev.platform_data = &mapphone_reset_keys_pdata,
 };
 
 static int __init mapphone_dt_kp_init(void)
@@ -241,7 +209,6 @@ static int __init mapphone_init_keypad(void)
 	if (mapphone_dt_kp_init())
 		printk(KERN_INFO "Keypad: using non-dt configuration\n");
 
-	platform_device_register(&mapphone_reset_keys_device);
 	return platform_device_register(&mapphone_keypad_device);
 }
 
