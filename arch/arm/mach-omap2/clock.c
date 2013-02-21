@@ -454,9 +454,11 @@ void omap2_clk_disable_unused(struct clk *clk)
 		return;
 
 	pr_debug("Disabling unused clock \"%s\"\n", clk->name);
+#ifdef CONFIG_DEBUG_LL
 	if(clk->name == "uart3_ick" || clk->name == "uart3_fck") {
 	   return;
 	}
+#endif
 	if (cpu_is_omap34xx()) {
 		omap2_clk_enable(clk);
 		omap2_clk_disable(clk);
