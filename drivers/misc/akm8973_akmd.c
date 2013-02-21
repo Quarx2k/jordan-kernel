@@ -36,8 +36,6 @@
 #define DEBUG 0
 #define MAX_FAILURE_COUNT 10
 
-I2C_CLIENT_INSMOD;
-
 static struct i2c_client *this_client;
 
 struct akm8973_data {
