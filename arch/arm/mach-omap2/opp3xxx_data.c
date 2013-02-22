@@ -160,7 +160,7 @@ static struct omap_opp_def __initdata omap36xx_opp_def_list[] = {
 				800000000, OMAP3630_VDD_MPU_OPP120_UV),
 	/* MPU OPP4 - OPP-SB */
 	OPP_INITIALIZER("mpu", "dpll1_ck", "mpu_iva", true,
-				1000000000, OMAP3630_VDD_MPU_OPP1G_UV),
+				800000000, OMAP3630_VDD_MPU_OPP1G_UV),
 
 	/* L3 OPP1 - OPP50 */
 	OPP_INITIALIZER("l3_main", "l3_ick", "core", true,
