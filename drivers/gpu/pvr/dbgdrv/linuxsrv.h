@@ -22,29 +22,27 @@
  * Imagination Technologies Ltd. <gpl-support@imgtec.com>
  * Home Park Estate, Kings Langley, Herts, WD4 8LZ, UK 
  *
- ******************************************************************************/
+ **************************************************************************/
 
-#ifndef SERVICES_HEADERS_H
-#define SERVICES_HEADERS_H
+#ifndef _LINUXSRV_H__
+#define _LINUXSRV_H__
 
-#ifdef DEBUG_RELEASE_BUILD
-#pragma optimize( "", off )
-#define DEBUG		1
-#endif
+typedef struct tagIOCTL_PACKAGE
+{
+	IMG_UINT32 ui32Cmd;              // ioctl command
+	IMG_UINT32 ui32Size;			   // needs to be correctly set
+	IMG_VOID 	*pInBuffer;          // input data buffer
+	IMG_UINT32  ui32InBufferSize;     // size of input data buffer
+	IMG_VOID    *pOutBuffer;         // output data buffer
+	IMG_UINT32  ui32OutBufferSize;    // size of output data buffer
+} IOCTL_PACKAGE;
 
-#include "img_defs.h"
-#include "services.h"
-#include "servicesint.h"
-#include "power.h"
-#include "resman.h"
-#include "queue.h"
-#include "srvkm.h"
-#include "kerneldisplay.h"
-#include "syscommon.h"
-#include "pvr_debug.h"
-#include "metrics.h"
-#include "osfunc.h"
-#include "refcount.h"
+IMG_UINT32 DeviceIoControl(IMG_UINT32 hDevice,		
+						IMG_UINT32 ui32ControlCode, 
+						IMG_VOID *pInBuffer,		
+						IMG_UINT32 ui32InBufferSize,
+						IMG_VOID *pOutBuffer,		
+						IMG_UINT32 ui32OutBufferSize,  
+						IMG_UINT32 *pui32BytesReturned); 
 
-#endif 
-
+#endif /* _LINUXSRV_H__*/
