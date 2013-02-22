@@ -472,7 +472,7 @@ static void mapphone_framedone_cb(int err, void *data)
 	DBG("%s()\n", __func__);
 
 	/* Turn on display when framedone */
-	mapphone_panel_display_on(dssdev);
+//	mapphone_panel_display_on(dssdev);
 
 #ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	dsi_from_dss_runtime_put(dssdev);
@@ -4076,7 +4076,12 @@ static int mapphone_panel_power_on(struct omap_dss_device *dssdev)
 	mp_data->enabled = true;
 	mp_data->som_enabled = false;
 
+	/*moved this out of interrupt*/
+	mapphone_panel_display_on(dssdev);
+
 	omapdss_dsi_vc_enable_hs(dssdev, dsi_vc_cmd, true);
+
+
 
 	if (dssdev->phy.dsi.type == OMAP_DSS_DSI_TYPE_VIDEO_MODE) {
 		if (!dssdev->skip_init)
