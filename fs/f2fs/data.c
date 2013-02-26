@@ -184,7 +184,7 @@ struct page *find_data_page(struct inode *inode, pgoff_t index)
 	f2fs_put_page(page, 0);
 
 	set_new_dnode(&dn, inode, NULL, NULL, 0);
-	err = get_dnode_of_data(&dn, index, RDONLY_NODE);
+	err = get_dnode_of_data(&dn, index, LOOKUP_NODE);
 	if (err)
 		return ERR_PTR(err);
 	f2fs_put_dnode(&dn);
@@ -223,7 +223,7 @@ struct page *get_lock_data_page(struct inode *inode, pgoff_t index)
 	int err;
 
 	set_new_dnode(&dn, inode, NULL, NULL, 0);
-	err = get_dnode_of_data(&dn, index, RDONLY_NODE);
+	err = get_dnode_of_data(&dn, index, LOOKUP_NODE);
 	if (err)
 		return ERR_PTR(err);
 	f2fs_put_dnode(&dn);
@@ -263,7 +263,7 @@ struct page *get_new_data_page(struct inode *inode, pgoff_t index,
 	int err;
 
 	set_new_dnode(&dn, inode, NULL, NULL, 0);
-	err = get_dnode_of_data(&dn, index, 0);
+	err = get_dnode_of_data(&dn, index, ALLOC_NODE);
 	if (err)
 		return ERR_PTR(err);
 
@@ -393,7 +393,7 @@ static int get_data_block_ro(struct inode *inode, sector_t iblock,
 
 	/* When reading holes, we need its node page */
 	set_new_dnode(&dn, inode, NULL, NULL, 0);
-	err = get_dnode_of_data(&dn, pgofs, RDONLY_NODE);
+	err = get_dnode_of_data(&dn, pgofs, LOOKUP_NODE_RA);
 	if (err)
 		return (err == -ENOENT) ? 0 : err;
 
@@ -444,7 +444,7 @@ int do_write_data_page(struct page *page)
 	int err = 0;
 
 	set_new_dnode(&dn, inode, NULL, NULL, 0);
-	err = get_dnode_of_data(&dn, page->index, RDONLY_NODE);
+	err = get_dnode_of_data(&dn, page->index, LOOKUP_NODE);
 	if (err)
 		return err;
 
@@ -608,7 +608,7 @@ static int f2fs_write_begin(struct file *file, struct address_space *mapping,
 	mutex_lock_op(sbi, DATA_NEW);
 
 	set_new_dnode(&dn, inode, NULL, NULL, 0);
-	err = get_dnode_of_data(&dn, index, 0);
+	err = get_dnode_of_data(&dn, index, ALLOC_NODE);
 	if (err) {
 		mutex_unlock_op(sbi, DATA_NEW);
 		f2fs_put_page(page, 1);
