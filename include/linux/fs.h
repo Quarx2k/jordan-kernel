@@ -1769,6 +1769,8 @@ struct file_system_type {
 	struct lock_class_key i_alloc_sem_key;
 };
 
+#define MODULE_ALIAS_FS(NAME) MODULE_ALIAS("fs-" NAME)
+
 extern int get_sb_ns(struct file_system_type *fs_type, int flags, void *data,
 	int (*fill_super)(struct super_block *, void *, int),
 	struct vfsmount *mnt);
