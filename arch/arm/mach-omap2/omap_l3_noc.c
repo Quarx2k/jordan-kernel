@@ -115,9 +115,12 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
 
 				slave_addr = std_err_main_addr +
 						L3_SLAVE_ADDRESS_OFFSET;
-
-				WARN(true, "L3 standard error: SOURCE:%s at address 0x%x\n",
-					source_name, readl(slave_addr));
+				WARN(!oops_in_progress, "***L3 standard error:"
+					"SOURCE:%s at address 0x%x"
+					"Hdr=0x%x MstAddr=0x%x\n",
+					source_name, readl(slave_addr),
+					readl(std_err_main_addr + L3_HDR),
+					readl(std_err_main_addr + L3_MSTADDR));
 
 				l3_dump_targ_context(base + regoffset);
 
@@ -131,7 +134,7 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
 				l3_targ_stderrlog_main_name[i][err_src];
 				regoffset = targ_reg_offset[i][err_src];
 
-				WARN(true, "CUSTOM SRESP error with SOURCE:%s\n",
+				WARN(!oops_in_progress, "CUSTOM SRESP error with SOURCE:%s\n",
 							source_name);
 
 				masterid = readl(base + regoffset +
@@ -140,8 +143,12 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
 				for (k = 0;
 				     k < NUM_OF_L3_MASTERS;
 				     k++) {
-					if (masterid == l3_masters[k].id) {
-						pr_err("Master 0x%x %10s\n",
+					if (masterid == l3_masters[k].id &&
+						likely(!oops_in_progress)) {
+						pr_err("Infor 0x%08x\n",
+							readl(base + regoffset +
+							L3_CUSTOMINFO_INFO));
+						pr_err("Master 0x%08x %10s\n",
 							masterid,
 							l3_masters[k].name);
 						pr_err("%s OPCODE   0x%08x\n",
