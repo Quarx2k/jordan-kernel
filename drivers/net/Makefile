@@ -291,4 +291,4 @@ obj-$(CONFIG_WIMAX) += wimax/
 obj-$(CONFIG_KINETO_GAN) += kineto_gan.o
 
 # small builtin driver bit
-obj-y	+= wl12xx_platform_data.o
+obj-$(CONFIG_WL12XX_PLATFORM_DATA)	+= wl12xx_platform_data.o
