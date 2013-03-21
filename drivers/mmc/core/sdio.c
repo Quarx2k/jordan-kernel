@@ -10,6 +10,7 @@
  */
 
 #include <linux/err.h>
+#include <linux/pm_runtime.h>
 
 #include <linux/mmc/host.h>
 #include <linux/mmc/card.h>
@@ -606,6 +607,9 @@ int mmc_attach_sdio(struct mmc_host *host, u32 ocr)
 	err = mmc_add_card(host->card);
 	if (err)
 		goto remove_added;
+
+	pm_runtime_set_active(&host->card->dev);
+	pm_runtime_enable(&host->card->dev);
 
 	/*
 	 * ...then the SDIO functions.
