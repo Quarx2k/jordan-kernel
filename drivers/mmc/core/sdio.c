@@ -284,6 +284,11 @@ static int mmc_sdio_init_card(struct mmc_host *host, u32 ocr,
 		err = mmc_select_card(card);
 		if (err)
 			goto remove;
+
+		/*
+		 * Enable Runtime PM for this func
+		 */
+		pm_runtime_enable(&card->sdio_func[i]->dev);
 	}
 
 #ifdef CONFIG_MMC_EMBEDDED_SDIO
