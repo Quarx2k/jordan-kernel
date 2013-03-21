@@ -485,7 +485,7 @@ static int mmc_sdio_resume(struct mmc_host *host)
 	return err;
 }
 
-static void mmc_sdio_power_restore(struct mmc_host *host)
+static int mmc_sdio_power_restore(struct mmc_host *host)
 {
 	int err;
 
@@ -498,6 +498,7 @@ static void mmc_sdio_power_restore(struct mmc_host *host)
 	if (!err && host->sdio_irqs)
 		mmc_signal_sdio_irq(host);
 	mmc_release_host(host);
+	return 0;
 }
 
 static const struct mmc_bus_ops mmc_sdio_ops = {
