@@ -232,7 +232,7 @@ static int mmc_sdio_init_card(struct mmc_host *host, u32 ocr,
 			      struct mmc_card *oldcard, int powered_resume)
 {
 	struct mmc_card *card;
-	int err;
+	int err,i;
 
 	BUG_ON(!host);
 	WARN_ON(!host->claimed);
