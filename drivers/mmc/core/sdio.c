@@ -508,18 +508,20 @@ static int mmc_sdio_resume(struct mmc_host *host)
 
 static int mmc_sdio_power_restore(struct mmc_host *host)
 {
-	int err;
+	int ret;
 
 	BUG_ON(!host);
 	BUG_ON(!host->card);
 
 	mmc_claim_host(host);
-	err = mmc_sdio_init_card(host, host->ocr, host->card,
+	ret = mmc_sdio_init_card(host, host->ocr, host->card,
 			(host->pm_flags & MMC_PM_KEEP_POWER));
-	if (!err && host->sdio_irqs)
+	if (!ret && host->sdio_irqs)
 		mmc_signal_sdio_irq(host);
+
 	mmc_release_host(host);
-	return 0;
+
+	return ret;
 }
 
 static const struct mmc_bus_ops mmc_sdio_ops = {
