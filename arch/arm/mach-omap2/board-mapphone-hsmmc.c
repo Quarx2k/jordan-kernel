@@ -25,6 +25,7 @@
 #include <linux/mmc/sdio_ids.h>
 #include <linux/regulator/consumer.h>
 
+#include <plat/board-mapphone.h>
 #include <plat/hardware.h>
 #include <plat/control.h>
 #include <plat/mmc.h>
@@ -38,24 +39,10 @@
 #endif
 
 #define GPIO_SIGNAL_MMC_DET 163
-#define MAPPHONE_WIFI_PMENA_GPIO	186
-#define MAPPHONE_WIFI_IRQ_GPIO	65
-static const int mmc2_cd_gpio = OMAP_MAX_GPIO_LINES + 1;
 
 static int hsmmc_card_detect(int irq)
 {
 	return !gpio_get_value_cansleep(GPIO_SIGNAL_MMC_DET);
-}
-
-extern int mapphone_wifi_status(int irq);
-#ifdef CONFIG_MMC_EMBEDDED_SDIO
-extern int mapphone_wifi_status_register(void (*callback)(int card_present,
-						void *dev_id), void *dev_id);
-#endif
-
-static int wifi_sdio_detect(int irq)
-{
-	return mapphone_wifi_status(irq);
 }
 
 /*
@@ -278,14 +265,15 @@ static struct omap_mmc_platform_data wifi_data __initdata = {
 	.nr_slots			= 1,
 	.slots[0] = {
 		.wires			= 4,
+		.nonremovable		= 1,
+		.power_saving		= 1,
 		.set_power		= wifi_set_power,
-		.ocr_mask		= MMC_VDD_32_33 | MMC_VDD_33_34 |
-						MMC_VDD_165_195,
+		.ocr_mask		= MMC_VDD_165_195,
 		.name			= "first slot",
 		.internal_clock		= 1,
 		.card_detect_irq        = 0,
 	},
-};
+};	
 
 static struct omap_mmc_platform_data *hsmmc_data[OMAP34XX_NR_MMC] __initdata;
 

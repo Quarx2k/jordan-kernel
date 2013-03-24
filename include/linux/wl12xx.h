@@ -23,7 +23,6 @@
 
 #ifndef _LINUX_WL12XX_H
 #define _LINUX_WL12XX_H
-#define CONFIG_WL12XX_PLATFORM_DATA
 /* Reference clock values */
 enum {
 	WL12XX_REFCLOCK_19	= 0, /* 19.2 MHz */

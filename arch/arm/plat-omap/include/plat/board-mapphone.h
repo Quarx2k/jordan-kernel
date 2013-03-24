@@ -87,6 +87,9 @@ extern struct camise_platform_data mapphone_camise_platform_data;
 /* legacy MIPI SRC DIV, kept to avoid conflict with old code */
 #define OMAP_MCAM_SRC_DIV_MIPI	            4
 
+#define MAPPHONE_WIFI_PMENA_GPIO	186
+#define MAPPHONE_WIFI_IRQ_GPIO		65
+
 /* must match value defined in device tree schema */
 #define MAPPHONE_BP_VIACBP71            0x00220000
 
