@@ -67,8 +67,17 @@ endif
 
 SEDFLAGS	= s/TEXT_START/$(ZTEXTADDR)/;s/BSS_START/$(ZBSSADDR)/
 
-targets       := vmlinux vmlinux.lds piggy.gz piggy.o font.o font.c \
-		 head.o misc.o $(OBJS)
+suffix_$(CONFIG_KERNEL_GZIP)    := gzip
+suffix_$(CONFIG_KERNEL_BZIP2)   := bzip2
+suffix_$(CONFIG_KERNEL_LZO)     := lzo
+suffix_$(CONFIG_KERNEL_LZMA)    := lzma
+suffix_$(CONFIG_KERNEL_XZ)      := xzkern
+
+targets       := vmlinux vmlinux.lds \
+		piggy.$(suffix_y) piggy.$(suffix_y).o \
+		font.o font.c head.o misc.o $(OBJS)
+
+extra-y       += piggy.gzip piggy.lzo piggy.lzma piggy.xzkern lib1funcs.S ashldi3.S
 
 ifeq ($(CONFIG_FUNCTION_TRACER),y)
 ORIG_CFLAGS := $(KBUILD_CFLAGS)
@@ -98,8 +107,15 @@ LDFLAGS_vmlinux += -p --no-undefined -X \
 # would otherwise mess up our GOT table
 CFLAGS_misc.o := -Dstatic=
 
-$(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.o \
-	 	$(addprefix $(obj)/, $(OBJS)) FORCE
+# For __aeabi_llsl
+ashldi3 = $(obj)/ashldi3.o
+
++$(obj)/ashldi3.S: $(srctree)/arch/$(SRCARCH)/lib/ashldi3.S FORCE
+	$(call cmd,shipped)
+
+$(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.$(suffix_y).o \
+		$(addprefix $(obj)/, $(OBJS)) $(lib1funcs) $(ashldi3) FORCE
+
 	$(call if_changed,ld)
 	@:
 
