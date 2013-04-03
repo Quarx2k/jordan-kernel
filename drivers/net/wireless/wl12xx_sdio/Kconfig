@@ -44,3 +44,18 @@ config WL12XX_SDIO
 config WL12XX_PLATFORM_DATA
 	bool
 	default y
+
+config NL80211_TESTMODE
+	bool "nl80211 testmode command"
+	depends on WL12XX_SDIO
+	help
+	  The nl80211 testmode command helps implementing things like
+	  factory calibration or validation tools for wireless chips.
+
+	  Select this option ONLY for kernels that are specifically
+	  built for such purposes.
+
+	  Debugging tools that are supposed to end up in the hands of
+	  users should better be implemented with debugfs.
+
+	  Say N.
