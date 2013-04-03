@@ -414,7 +414,7 @@ source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
 source "drivers/misc/ts27010mux/Kconfig"
-source "drivers/misc/modem_pm_driver/Kconfig
+source "drivers/misc/modem_pm_driver/Kconfig"
 source "drivers/misc/smc/Kconfig"
 source "drivers/misc/sec/Kconfig"
 source "drivers/misc/netmux/Kconfig"

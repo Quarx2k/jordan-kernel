@@ -163,7 +163,7 @@ config OMAP_MCBSP
 	  Buffered Serial Port.
 
 config MEM_DUMP
-	bool " memory dump support"
+	bool "memory dump support"
 	depends on ARCH_OMAP
 	default n
 	help
