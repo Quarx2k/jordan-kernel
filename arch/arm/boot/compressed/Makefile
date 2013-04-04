@@ -109,8 +109,8 @@ CFLAGS_misc.o := -Dstatic=
 
 # For __aeabi_llsl
 ashldi3 = $(obj)/ashldi3.o
- 
-$(obj)/ashldi3.S: $(srctree)/arch/$(SRCARCH)/lib/ashldi3.S
+
++$(obj)/ashldi3.S: $(srctree)/arch/$(SRCARCH)/lib/ashldi3.S FORCE
 	$(call cmd,shipped)
 
 $(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.$(suffix_y).o \
@@ -119,10 +119,10 @@ $(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.$(suffix_y).o \
 	$(call if_changed,ld)
 	@:
 
-$(obj)/piggy.$(suffix_y): $(obj)/../Image FORCE
-	$(call if_changed,$(suffix_y))
+$(obj)/piggy.gz: $(obj)/../Image FORCE
+	$(call if_changed,gzip)
 
-$(obj)/piggy.$(suffix_y).o:  $(obj)/piggy.$(suffix_y) FORCE
+$(obj)/piggy.o:  $(obj)/piggy.gz FORCE
 
 CFLAGS_font.o := -Dstatic=
 
