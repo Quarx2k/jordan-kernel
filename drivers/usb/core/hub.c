@@ -794,8 +794,9 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 			 * Do not disable USB3 protocol ports.
 			 */
 			if (!hub_is_superspeed(hdev)) {
+			printk("!hub_is_superspeed\n");
 #ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
-			printk("!hub_is_superspeed\n")
+
 				clear_port_feature(hdev, port1,
 						   USB_PORT_FEAT_ENABLE);
 #endif
@@ -809,25 +810,27 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 		/* Clear status-change flags; we'll debounce later */
 		if (portchange & USB_PORT_STAT_C_CONNECTION) {
 			need_debounce_delay = true;
+			printk("USB_PORT_STAT_C_CONNECTION\n");
 #ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
-			printk("USB_PORT_STAT_C_CONNECTION\n")
+
 			clear_port_feature(hub->hdev, port1,
 					USB_PORT_FEAT_C_CONNECTION);
 #endif
 		}
 		if (portchange & USB_PORT_STAT_C_ENABLE) {
+			printk("USB_PORT_STAT_C_ENABLE\n");
 			need_debounce_delay = true;
 #ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
-			printk("USB_PORT_STAT_C_ENABLE\n")
+
 			clear_port_feature(hub->hdev, port1,
 					USB_PORT_FEAT_C_ENABLE);
 #endif
 		}
 		if (portchange & USB_PORT_STAT_C_LINK_STATE) {
+			printk("USB_PORT_STAT_C_LINK_STATE\n");
 			need_debounce_delay = true;
 #ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
-			printk("USB_PORT_STAT_C_LINK_STATE\n")
-			clear_port_feature(hub->hdev, port1,
+			clear_port_feature(hub->hdev, por1,
 					USB_PORT_FEAT_C_PORT_LINK_STATE);
 #endif
 		}
@@ -845,6 +848,7 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 			/* Tell khubd to disconnect the device or
 			 * check for a new connection
 			 */
+			printk("USB_STATE_NOTATTACHED\n");
 			if (udev || (portstatus & USB_PORT_STAT_CONNECTION))
 				set_bit(port1, hub->change_bits);
 
@@ -854,6 +858,7 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 			 * (i.e., remote wakeup request), have khubd
 			 * take care of it.
 			 */
+			printk("USB_PORT_STAT_ENABLE\n");
 			if (portchange)
 				set_bit(port1, hub->change_bits);
 
@@ -2845,6 +2850,7 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 #ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	retval = hub_port_reset(hub, port1, udev, delay);
 #else
+	printk("skip reset\n");
 	retval = 0;
 #endif
 	if (retval < 0)		/* error or disconnect */
@@ -2857,12 +2863,12 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 		dev_dbg(&udev->dev, "device reset changed speed!\n");
 		goto fail;
 	}
-	oldspeed = udev->speed;
-
 #ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+	printk("set speed/state\n");
 	udev->speed = USB_SPEED_HIGH;
 	udev->state = USB_STATE_UNAUTHENTICATED;
 #endif
+	oldspeed = udev->speed;
 
 	/* USB 2.0 section 5.5.3 talks about ep0 maxpacket ...
 	 * it's fixed size except for full speed devices.
@@ -2959,12 +2965,14 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 #ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 				r = usb_control_msg(udev, usb_rcvaddr0pipe(),
 #else
+
 				r = usb_control_msg(udev, (PIPE_CONTROL << 30) | (0x02 << 8) | USB_DIR_IN,
 #endif
 					USB_REQ_GET_DESCRIPTOR, USB_DIR_IN,
 					USB_DT_DEVICE << 8, 0,
 					buf, GET_DESCRIPTOR_BUFSIZE,
 					initial_descriptor_timeout);
+				printk("add WRIGLEY usb: %d\n",r);
 				switch (buf->bMaxPacketSize0) {
 				case 8: case 16: case 32: case 64: case 255:
 					if (buf->bDescriptorType ==
@@ -2988,6 +2996,7 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 #ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 			retval = hub_port_reset(hub, port1, udev, delay);
 #else
+			printk("skip reset2\n");
 			retval = 0;
 #endif
 			if (retval < 0)		/* error or disconnect */
@@ -3023,6 +3032,7 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 			}
 #else
 			/* Make device use proper address. */
+			printk("Make device use proper address\n");
 			update_devnum(udev, devnum);
 
 			usb_set_device_state(udev, USB_STATE_ADDRESS);
@@ -3592,6 +3602,7 @@ static void hub_events(void)
 				clear_port_feature(hdev, i,
 					USB_PORT_FEAT_C_RESET);
 			}
+
 			if ((portchange & USB_PORT_STAT_C_BH_RESET) &&
 					hub_is_superspeed(hub->hdev)) {
 				dev_dbg(hub_dev,
@@ -3946,9 +3957,11 @@ static int usb_reset_and_verify_device(struct usb_device *udev)
 			 * device has been reset, and it will have to use
 			 * alternate setting 0 as the current alternate setting.
 			 */
+			printk("intf->resetting_device = 1\n");
 			intf->resetting_device = 1;
 			ret = usb_set_interface(udev, desc->bInterfaceNumber,
 					desc->bAlternateSetting);
+			printk("intf->resetting_device = 0\n");
 			intf->resetting_device = 0;
 		}
 		if (ret < 0) {

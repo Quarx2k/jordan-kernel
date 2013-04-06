@@ -200,7 +200,7 @@ static struct platform_device *omap_usbhs_alloc_child(const char *name,
 {
 	struct platform_device	*child;
 	int			ret;
-
+	printk("%s\n",__func__);
 	child = platform_device_alloc(name, 0);
 
 	if (!child) {
@@ -250,7 +250,7 @@ static int omap_usbhs_alloc_children(struct platform_device *pdev)
 	struct resource				*res;
 	struct resource				resources[2];
 	int					ret;
-
+	printk("%s\n",__func__);
 	omap = platform_get_drvdata(pdev);
 	ehci_data = omap->platdata.ehci_data;
 	ohci_data = omap->platdata.ohci_data;
@@ -327,7 +327,7 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
 	struct resource			*res;
 	int				ret = 0;
 	int				i;
-
+	printk("%s\n",__func__);
 	if (!pdata) {
 		dev_err(dev, "Missing platform data\n");
 		ret = -ENOMEM;
@@ -534,7 +534,7 @@ static void omap_usbhs_deinit(struct device *dev);
 static int __devexit usbhs_omap_remove(struct platform_device *pdev)
 {
 	struct usbhs_hcd_omap *omap = platform_get_drvdata(pdev);
-
+	printk("%s\n",__func__);
 	omap_usbhs_deinit(&pdev->dev);
 	iounmap(omap->tll_base);
 	iounmap(omap->uhh_base);
@@ -555,6 +555,7 @@ static int __devexit usbhs_omap_remove(struct platform_device *pdev)
 
 static bool is_ohci_port(enum usbhs_omap_port_mode pmode)
 {
+	printk("%s\n",__func__);
 	switch (pmode) {
 	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0:
 	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DPDM:
@@ -579,6 +580,7 @@ static bool is_ohci_port(enum usbhs_omap_port_mode pmode)
  */
 static unsigned ohci_omap3_fslsmode(enum usbhs_omap_port_mode mode)
 {
+	printk("%s\n",__func__);
 	switch (mode) {
 	case OMAP_USBHS_PORT_MODE_UNUSED:
 	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0:
@@ -622,7 +624,7 @@ static void usbhs_omap_tll_init(struct device *dev, u8 tll_channel_count)
 	struct usbhs_omap_platform_data	*pdata = dev->platform_data;
 	unsigned			reg;
 	int				i;
-
+	printk("%s\n",__func__);
 	/* Program Common TLL register */
 	reg = usbhs_read(omap->tll_base, OMAP_TLL_SHARED_CONF);
 	reg |= (OMAP_TLL_SHARED_CONF_FCLK_IS_ON
@@ -664,7 +666,7 @@ static int usbhs_runtime_resume(struct device *dev)
 {
 	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
 	struct usbhs_omap_platform_data	*pdata = &omap->platdata;
-
+	printk("%s\n",__func__);
 	dev_dbg(dev, "usbhs_runtime_resume\n");
 
 	if (!pdata) {
@@ -720,7 +722,7 @@ static void omap_usbhs_init(struct device *dev)
 	struct usbhs_omap_platform_data	*pdata = &omap->platdata;
 	unsigned long			flags = 0;
 	unsigned			reg;
-
+	printk("%s\n",__func__);
 	dev_dbg(dev, "starting TI HSUSB Controller\n");
 
 	pm_runtime_get_sync(dev);
