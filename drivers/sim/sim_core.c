@@ -76,7 +76,7 @@ static struct clk *usim_ick;
 static struct clk *omap_96m_fck;
 static struct clk *omap_120m_fck;
 
-static struct pm_qos_request_list **sim_dev;
+static struct pm_qos_request_list *sim_dev;
 static struct device *sim_device;
 /******************************************************************************
 * Constants
@@ -1103,7 +1103,7 @@ static long sim_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 				    DMA_SYSCONFIG_MIDLEMODE(1));
 
 				/* Request the latency constraint */
-				omap_pm_set_max_mpu_wakeup_lat(sim_dev, 10);
+				pm_qos_update_request(sim_dev, 10);
 
 				sim_low_power_enabled = (BOOL) args_kernel[1];
 				/* enable the SIM FCLK */
@@ -1131,7 +1131,7 @@ static long sim_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 				sim_low_power_enabled = (BOOL) args_kernel[1];
 
 				/* Release the latency constraint */
-				omap_pm_set_max_mpu_wakeup_lat(sim_dev, -1);
+				pm_qos_update_request(sim_dev, -1);
 			}
 
 		}
