@@ -443,15 +443,15 @@ static int wakeup_timer_add
 		return -EINVAL;
 
 	/* Need create new request */
-	if (likely(filp->private_data == 0)) {
+	if (likely(filp->moto_private_data == 0)) {
 		if (cascade_create(&pwkup_cascade))
 			return -ENOMEM;
 
 		/* Initialize more members in timer request */
-		filp->private_data = (void *)pwkup_cascade;
+		filp->moto_private_data = (void *)pwkup_cascade;
 	} else {
 		/* Remove the timer request from list */
-		pwkup_cascade = (struct timer_cascade_root *)filp->private_data;
+		pwkup_cascade = (struct timer_cascade_root *)filp->moto_private_data;
 
 		spin_lock_irqsave(&wakeup_timer_lock, flags);
 		cascade_deattach(pwkup_cascade);
@@ -477,10 +477,10 @@ static int wakeup_timer_destroy(struct file *filp)
 	struct timer_cascade_root *pwkup_cascade;
 
 	/* No wakeup timer request */
-	if (filp->private_data == 0)
+	if (filp->moto_private_data == 0)
 		return 0;
 
-	pwkup_cascade = (struct timer_cascade_root *)filp->private_data;
+	pwkup_cascade = (struct timer_cascade_root *)filp->moto_private_data;
 
 	spin_lock_irqsave(&wakeup_timer_lock, flags);
 	cascade_deattach(pwkup_cascade);
@@ -494,19 +494,19 @@ static int wakeup_timer_destroy(struct file *filp)
 	/* Free the memory for the timer request */
 	kfree(pwkup_cascade);
 
-	filp->private_data = 0;
+	filp->moto_private_data = 0;
 
 	return 0;
 }
 
 /*
  * Only one timer is allowed for each thread
- * Driver will use filp->private_data as the reference for the timer request
+ * Driver will use filp->moto_private_data as the reference for the timer request
  * to avoid going through the whole list
  */
 static int wakeup_timer_open(struct inode *inode, struct file *filp)
 {
-	if (filp->private_data == 0)
+	if (filp->moto_private_data == 0)
 		return nonseekable_open(inode, filp);
 	else
 		return -1;
@@ -573,10 +573,10 @@ static unsigned int wakeup_timer_poll(struct file *filp, poll_table *wait)
 	struct timer_cascade_root *pwkup_cascade;
 
 	/* If the timer is not present, do not permit this operation */
-	if (filp->private_data == NULL)
+	if (filp->moto_private_data == NULL)
 		return -EPERM;
 
-	pwkup_cascade = (struct timer_cascade_root *)filp->private_data;
+	pwkup_cascade = (struct timer_cascade_root *)filp->moto_private_data;
 	if (pwkup_cascade->state == TIMER_INVALID)
 		return -EPERM;
 
