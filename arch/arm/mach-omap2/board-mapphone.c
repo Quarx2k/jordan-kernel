@@ -139,7 +139,7 @@ static struct platform_device *mapphone_devices[] __initdata = {
 
 static struct wl12xx_platform_data mapphone_wlan_data __initdata = {
 	.irq = OMAP_GPIO_IRQ(MAPPHONE_WIFI_IRQ_GPIO),
-	.board_ref_clock = WL12XX_REFCLOCK_38,
+	.board_ref_clock = WL12XX_REFCLOCK_26,
 };
 
 int wifi_set_power(struct device *dev, int slot, int power_on, int vdd)
@@ -161,13 +161,14 @@ int wifi_set_power(struct device *dev, int slot, int power_on, int vdd)
 static void mapphone_wifi_init(void)
 {
 	int ret;
+
 	printk("mapphone_wifi_init\n");
 
 	ret = gpio_request(MAPPHONE_WIFI_PMENA_GPIO, "wifi_pmena");
 	if (ret < 0) {
 		printk(KERN_ERR "%s: can't reserve GPIO: %d\n", __func__,
 			MAPPHONE_WIFI_PMENA_GPIO);
-		return;
+		gpio_free(MAPPHONE_WIFI_PMENA_GPIO);
 	}
 	gpio_direction_output(MAPPHONE_WIFI_PMENA_GPIO, 0);
 
