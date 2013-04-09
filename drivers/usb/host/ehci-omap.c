@@ -799,9 +799,9 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 
 #ifdef CONFIG_HAS_WAKELOCK
 	wake_lock_init(&omap->ehci->wake_lock_ehci_rwu,
-			WAKE_LOCK_SUSPEND, "ehci_rwu");
+			WAKE_LOCK_IDLE, "ehci_rwu");
 	wake_lock_init(&omap->ehci->wake_lock_ehci_pm,
-			WAKE_LOCK_SUSPEND, "ehci_pm");
+			WAKE_LOCK_IDLE, "ehci_pm");
 #endif
 
 	ret = omap_start_ehc(omap, hcd);
