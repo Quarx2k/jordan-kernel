@@ -155,5 +155,7 @@
 
 #define SDIO_FBR_BLKSIZE	0x10	/* block size (2 bytes) */
 
+#define SDIO_BUS_ASYNC_INT	0x20
+
 #endif
 

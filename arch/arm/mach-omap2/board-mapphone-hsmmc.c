@@ -274,7 +274,7 @@ static struct omap_mmc_platform_data wifi_data __initdata = {
 		.name			= "first slot",
 		.internal_clock		= 1,
 		.card_detect_irq        = 0,
-		.keep_power		= 0, //MMC_PM_KEEP_POWER;
+		.keep_power		= 1, //MMC_PM_KEEP_POWER;
 	},
 };	
 
