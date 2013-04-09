@@ -1838,6 +1838,7 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 
 	if (mmc_slot(host).keep_power) {
 		mmc->pm_caps |= MMC_PM_KEEP_POWER;
+		mmc->caps |= MMC_CAP_POWER_OFF_CARD;
 	}
 	omap_hsmmc_conf_bus_power(host);
 
