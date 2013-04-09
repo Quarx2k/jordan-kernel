@@ -253,7 +253,7 @@ static int pwrkey_init(struct cpcap_device *cpcap)
 	retval = cpcap_irq_register(cpcap, CPCAP_IRQ_ON, pwrkey_handler, data);
 	if (retval)
 		kfree(data);
-	wake_lock_init(&data->wake_lock, WAKE_LOCK_SUSPEND, "pwrkey");
+	wake_lock_init(&data->wake_lock, WAKE_LOCK_IDLE, "pwrkey");
 #ifdef CONFIG_PM_DEEPSLEEP
 
 	hrtimer_init(&(data->longPress_timer),
@@ -517,7 +517,7 @@ int cpcap_irq_init(struct cpcap_device *cpcap)
 	data->workqueue = create_workqueue("cpcap_irq");
 	INIT_WORK(&data->work, irq_work_func);
 	mutex_init(&data->lock);
-	wake_lock_init(&data->wake_lock, WAKE_LOCK_SUSPEND, "cpcap-irq");
+	wake_lock_init(&data->wake_lock, WAKE_LOCK_IDLE, "cpcap-irq");
 	data->cpcap = cpcap;
 
 	retval = request_irq(spi->irq, event_isr, IRQF_DISABLED |
