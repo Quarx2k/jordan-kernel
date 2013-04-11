@@ -76,23 +76,6 @@ static struct platform_device cpcap_audio_device = {
 	.dev.platform_data  = NULL,
 };
 #endif
-
-static struct platform_device cpcap_bd7885 = {
-	.name           = "bd7885",
-	.id             = -1,
-	.dev            = {
-		.platform_data  = NULL,
-       },
-};
-
-static struct platform_device cpcap_vio_active_device = {
-	.name		= "cpcap_vio_active",
-	.id		= -1,
-	.dev		= {
-		.platform_data = NULL,
-	},
-};
-
 #ifdef CONFIG_PM_DBG_DRV
 static struct platform_device cpcap_pm_dbg_device = {
 	.name		= "cpcap_pm_dbg",
@@ -122,7 +105,6 @@ static struct platform_device *cpcap_devices[] = {
 #ifdef CONFIG_LEDS_AF_LED
 	&cpcap_af_led,
 #endif
-	&cpcap_bd7885
 };
 
 
@@ -132,14 +114,6 @@ static struct platform_device *cpcap_devices[] = {
  */
 static struct platform_device cpcap_lm3554 = {
 	.name           = "flash-torch",
-	.id             = -1,
-	.dev            = {
-		.platform_data  = NULL,
-	},
-};
-
-static struct platform_device cpcap_lm3559 = {
-	.name           = "flash-torch-3559",
 	.id             = -1,
 	.dev            = {
 		.platform_data  = NULL,
@@ -248,47 +222,6 @@ static int __init led_cpcap_lm3554_init(void)
 
 	of_node_put(node);
 	return device_available;
-}
-
-static int __init led_cpcap_lm3559_init(void)
-{
-	u8 device_available;
-	struct device_node *node;
-	const void *prop;
-
-	node = of_find_node_by_path(DT_PATH_LM3559);
-	if (node == NULL)
-		return -ENODEV;
-
-	prop = of_get_property(node, "device_available", NULL);
-	if (prop)
-		device_available = *(u8 *)prop;
-	else {
-		pr_err("Read property %s error!\n", "device_available");
-		of_node_put(node);
-		return -ENODEV;
-	}
-
-	of_node_put(node);
-	return device_available;
-}
-
-int is_cpcap_vio_supply_converter(void)
-{
-	struct device_node *node;
-	const void *prop;
-	int size;
-
-	node = of_find_node_by_path(DT_PATH_CPCAP);
-	if (node) {
-		prop = of_get_property(node,
-				DT_PROP_CPCAP_VIO_SUPPLY_CONVERTER,
-				&size);
-		if (prop && size)
-			return *(u8 *)prop;
-	}
-	/* The converter is existing by default */
-	return 1;
 }
 
 #ifdef CONFIG_SOUND_CPCAP_OMAP
@@ -633,12 +566,6 @@ void __init mapphone_cpcap_client_init(void)
 
 	if (led_cpcap_lm3554_init() > 0)
 		cpcap_device_register(&cpcap_lm3554);
-
-	if (led_cpcap_lm3559_init() > 0)
-		cpcap_device_register(&cpcap_lm3559);
-
-	if (!is_cpcap_vio_supply_converter())
-		cpcap_device_register(&cpcap_vio_active_device);
 
 #ifdef CONFIG_PM_DBG_DRV
 	get_pm_dbg_drvdata();

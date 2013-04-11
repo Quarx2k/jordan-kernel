@@ -717,8 +717,7 @@ void __init omap_uart_set_uart0_padconf(int padconf)
 	uart0_padconf = padconf;
 }
 
-void __init omap_serial_init(int wake_gpio_strobe,
-			     unsigned int wake_strobe_enable_mask)
+void __init omap_serial_init()
 {
 	int i;
 	const struct omap_uart_config *info;
@@ -744,9 +743,6 @@ void __init omap_serial_init(int wake_gpio_strobe,
 			p->disabled = 1;
 			continue;
 		}
-
-		if (wake_strobe_enable_mask & (1 << i))
-			p->wake_gpio_strobe = wake_gpio_strobe;
 
 		sprintf(name, "uart%d_ick", i+1);
 		uart->ick = clk_get(NULL, name);

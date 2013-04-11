@@ -46,8 +46,7 @@ extern void omap_serial_early_init(void);
 extern void omap_uart_set_gps_port(int);
 extern void omap_serial_ctsrts_init(unsigned char ctsrts[]);
 extern void omap_uart_set_uart0_padconf(int);
-extern void omap_serial_init(int wake_gpio_strobe,
-			     unsigned int wake_strobe_enable_mask);
+extern void omap_serial_init(void);
 extern int omap_uart_can_sleep(void);
 extern void omap_uart_check_wakeup(void);
 extern void omap_uart_prepare_suspend(void);

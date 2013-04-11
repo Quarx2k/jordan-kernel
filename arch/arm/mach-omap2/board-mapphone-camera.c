@@ -51,10 +51,6 @@
 #include <linux/spi/cpcap.h>
 #include <linux/spi/cpcap-regbits.h>
 #endif
-#ifdef CONFIG_VIDEO_CAM_ISE
-#include <media/camise.h>
-#define CAMISE_XCLK_24MHZ			24000000
-#endif
 #define OV8810_CSI2_CLOCK_POLARITY	0	/* +/- pin order */
 #define OV8810_CSI2_DATA0_POLARITY	0	/* +/- pin order */
 #define OV8810_CSI2_DATA1_POLARITY	0	/* +/- pin order */
@@ -68,7 +64,10 @@
 #define OV8810_CSI2_PHY_TCLK_SETTLE	14
 #define OV8810_XCLK_27MHZ			27000000
 #endif
-
+#ifdef CONFIG_VIDEO_CAM_ISE
+#include <media/camise.h>
+#define CAMISE_XCLK_24MHZ			24000000
+#endif
 #if defined(CONFIG_VIDEO_OV5650) || defined(CONFIG_VIDEO_OV5650_MODULE)
 #include <media/ov5650.h>
 #define OV5650_CSI2_CLOCK_POLARITY	0	/* +/- pin order */

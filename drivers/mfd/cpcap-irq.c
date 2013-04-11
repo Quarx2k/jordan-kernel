@@ -61,7 +61,6 @@ struct cpcap_irqdata {
 	struct cpcap_device *cpcap;
 	struct cpcap_event_handler event_handler[CPCAP_IRQ__NUM];
 	struct cpcap_irq_info irq_info[CPCAP_IRQ__NUM];
-	struct wake_lock wake_lock;
 };
 
 #define EVENT_MASK(event) (1 << ((event) % NUM_INTS_PER_REG))
@@ -76,7 +75,6 @@ static irqreturn_t event_isr(int irq, void *data)
 {
 	struct cpcap_irqdata *irq_data = data;
 	disable_irq_nosync(irq);
-	wake_lock(&irq_data->wake_lock);
 	queue_work(irq_data->workqueue, &irq_data->work);
 
 	return IRQ_HANDLED;
@@ -161,7 +159,6 @@ void cpcap_irq_mask_all(struct cpcap_device *cpcap)
 struct pwrkey_data {
 	struct cpcap_device *cpcap;
 	enum pwrkey_states state;
-	struct wake_lock wake_lock;
 #ifdef CONFIG_PM_DEEPSLEEP
 	struct hrtimer longPress_timer;
 	int expired;
@@ -186,9 +183,6 @@ static enum hrtimer_restart longPress_timer_callback(struct hrtimer *timer)
 	struct cpcap_device *cpcap = pwrkey_data->cpcap;
 	enum pwrkey_states new_state = PWRKEY_PRESS;
 
-	wake_lock_timeout(&pwrkey_data->wake_lock, 20);
-
-
 	pwrkey_data->expired = 1;
 	cpcap_broadcast_key_event(cpcap, KEY_END, new_state);
 	pwrkey_data->state = new_state;
@@ -212,7 +206,6 @@ static void pwrkey_handler(enum cpcap_irqs irq, void *data)
 	if (get_deepsleep_mode()) {
 		if (new_state == PWRKEY_RELEASE) {
 			hrtimer_cancel(&pwrkey_data->longPress_timer);
-			wake_lock_timeout(&pwrkey_data->wake_lock, 20);
 			if (pwrkey_data->expired == 1) {
 				pwrkey_data->expired = 0;
 				cpcap_broadcast_key_event(cpcap,
@@ -223,7 +216,6 @@ static void pwrkey_handler(enum cpcap_irqs irq, void *data)
 			pwrkey_data->expired = 0;
 			hrtimer_start(&pwrkey_data->longPress_timer,
 					ktime_set(2, 0), HRTIMER_MODE_REL);
-			wake_lock_timeout(&pwrkey_data->wake_lock, 2*HZ+5);
 		}
 	}
 
@@ -233,7 +225,6 @@ static void pwrkey_handler(enum cpcap_irqs irq, void *data)
 
 	if ((new_state < PWRKEY_UNKNOWN) && (new_state != last_state)) {
 #endif
-		wake_lock_timeout(&pwrkey_data->wake_lock, 20);
 		cpcap_broadcast_key_event(cpcap, KEY_END, new_state);
 		pwrkey_data->state = new_state;
 	}
@@ -253,7 +244,6 @@ static int pwrkey_init(struct cpcap_device *cpcap)
 	retval = cpcap_irq_register(cpcap, CPCAP_IRQ_ON, pwrkey_handler, data);
 	if (retval)
 		kfree(data);
-	wake_lock_init(&data->wake_lock, WAKE_LOCK_IDLE, "pwrkey");
 #ifdef CONFIG_PM_DEEPSLEEP
 
 	hrtimer_init(&(data->longPress_timer),
@@ -274,7 +264,6 @@ static void pwrkey_remove(struct cpcap_device *cpcap)
 	if (!data)
 		return;
 	cpcap_irq_free(cpcap, CPCAP_IRQ_ON);
-	wake_lock_destroy(&data->wake_lock);
 	kfree(data);
 }
 
@@ -385,7 +374,6 @@ static void irq_work_func(struct work_struct *work)
 	}
 error:
 	mutex_unlock(&data->lock);
-	wake_unlock(&data->wake_lock);
 }
 
 #ifdef CONFIG_DEBUG_FS
@@ -517,7 +505,6 @@ int cpcap_irq_init(struct cpcap_device *cpcap)
 	data->workqueue = create_workqueue("cpcap_irq");
 	INIT_WORK(&data->work, irq_work_func);
 	mutex_init(&data->lock);
-	wake_lock_init(&data->wake_lock, WAKE_LOCK_IDLE, "cpcap-irq");
 	data->cpcap = cpcap;
 
 	retval = request_irq(spi->irq, event_isr, IRQF_DISABLED |

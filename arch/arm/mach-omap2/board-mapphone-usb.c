@@ -604,7 +604,7 @@ static struct platform_device ohci_device = {
 	.num_resources	= ARRAY_SIZE(ohci_resources),
 	.resource	= ohci_resources,
 };
-#endif /* OHCI specific data */
+
 
 extern void set_cdma_modem_interface(unsigned int number);
 
@@ -636,18 +636,12 @@ void mapphone_init_modem_interface(void)
 	of_node_put(node);
 	return;
 }
-
+#endif /* OHCI specific data */
 
 void __init mapphone_ehci_init(void)
 {
 	if (!strcmp(boot_mode, "charger"))
 		return;
-
-	omap_cfg_reg(AF5_34XX_GPIO142);		/*  IPC_USB_SUSP      */
-	omap_cfg_reg(AD1_3430_USB3FS_PHY_MM3_RXRCV);
-	omap_cfg_reg(AD2_3430_USB3FS_PHY_MM3_TXDAT);
-	omap_cfg_reg(AC1_3430_USB3FS_PHY_MM3_TXEN_N);
-	omap_cfg_reg(AE1_3430_USB3FS_PHY_MM3_TXSE0);
 
 #ifdef CONFIG_USB_SERIAL_VIATELECOM_CBP
 	if (mapphone_bp_get_type() == MAPPHONE_BP_VIACBP71) {
@@ -655,9 +649,10 @@ void __init mapphone_ehci_init(void)
 		ohci_device.dev.platform_data  = &dummy_usb_config_via;
 	}
 #endif
+#if defined(CONFIG_USB_OHCI_HCD) || defined(CONFIG_USB_OHCI_HCD_MODULE)
 	if (is_cdma_phone())
 		mapphone_init_modem_interface();
-
+#endif
 #if defined(CONFIG_USB_EHCI_HCD) || defined(CONFIG_USB_EHCI_HCD_MODULE)
 	if (!is_cdma_phone()) {
 		usb_platform_data.port_data[2].mode =
