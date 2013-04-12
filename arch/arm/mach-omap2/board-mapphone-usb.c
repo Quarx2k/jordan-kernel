@@ -189,7 +189,7 @@ failed_clk1:
 static struct usbhs_omap_board_data usbhs_bdata  = {
 	.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED,
 	.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED,
-	.port_mode[2] = OMAP_OHCI_PORT_MODE_PHY_4PIN_DPDM, //7, added to DT
+	.port_mode[2] = OMAP_EHCI_PORT_MODE_PHY, //7, added to DT
 	.phy_reset  = false,
 	.reset_gpio_port[0]  = -EINVAL,
 	.reset_gpio_port[1]  = -EINVAL,
@@ -255,7 +255,7 @@ void __init mapphone_usbhost_init(void)
 
 	for (i = 0; i < OMAP3_HS_USB_PORTS; i++) {
 		if (usbhs_bdata.port_mode[i] ==
-					OMAP_OHCI_PORT_MODE_PHY_4PIN_DPDM)
+					OMAP_EHCI_PORT_MODE_PHY)
 			feature_ipc_ohci_phy = 1;
 		else if (usbhs_bdata.port_mode[i] == OMAP_EHCI_PORT_MODE_PHY)
 			feature_ipc_ehci_phy = 1;
