@@ -123,7 +123,13 @@ static struct prm_setup_vc prm_setup = {
 	.vdd_cmd_ra = (R_VDD2_SR_CONTROL << OMAP3430_VOLRA1_SHIFT) |
 			(R_VDD1_SR_CONTROL << OMAP3430_VOLRA0_SHIFT),
 	.vdd_ch_conf = OMAP3430_CMD1 | OMAP3430_RAV1,
-	.vdd_i2c_cfg = OMAP3430_MCODE_SHIFT | OMAP3430_HSEN | OMAP3430_SREN,
+	/* Errata ID: i531 */
+        /* Description: Extra power consumed when repeated start operation
+         * mode is enabled on I2C4
+         * WA: Set PRM_VC_I2C_CFG[SREN] to '0' to allow I2C4 driving a high
+         * state between two I2C commands
+         */
+        .vdd_i2c_cfg = OMAP3430_MCODE_SHIFT | OMAP3430_HSEN | ~OMAP3430_SREN,
 };
 
 static inline void omap3_per_save_context(void)
