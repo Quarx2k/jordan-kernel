@@ -144,7 +144,7 @@ static struct gpio_event_info *mapphone_keypad_info[] = {
 };
 
 static struct gpio_event_platform_data mapphone_keypad_data = {
-	.name = "mapphone-keypad",
+	.name = "sholes-keypad",
 	.info = mapphone_keypad_info,
 	.info_count = ARRAY_SIZE(mapphone_keypad_info)
 };
