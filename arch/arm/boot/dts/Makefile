@@ -1,5 +1,13 @@
 ifeq ($(CONFIG_OF),y)
 
+DTB_NAMES := $(subst $\",,$(CONFIG_BUILD_ARM_APPENDED_DTB_IMAGE_NAMES))
+ifneq ($(DTB_NAMES),)
+DTB_LIST := $(addsuffix .dtb,$(DTB_NAMES))
+else
+DTB_LIST := $(dtb-y)
+endif
+DTB_OBJS := $(addprefix $(obj)/,$(DTB_LIST))
+
 # Keep at91 dtb files sorted alphabetically for each SoC
 # rm9200
 dtb-$(CONFIG_ARCH_AT91) += at91rm9200ek.dtb
@@ -222,9 +230,15 @@ targets += dtbs
 targets += $(DTB_LIST)
 endif
 
+$(obj)/dtb_list: $(DTB_OBJS) FORCE
+	$(call if_changed,cat64)
+
+#$(srctree)/scripts/dtcat.py $(obj)/../zImage $(DTB_OBJS) > $@
+
 # *.dtb used to be generated in the directory above. Clean out the
 # old build results so people don't accidentally use them.
-dtbs: $(addprefix $(obj)/, $(DTB_LIST))
+dtbs: $(DTB_OBJS)
 	$(Q)rm -f $(obj)/../*.dtb
 
 clean-files := *.dtb
+

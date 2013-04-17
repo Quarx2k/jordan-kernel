@@ -273,11 +273,11 @@ $(obj)/%.dtb: $(src)/%.dts FORCE
 
 dtc-tmp = $(subst $(comma),_,$(dot-target).dts.tmp)
 
-# cat
+# cat64
 # ---------------------------------------------------------------------------
-# Concatentate multiple files together
-quiet_cmd_cat = CAT     $@
-cmd_cat = (cat $(filter-out FORCE,$^) > $@) || (rm -f $@; false)
+# Concatentate multiple files together aligned to 64 bit
+quiet_cmd_cat64 = CAT64     $@
+cmd_cat64 = ($(srctree)/scripts/dtcat.py $(filter-out FORCE,$^) > $@)
 
 # Bzip2
 # ---------------------------------------------------------------------------
