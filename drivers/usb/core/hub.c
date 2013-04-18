@@ -31,7 +31,6 @@
 #include "usb.h"
 
 /* if we are in debug mode, always announce new devices */
-#define DEBUG 1
 #ifdef DEBUG
 #ifndef CONFIG_USB_ANNOUNCE_NEW_DEVICES
 #define CONFIG_USB_ANNOUNCE_NEW_DEVICES
@@ -794,7 +793,6 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 			 * Do not disable USB3 protocol ports.
 			 */
 			if (!hub_is_superspeed(hdev)) {
-			printk("!hub_is_superspeed\n");
 #ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 
 				clear_port_feature(hdev, port1,
@@ -810,7 +808,6 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 		/* Clear status-change flags; we'll debounce later */
 		if (portchange & USB_PORT_STAT_C_CONNECTION) {
 			need_debounce_delay = true;
-			printk("USB_PORT_STAT_C_CONNECTION\n");
 #ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 
 			clear_port_feature(hub->hdev, port1,
@@ -818,7 +815,6 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 #endif
 		}
 		if (portchange & USB_PORT_STAT_C_ENABLE) {
-			printk("USB_PORT_STAT_C_ENABLE\n");
 			need_debounce_delay = true;
 #ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 
@@ -827,7 +823,6 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 #endif
 		}
 		if (portchange & USB_PORT_STAT_C_LINK_STATE) {
-			printk("USB_PORT_STAT_C_LINK_STATE\n");
 			need_debounce_delay = true;
 #ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 			clear_port_feature(hub->hdev, por1,
@@ -840,7 +835,6 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 		 */
 		if (!(portstatus & USB_PORT_STAT_CONNECTION) ||
 				(portchange & USB_PORT_STAT_C_CONNECTION)) {
-			printk("forget about removed device\n");
 			clear_bit(port1, hub->removed_bits);
 		}
 
@@ -848,7 +842,6 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 			/* Tell khubd to disconnect the device or
 			 * check for a new connection
 			 */
-			printk("USB_STATE_NOTATTACHED\n");
 			if (udev || (portstatus & USB_PORT_STAT_CONNECTION))
 				set_bit(port1, hub->change_bits);
 
@@ -858,7 +851,6 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 			 * (i.e., remote wakeup request), have khubd
 			 * take care of it.
 			 */
-			printk("USB_PORT_STAT_ENABLE\n");
 			if (portchange)
 				set_bit(port1, hub->change_bits);
 
@@ -1034,7 +1026,7 @@ static int hub_configure(struct usb_hub *hub,
 	}
 
 	hdev->maxchild = hub->descriptor->bNbrPorts;
-	dev_dbg (hub_dev, "%d port%s detected\n", hdev->maxchild,
+	dev_info (hub_dev, "%d port%s detected\n", hdev->maxchild,
 		(hdev->maxchild == 1) ? "" : "s");
 
 	hub->port_owners = kzalloc(hdev->maxchild * sizeof(void *), GFP_KERNEL);
@@ -1351,7 +1343,7 @@ descriptor_error:
 		goto descriptor_error;
 
 	/* We found a hub */
-	dev_dbg (&intf->dev, "USB hub found\n");
+	dev_info (&intf->dev, "USB hub found\n");
 
 	hub = kzalloc(sizeof(*hub), GFP_KERNEL);
 	if (!hub) {
@@ -1675,7 +1667,7 @@ void usb_disconnect(struct usb_device **pdev)
 	 */
 
 	usb_set_device_state(udev, USB_STATE_NOTATTACHED);
-	dev_dbg(&udev->dev, "USB disconnect, device number %d\n",
+	dev_info(&udev->dev, "USB disconnect, device number %d\n",
 			udev->devnum);
 
 	usb_lock_device(udev);
@@ -1730,10 +1722,10 @@ static void show_string(struct usb_device *udev, char *id, char *string)
 
 static void announce_device(struct usb_device *udev)
 {
-	dev_dbg(&udev->dev, "New USB device found, idVendor=%04x, idProduct=%04x\n",
+	dev_info(&udev->dev, "New USB device found, idVendor=%04x, idProduct=%04x\n",
 		le16_to_cpu(udev->descriptor.idVendor),
 		le16_to_cpu(udev->descriptor.idProduct));
-	dev_dbg(&udev->dev,
+	dev_info(&udev->dev,
 		"New USB device strings: Mfr=%d, Product=%d, SerialNumber=%d\n",
 		udev->descriptor.iManufacturer,
 		udev->descriptor.iProduct,
@@ -1779,7 +1771,7 @@ static int usb_enumerate_device_otg(struct usb_device *udev)
 			if (desc->bmAttributes & USB_OTG_HNP) {
 				unsigned		port1 = udev->portnum;
 
-				dev_dbg(&udev->dev,
+				dev_info(&udev->dev,
 					"Dual-Role OTG device on %sHNP port\n",
 					(port1 == bus->otg_port)
 						? "" : "non-");
@@ -1798,7 +1790,7 @@ static int usb_enumerate_device_otg(struct usb_device *udev)
 					/* OTG MESSAGE: report errors here,
 					 * customize to match your product.
 					 */
-					dev_dbg(&udev->dev,
+					dev_info(&udev->dev,
 						"can't set HNP mode: %d\n",
 						err);
 					bus->b_hnp_enable = 0;
@@ -2028,7 +2020,7 @@ int usb_authorize_device(struct usb_device *usb_dev)
 			 * set other configurations. */
 		}
 	}
-	dev_dbg(&usb_dev->dev, "authorized to connect\n");
+	dev_info(&usb_dev->dev, "authorized to connect\n");
 
 error_enumerate:
 error_device_descriptor:
@@ -2912,7 +2904,7 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 	default: 		speed = "?";	break;
 	}
 	if (udev->speed != USB_SPEED_SUPER)
-		dev_dbg(&udev->dev,
+		dev_info(&udev->dev,
 				"%s %s speed %sUSB device number %d using %s\n",
 				(udev->config) ? "reset" : "new", speed, type,
 				devnum, udev->bus->controller->driver->name);
@@ -2972,7 +2964,6 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 					USB_DT_DEVICE << 8, 0,
 					buf, GET_DESCRIPTOR_BUFSIZE,
 					initial_descriptor_timeout);
-				printk("add WRIGLEY usb: %d\n",r);
 				switch (buf->bMaxPacketSize0) {
 				case 8: case 16: case 32: case 64: case 255:
 					if (buf->bDescriptorType ==
@@ -3045,7 +3036,7 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 			}
 			if (udev->speed == USB_SPEED_SUPER) {
 				devnum = udev->devnum;
-				dev_dbg(&udev->dev,
+				dev_info(&udev->dev,
 						"%s SuperSpeed USB device number %d using %s\n",
 						(udev->config) ? "reset" : "new",
 						devnum, udev->bus->controller->driver->name);
@@ -3130,7 +3121,7 @@ check_highspeed (struct usb_hub *hub, struct usb_device *udev, int port1)
 	status = usb_get_descriptor (udev, USB_DT_DEVICE_QUALIFIER, 0,
 			qual, sizeof *qual);
 	if (status == sizeof *qual) {
-		dev_dbg(&udev->dev, "not running at top speed; "
+		dev_info(&udev->dev, "not running at top speed; "
 			"connect to a high speed hub\n");
 		/* hub LEDs are probably harder to miss than syslog */
 		if (hub->has_indicators) {
@@ -3910,7 +3901,7 @@ static int usb_reset_and_verify_device(struct usb_device *udev)
  
 	/* Device might have changed firmware (DFU or similar) */
 	if (descriptors_changed(udev, &descriptor)) {
-		dev_dbg(&udev->dev, "device firmware changed\n");
+		dev_info(&udev->dev, "device firmware changed\n");
 		udev->descriptor = descriptor;	/* for disconnect() calls */
 		goto re_enumerate;
   	}
@@ -3963,11 +3954,9 @@ static int usb_reset_and_verify_device(struct usb_device *udev)
 			 * device has been reset, and it will have to use
 			 * alternate setting 0 as the current alternate setting.
 			 */
-			printk("intf->resetting_device = 1\n");
 			intf->resetting_device = 1;
 			ret = usb_set_interface(udev, desc->bInterfaceNumber,
 					desc->bAlternateSetting);
-			printk("intf->resetting_device = 0\n");
 			intf->resetting_device = 0;
 		}
 		if (ret < 0) {
