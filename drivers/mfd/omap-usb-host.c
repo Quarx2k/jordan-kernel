@@ -200,7 +200,6 @@ static struct platform_device *omap_usbhs_alloc_child(const char *name,
 {
 	struct platform_device	*child;
 	int			ret;
-	printk("%s\n",__func__);
 	child = platform_device_alloc(name, 0);
 
 	if (!child) {
@@ -250,7 +249,6 @@ static int omap_usbhs_alloc_children(struct platform_device *pdev)
 	struct resource				*res;
 	struct resource				resources[2];
 	int					ret;
-	printk("%s\n",__func__);
 	omap = platform_get_drvdata(pdev);
 	ehci_data = omap->platdata.ehci_data;
 	ohci_data = omap->platdata.ohci_data;
@@ -327,7 +325,6 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
 	struct resource			*res;
 	int				ret = 0;
 	int				i;
-	printk("%s\n",__func__);
 	if (!pdata) {
 		dev_err(dev, "Missing platform data\n");
 		ret = -ENOMEM;
@@ -534,7 +531,6 @@ static void omap_usbhs_deinit(struct device *dev);
 static int __devexit usbhs_omap_remove(struct platform_device *pdev)
 {
 	struct usbhs_hcd_omap *omap = platform_get_drvdata(pdev);
-	printk("%s\n",__func__);
 	omap_usbhs_deinit(&pdev->dev);
 	iounmap(omap->tll_base);
 	iounmap(omap->uhh_base);
@@ -555,7 +551,6 @@ static int __devexit usbhs_omap_remove(struct platform_device *pdev)
 
 static bool is_ohci_port(enum usbhs_omap_port_mode pmode)
 {
-	printk("%s\n",__func__);
 	switch (pmode) {
 	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0:
 	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DPDM:
@@ -580,7 +575,6 @@ static bool is_ohci_port(enum usbhs_omap_port_mode pmode)
  */
 static unsigned ohci_omap3_fslsmode(enum usbhs_omap_port_mode mode)
 {
-	printk("%s\n",__func__);
 	switch (mode) {
 	case OMAP_USBHS_PORT_MODE_UNUSED:
 	case OMAP_OHCI_PORT_MODE_PHY_6PIN_DATSE0:
@@ -624,7 +618,6 @@ static void usbhs_omap_tll_init(struct device *dev, u8 tll_channel_count)
 	struct usbhs_omap_platform_data	*pdata = dev->platform_data;
 	unsigned			reg;
 	int				i;
-	printk("%s\n",__func__);
 	/* Program Common TLL register */
 	reg = usbhs_read(omap->tll_base, OMAP_TLL_SHARED_CONF);
 	reg |= (OMAP_TLL_SHARED_CONF_FCLK_IS_ON
@@ -644,10 +637,11 @@ static void usbhs_omap_tll_init(struct device *dev, u8 tll_channel_count)
 				<< OMAP_TLL_CHANNEL_CONF_FSLSMODE_SHIFT;
 			reg |= OMAP_TLL_CHANNEL_CONF_CHANMODE_FSLS;
 		} else if (pdata->port_mode[i] == OMAP_EHCI_PORT_MODE_TLL) {
-
 			/* Disable AutoIdle, BitStuffing and use SDR Mode */
 			reg &= ~(OMAP_TLL_CHANNEL_CONF_UTMIAUTOIDLE
-				| OMAP_TLL_CHANNEL_CONF_ULPINOBITSTUFF
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+				| OMAP_TLL_CHANNEL_CONF_ULPINOBITSTUFF);
+#endif
 				| OMAP_TLL_CHANNEL_CONF_ULPIDDRMODE);
 
 		} else
@@ -722,7 +716,6 @@ static void omap_usbhs_init(struct device *dev)
 	struct usbhs_omap_platform_data	*pdata = &omap->platdata;
 	unsigned long			flags = 0;
 	unsigned			reg;
-	printk("%s\n",__func__);
 	dev_dbg(dev, "starting TI HSUSB Controller\n");
 
 	pm_runtime_get_sync(dev);
@@ -768,14 +761,13 @@ static void omap_usbhs_init(struct device *dev)
 	/* Keep ENA_INCR_ALIGN = 0: Known to cause OCP delays */
 	reg &= ~OMAP_UHH_HOSTCONFIG_INCRX_ALIGN_EN;
 
-	if (is_omap_usbhs_rev1(omap)) {
+	if (is_omap_usbhs_rev1(omap)) { 
 		if (pdata->port_mode[0] == OMAP_USBHS_PORT_MODE_UNUSED)
 			reg &= ~OMAP_UHH_HOSTCONFIG_P1_CONNECT_STATUS;
 		if (pdata->port_mode[1] == OMAP_USBHS_PORT_MODE_UNUSED)
 			reg &= ~OMAP_UHH_HOSTCONFIG_P2_CONNECT_STATUS;
 		if (pdata->port_mode[2] == OMAP_USBHS_PORT_MODE_UNUSED)
 			reg &= ~OMAP_UHH_HOSTCONFIG_P3_CONNECT_STATUS;
-
 		/* Bypass the TLL module for PHY mode operation */
 		if (cpu_is_omap3430() && (omap_rev() <= OMAP3430_REV_ES2_1)) {
 			dev_dbg(dev, "OMAP3 ES version <= ES2.1\n");
@@ -827,12 +819,12 @@ static void omap_usbhs_init(struct device *dev)
 		(is_ohci_port(pdata->port_mode[0])) ||
 		(is_ohci_port(pdata->port_mode[1])) ||
 		(is_ohci_port(pdata->port_mode[2]))) {
-
 		/* Enable UTMI mode for required TLL channels */
-		if (is_omap_usbhs_rev2(omap))
+		if (is_omap_usbhs_rev2(omap)) {
 			usbhs_omap_tll_init(dev, OMAP_REV2_TLL_CHANNEL_COUNT);
-		else
+		} else {
 			usbhs_omap_tll_init(dev, OMAP_TLL_CHANNEL_COUNT);
+		}
 	}
 
 	if (pdata->ehci_data->phy_reset) {
