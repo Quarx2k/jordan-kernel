@@ -49,7 +49,7 @@
 #include "protocol.h"
 #include "config.h"
 #include "debug.h"
-
+#include <linux/sched.h>
 extern struct class *netmux_class;
 
 static const struct tty_operations tty_ops = {

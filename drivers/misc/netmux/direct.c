@@ -57,7 +57,7 @@
 #include "protocol.h"
 #include "config.h"
 #include "debug.h"
-
+#include <linux/sched.h>
 
 /*
  * major_list keeps track of a list of major numbers

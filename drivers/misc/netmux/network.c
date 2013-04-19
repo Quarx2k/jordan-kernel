@@ -52,6 +52,7 @@
 #include "debug.h"
 #include <linux/wakelock.h>
 #include <linux/ip.h>
+#include <linux/sched.h>
 
 extern struct wake_lock netmux_send_wakelock;
 

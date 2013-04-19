@@ -61,7 +61,7 @@
 #include <linux/workqueue.h>
 #include <linux/spinlock.h>
 #include <asm/irq.h>
-
+#include <linux/semaphore.h>
 
 void initialize_utilities(void);
 void shutdown_utilities(void);
@@ -221,7 +221,7 @@ typedef struct semaphore CRITICALSECTION;
 /*
  * The following are routines to control a critical section
  */
-#define initialize_criticalsection_lock(lock) init_MUTEX(lock)
+#define initialize_criticalsection_lock(lock) sema_init(lock,1)
 #define destroy_criticalsection_lock(lock)    {}
 
 #define enter_read_criticalsection(lock)      down(lock)

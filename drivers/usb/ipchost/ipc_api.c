@@ -185,6 +185,7 @@ void usb_ipc_api_read_callback(USB_IPC_CHANNEL_INDEX ch_index,
 						max_temp_buff_size);
 		/* error */
 		if (ret != 0) {
+			printk("IPC_USB_READ_ERROR\n");
 			IPC_USB_READ_ERROR(usb_ipc_channels[ch_index],
 					   ipc_notify_status);
 		}

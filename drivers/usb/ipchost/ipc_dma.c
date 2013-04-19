@@ -57,7 +57,6 @@ struct IPC_DMA_MEMCPY ipc_memcpy_node2buf;
 struct IPC_DMA_MEMCPY ipc_memcpy_buf2node;
 
 extern void usb_ipc_exchange_endian16(unsigned short *data);
-extern void dma_cache_maint(const void *start, size_t size, int direction);
 
 #define NODE_BUF_PHYS_ADDR(x)   virt_to_phys(x)
 #define USB_BUF_PHYS_ADDR(x)    virt_to_phys(x)
@@ -83,7 +82,7 @@ void ipc_dma_node2buf_callback(int lch, u16 ch_status, void *data)
 	int ret, i;
 	struct USB_IPC_API_PARAMS *ipc_ch;
 	IPC_DATA_HEADER *header;
-
+	struct device *dev = &usb_ipc_data_param.udev->dev;
 	DEBUG("%s\n", __func__);
 
 	ipc_ch = ipc_memcpy_node2buf.ipc_ch;
@@ -114,7 +113,7 @@ void ipc_dma_node2buf_callback(int lch, u16 ch_status, void *data)
 	    ipc_memcpy_node2buf.frame_index >= header->nb_frame) {
 		omap_stop_dma(ipc_memcpy_node2buf.dma_ch);
 
-		dma_cache_maint((void *) ipc_ch->write_ptr.temp_buff,
+		dma_map_single(dev,(void *) ipc_ch->write_ptr.temp_buff,
 				ipc_ch->max_temp_buff_size,
 				DMA_FROM_DEVICE);
 
@@ -143,7 +142,7 @@ void ipc_dma_node2buf_callback(int lch, u16 ch_status, void *data)
 		/* change to big endian end */
 
 		ipc_ch->write_ptr.end_flag = 1;
-		dma_cache_maint((const void *) ipc_ch->write_ptr.temp_buff,
+		dma_map_single(dev,( void *) ipc_ch->write_ptr.temp_buff,
 				sizeof(IPC_DATA_HEADER_INDEX) +
 					(sizeof(IPC_FRAME_DESCRIPTOR) *
 						(header->nb_frame)),
@@ -163,7 +162,7 @@ void ipc_dma_node2buf_callback(int lch, u16 ch_status, void *data)
 
 	ipc_memcpy_node2buf.node_index++;
 
-	dma_cache_maint(ipc_memcpy_node2buf.
+	dma_map_single(dev,ipc_memcpy_node2buf.
 			node_ptr[ipc_memcpy_node2buf.node_index].data_ptr,
 		ipc_memcpy_node2buf.node_ptr[ipc_memcpy_node2buf.
 			node_index].length,
@@ -191,6 +190,7 @@ int ipc_dma_memcpy_node2buf(struct USB_IPC_API_PARAMS *ipc_ch,
 	int ret, i;
 	int frame_size, frame_index, len;
 	IPC_DATA_HEADER *header;
+	struct device *dev = &usb_ipc_data_param.udev->dev;
 
 	DEBUG("%s\n", __func__);
 
@@ -293,11 +293,11 @@ int ipc_dma_memcpy_node2buf(struct USB_IPC_API_PARAMS *ipc_ch,
 		ipc_memcpy_node2buf.total_size,
 		ipc_memcpy_node2buf.node_index);
 
-	dma_cache_maint((void *) ipc_ch->write_ptr.temp_buff,
+	dma_map_single(dev,(void *) ipc_ch->write_ptr.temp_buff,
 			sizeof(IPC_DATA_HEADER_INDEX) +
 			  (sizeof(IPC_FRAME_DESCRIPTOR) * (header->nb_frame)),
 			DMA_TO_DEVICE);
-	dma_cache_maint(ipc_memcpy_node2buf.
+	dma_map_single(dev,ipc_memcpy_node2buf.
 			node_ptr[ipc_memcpy_node2buf.node_index].data_ptr,
 		ipc_memcpy_node2buf.node_ptr
 			[ipc_memcpy_node2buf.node_index].length,
@@ -324,7 +324,7 @@ void ipc_dma_buf2node_callback(int lch, u16 ch_status, void *data)
 	int size;
 	HW_CTRL_IPC_WRITE_STATUS_T ipc_status;
 	struct USB_IPC_API_PARAMS *ipc_ch;
-
+	struct device *dev = &usb_ipc_data_param.udev->dev;
 	DEBUG("%s\n", __func__);
 
 	ipc_ch = ipc_memcpy_buf2node.ipc_ch;
@@ -347,7 +347,7 @@ void ipc_dma_buf2node_callback(int lch, u16 ch_status, void *data)
 		ipc_memcpy_buf2node.frame_index++;
 	}
 
-	dma_cache_maint(ipc_ch->read_ptr.
+	dma_map_single(dev,ipc_ch->read_ptr.
 			node_ptr[ipc_memcpy_buf2node.node_index].data_ptr,
 		ipc_ch->read_ptr.node_ptr
 			[ipc_memcpy_buf2node.node_index].length,

@@ -146,7 +146,7 @@ extern spinlock_t ipc_event_lock;
 extern wait_queue_head_t kipcd_wait;
 
 /* macros for LinkDriver read/write semphore */
-#define SEM_LOCK_INIT(x)     init_MUTEX_LOCKED(x)
+#define SEM_LOCK_INIT(x)     sema_init(x,1)
 #define SEM_LOCK(x)          down(x)
 #define SEM_UNLOCK(x)        up(x)
 

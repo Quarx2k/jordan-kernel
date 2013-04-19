@@ -42,7 +42,7 @@
 /* NetMUX and maintaining its integrity.                                      */
 
 #include <linux/proc_fs.h>
-
+#include <linux/sched.h>
 #include "config.h"
 #include "debug.h"
 typedef struct USERCONFIGDATA {

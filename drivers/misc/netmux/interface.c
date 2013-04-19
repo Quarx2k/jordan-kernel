@@ -43,7 +43,7 @@
 
 #include "interface.h"
 #include "debug.h"
-
+#include <linux/semaphore.h>
 
 /*
  * CreateInterfaceLibrary creates an object to store a list of
