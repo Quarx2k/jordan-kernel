@@ -89,6 +89,8 @@ static struct usbhs_omap_board_data usbhs_bdata  = {
 
 void __init mapphone_usbhost_init(void)
 {
+	usbhs_bdata.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED;
+	usbhs_bdata.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED;
 	usbhs_bdata.port_mode[2] = OMAP_EHCI_PORT_MODE_TLL;
 	usbhs_init(&usbhs_bdata);
 }
