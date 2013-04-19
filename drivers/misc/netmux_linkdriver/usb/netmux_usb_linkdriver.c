@@ -92,6 +92,11 @@
 
 #include <ldprotocol.h>
 
+#include <linux/usb.h>
+#include <linux/usb_ipc.h>
+#include <linux/ipc_api.h>
+#include <linux/dma-mapping.h>
+
 /*
  * Define our module
  */
@@ -129,8 +134,7 @@ static char LDLogState[LDLOG_COMMAND_LEN];
  * Define the receive buffer sizes.  Note that the remote receive buffer size
  * will be reset by the remote IPC Link Driver so don't depend on this
  * definition.
- */extern void ___dma_single_cpu_to_dev(const void *, size_t,
-		enum dma_data_direction);
+ */
 
 #define LOC_MAX_RCV_SIZ  MAX_FRAME_SIZE	/*1552 */
 #define REM_MAX_RCV_SIZ  MAX_FRAME_SIZE	/*1552 */
@@ -154,6 +158,8 @@ static char LDLogState[LDLOG_COMMAND_LEN];
  */
 
 static DEFINE_SPINLOCK(ild_lock);
+
+USB_IPC_IFS_STRUCT usb_ipc_data_param;
 /*
  * Define all the globals required.
  */
@@ -195,9 +201,6 @@ static struct sk_buff_head send_queue;
 
 #define RECEIVE_LIST_MAX_SIZE MAX_FRAME_NUM
 /* This should depend on the BP transmitting side*/
-
-extern void ___dma_single_cpu_to_dev(const void *, size_t,
-		enum dma_data_direction);
 
 typedef struct LD_MINI_TRACE {
 	unsigned long function_index;
@@ -381,6 +384,7 @@ static void MUXReceiveComplete(unsigned long arg)
 	unsigned int comand;
 	HW_CTRL_IPC_STATUS_T status;
 	int index;
+	struct device	dev = usb_ipc_data_param.udev->dev;
 
 	DEBUG("%s(%lu)\n", __func__, arg);
 	TRACE(6, 0);
@@ -437,7 +441,7 @@ static void MUXReceiveComplete(unsigned long arg)
 		 * DMA_FROM_DEVICE is used but that change will
 		 * require taking care of possible cache line crossings
 		 */
-		___dma_single_cpu_to_dev(receive_commbuff[index]->data,
+		dma_map_single(&dev,receive_commbuff[index]->data,
 				LOC_MAX_RCV_SIZ, DMA_BIDIRECTIONAL);
 		/* if E bit set stop reading*/
 		if (comand & END_BIT)
@@ -534,7 +538,7 @@ static void USBTransmit(void)
 	int buff_len = 0;
 	int frame_num = 0;
 	HW_CTRL_IPC_STATUS_T status;
-
+	struct device	dev = usb_ipc_data_param.udev->dev;
 	DEBUG("%s\n", __func__);
 
 	spin_lock_bh(&ild_lock);
@@ -580,7 +584,7 @@ static void USBTransmit(void)
 		 * is used but that change will require taking care of
 		 * possible cache line crossings
 		 */
-		___dma_single_cpu_to_dev(transmit_commbuff->data,
+		dma_map_single(&dev,transmit_commbuff->data,
 				transmit_commbuff->len, DMA_BIDIRECTIONAL);
 		LOGSKBUFF(transmit_commbuff);
 
@@ -783,6 +787,7 @@ void LDInit(void)
 	int index;
 	int result = -1;
 
+	struct device	dev = usb_ipc_data_param.udev->dev;
 	DEBUG("%s()\n", __func__);
 
 	tasklet_init(&write_callback, &MUXTransmitComplete, 0);
@@ -863,7 +868,7 @@ void LDInit(void)
 		 * is used but that change will require taking care
 		 * of possible cache line crossings
 		 */
-		___dma_single_cpu_to_dev(receive_commbuff[index]->data,
+		dma_map_single(&dev,receive_commbuff[index]->data,
 				LOC_MAX_RCV_SIZ, DMA_BIDIRECTIONAL);
 	}
 
