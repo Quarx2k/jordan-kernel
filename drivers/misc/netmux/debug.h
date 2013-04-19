@@ -43,5 +43,7 @@
 #include "debug_host.h"
 #include "debug_client.h"
 
+#define _LOG_
+#define _DEBUG_
 
 #endif

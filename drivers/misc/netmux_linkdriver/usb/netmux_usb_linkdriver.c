@@ -97,6 +97,8 @@
 #include <linux/ipc_api.h>
 #include <linux/dma-mapping.h>
 
+#define _LOG_
+#define _DEBUG_
 /*
  * Define our module
  */
