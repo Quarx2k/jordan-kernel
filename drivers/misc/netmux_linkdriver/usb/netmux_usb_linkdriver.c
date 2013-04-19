@@ -386,7 +386,7 @@ static void MUXReceiveComplete(unsigned long arg)
 	unsigned int comand;
 	HW_CTRL_IPC_STATUS_T status;
 	int index;
-	struct device	dev = usb_ipc_data_param.udev->dev;
+	struct device *dev = &usb_ipc_data_param.udev->dev;
 
 	DEBUG("%s(%lu)\n", __func__, arg);
 	TRACE(6, 0);
@@ -443,7 +443,7 @@ static void MUXReceiveComplete(unsigned long arg)
 		 * DMA_FROM_DEVICE is used but that change will
 		 * require taking care of possible cache line crossings
 		 */
-		dma_map_single(&dev,receive_commbuff[index]->data,
+		dma_map_single(dev,receive_commbuff[index]->data,
 				LOC_MAX_RCV_SIZ, DMA_BIDIRECTIONAL);
 		/* if E bit set stop reading*/
 		if (comand & END_BIT)
@@ -540,7 +540,7 @@ static void USBTransmit(void)
 	int buff_len = 0;
 	int frame_num = 0;
 	HW_CTRL_IPC_STATUS_T status;
-	struct device	dev = usb_ipc_data_param.udev->dev;
+	struct device *dev = &usb_ipc_data_param.udev->dev;
 	DEBUG("%s\n", __func__);
 
 	spin_lock_bh(&ild_lock);
@@ -586,7 +586,7 @@ static void USBTransmit(void)
 		 * is used but that change will require taking care of
 		 * possible cache line crossings
 		 */
-		dma_map_single(&dev,transmit_commbuff->data,
+		dma_map_single(dev,transmit_commbuff->data,
 				transmit_commbuff->len, DMA_BIDIRECTIONAL);
 		LOGSKBUFF(transmit_commbuff);
 
@@ -789,7 +789,7 @@ void LDInit(void)
 	int index;
 	int result = -1;
 
-	struct device	dev = usb_ipc_data_param.udev->dev;
+	struct device *dev = &usb_ipc_data_param.udev->dev;
 	DEBUG("%s()\n", __func__);
 
 	tasklet_init(&write_callback, &MUXTransmitComplete, 0);
@@ -870,7 +870,7 @@ void LDInit(void)
 		 * is used but that change will require taking care
 		 * of possible cache line crossings
 		 */
-		dma_map_single(&dev,receive_commbuff[index]->data,
+		dma_map_single(dev,receive_commbuff[index]->data,
 				LOC_MAX_RCV_SIZ, DMA_BIDIRECTIONAL);
 	}
 
