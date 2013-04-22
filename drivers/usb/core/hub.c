@@ -3460,7 +3460,7 @@ static void hub_events(void)
 				(u16) hub->change_bits[0],
 				(u16) hub->event_bits[0]);
 
-#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+#if 0// CONFIG_MACH_OMAP_MAPPHONE_DEFY
 		if ((u16) hub->change_bits[0] == 0) {
 			printk("Skip modem reset\n");
 			return;
