@@ -75,22 +75,22 @@ static struct platform_driver cpcap_usb_connected_driver = {
 
 void mapphone_gadget_init(void)
 {
-	platform_device_register(&android_usb_platform_device);
 	platform_driver_register(&cpcap_usb_connected_driver);
+	platform_device_register(&android_usb_platform_device);
 
 }
 
 static struct usbhs_omap_board_data usbhs_bdata  = {
 	.phy_reset  = false,
-	.ehci_phy_vbus_not_used = true,
-	.es2_compatibility = true,
+	.ehci_phy_vbus_not_used = false,
+	.es2_compatibility = false,
+	.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED,
+	.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED,
+	.port_mode[2] = OMAP_EHCI_PORT_MODE_TLL,
 };
 
 
 void __init mapphone_usbhost_init(void)
 {
-	usbhs_bdata.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED;
-	usbhs_bdata.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED;
-	usbhs_bdata.port_mode[2] = OMAP_EHCI_PORT_MODE_TLL;
 	usbhs_init(&usbhs_bdata);
 }
