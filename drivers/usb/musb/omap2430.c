@@ -35,16 +35,10 @@
 #include <linux/dma-mapping.h>
 #include <linux/pm_runtime.h>
 #include <linux/err.h>
-#include <linux/pm_qos_params.h>
-#include <linux/mutex.h>
-#include <asm/mach-types.h>
 
 #include "musb_core.h"
 #include "omap2430.h"
 
-#define DEBUG
-
-static DEFINE_MUTEX(mpu_lat_mutex);
 struct omap2430_glue {
 	struct device		*dev;
 	struct platform_device	*musb;
@@ -52,30 +46,6 @@ struct omap2430_glue {
 #define glue_to_musb(g)		platform_get_drvdata(g->musb)
 
 static struct timer_list musb_idle_timer;
-static void __iomem *ctrl_base;
-void __iomem *phymux_base;
-
-void musb_enable_vbus(struct musb *musb)
-{
-	 int devctl;
-
-	/* enable VBUS valid, id groung*/
-	__raw_writel(AVALID | VBUSVALID, ctrl_base +
-					USBOTGHS_CONTROL);
-	/* start the session */
-	devctl = musb_readb(musb->mregs, MUSB_DEVCTL);
-	devctl |= MUSB_DEVCTL_SESSION;
-	musb_writeb(musb->mregs, MUSB_DEVCTL, devctl);
-
-	while (musb_readb(musb->mregs, MUSB_DEVCTL) & 0x80) {
-		mdelay(20);
-		DBG(1, "devcontrol before vbus=%x\n", musb_readb(musb->mregs,
-						 MUSB_DEVCTL));
-	}
-	if (musb->xceiv->set_vbus)
-		otg_set_vbus(musb->xceiv, 1);
-
-}
 
 #if defined(CONFIG_USB_MOT_ANDROID) && defined(CONFIG_USB_MUSB_OTG)
  /* blocking notifier support */
@@ -466,7 +436,7 @@ static int omap2430_musb_init(struct musb *musb)
 	return 0;
 
 err2:
-		destroy_workqueue(musb->otg_notifier_wq);
+	destroy_workqueue(musb->otg_notifier_wq);
 err1:
 	otg_put_transceiver(musb->xceiv);
 	pm_runtime_disable(dev);
@@ -629,7 +599,6 @@ static int __exit omap2430_remove(struct platform_device *pdev)
 }
 
 #ifdef CONFIG_PM
-
 void musb_platform_save_context(struct musb *musb)
 {
 	void __iomem *musb_base = musb->mregs;
