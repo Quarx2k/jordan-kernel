@@ -1882,7 +1882,12 @@ void __init mapphone_padconf_init(void)
 					if (cpu_is_omap3430())
 						continue;
 			}
-
+#ifdef CONFIG_DEBUG_LL
+			if (addr == 0x480021AA)
+			{
+			continue;
+			}
+#endif
 			omap_writew(val, addr);
 		} else {
 			printk(KERN_ERR "padconf check failed, offset = 0x%04x\n",

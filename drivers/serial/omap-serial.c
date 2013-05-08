@@ -1622,8 +1622,11 @@ static int serial_omap_probe(struct platform_device *pdev)
 	ui[pdev->id - 1] = up;
 	serial_omap_add_console_port(up);
 	serial_omap_clear_fifos(up);
-
+#ifndef CONFIG_DEBUG_LL
 	ret = uart_add_one_port(&serial_omap_reg, &up->port);
+#else
+	ret = pdev->id == 3 ? 0 : uart_add_one_port(&serial_omap_reg, &up->port);
+#endif
 	if (ret != 0)
 		goto do_release_region;
 	platform_set_drvdata(pdev, up);

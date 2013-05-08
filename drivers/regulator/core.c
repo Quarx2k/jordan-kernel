@@ -768,7 +768,12 @@ static int set_machine_constraints(struct regulator_dev *rdev,
 	}
 
 	rdev->constraints = constraints;
-
+#ifdef CONFIG_DEBUG_LL
+	if (strcmp(rdev->desc->name, "vusb") == 0 || strcmp(rdev->desc->name, "vrfref") == 0)
+	{
+		return ret;
+	}
+#endif
 	/* do we need to apply the constraint voltage */
 	if (rdev->constraints->apply_uV &&
 		rdev->constraints->min_uV == rdev->constraints->max_uV &&
@@ -1285,7 +1290,16 @@ EXPORT_SYMBOL_GPL(regulator_enable);
 static int _regulator_disable(struct regulator_dev *rdev)
 {
 	int ret = 0;
-
+#ifdef CONFIG_DEBUG_LL
+	if (strcmp(rdev->desc->name, "vsim") == 0 || strcmp(rdev->desc->name, "vsimcard") == 0)
+	{
+		return ret;
+	}
+	if (strcmp(rdev->desc->name, "vusb") == 0)
+	{
+		return ret;
+	}
+#endif
 	if (WARN(rdev->use_count <= 0,
 			"unbalanced disables for %s\n",
 			rdev->desc->name))

@@ -1084,7 +1084,16 @@ void omap2_clk_disable_unused(struct clk *clk)
 	regval32 = __raw_readl(clk->enable_reg);
 	if ((regval32 & (1 << clk->enable_bit)) == v)
 		return;
-
+#ifdef CONFIG_DEBUG_LL
+	if (strcmp(clk->name, "uart3_ick") == 0)
+	{
+		return;
+	}
+	if (strcmp(clk->name, "uart3_fck") == 0)
+	{
+		return;
+	}
+#endif
 	printk(KERN_DEBUG "Disabling unused clock \"%s\"\n", clk->name);
 	if (cpu_is_omap34xx()) {
 		omap2_clk_enable(clk);
