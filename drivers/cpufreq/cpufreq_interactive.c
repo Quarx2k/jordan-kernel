@@ -158,6 +158,13 @@ static struct cpufreq_interactive_inputopen inputopen;
 
 static int boost_val;
 
+/*
+ * The CPU will be boosted to this frequency when the screen is
+ * touched. input_boost needs to be enabled.
+ */
+
+static int input_boost_freq = 1000000;
+
 /* Duration of a boot pulse in usecs */
 static int boostpulse_duration_val = DEFAULT_MIN_SAMPLE_TIME;
 /* End time of boost pulse in ktime converted to usecs */
@@ -719,8 +726,8 @@ static void cpufreq_interactive_boost(void)
 	for_each_online_cpu(i) {
 		pcpu = &per_cpu(cpuinfo, i);
 
-		if (pcpu->target_freq < hispeed_freq) {
-			pcpu->target_freq = hispeed_freq;
+		if (pcpu->target_freq < input_boost_freq) {
+			pcpu->target_freq = input_boost_freq;
 			cpumask_set_cpu(i, &up_cpumask);
 			pcpu->target_set_time_in_idle =
 				get_cpu_idle_time_us(i, &pcpu->target_set_time);
@@ -733,7 +740,7 @@ static void cpufreq_interactive_boost(void)
 		 * validated.
 		 */
 
-		pcpu->floor_freq = hispeed_freq;
+		pcpu->floor_freq = input_boost_freq;
 		pcpu->floor_validate_time = ktime_to_us(ktime_get());
 	}
 
@@ -1078,6 +1085,30 @@ static ssize_t store_boostpulse_duration(
 
 define_one_global_rw(boostpulse_duration);
 
+static ssize_t show_input_boost_freq(struct kobject *kobj, struct attribute *attr,
+			  char *buf)
+{
+	return sprintf(buf, "%d\n", input_boost_freq);
+}
+
+static ssize_t store_input_boost_freq(struct kobject *kobj, struct attribute *attr,
+			   const char *buf, size_t count)
+{
+	int ret;
+	unsigned long val;
+
+	ret = strict_strtoul(buf, 0, &val);
+	if (ret < 0)
+		return ret;
+
+	input_boost_freq = val;
+
+	return count;
+}
+
+static struct global_attr input_boost_freq_attr = __ATTR(input_boost_freq, 0644,
+		show_input_boost_freq, store_input_boost_freq);
+
 static ssize_t show_sampling_periods(struct kobject *kobj,
 			struct attribute *attr, char *buf)
 {
@@ -1221,6 +1252,7 @@ static struct attribute *interactive_attributes[] = {
 	&input_boost.attr,
 	&boost.attr,
 	&boostpulse.attr,
+	&input_boost_freq_attr.attr,
 	&low_power_threshold_attr.attr,
 	&hi_perf_threshold_attr.attr,
 	&sampling_periods_attr.attr,
@@ -1278,8 +1310,10 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 			smp_wmb();
 		}
 
-		if (!hispeed_freq)
+		if (!hispeed_freq) {
 			hispeed_freq = policy->max;
+			input_boost_freq = hispeed_freq;
+		}
 		history_load_index = 0;
 
 		/*
