@@ -472,6 +472,18 @@ config REGULATOR_TWL4030
 	  This driver supports the voltage regulators provided by
 	  this family of companion chips.
 
+config REGULATOR_TI_OMAP_PMIC
+	tristate "TI Generic regulator for Voltage Processor / Controller"
+	depends on ARCH_OMAP
+	help
+	  Select this option to support PMICs over Texas Instruments'
+	  custom Voltage Processor + Voltage Controller data interface
+	  used in OMAP SoCs. This is a specific "write-only" interface
+	  designed to interface with I2C based PMICs.
+
+	  This option enables the regulator driver representing the PMIC
+	  on the OMAP VC/VP hardware.
+
 config REGULATOR_VEXPRESS
 	tristate "Versatile Express regulators"
 	depends on VEXPRESS_CONFIG

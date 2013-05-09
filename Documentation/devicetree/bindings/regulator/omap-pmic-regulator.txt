@@ -1,0 +1,41 @@
+Generic Power Management IC(PMIC) Regulator for Texas Instruments OMAP SoCs
+
+Required Properties:
+- compatible: Should be one of:
+  - "ti,omap-twl4030-vdd1" - TWL4030/5030/TPS65950 VDD1
+  - "ti,omap-twl4030-vdd2" - TWL4030/5030/TPS65950 VDD2
+  - "ti,omap-twl6030-vcore1" - TWL6030 VCORE1
+  - "ti,omap-twl6030-vcore2" - TWL6030 VCORE2
+  - "ti,omap-twl6030-vcore3" - TWL6030 VCORE3
+  - "ti,omap-tps62361" - TPS62361 VSEL1
+  - "ti,omap-twl6032-smps1" - TWL6032 SMPS1
+  - "ti,omap-twl6032-smps2" - TWL6032 SMPS2
+  - "ti,omap-twl6032-smps5" - TWL6032 SMPS5
+  - "ti,omap-twl6035-smps1" - TWL6035/6037 in SMPS1, 12, 123 configuration
+  - "ti,omap-twl6035-smps4" - TWL6035/6037 in SMPS4, 45 configuration
+  - "ti,omap-twl6035-smps8" - TWL6035/6037 in SMPS8 configuration
+
+Optional Properties:
+- gpios: OF device-tree gpio specification - can be an array, will be setup
+	in the order of definition and set to the flags.
+- pinctrl: OF device-tree pinctrl definitions as needed (usually for the GPIOs)
+- ti,boot-voltage-micro-volts - voltage in microvolts that bootloader is leaving
+	over the PMIC at. This may be 'PMIC data manual configuration' if
+	bootloader does not set an value, or appropritate value.
+
+
+Example: Sample PMIC description
+omap_tps62361: tps62361 {
+	compatible = "ti,omap-tps62361";
+};
+
+/* Board Specific configuration */
+&omap_tps62361 {
+	pinctrl-names = "default";
+	pinctrl-0 = <
+		&tps62361_wkgpio_pins
+	>;
+	gpios = <&gpio1 7 1>;	/* gpio_wk7 */
+
+	ti,boot-voltage-micro-volts=<1200000>;
+};
