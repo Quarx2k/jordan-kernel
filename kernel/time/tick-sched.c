@@ -155,6 +155,27 @@ static void tick_nohz_update_jiffies(void)
 	touch_softlockup_watchdog();
 }
 
+/*
+ * Updates the per cpu time idle statistics counters
+ */
+static void
+update_ts_time_stats(int cpu, struct tick_sched *ts, ktime_t now, u64 *last_update_time)
+{
+	ktime_t delta;
+
+	if (ts->idle_active) {
+		delta = ktime_sub(now, ts->idle_entrytime);
+		ts->idle_sleeptime = ktime_add(ts->idle_sleeptime, delta);
+		if (nr_iowait_cpu(cpu) > 0)
+			ts->iowait_sleeptime = ktime_add(ts->iowait_sleeptime, delta);
+		ts->idle_entrytime = now;
+	}
+
+	if (last_update_time)
+		*last_update_time = ktime_to_us(now);
+
+}
+
 static void tick_nohz_stop_idle(int cpu)
 {
 	struct tick_sched *ts = &per_cpu(tick_cpu_sched, cpu);
@@ -171,15 +192,17 @@ static void tick_nohz_stop_idle(int cpu)
 	}
 }
 
-static ktime_t tick_nohz_start_idle(struct tick_sched *ts)
+static ktime_t tick_nohz_start_idle(int cpu, struct tick_sched *ts)
 {
 	ktime_t now, delta;
 
 	now = ktime_get();
 	if (ts->idle_active) {
 		delta = ktime_sub(now, ts->idle_entrytime);
-		ts->idle_lastupdate = now;
 		ts->idle_sleeptime = ktime_add(ts->idle_sleeptime, delta);
+		if (nr_iowait_cpu(cpu) > 0)
+			ts->iowait_sleeptime = ktime_add(ts->iowait_sleeptime, delta);
+		ts->idle_lastupdate = now;
 	}
 	ts->idle_entrytime = now;
 	ts->idle_active = 1;
@@ -202,6 +225,32 @@ u64 get_cpu_idle_time_us(int cpu, u64 *last_update_time)
 	return ktime_to_us(ts->idle_sleeptime);
 }
 EXPORT_SYMBOL_GPL(get_cpu_idle_time_us);
+
+/*
+ * get_cpu_iowait_time_us - get the total iowait time of a cpu
+ * @cpu: CPU number to query
+ * @last_update_time: variable to store update time in
+ *
+ * Return the cummulative iowait time (since boot) for a given
+ * CPU, in microseconds.
+ *
+ * This time is measured via accounting rather than sampling,
+ * and is as accurate as ktime_get() is.
+ *
+ * This function returns -1 if NOHZ is not enabled.
+ */
+u64 get_cpu_iowait_time_us(int cpu, u64 *last_update_time)
+{
+	struct tick_sched *ts = &per_cpu(tick_cpu_sched, cpu);
+
+	if (!tick_nohz_enabled)
+		return -1;
+
+	update_ts_time_stats(cpu, ts, ktime_get(), last_update_time);
+
+	return ktime_to_us(ts->iowait_sleeptime);
+}
+EXPORT_SYMBOL_GPL(get_cpu_iowait_time_us);
 
 /**
  * tick_nohz_stop_sched_tick - stop the idle tick from the idle task
@@ -239,7 +288,7 @@ void tick_nohz_stop_sched_tick(int inidle)
 	 */
 	ts->inidle = 1;
 
-	now = tick_nohz_start_idle(ts);
+	now = tick_nohz_start_idle(cpu, ts);
 
 	/*
 	 * If this cpu is offline and it is the one which updates
