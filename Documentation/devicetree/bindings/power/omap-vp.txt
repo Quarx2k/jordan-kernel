@@ -1,0 +1,39 @@
+Voltage Controller driver for Texas Instruments OMAP SoCs
+
+Voltage Controller Properties:
+The following are the properties of the voltage controller node
+Required Properties:
+- compatible: Should be one of:
+  - "ti,omap3-vp" - for OMAP3 family of devices
+  - "ti,omap4-vp" - for OMAP4 family of devices
+  - "ti,omap5-vp" - for OMAP5 family of devices
+- reg: Address and length of the register set for the device. It contains
+  the information of registers in the same order as described by reg-names
+- reg-names: Should contain the reg names
+  - "base-address"	- contains base address of VP module
+  - "int-address"	- contains base address of interrupt register for VP module
+- clocks: should point to the clock node used by VC module, usually sysclk
+- ti,min-micro-volts - SoC supported min operational voltage in micro-volts
+- ti,max-micro-volts - SoC supported max operational voltage in micro-volts
+- ti,min-step-micro-volts - SoC supported min operational voltage steps in micro-volts
+- ti,max-step-micro-volts - SoC supported max operational voltage steps in micro-volts
+- ti,tranxdone-status-mask: Mask to the int-register to write-to-clear mask
+	indicating VP has completed operation in sending command to Voltage Controller.
+- ti,vc-channel - phandle to the Voltage Controller Channel device used by this Voltage
+	Processor.
+Example:
+vp_mpu: vp@0x4a307b58 {
+	compatible = "ti,omap4-vp";
+
+	reg = <0x4a307b58 0x18>, <0x4A306014 0x4>;
+	reg-names = "base-address", "int-address";
+	ti,tranxdone-status-mask=<0x20>;
+
+	clocks = <&sysclk_in>;
+
+	ti,vc-channel = <&vc_mpu>;
+	ti,min-step-micro-volts = <10000>;
+	ti,max-step-micro-volts = <50000>;
+	ti,min-micro-volts = <750000>;
+	ti,max-micro-volts = <1410000>;
+};
