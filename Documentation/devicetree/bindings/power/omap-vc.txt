@@ -1,0 +1,99 @@
+Voltage Controller driver for Texas Instruments OMAP SoCs
+
+Voltage Controller Properties:
+The following are the properties of the voltage controller node
+Required Properties:
+- compatible: Should be one of:
+  - "ti,omap3-vc" - for OMAP3 family of devices
+  - "ti,omap4-vc" - for OMAP4 family of devices
+  - "ti,omap5-vc" - for OMAP5 family of devices
+- reg: Address and length of the register set for the device. It contains
+  the information of registers in the same order as described by reg-names
+- reg-names: Should contain the reg names
+  - "base-address"	- contains base address of VC module
+- clocks: should point to the clock node used by VC module, usually sysclk
+- ti,i2c-clk-scl-low: is mandatory if ti,i2c-pad-load is not used. contains
+  hex to represent timing for slow I2C phase low clock time.
+- ti,i2c-clk-scl-high: is mandatory if ti,i2c-pad-load is not used. contains
+  hex to represent timing for slow I2C phase high clock time.
+- ti,i2c-clk-hsscl-low: is mandatory if ti,i2c-pad-load is not used and
+  ti,i2c-high-speed is used, contains hex to represent timing for high speed I2C
+  phase low clock time.
+- ti,i2c-clk-hsscl-high: is mandatory if ti,i2c-pad-load is not used and
+  ti,i2c-high-speed is used, contains hex to represent timing for high speed I2C
+  phase high clock time.
+- Must contain VC channel nodes which belong to the Voltage controller.
+
+Optional Properties:
+- ti,i2c-high-speed: bool to indicate if VC should operate in high speed I2C
+  mode.
+- ti,i2c-pad-load: if ti,i2c-high-speed, then this is optional to auto load
+  pre-calculated I2C clock timing configuration. This is denoted in pico-farads.
+- ti,i2c-pcb-length: if ti,i2c-pad-load, then this is optional to select the
+  pre-calculated I2C clock timing configuration. default of '63' is used.
+  This is denoted in millimeters.
+- pinctrl: Most OMAP SoCs do not allow pinctrl option to select VC's I2C path.
+  it is usually hardcoded by default. Define "default" pinctrl-0 as needed.
+
+Voltage Controller Channel Properties:
+The following are the properties of the voltage controller channel nodes
+Required Properties:
+- compatible: Should be one of:
+  - ti,omap3-vc-channel-0 - Channel 0 on OMAP3 family of devices
+  - ti,omap3-vc-channel-1 - Channel 1 on OMAP3 family of devices
+  - ti,omap4-vc-channel-mpu - Channel MPU on OMAP4 family of devices
+  - ti,omap4-vc-channel-iva - Channel IVA on OMAP4 family of devices
+  - ti,omap4-vc-channel-core - Channel CORE on OMAP4 family of devices
+  - ti,omap5-vc-channel-mpu - Channel MPU on OMAP5 family of devices
+  - ti,omap5-vc-channel-mm - Channel MM on OMAP5 family of devices
+  - ti,omap5-vc-channel-core - Channel CORE on OMAP5 family of devices
+- ti,master-channel: bool to mark the "master channel". Only ONE channel is
+  to be marked as master channel depending on SoC specification.
+
+Optional Properties:
+- ti,retention-micro-volts: retention voltage for the voltage controller in
+  micro-volts
+- ti,off-micro-volts: OFF mode voltage for the voltage controller in micro-volts
+- ti,use-master-slave-addr: available only for a "non-master" channel. This
+  indicates the the channel will use master channel's slave address. Usually
+  used when the PMIC has the same slave address for all SMPSs.
+- ti,use-master-voltage-reg-addr: available only for a "non-master" channel.
+  channel will use voltage register of the master channel to send voltage
+  commands - usually used in "ganged" voltage rail configuration - NOTE: this
+  is useful only when doing voltage transitions alone and not using AVS.
+- ti,use-master-command-reg-addr: available only for a "non-master" channel.
+  channel will use command register of the master channel to send command
+  values - usually used in "ganged" voltage rail configuration - NOTE: this
+  is useful only when doing voltage transitions alone and not using AVS.
+- ti,use-master-command-reg-val: available only for a "non-master" channel.
+  channel will use command value of the master channel to send commands
+  - usually used in "ganged" voltage rail configuration - NOTE: this
+  is useful only when doing voltage transitions alone and not using AVS.
+
+Example:
+SoC file: (example from OMAP4)
+vc: vc@0x4A307B88 {
+		compatible = "ti,omap4-vc";
+		clocks = <&sysclk_in>;
+		reg = <0x4A307B88 0x40>;
+		reg-names = "base-address";
+
+		vc_mpu: vc_mpu {
+			compatible = "ti,omap4-vc-channel-mpu";
+			ti,master-channel;
+			ti,retention-micro-volts = <750000>;
+			ti,off-micro-volts = <0>;
+		};
+
+		vc_iva: vc_iva {
+			compatible = "ti,omap4-vc-channel-iva";
+			ti,retention-micro-volts = <750000>;
+			ti,off-micro-volts = <0>;
+		};
+
+		vc_core: vc_core {
+			compatible = "ti,omap4-vc-channel-core";
+			ti,retention-micro-volts = <750000>;
+			ti,off-micro-volts = <0>;
+		};
+	};
