@@ -21,6 +21,7 @@
 /* #define VERBOSE_DEBUG */
 
 #include <linux/kernel.h>
+#include <linux/slab.h>
 #include <linux/utsname.h>
 #include <linux/device.h>
 
@@ -66,7 +67,7 @@ MODULE_PARM_DESC(index, "Index value for the USB MIDI Gadget adapter.");
 module_param(id, charp, 0444);
 MODULE_PARM_DESC(id, "ID string for the USB MIDI Gadget adapter.");
 
-/* Some systems will want different product identifers published in the
+/* Some systems will want different product identifiers published in the
  * device descriptor, either numbers or strings or both.  These string
  * parameters are in UTF-8 (superset of ASCII's 7 bit characters).
  */
@@ -237,7 +238,7 @@ static const struct usb_interface_descriptor ac_interface_desc = {
 };
 
 /* B.3.2  Class-Specific AC Interface Descriptor */
-static const struct uac_ac_header_descriptor_1 ac_header_desc = {
+static const struct uac1_ac_header_descriptor_1 ac_header_desc = {
 	.bLength =		UAC_DT_AC_HEADER_SIZE(1),
 	.bDescriptorType =	USB_DT_CS_INTERFACE,
 	.bDescriptorSubtype =	USB_MS_HEADER,
@@ -618,11 +619,6 @@ gmidi_set_config(struct gmidi_device *dev, unsigned number, gfp_t gfp_flags)
 	}
 #endif
 
-	if (gadget_is_sa1100(gadget) && dev->config) {
-		/* tx fifo is full, but we can't clear it...*/
-		ERROR(dev, "can't change configurations\n");
-		return -ESPIPE;
-	}
 	gmidi_reset_config(dev);
 
 	switch (number) {
@@ -1296,7 +1292,6 @@ static void gmidi_resume(struct usb_gadget *gadget)
 static struct usb_gadget_driver gmidi_driver = {
 	.speed		= USB_SPEED_FULL,
 	.function	= (char *)longname,
-	.bind		= gmidi_bind,
 	.unbind		= gmidi_unbind,
 
 	.setup		= gmidi_setup,
@@ -1313,7 +1308,7 @@ static struct usb_gadget_driver gmidi_driver = {
 
 static int __init gmidi_init(void)
 {
-	return usb_gadget_register_driver(&gmidi_driver);
+	return usb_gadget_probe_driver(&gmidi_driver, gmidi_bind);
 }
 module_init(gmidi_init);
 

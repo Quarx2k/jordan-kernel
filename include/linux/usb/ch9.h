@@ -804,4 +804,6 @@ enum usb_device_state {
 	 */
 };
 
+#define USB_SELF_POWER_VBUS_MAX_DRAW            100
+
 #endif /* __LINUX_USB_CH9_H */

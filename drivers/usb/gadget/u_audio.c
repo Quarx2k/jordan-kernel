@@ -10,6 +10,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/slab.h>
 #include <linux/device.h>
 #include <linux/delay.h>
 #include <linux/ctype.h>
@@ -254,6 +255,7 @@ static int gaudio_open_snd_dev(struct gaudio *card)
 		ERROR(card, "No such PCM capture device: %s\n", fn_cap);
 		snd->substream = NULL;
 		snd->card = NULL;
+		snd->filp = NULL;
 	} else {
 		pcm_file = snd->filp->private_data;
 		snd->substream = pcm_file->substream;
@@ -272,22 +274,23 @@ static int gaudio_close_snd_dev(struct gaudio *gau)
 
 	/* Close control device */
 	snd = &gau->control;
-	if (!IS_ERR(snd->filp))
+	if (snd->filp)
 		filp_close(snd->filp, current->files);
 
 	/* Close PCM playback device and setup substream */
 	snd = &gau->playback;
-	if (!IS_ERR(snd->filp))
+	if (snd->filp)
 		filp_close(snd->filp, current->files);
 
 	/* Close PCM capture device and setup substream */
 	snd = &gau->capture;
-	if (!IS_ERR(snd->filp))
+	if (snd->filp)
 		filp_close(snd->filp, current->files);
 
 	return 0;
 }
 
+static struct gaudio *the_card;
 /**
  * gaudio_setup - setup ALSA interface and preparing for USB transfer
  *
@@ -302,6 +305,8 @@ int __init gaudio_setup(struct gaudio *card)
 	ret = gaudio_open_snd_dev(card);
 	if (ret)
 		ERROR(card, "we need at least one control device\n");
+	else if (!the_card)
+		the_card = card;
 
 	return ret;
 
@@ -312,9 +317,11 @@ int __init gaudio_setup(struct gaudio *card)
  *
  * This is called to free all resources allocated by @gaudio_setup().
  */
-void gaudio_cleanup(struct gaudio *card)
+void gaudio_cleanup(void)
 {
-	if (card)
-		gaudio_close_snd_dev(card);
+	if (the_card) {
+		gaudio_close_snd_dev(the_card);
+		the_card = NULL;
+	}
 }
 

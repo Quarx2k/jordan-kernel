@@ -24,6 +24,7 @@
 #include <linux/device.h>
 #include <linux/etherdevice.h>
 #include <linux/crc32.h>
+#include <linux/slab.h>
 
 #include "u_ether.h"
 
@@ -313,6 +314,9 @@ eem_unbind(struct usb_configuration *c, struct usb_function *f)
 
 static void eem_cmd_complete(struct usb_ep *ep, struct usb_request *req)
 {
+	struct sk_buff *skb = (struct sk_buff *)req->context;
+
+	dev_kfree_skb_any(skb);
 }
 
 /*
@@ -358,7 +362,7 @@ done:
 	 * b15:		bmType (0 == data)
 	 */
 	len = skb->len;
-	put_unaligned_le16((len & 0x3FFF) | BIT(14), skb_push(skb, 2));
+	put_unaligned_le16(len & 0x3FFF, skb_push(skb, 2));
 
 	/* add a zero-length EEM packet, if needed */
 	if (padlen)
@@ -427,10 +431,11 @@ static int eem_unwrap(struct gether *port,
 				skb_trim(skb2, len);
 				put_unaligned_le16(BIT(15) | BIT(11) | len,
 							skb_push(skb2, 2));
-				skb_copy_bits(skb, 0, req->buf, skb->len);
-				req->length = skb->len;
+				skb_copy_bits(skb2, 0, req->buf, skb2->len);
+				req->length = skb2->len;
 				req->complete = eem_cmd_complete;
 				req->zero = 1;
+				req->context = skb2;
 				if (usb_ep_queue(port->in_ep, req, GFP_ATOMIC))
 					DBG(cdev, "echo response queue fail\n");
 				break;
@@ -464,13 +469,11 @@ static int eem_unwrap(struct gether *port,
 			}
 
 			/* validate CRC */
-			crc = get_unaligned_le32(skb->data + len - ETH_FCS_LEN);
 			if (header & BIT(14)) {
 				crc = get_unaligned_le32(skb->data + len
 							- ETH_FCS_LEN);
 				crc2 = ~crc32_le(~0,
-						skb->data,
-						skb->len - ETH_FCS_LEN);
+						skb->data, len - ETH_FCS_LEN);
 			} else {
 				crc = get_unaligned_be32(skb->data + len
 							- ETH_FCS_LEN);

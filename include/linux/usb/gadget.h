@@ -15,6 +15,8 @@
 #ifndef __LINUX_USB_GADGET_H
 #define __LINUX_USB_GADGET_H
 
+#include <linux/slab.h>
+
 struct usb_ep;
 
 /**
@@ -427,7 +429,10 @@ struct usb_gadget_ops {
 	int	(*vbus_draw) (struct usb_gadget *, unsigned mA);
 	int	(*pullup) (struct usb_gadget *, int is_on);
 	int	(*ioctl)(struct usb_gadget *,
-				unsigned code, unsigned long param);
+	unsigned code, unsigned long param);
+#ifdef CONFIG_USB_SAMSUNG_VBUS_CHECK
+	int    (*get_vbus_state)(struct usb_gadget *);
+#endif 
 };
 
 /**
@@ -484,6 +489,7 @@ struct usb_gadget {
 	unsigned			b_hnp_enable:1;
 	unsigned			a_hnp_support:1;
 	unsigned			a_alt_hnp_support:1;
+	unsigned			host_request:1;
 	const char			*name;
 	struct device			dev;
 };
@@ -492,9 +498,13 @@ static inline void set_gadget_data(struct usb_gadget *gadget, void *data)
 	{ dev_set_drvdata(&gadget->dev, data); }
 static inline void *get_gadget_data(struct usb_gadget *gadget)
 	{ return dev_get_drvdata(&gadget->dev); }
+static inline struct usb_gadget *dev_to_usb_gadget(struct device *dev)
+{
+	return container_of(dev, struct usb_gadget, dev);
+}
 
 /* iterates the non-control endpoints; 'tmp' is a struct usb_ep pointer */
-#define gadget_for_each_ep(tmp,gadget) \
+#define gadget_for_each_ep(tmp, gadget) \
 	list_for_each_entry(tmp, &(gadget)->ep_list, ep_list)
 
 
@@ -780,6 +790,20 @@ struct usb_gadget_driver {
 	struct device_driver	driver;
 };
 
+/**
+ * usb_gadget_probe_driver - probe a gadget driver
+ * @driver: the driver being registered
+ * @bind: the driver's bind callback
+ * Context: can sleep
+ *
+ * Call this in your gadget driver's module initialization function,
+ * to tell the underlying usb controller driver about your driver.
+ * The @bind() function will be called to bind it to a gadget before this
+ * registration call returns.  It's expected that the @bind() function will
+ * be in init sections.
+ */
+int usb_gadget_probe_driver(struct usb_gadget_driver *driver,
+                int (*bind)(struct usb_gadget *));
 
 
 /*-------------------------------------------------------------------------*/
