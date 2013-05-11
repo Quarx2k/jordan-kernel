@@ -362,6 +362,8 @@ static inline char *pack_hex_byte(char *buf, u8 byte)
 	return buf;
 }
 
+extern int hex_to_bin(char ch);
+
 #ifndef pr_fmt
 #define pr_fmt(fmt) fmt
 #endif
@@ -405,6 +407,7 @@ static inline char *pack_hex_byte(char *buf, u8 byte)
 #define pr_debug(fmt, ...) \
 	({ if (0) printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__); 0; })
 #endif
+
 
 /*
  * General tracing related utility functions - trace_printk(),
