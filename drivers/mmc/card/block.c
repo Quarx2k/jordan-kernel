@@ -216,7 +216,7 @@ static void __init mmcpart_setup(char **arg)
 		}
 	}
 }
-__early_param("mmcparts=", mmcpart_setup);
+early_param("mmcparts", mmcpart_setup);
 
 /*
  * return alias name of mmc partition

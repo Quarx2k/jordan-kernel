@@ -517,7 +517,7 @@ static void __init omap_vram_early_vram(char **p)
 	if (**p == ',')
 		omap_vram_def_sdram_start = simple_strtoul((*p) + 1, p, 16);
 }
-__early_param("vram=", omap_vram_early_vram);
+early_param("vram", omap_vram_early_vram);
 
 /*
  * Called from map_io. We need to call to this early enough so that we
