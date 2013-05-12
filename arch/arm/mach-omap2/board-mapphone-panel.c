@@ -44,9 +44,6 @@
 #ifndef CONFIG_PANEL_MAPPHONE_HDTV
 #error CONFIG_PANEL_MAPPHONE_HDTV must be defined for Mapphone to compile
 #endif
-#ifndef CONFIG_OMAP2_DSS_DISPSW
-#error CONFIG_OMAP2_DSS_DISPSW must be defined for Mapphone to compile
-#endif
 #ifndef CONFIG_HDMI_TDA19989
 #error CONFIG_HDMI_TDA19989 must be defined for Mapphone to compile
 #endif
