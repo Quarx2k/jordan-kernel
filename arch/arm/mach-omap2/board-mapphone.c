@@ -1722,38 +1722,6 @@ static struct platform_device *mapphone_devices[] __initdata = {
 
 #endif
 
-#ifdef CONFIG_ANDROID_RAM_CONSOLE
-#define RAM_CONSOLE_START   0x8E000000
-#define RAM_CONSOLE_SIZE    0x20000
-static struct resource ram_console_resource = {
-       .start  = RAM_CONSOLE_START,
-       .end    = (RAM_CONSOLE_START + RAM_CONSOLE_SIZE - 1),
-       .flags  = IORESOURCE_MEM,
-};
-
-static struct platform_device ram_console_device = {
-       .name = "ram_console",
-       .id = 0,
-       .num_resources  = 1,
-       .resource       = &ram_console_resource,
-};
-
-static inline void mapphone_ramconsole_init(void)
-{
-	platform_device_register(&ram_console_device);
-}
-
-static inline void omap2_ramconsole_reserve_sdram(void)
-{
-	reserve_bootmem(RAM_CONSOLE_START, RAM_CONSOLE_SIZE, 0);
-}
-#else
-static inline void mapphone_ramconsole_init(void) {}
-
-static inline void omap2_ramconsole_reserve_sdram(void) {}
-#endif
-
-
 static struct platform_device mapphone_sgx_device = {
        .name                   = "pvrsrvkm",
        .id             = -1,
@@ -1846,7 +1814,6 @@ static void __init mapphone_init(void)
 	activate_emu_uart();
 #endif
 	mapphone_gpio_mapping_init();
-	mapphone_ramconsole_init();
 	mapphone_spi_init();
 	mapphone_cpcap_client_init();
 	mapphone_serial_init();
@@ -1872,12 +1839,7 @@ static void __init mapphone_init(void)
 
 static void __init mapphone_reserve(void)
 {
-	printk("1\n");
 	omap_reserve();
-	printk("2\n");
-
-	//omap2_map_common_io();
-	omap2_ramconsole_reserve_sdram();
 #ifdef CONFIG_ION_OMAP
 	omap_ion_init();
 #endif
