@@ -200,7 +200,6 @@ static int emmc_set_power(struct device *dev, int slot, int power_on,
 int wifi_set_power(struct device *dev, int slot, int power_on, int vdd)
 {
 	static int power_state;
-	printk("Powering %s wifi\n", (power_on ? "on" : "off"));
 	if (power_on == power_state) {
 		return 0;
 	}
