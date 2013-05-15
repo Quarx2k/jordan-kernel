@@ -29,6 +29,7 @@
 #include <linux/mutex.h>
 #include <linux/slab.h>
 #include <linux/input.h>
+#include <linux/earlysuspend.h>
 #include <asm/cputime.h>
 
 #define CREATE_TRACE_POINTS
@@ -86,6 +87,12 @@ static spinlock_t tune_cpumask_lock;
 /* Consider IO as busy */
 static unsigned long io_is_busy;
 
+/* History for last freq before it went to suspend*/
+static unsigned int last_freq;
+
+/* Suspend/Resume flag */
+static bool suspend_freq;
+
 static unsigned int sampling_periods;
 static unsigned int history_load_index;
 static unsigned int low_power_threshold;
@@ -107,7 +114,7 @@ static enum tune_values {
 #define MAX_MIN_SAMPLE_TIME (80 * USEC_PER_MSEC)
 
 /* Hi speed to bump to from lo speed when load burst (default max) */
-#define DEFAULT_HISPEED_FREQ 800000
+#define DEFAULT_HISPEED_FREQ 1000000
 static u64 hispeed_freq;
 
 /* Go to hi speed when CPU load at or above this value. */
@@ -115,13 +122,13 @@ static u64 hispeed_freq;
 static unsigned long go_hispeed_load;
 
 /* Target load.  Lower values result in higher CPU speeds. */
-#define DEFAULT_TARGET_LOAD 90
+#define DEFAULT_TARGET_LOAD 95
 static unsigned long target_load = DEFAULT_TARGET_LOAD;
 
 /*
  * The minimum amount of time to spend at a frequency before we can ramp down.
  */
-#define DEFAULT_MIN_SAMPLE_TIME (20 * USEC_PER_MSEC)
+#define DEFAULT_MIN_SAMPLE_TIME (80 * USEC_PER_MSEC)
 static unsigned long min_sample_time;
 
 /*
@@ -163,7 +170,7 @@ static int boost_val;
  * touched. input_boost needs to be enabled.
  */
 
-static int input_boost_freq = 1000000;
+static int input_boost_freq = DEFAULT_HISPEED_FREQ;
 
 /* Duration of a boot pulse in usecs */
 static int boostpulse_duration_val = DEFAULT_MIN_SAMPLE_TIME;
@@ -187,6 +194,7 @@ static inline cputime64_t get_cpu_iowait_time(
 	unsigned int cpu, cputime64_t *wall)
 {
 	u64 iowait_time = get_cpu_iowait_time_us(cpu, wall);
+
 
 	if (iowait_time == -1ULL)
 		return 0;
@@ -644,6 +652,12 @@ static int cpufreq_interactive_up_task(void *data)
 			if (!pcpu->governor_enabled)
 				continue;
 
+			/*
+			 * Make a break point here, if suspended it should not scale
+			 */
+			if (suspend_freq)
+				break;
+
 			mutex_lock(&set_speed_lock);
 
 			for_each_cpu(j, pcpu->policy->cpus) {
@@ -658,17 +672,51 @@ static int cpufreq_interactive_up_task(void *data)
 				__cpufreq_driver_target(pcpu->policy,
 							max_freq,
 							CPUFREQ_RELATION_H);
+
 			mutex_unlock(&set_speed_lock);
 			trace_cpufreq_interactive_up(cpu, pcpu->target_freq,
 						     pcpu->policy->cur);
 
 			pcpu->freq_change_time_in_iowait =
 				get_cpu_iowait_time(cpu, NULL);
+
 		}
 	}
 
 	return 0;
 }
+
+static void interactive_early_suspend(struct early_suspend *handler)
+{
+	struct cpufreq_interactive_cpuinfo *pcpu;
+	unsigned int cpu;
+	pcpu = &per_cpu(cpuinfo, cpu);	
+
+	/* Safe the last frequency, so we can restore it later */
+	last_freq = pcpu->target_freq;
+
+
+	/* set it to the lowest possible frequency */
+	pcpu->target_freq = pcpu->policy->min;	
+	suspend_freq = true;
+}
+
+
+static void interactive_late_resume(struct early_suspend *handler)
+{
+	struct cpufreq_interactive_cpuinfo *pcpu;
+	unsigned int cpu;
+	pcpu = &per_cpu(cpuinfo, cpu);
+
+	/* Resume */
+	pcpu->target_freq = last_freq;
+	suspend_freq = false;	
+}
+
+static struct early_suspend interactive_suspend  = {
+	.suspend 	= interactive_early_suspend,
+	.resume 	= interactive_late_resume,
+};
 
 static void cpufreq_interactive_freq_down(struct work_struct *work)
 {
@@ -711,6 +759,9 @@ static void cpufreq_interactive_freq_down(struct work_struct *work)
 					       pcpu->policy->cur);
 		pcpu->freq_change_time_in_iowait =
 			get_cpu_iowait_time(cpu, NULL);
+		
+		last_freq = pcpu->target_freq;
+		
 	}
 }
 
@@ -1408,6 +1459,9 @@ static int __init cpufreq_interactive_init(void)
 	above_hispeed_delay_val = DEFAULT_ABOVE_HISPEED_DELAY;
 	timer_rate = DEFAULT_TIMER_RATE;
 	input_boost_val = DEFAULT_INPUT_BOOST;
+
+	/* suspend/resume call */
+	register_early_suspend(&interactive_suspend);
 
 	sampling_periods = DEFAULT_SAMPLING_PERIODS;
 	hi_perf_threshold = DEFAULT_HI_PERF_THRESHOLD;
