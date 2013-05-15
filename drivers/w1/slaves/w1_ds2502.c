@@ -279,7 +279,7 @@ static enum w1_ds2502_state w1_ds2502_retry(struct w1_slave *sl,
 	return next_state;
 }
 
-static ssize_t w1_ds2502_read_eeprom(struct kobject *kobj,
+static ssize_t w1_ds2502_read_eeprom(struct file *filp, struct kobject *kobj,
 				     struct bin_attribute *bin_attr,
 				     char *buf, loff_t off, size_t count)
 {
@@ -334,7 +334,7 @@ static ssize_t w1_ds2502_read_eeprom(struct kobject *kobj,
 	return (data->status == 0) ? count : 0;
 }
 
-static ssize_t w1_ds2502_read_uid(struct kobject *kobj,
+static ssize_t w1_ds2502_read_uid(struct file *filp, struct kobject *kobj,
 				  struct bin_attribute *bin_attr,
 				  char *buf, loff_t off, size_t count)
 {
