@@ -1992,7 +1992,7 @@ static noinline struct module *load_module(void __user *umod,
 	long err = 0;
 	void *ptr = NULL; /* Stops spurious gcc warning */
 	unsigned long symoffs, stroffs, *strmap;
-	void __percpu *percpu;
+	void *percpu;
 
 	mm_segment_t old_fs;
 
