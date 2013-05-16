@@ -115,34 +115,34 @@ static enum tune_values {
 
 /* Hi speed to bump to from lo speed when load burst (default max) */
 #define DEFAULT_HISPEED_FREQ 1000000
-static u64 hispeed_freq;
+static u64 hispeed_freq = DEFAULT_HISPEED_FREQ;
 
 /* Go to hi speed when CPU load at or above this value. */
-#define DEFAULT_GO_HISPEED_LOAD 95
-static unsigned long go_hispeed_load;
+#define DEFAULT_GO_HISPEED_LOAD 80
+static unsigned long go_hispeed_load = DEFAULT_GO_HISPEED_LOAD;
 
 /* Target load.  Lower values result in higher CPU speeds. */
-#define DEFAULT_TARGET_LOAD 95
+#define DEFAULT_TARGET_LOAD 80
 static unsigned long target_load = DEFAULT_TARGET_LOAD;
 
 /*
  * The minimum amount of time to spend at a frequency before we can ramp down.
  */
 #define DEFAULT_MIN_SAMPLE_TIME (80 * USEC_PER_MSEC)
-static unsigned long min_sample_time;
+static unsigned long min_sample_time = DEFAULT_MIN_SAMPLE_TIME;
 
 /*
  * The sample rate of the timer used to increase frequency
  */
 #define DEFAULT_TIMER_RATE (20 * USEC_PER_MSEC)
-static unsigned long timer_rate;
+static unsigned long timer_rate = DEFAULT_TIMER_RATE;
 
 /*
  * Wait this long before raising speed above hispeed, by default a single
  * timer interval.
  */
 #define DEFAULT_ABOVE_HISPEED_DELAY DEFAULT_TIMER_RATE
-static unsigned long above_hispeed_delay_val;
+static unsigned long above_hispeed_delay_val = DEFAULT_ABOVE_HISPEED_DELAY;
 
 /*
  * Boost pulse to hispeed on touchscreen input.
@@ -343,33 +343,23 @@ static void cpufreq_interactive_timer(unsigned long data)
 	
 	boosted = boost_val || now < boostpulse_endtime;
 
-	if (cpu_load >= go_hispeed_load || boosted) {
-		if (pcpu->target_freq < hispeed_freq &&
-		    hispeed_freq < pcpu->policy->max) {
-			new_freq = hispeed_freq;
-		} else {
-			new_freq = pcpu->policy->cur * cpu_load / target_load;
-
-			if (new_freq < hispeed_freq)
-				new_freq = hispeed_freq;
-
-			if (pcpu->target_freq == hispeed_freq &&
-			    new_freq > hispeed_freq &&
-			    cputime64_sub(pcpu->timer_run_time,
-					  pcpu->hispeed_validate_time)
-			    < above_hispeed_delay_val) {
-				trace_cpufreq_interactive_notyet(data, cpu_load,
-								 pcpu->target_freq,
-								 new_freq);
-				goto rearm;
-			}
-		}
+	if ((cpu_load >= go_hispeed_load || boosted) &&
+	    pcpu->target_freq < hispeed_freq) {
+		new_freq = hispeed_freq;
 	} else {
 		new_freq = pcpu->policy->cur * cpu_load / target_load;
 	}
 
-	if (new_freq <= hispeed_freq)
-		pcpu->hispeed_validate_time = pcpu->timer_run_time;
+	if (pcpu->target_freq >= hispeed_freq &&
+	    new_freq > pcpu->target_freq &&
+	    now - pcpu->hispeed_validate_time < above_hispeed_delay_val) {
+		trace_cpufreq_interactive_notyet(
+			data, cpu_load, pcpu->target_freq,
+			pcpu->policy->cur, new_freq);
+		goto rearm;
+	}
+
+	pcpu->hispeed_validate_time = now;
 
 	if (cpufreq_frequency_table_target(pcpu->policy, pcpu->freq_table,
 					   new_freq, CPUFREQ_RELATION_L,
@@ -389,8 +379,9 @@ static void cpufreq_interactive_timer(unsigned long data)
 		if (cputime64_sub(pcpu->timer_run_time,
 				  pcpu->floor_validate_time)
 		    < min_sample_time) {
-			trace_cpufreq_interactive_notyet(data, cpu_load,
-					 pcpu->target_freq, new_freq);
+			trace_cpufreq_interactive_notyet(
+				data, cpu_load, pcpu->target_freq,
+				pcpu->policy->cur, new_freq);
 			goto rearm;
 		}
 	}
@@ -1452,13 +1443,6 @@ static int __init cpufreq_interactive_init(void)
 	unsigned int i;
 	struct cpufreq_interactive_cpuinfo *pcpu;
 	struct sched_param param = { .sched_priority = MAX_RT_PRIO-1 };
-
-	hispeed_freq = DEFAULT_HISPEED_FREQ;
-	go_hispeed_load = DEFAULT_GO_HISPEED_LOAD;
-	min_sample_time = DEFAULT_MIN_SAMPLE_TIME;
-	above_hispeed_delay_val = DEFAULT_ABOVE_HISPEED_DELAY;
-	timer_rate = DEFAULT_TIMER_RATE;
-	input_boost_val = DEFAULT_INPUT_BOOST;
 
 	/* suspend/resume call */
 	register_early_suspend(&interactive_suspend);
