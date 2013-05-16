@@ -509,7 +509,6 @@ int vma_adjust(struct vm_area_struct *vma, unsigned long start,
 	struct prio_tree_root *root = NULL;
 	struct anon_vma *anon_vma = NULL;
 	struct file *file = vma->vm_file;
-	struct anon_vma *anon_vma = NULL;
 	long adjust_next = 0;
 	int remove_next = 0;
 
