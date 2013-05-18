@@ -86,14 +86,6 @@
 #include <media/camise.h>
 #endif
 
-
-#if defined(CONFIG_LEDS_BD7885)
-#include <linux/leds-bd7885.h>
-#endif
-#if defined(CONFIG_LEDS_BU9847)
-#include <linux/leds-bu9847.h>
-#endif
-
 #ifdef CONFIG_VIDEO_OMAP3_HPLENS
 #include <../drivers/media/video/hplens.h>
 #endif
