@@ -302,6 +302,17 @@ static struct attribute * g[] = {
 	&pm_test_attr.attr,
 #endif
 #endif
+
+/* For defy userspace libs */
+#ifdef CONFIG_USER_WAKELOCK
+	&wake_lock_attr.attr,
+	&wake_unlock_attr.attr,
+#endif
+#ifdef CONFIG_PM_DEEPSLEEP
+       &active_wake_lock_attr.attr,
+#endif
+/* end */
+
 	NULL,
 };
 
