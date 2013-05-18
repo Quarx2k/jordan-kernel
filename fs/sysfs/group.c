@@ -166,7 +166,7 @@ int sysfs_merge_group(struct kobject *kobj,
 	int i;
 
 	if (grp)
-		dir_sd = sysfs_get_dirent(kobj->sd, NULL, grp->name);
+		dir_sd = sysfs_get_dirent(kobj->sd, grp->name);
 	else
 		dir_sd = sysfs_get(kobj->sd);
 	if (!dir_sd)
@@ -176,7 +176,7 @@ int sysfs_merge_group(struct kobject *kobj,
 		error = sysfs_add_file(dir_sd, *attr, SYSFS_KOBJ_ATTR);
 	if (error) {
 		while (--i >= 0)
-			sysfs_hash_and_remove(dir_sd, NULL, (*--attr)->name);
+			sysfs_hash_and_remove(dir_sd, (*--attr)->name);
 	}
 	sysfs_put(dir_sd);
 
@@ -196,12 +196,12 @@ void sysfs_unmerge_group(struct kobject *kobj,
 	struct attribute *const *attr;
 
 	if (grp)
-		dir_sd = sysfs_get_dirent(kobj->sd, NULL, grp->name);
+		dir_sd = sysfs_get_dirent(kobj->sd, grp->name);
 	else
 		dir_sd = sysfs_get(kobj->sd);
 	if (dir_sd) {
 		for (attr = grp->attrs; *attr; ++attr)
-			sysfs_hash_and_remove(dir_sd, NULL, (*attr)->name);
+			sysfs_hash_and_remove(dir_sd, (*attr)->name);
 		sysfs_put(dir_sd);
 	}
 }
