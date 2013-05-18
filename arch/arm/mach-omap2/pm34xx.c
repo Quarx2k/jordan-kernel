@@ -723,7 +723,6 @@ static void omap3_pm_idle(void)
 		goto out;
 
 	trace_pm_idle_entry();
-	save_sync_trace_clock();
 
 	omap_sram_idle();
 
@@ -736,7 +735,6 @@ static void omap3_pm_idle(void)
 	 * resync_track_clock must ensure that timestamps never ever go
 	 * backward.
 	 */
-	resync_trace_clock();
 	trace_pm_idle_exit();
 
 out:
@@ -792,13 +790,11 @@ static int omap3_pm_suspend(void)
 
 	omap_uart_prepare_suspend();
 	trace_pm_suspend_entry();
-	save_sync_trace_clock();
 	omap3_intc_suspend();
 
 	regset_save_on_suspend = 1;
 	omap_sram_idle();
 	regset_save_on_suspend = 0;
-	resync_trace_clock();
 	trace_pm_suspend_exit();
 
 restore:
