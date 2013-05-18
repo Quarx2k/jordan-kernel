@@ -1250,12 +1250,6 @@ static struct i2c_board_info __initdata
 		.platform_data = &mapphone_camise_platform_data,
 	},
 #endif
-#ifdef CONFIG_VIDEO_OMAP3_HPLENS
-	{
-		I2C_BOARD_INFO("HP_GEN_LENS", 0x04),
-		.platform_data = &mapphone_hplens_platform_data,
-	},
-#endif
 };
 
 static struct i2c_board_info *get_board_info
