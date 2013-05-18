@@ -64,7 +64,6 @@
 #include <linux/magic.h>
 #include <linux/perf_event.h>
 #include <linux/posix-timers.h>
-#include <linux/user-return-notifier.h>
 #include <linux/oom.h>
 
 #include <asm/pgtable.h>
