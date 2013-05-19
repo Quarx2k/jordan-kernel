@@ -68,6 +68,11 @@ static struct platform_device cpcap_audio_device = {
 #endif
 
 static struct platform_device *cpcap_devices[] = {
+
+#ifdef CONFIG_SOUND_CPCAP_OMAP
+  &cpcap_audio_device,
+#endif
+
 #ifdef CONFIG_CPCAP_USB
 	&cpcap_usb_device,
 	&cpcap_usb_det_device,
