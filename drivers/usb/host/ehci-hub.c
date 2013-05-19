@@ -118,7 +118,6 @@ static int ehci_bus_suspend (struct usb_hcd *hcd)
 		u32 __iomem	*reg = &ehci->regs->port_status[port];
 		u32		t1 = ehci_readl(ehci, reg);
 		if (t1 & PORT_RESUME) {
-			LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x4D);
 			return -EBUSY;
 		}
 	}
@@ -147,8 +146,6 @@ static int ehci_bus_suspend (struct usb_hcd *hcd)
 				ehci_dbg(ehci, "suspend failed because "
 						"port %d is resuming\n",
 						port + 1);
-				LOG_USBHOST_ACTIVITY( \
-					aUsbHostDbg, iUsbHostDbg, 0x4D);
 				return -EBUSY;
 			}
 		}
@@ -242,7 +239,6 @@ static int ehci_bus_suspend (struct usb_hcd *hcd)
 	ehci_readl(ehci, &ehci->regs->intr_enable);
 
 	ehci->next_statechange = jiffies + msecs_to_jiffies(10);
-	LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x40);
 	spin_unlock_irq (&ehci->lock);
 
 	/* ehci_work() may have re-enabled the watchdog timer, which we do not
@@ -323,7 +319,6 @@ static int ehci_bus_resume (struct usb_hcd *hcd)
 
 	/* msleep for 20ms only if code is trying to resume port */
 	if (resume_needed) {
-		LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x31);
 		spin_unlock_irq(&ehci->lock);
 		msleep(20);
 		spin_lock_irq(&ehci->lock);
@@ -358,8 +353,6 @@ static int ehci_bus_resume (struct usb_hcd *hcd)
 	/* Now we can safely re-enable irqs */
 	ehci_writel(ehci, INTR_MASK, &ehci->regs->intr_enable);
 
-	LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x32);
-	LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, jiffies);
 	spin_unlock_irq (&ehci->lock);
 	ehci_handover_companion_ports(ehci);
 	return 0;
@@ -1016,7 +1009,6 @@ static int ehci_hub_control (
 						+ msecs_to_jiffies (50);
 			}
 			ehci_writel(ehci, temp, status_reg);
-			LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x18);
 			break;
 
 		/* For downstream facing ports (these):  one hub port is put

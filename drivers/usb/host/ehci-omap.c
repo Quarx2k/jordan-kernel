@@ -622,8 +622,6 @@ static irqreturn_t usbtll_irq(int irq, void *pdev)
 
 	spin_lock_irqsave(&usb_clocks_lock, flags);
 	if (usbtll_irqstatus & 1) {
-		LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x30);
-		LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, jiffies);
 		if (test_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags)) {
 			ehci_omap_writel(omap->tll_base,
 				OMAP_USBTLL_IRQSTATUS, usbtll_irqstatus);
@@ -983,7 +981,6 @@ static int ehci_omap_bus_suspend(struct usb_hcd *hcd)
 		if (omap->usbtll_fck)
 			clk_disable(omap->usbtll_fck);
 		clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
-		LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, jiffies);
 	}
 	spin_unlock_irqrestore(&usb_clocks_lock, flags);
 #ifdef CONFIG_HAS_WAKELOCK
