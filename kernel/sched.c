@@ -4335,7 +4335,6 @@ load_balance_newidle(int this_cpu, struct rq *this_rq, struct sched_domain *sd)
 	int sd_idle = 0;
 	int all_pinned = 0;
 	struct cpumask *cpus = __get_cpu_var(load_balance_tmpmask);
-);
 
 	cpumask_copy(cpus, cpu_active_mask);
 
