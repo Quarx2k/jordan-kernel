@@ -60,7 +60,6 @@
 #include <linux/ti_wilink_st.h>
 #include <linux/skbuff.h>
 #endif
-#include "cm-regbits-34xx.h"
 
 #ifdef CONFIG_ARM_OF
 #include <mach/dt_path.h>
@@ -110,22 +109,11 @@
 #define ATMXT_NAME	"placeholder"
 #define CYTTSP_NAME	"placeholder"
 
-#define MAPPHONE_IPC_USB_SUSP_GPIO	142
 #define MAPPHONE_LM_3530_INT_GPIO	92
 #define MAPPHONE_AKM8973_INT_GPIO	175
-#define MAPPHONE_AKM8975_INT_GPIO       175
-#define MAPPHONE_AUDIO_PATH_GPIO	143
-#define MAPPHONE_BP_READY2_AP_GPIO	59
 #define MAPPHONE_POWER_OFF_GPIO		176
-#define MAPPHONE_BPWAKE_STROBE_GPIO	157
-#define MAPPHONE_APWAKE_TRIGGER_GPIO	141
-#define MAPPHONE_AIRC_INT_GPIO        180
 #define MAPPHONE_BT_RESET_GPIO 21 //get_gpio_by_name("bt_reset_b")
 #define WILINK_UART_DEV_NAME "/dev/ttyS1"
-
-#define MAPPHONE_MMCPROBE_ENABLED 0
-
-#define CAMERA_FLASH_ID 0
 
 /* CPCAP Defines */
 #define CPCAP_SMPS_VOL_OPP1        0x02
@@ -1446,11 +1434,7 @@ static int __init mapphone_i2c_init(void)
 
 	return 0;
 }
-
 arch_initcall(mapphone_i2c_init);
-
-extern void __init mapphone_spi_init(void);
-extern void __init mapphone_gpio_iomux_init(void);
 
 static void __init mapphone_serial_init(void)
 {

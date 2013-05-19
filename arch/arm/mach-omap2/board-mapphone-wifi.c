@@ -4,13 +4,9 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/platform_device.h>
-#include <linux/delay.h>
-#include <linux/mmc/host.h>
-#include <linux/mmc/sdio_ids.h>
 #include <linux/err.h>
 
 #include <asm/gpio.h>
-#include <asm/io.h>
 #include <plat/board-mapphone.h>
 #include <linux/wl12xx.h>
 

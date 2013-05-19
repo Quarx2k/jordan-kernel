@@ -58,16 +58,6 @@ static struct platform_device cpcap_usb_det_device = {
 };
 #endif /* CONFIG_CPCAP_USB */
 
-#ifdef CONFIG_TTA_CHARGER
-static struct platform_device cpcap_tta_det_device = {
-	.name   = "cpcap_tta_charger",
-	.id     = -1,
-	.dev    = {
-		.platform_data  = NULL,
-	},
-};
-#endif
-
 
 #ifdef CONFIG_SOUND_CPCAP_OMAP
 static struct platform_device cpcap_audio_device = {
@@ -76,32 +66,13 @@ static struct platform_device cpcap_audio_device = {
 	.dev.platform_data  = NULL,
 };
 #endif
-#ifdef CONFIG_PM_DBG_DRV
-static struct platform_device cpcap_pm_dbg_device = {
-	.name		= "cpcap_pm_dbg",
-	.id		= -1,
-	.dev		= {
-		.platform_data = NULL,
-	},
-};
-
-static struct pm_dbg_drvdata cpcap_pm_dbg_drvdata = {
-	.pm_cd_factor = 1000,
-};
-#endif
 
 static struct platform_device *cpcap_devices[] = {
 #ifdef CONFIG_CPCAP_USB
 	&cpcap_usb_device,
 	&cpcap_usb_det_device,
 #endif
-#ifdef CONFIG_SOUND_CPCAP_OMAP
-	&cpcap_audio_device,
-#endif
 	&cpcap_3mm5_device,
-#ifdef CONFIG_TTA_CHARGER
-	&cpcap_tta_det_device,
-#endif
 #ifdef CONFIG_LEDS_AF_LED
 	&cpcap_af_led,
 #endif
@@ -529,25 +500,6 @@ static void cpcap_leds_init(void)
 		node = of_find_node_by_name(node, "LEDController");
 	}
 }
-
-#ifdef CONFIG_PM_DBG_DRV
-static void get_pm_dbg_drvdata(void)
-{
-	struct device_node *node;
-	const void *prop;
-	int size;
-
-	node = of_find_node_by_path("/System@0/PMDbgDevice@0");
-	if (node) {
-		prop = of_get_property(node,
-			"pm_cd_factor",
-			&size);
-		if (prop && size)
-			cpcap_pm_dbg_drvdata.pm_cd_factor = *(u16 *)prop;
-	}
-}
-#endif
-
 #endif /* CONFIG_ARM_OF */
 
 
@@ -567,9 +519,4 @@ void __init mapphone_cpcap_client_init(void)
 	if (led_cpcap_lm3554_init() > 0)
 		cpcap_device_register(&cpcap_lm3554);
 
-#ifdef CONFIG_PM_DBG_DRV
-	get_pm_dbg_drvdata();
-	cpcap_device_register(&cpcap_pm_dbg_device);
-	platform_set_drvdata(&cpcap_pm_dbg_device, &cpcap_pm_dbg_drvdata);
-#endif
 }
