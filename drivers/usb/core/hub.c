@@ -416,11 +416,9 @@ static void hub_irq(struct urb *urb)
 	case -ENOENT:		/* synchronous unlink */
 	case -ECONNRESET:	/* async unlink */
 	case -ESHUTDOWN:	/* hardware going away */
-		LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x51);
 		return;
 
 	default:		/* presumably an error */
-		LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x52);
 		/* Cause a hub reset after 10 consecutive errors */
 		dev_dbg (hub->intfdev, "transfer --> %d\n", status);
 		if ((++hub->nerrors < 10) || hub->error)
@@ -430,7 +428,6 @@ static void hub_irq(struct urb *urb)
 
 	/* let khubd handle things */
 	case 0:			/* we got data:  port status changed */
-		LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x50);
 		bits = 0;
 		for (i = 0; i < urb->actual_length; ++i)
 			bits |= ((unsigned long) ((*hub->buffer)[i]))
@@ -448,7 +445,6 @@ resubmit:
 	if (hub->quiescing)
 		return;
 
-	LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x53);
 	if ((status = usb_submit_urb (hub->urb, GFP_ATOMIC)) != 0
 			&& status != -ENODEV && status != -EPERM)
 		dev_err (hub->intfdev, "resubmit --> %d\n", status);
@@ -733,7 +729,6 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 			clear_port_feature(hdev, port1, USB_PORT_FEAT_ENABLE);
 #endif
 			portstatus &= ~USB_PORT_STAT_ENABLE;
-			LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x26);
 		}
 
 		/* Clear status-change flags; we'll debounce later */
@@ -743,7 +738,6 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 			clear_port_feature(hub->hdev, port1,
 					USB_PORT_FEAT_C_CONNECTION);
 #endif
-			LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x27);
 		}
 		if (portchange & USB_PORT_STAT_C_ENABLE) {
 			need_debounce_delay = true;
@@ -751,7 +745,6 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 			clear_port_feature(hub->hdev, port1,
 					USB_PORT_FEAT_C_ENABLE);
 #endif
-			LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x28);
 		}
 
 		if (!udev || udev->state == USB_STATE_NOTATTACHED) {
@@ -760,8 +753,6 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 			 */
 			if (udev || (portstatus & USB_PORT_STAT_CONNECTION)) {
 				set_bit(port1, hub->change_bits);
-				LOG_USBHOST_ACTIVITY( \
-					aUsbHostDbg, iUsbHostDbg, 0x29);
 			}
 
 		} else if (portstatus & USB_PORT_STAT_ENABLE) {
@@ -772,8 +763,6 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 			 */
 			if (portchange) {
 				set_bit(port1, hub->change_bits);
-				LOG_USBHOST_ACTIVITY( \
-					aUsbHostDbg, iUsbHostDbg, 0x2A);
 			}
 
 		} else if (udev->persist_enabled) {
@@ -781,12 +770,10 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 			udev->reset_resume = 1;
 #endif
 			set_bit(port1, hub->change_bits);
-			LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x2B);
 		} else {
 			/* The power session is gone; tell khubd */
 			usb_set_device_state(udev, USB_STATE_NOTATTACHED);
 			set_bit(port1, hub->change_bits);
-			LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x2C);
 		}
 	}
 
@@ -829,7 +816,6 @@ static void hub_init_func2(struct work_struct *ws)
 {
 	struct usb_hub *hub = container_of(ws, struct usb_hub, init_work.work);
 
-	LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x21);
 	hub_activate(hub, HUB_INIT2);
 }
 
@@ -837,7 +823,6 @@ static void hub_init_func3(struct work_struct *ws)
 {
 	struct usb_hub *hub = container_of(ws, struct usb_hub, init_work.work);
 
-	LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x22);
 	hub_activate(hub, HUB_INIT3);
 }
 
@@ -885,7 +870,6 @@ static int hub_post_reset(struct usb_interface *intf)
 {
 	struct usb_hub *hub = usb_get_intfdata(intf);
 
-	LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x23);
 	hub_activate(hub, HUB_POST_RESET);
 	return 0;
 }
@@ -1151,7 +1135,6 @@ static int hub_configure(struct usb_hub *hub,
 	if (hub->has_indicators && blinkenlights)
 		hub->indicator [0] = INDICATOR_CYCLE;
 
-	LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x20);
 	hub_activate(hub, HUB_INIT);
 	return 0;
 
@@ -1996,8 +1979,6 @@ static int hub_port_reset(struct usb_hub *hub, int port1,
 {
 	int i, status;
 
-	LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x10);
-
 	/* Block EHCI CF initialization during the port reset.
 	 * Some companion controllers don't like it when they mix.
 	 */
@@ -2017,15 +1998,12 @@ static int hub_port_reset(struct usb_hub *hub, int port1,
 				dev_dbg(hub->intfdev,
 						"port_wait_reset: err = %d\n",
 						status);
-				LOG_USBHOST_ACTIVITY( \
-					aUsbHostDbg, iUsbHostDbg, 0x11);
 			}
 		}
 
 		/* return on disconnect or reset */
 		switch (status) {
 		case 0:
-			LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x12);
 			/* TRSTRCY = 10 ms; plus some extra */
 			msleep(10 + 40);
 			update_address(udev, 0);
@@ -2053,7 +2031,6 @@ static int hub_port_reset(struct usb_hub *hub, int port1,
 
  done:
 	up_read(&ehci_cf_port_reset_rwsem);
-	LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x13);
 	return status;
 }
 
@@ -2082,7 +2059,6 @@ static int check_port_resume_type(struct usb_device *udev,
 	else if (!(portstatus & USB_PORT_STAT_ENABLE) && !udev->reset_resume) {
 		if (udev->persist_enabled) {
 			udev->reset_resume = 1;
-			LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x38);
 		}
 		else
 			status = -ENODEV;
@@ -2236,7 +2212,6 @@ static int finish_port_resume(struct usb_device *udev)
 	 */
 	if (udev->reset_resume) {
  retry_reset_resume:
-		LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x36);
 		status = usb_reset_and_verify_device(udev);
 	}
 
@@ -2264,7 +2239,6 @@ static int finish_port_resume(struct usb_device *udev)
 	}
 
 	if (status) {
-		LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x3D);
 		dev_dbg(&udev->dev, "gone after usb resume? status %d\n",
 				status);
 	} else if (udev->actconfig) {
@@ -2334,7 +2308,6 @@ int usb_port_resume(struct usb_device *udev, pm_message_t msg)
 		goto SuspendCleared;
 
 	// dev_dbg(hub->intfdev, "resume port %d\n", port1);
-	LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x34);
 	set_bit(port1, hub->busy_bits);
 
 	/* see 7.1.7.7; affects power usage, but not budgeting */
@@ -2343,7 +2316,6 @@ int usb_port_resume(struct usb_device *udev, pm_message_t msg)
 	if (status) {
 		dev_dbg(hub->intfdev, "can't resume port %d, status %d\n",
 				port1, status);
-		LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x3F);
 	} else {
 		/* drive resume for at least 20 msec */
 		dev_dbg(&udev->dev, "usb %sresume\n",
@@ -2361,7 +2333,6 @@ int usb_port_resume(struct usb_device *udev, pm_message_t msg)
 	}
 
  SuspendCleared:
-	LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x35);
 	if (status == 0) {
 		if (portchange & USB_PORT_STAT_C_SUSPEND)
 			clear_port_feature(hub->hdev, port1,
@@ -2376,7 +2347,6 @@ int usb_port_resume(struct usb_device *udev, pm_message_t msg)
 		status = finish_port_resume(udev);
 	if (status < 0) {
 		dev_dbg(&udev->dev, "can't resume, status %d\n", status);
-		LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x3C);
 		hub_port_logical_disconnect(hub, port1);
 	}
 	return status;
@@ -2388,7 +2358,6 @@ static int remote_wakeup(struct usb_device *udev)
 	int	status = 0;
 
 	if (udev->state == USB_STATE_SUSPENDED) {
-		LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x33);
 		dev_dbg(&udev->dev, "usb %sresume\n", "wakeup-");
 		usb_mark_last_busy(udev);
 		status = usb_external_resume_device(udev, PMSG_REMOTE_RESUME);
@@ -2466,7 +2435,6 @@ static int hub_resume(struct usb_interface *intf)
 	struct usb_hub *hub = usb_get_intfdata(intf);
 
 	dev_dbg(&intf->dev, "%s\n", __func__);
-	LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x24);
 	hub_activate(hub, HUB_RESUME);
 	return 0;
 }
@@ -2476,7 +2444,6 @@ static int hub_reset_resume(struct usb_interface *intf)
 	struct usb_hub *hub = usb_get_intfdata(intf);
 
 	dev_dbg(&intf->dev, "%s\n", __func__);
-	LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x25);
 	hub_activate(hub, HUB_RESET_RESUME);
 	return 0;
 }
@@ -2495,7 +2462,6 @@ static int hub_reset_resume(struct usb_interface *intf)
 void usb_root_hub_lost_power(struct usb_device *rhdev)
 {
 	dev_warn(&rhdev->dev, "root hub lost power or was reset\n");
-	LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x3E);
 	rhdev->reset_resume = 1;
 }
 EXPORT_SYMBOL_GPL(usb_root_hub_lost_power);
@@ -2635,8 +2601,6 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 	char 			*speed, *type;
 	int			devnum = udev->devnum;
 
-	LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0xC);
-
 	/* root hub ports have a slightly longer reset period
 	 * (from USB 2.0 spec, section 7.1.7.5)
 	 */
@@ -2679,7 +2643,6 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 
 	if (oldspeed != USB_SPEED_UNKNOWN && oldspeed != udev->speed) {
 		dev_dbg(&udev->dev, "device reset changed speed!\n");
-		LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0xE);
 		goto fail;
 	}
 
@@ -2810,7 +2773,6 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 					buf->bMaxPacketSize0;
 			kfree(buf);
 
-			LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0xD);
 #ifndef CONFIG_MAPPHONE_2NDBOOT
 			retval = hub_port_reset(hub, port1, udev, delay);
 #else
@@ -2926,7 +2888,6 @@ fail:
 	if (retval) {
 		hub_port_disable(hub, port1, 0);
 		update_address(udev, devnum);	/* for disconnect processing */
-		LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0xF);
 	}
 	mutex_unlock(&usb_address0_mutex);
 	return retval;
@@ -3042,7 +3003,6 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
 #ifdef CONFIG_USB_SUSPEND
 		} else if (udev->state == USB_STATE_SUSPENDED &&
 				udev->persist_enabled) {
-			LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x6);
 			/* For a suspended device, treat this as a
 			 * remote wakeup event.
 			 */
@@ -3056,14 +3016,12 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
 
 		if (status == 0) {
 			clear_bit(port1, hub->change_bits);
-			LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x8);
 			return;
 		}
 	}
 
 	/* Disconnect any existing devices under this port */
 	if (udev) {
-		LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x9);
 		usb_disconnect(&hdev->children[port1-1]);
 	}
 	clear_bit(port1, hub->change_bits);
@@ -3072,7 +3030,6 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
 				USB_PORT_STAT_C_ENABLE)) {
 		status = hub_port_debounce(hub, port1);
 		if (status < 0) {
-			LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0xA);
 			if (printk_ratelimit())
 				dev_err(hub_dev, "connect-debounce failed, "
 						"port %d disabled\n", port1);
@@ -3108,7 +3065,6 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
 			goto done;
 		}
 
-		LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0xB);
 		usb_set_device_state(udev, USB_STATE_POWERED);
  		udev->bus_mA = hub->mA_per_port;
 		udev->level = hdev->level + 1;
@@ -3257,7 +3213,6 @@ static void hub_events(void)
 	int i, ret;
 	int connect_change;
 
-	LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x0);
 	/*
 	 *  We restart the list every time to avoid a deadlock with
 	 * deleting hubs downstream from this one. This should be
@@ -3305,7 +3260,6 @@ static void hub_events(void)
 		}
 
 		/* Autoresume */
-		LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x1);
 		ret = usb_autopm_get_interface(intf);
 		if (ret) {
 			dev_dbg(hub_dev, "Can't autoresume: %d\n", ret);
@@ -3320,7 +3274,6 @@ static void hub_events(void)
 			dev_dbg (hub_dev, "resetting for error %d\n",
 				hub->error);
 
-			LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x2);
 			ret = usb_reset_device(hdev);
 			if (ret) {
 				dev_dbg (hub_dev,
@@ -3390,8 +3343,6 @@ static void hub_events(void)
 					msleep(10);
 
 					usb_lock_device(udev);
-					LOG_USBHOST_ACTIVITY( \
-						aUsbHostDbg, iUsbHostDbg, 0x3);
 					ret = remote_wakeup(hdev->
 							children[i-1]);
 					usb_unlock_device(udev);
@@ -3400,8 +3351,6 @@ static void hub_events(void)
 				} else {
 					ret = -ENODEV;
 					hub_port_disable(hub, i, 1);
-					LOG_USBHOST_ACTIVITY( \
-						aUsbHostDbg, iUsbHostDbg, 0x4);
 				}
 				dev_dbg (hub_dev,
 					"resume on port %d, status %d\n",
@@ -3421,8 +3370,6 @@ static void hub_events(void)
 				dev_dbg (hub_dev,
 					"reset change on port %d\n",
 					i);
-				LOG_USBHOST_ACTIVITY( \
-					aUsbHostDbg, iUsbHostDbg, 0x5);
 				clear_port_feature(hdev, i,
 					USB_PORT_FEAT_C_RESET);
 			}
@@ -3672,14 +3619,12 @@ static int usb_reset_and_verify_device(struct usb_device *udev)
 			udev->state == USB_STATE_SUSPENDED) {
 		dev_dbg(&udev->dev, "device reset not allowed in state %d\n",
 				udev->state);
-		LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x3A);
 		return -EINVAL;
 	}
 
 	if (!parent_hdev) {
 		/* this requires hcd-specific logic; see OHCI hc_restart() */
 		dev_dbg(&udev->dev, "%s for root hub!\n", __func__);
-		LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x3B);
 		return -EISDIR;
 	}
 	parent_hub = hdev_to_hub(parent_hdev);
@@ -3754,7 +3699,6 @@ done:
 	return 0;
  
 re_enumerate:
-	LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x37);
 	hub_port_logical_disconnect(parent_hub, port1);
 	return -ENODEV;
 }
@@ -3814,7 +3758,6 @@ int usb_reset_device(struct usb_device *udev)
 		}
 	}
 
-	LOG_USBHOST_ACTIVITY(aUsbHostDbg, iUsbHostDbg, 0x39);
 	ret = usb_reset_and_verify_device(udev);
 
 	if (config) {
