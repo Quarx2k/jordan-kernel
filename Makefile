@@ -1040,7 +1040,7 @@ define filechk_utsrelease.h
 	  exit 1;                                                         \
 	fi;                                                               \
 	(echo \#define KERNEL_VER_NOSCM \"$(KERNEL_VER_NOSCM)\";          \
-	echo \#define UTS_RELEASE \"$(KERNEL_VER_NOSCM)-Jellybean\";)
+	echo \#define UTS_RELEASE \"$(KERNEL_VER_NOSCM)-AeroKernel\";)
 endef
 
 define filechk_version.h
