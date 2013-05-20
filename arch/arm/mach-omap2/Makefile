@@ -89,18 +89,6 @@ obj-$(CONFIG_MACH_OMAP_ZOOM2)		+= board-zoom2.o \
 					   board-ldp-flash.o \
 					   board-zoom2-camera.o \
 					   board-zoom2-wifi.o
-obj-$(CONFIG_MACH_SHOLES)		+= board-sholes.o \
-					   board-sholes-camera.o \
-					   board-sholes-flash.o \
-					   board-sholes-spi.o \
-					   board-sholes-sensors.o \
-					   board-sholes-hsmmc.o \
-					   board-sholes-keypad.o \
-					   board-sholes-wifi.o \
-					   board-sholes-mmcprobe.o 
-
-# usbnet temporarily disabled
-#					   board-sholes-usbnet.o \
 
 obj-$(CONFIG_MACH_MAPPHONE)             += board-mapphone.o \
                                            board-mapphone-camera.o \
