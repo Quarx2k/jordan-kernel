@@ -1778,6 +1778,7 @@ static void __init mapphone_init(void)
 	mapphone_hsmmc_init();
 	mapphone_sgx_init();
 	mapphone_power_off_init();
+	mapphone_gadget_init();
 	mapphone_sim_init();
 }
 
