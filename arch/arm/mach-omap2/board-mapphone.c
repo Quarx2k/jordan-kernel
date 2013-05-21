@@ -1562,6 +1562,27 @@ u32 omap_pmic_voltage_ramp_delay(u8 srid, u8 target_vsel, u8 current_vsel)
 static void mapphone_pm_init(void)
 {
 	omap3_pm_init_vc(&mapphone_prm_setup);
+
+	/* Set CPCAP SW1/SW2 I2C CNTL Reg to 0x45 (PSM/PSM mode, VPLL enabled)
+	 * to avoid extra current drain in active case before hit RET once
+	 */
+	omap3_bypass_cmd(CPCAP_SRI2C_SLAVE_ADDR_VDD1,
+			CPCAP_SMPS_VOL_CNTL, 0x45);
+	omap3_bypass_cmd(CPCAP_SRI2C_SLAVE_ADDR_VDD1,
+			CPCAP_SMPS_VOL_OPP1, 0x13);
+	omap3_bypass_cmd(CPCAP_SRI2C_SLAVE_ADDR_VDD1,
+			CPCAP_SMPS_VOL_OPP2, 0x32);
+
+	/* SW2, OPP1 for RET Voltage --- 0.8375V,
+	 * OPP2 for ON Voltge --- 1.175V(OPP3)
+	 */
+	omap3_bypass_cmd(CPCAP_SRI2C_SLAVE_ADDR_VDD2,
+			CPCAP_SMPS_VOL_CNTL, 0x45);
+	omap3_bypass_cmd(CPCAP_SRI2C_SLAVE_ADDR_VDD2,
+			CPCAP_SMPS_VOL_OPP1, 0x13);
+	omap3_bypass_cmd(CPCAP_SRI2C_SLAVE_ADDR_VDD2,
+			CPCAP_SMPS_VOL_OPP2, 0x2E);
+
 }
 
 /* must match value in drivers/w1/w1_family.h */
