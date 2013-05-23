@@ -104,7 +104,7 @@ obj-$(CONFIG_MACH_MAPPHONE)             += board-mapphone.o \
 					   board-mapphone-padconf.o
 
 obj-$(CONFIG_EMU_UART_DEBUG)		+= board-mapphone-emu_uart.o
-obj-$(CONFIG_HAVE_TRACE_CLOCK)		+= trace-clock.o
+
 obj-$(CONFIG_MACH_NOKIA_RX51)		+= board-rx51.o \
 					   board-rx51-sdram.o \
 					   board-rx51-peripherals.o \
