@@ -341,16 +341,14 @@ static inline long work_on_cpu(unsigned int cpu, long (*fn)(void *), void *arg)
 long work_on_cpu(unsigned int cpu, long (*fn)(void *), void *arg);
 #endif /* CONFIG_SMP */
 
-<<<<<<< HEAD
 #ifdef CONFIG_LOCKDEP
 int in_workqueue_context(struct workqueue_struct *wq);
 #endif
-=======
+
 #ifdef CONFIG_FREEZER
 extern void freeze_workqueues_begin(void);
 extern bool freeze_workqueues_busy(void);
 extern void thaw_workqueues(void);
 #endif /* CONFIG_FREEZER */
 
->>>>>>> a0a1a5f... workqueue: reimplement workqueue freeze using max_active
 #endif

@@ -833,7 +833,7 @@ static int __init cpufreq_boosted_init(void)
 	}
 
 	// Scale up is high priority
-	up_wq = create_rt_workqueue("kboosted_up");
+	up_wq = create_singlethread_workqueue("kboosted_up");
 	down_wq = create_workqueue("kboosted_down");
 	if (!up_wq || !down_wq)
 		return -ENOMEM;

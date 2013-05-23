@@ -221,7 +221,7 @@ OMAPLFB_ERROR OMAPLFBCreateSwapQueue(OMAPLFB_SWAPCHAIN *psSwapChain)
 	psSwapChain->psWorkQueue = create_freezable_workqueue(DEVNAME);
 #else
 	
-	psSwapChain->psWorkQueue = __create_workqueue(DEVNAME, 1, 1, 1);
+	psSwapChain->psWorkQueue = __create_workqueue(DEVNAME, /*1,*/ 1, 1);
 #endif
 #endif
 	if (psSwapChain->psWorkQueue == NULL)
