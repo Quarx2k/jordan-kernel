@@ -134,7 +134,7 @@ MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("platform:" MUSB_DRIVER_NAME);
 
-
+struct musb *g_musb;
 /*-------------------------------------------------------------------------*/
 
 static inline struct musb *dev_to_musb(struct device *dev)
@@ -1918,6 +1918,8 @@ bad_config:
 	musb = allocate_instance(dev, plat->config, ctrl);
 	if (!musb)
 		return -ENOMEM;
+
+	g_musb = musb;
 
 	spin_lock_init(&musb->lock);
 	musb->board_mode = plat->mode;

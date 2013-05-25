@@ -279,6 +279,8 @@ static int configure_hardware(struct cpcap_usb_det_data *data,
 	return retval;
 }
 
+extern void cpcap_musb_notifier_call(bool event);
+
 static void notify_accy(struct cpcap_usb_det_data *data, enum cpcap_accy accy)
 {
 	dev_info(&data->cpcap->spi->dev, "notify_accy: accy=%d\n", accy);
@@ -309,6 +311,15 @@ static void notify_accy(struct cpcap_usb_det_data *data, enum cpcap_accy accy)
 	} else if (data->usb_connected_dev) {
 		platform_device_del(data->usb_connected_dev);
 		data->usb_connected_dev = NULL;
+	}
+
+
+	if (accy == CPCAP_ACCY_NONE || accy == CPCAP_ACCY_CHARGER) {
+		printk("USB disconnected!\n");
+		cpcap_musb_notifier_call(false);
+	} else if ((accy == CPCAP_ACCY_USB) || (accy == CPCAP_ACCY_FACTORY)) {
+		printk("USB connected!\n");
+		cpcap_musb_notifier_call(true);
 	}
 
 	if (accy == CPCAP_ACCY_CHARGER) {

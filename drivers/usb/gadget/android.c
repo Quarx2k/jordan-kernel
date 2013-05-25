@@ -63,6 +63,7 @@ MODULE_VERSION("1.0");
 
 static const char longname[] = "Gadget Android";
 
+struct usb_gadget *g_gadget;
 /* Default vendor and product IDs, overridden by userspace */
 #define VENDOR_ID		0x18D1
 #define PRODUCT_ID		0x0001
@@ -136,16 +137,6 @@ static struct usb_gadget_strings *dev_strings[] = {
 	&stringtab_dev,
 	NULL,
 };
-
-void android_usb_set_connected(int connected)
-{
-	if (_android_dev && _android_dev->cdev && _android_dev->cdev->gadget) {
-		if (connected)
-			usb_gadget_connect(_android_dev->cdev->gadget);
-		else
-			usb_gadget_disconnect(_android_dev->cdev->gadget);
-	}
-}
 
 static struct usb_device_descriptor device_desc = {
 	.bLength              = sizeof(device_desc),
@@ -983,6 +974,7 @@ static int android_bind(struct usb_composite_dev *cdev)
 	if (ret)
 		return ret;
 
+	g_gadget = gadget;
 	/* Allocate string descriptor numbers ... note that string
 	 * contents can be overridden by the composite_dev glue.
 	 */

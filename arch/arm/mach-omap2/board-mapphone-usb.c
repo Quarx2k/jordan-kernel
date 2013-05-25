@@ -16,47 +16,11 @@
 #include <mach/gpio.h>
 #include <linux/gpio_mapping.h>
 #include <plat/usb.h>
-#include <linux/usb/android_composite.h>
 
 #include "cm-regbits-34xx.h"
 #include "clock.h"
 
 #define MAPPHONE_IPC_USB_SUSP_GPIO	142
-
-static int cpcap_usb_connected_probe(struct platform_device *pdev)
-{
-	android_usb_set_connected(1);
-	return 0;
-}
-
-static int cpcap_usb_connected_remove(struct platform_device *pdev)
-{
-	android_usb_set_connected(0);
-	return 0;
-}
-
-static struct platform_device android_usb_platform_device = {
-	.name	= "android_gadget",
-	.id	= -1,
-	.dev	= {
-	},
-};
-
-static struct platform_driver cpcap_usb_connected_driver = {
-	.probe		= cpcap_usb_connected_probe,
-	.remove		= cpcap_usb_connected_remove,
-	.driver		= {
-		.name	= "cpcap_usb_connected",
-		.owner	= THIS_MODULE,
-	},
-};
-
-
-void mapphone_gadget_init(void)
-{
-	platform_device_register(&android_usb_platform_device);
-	platform_driver_register(&cpcap_usb_connected_driver);
-}
 
 static int mapphone_usb_port_startup(struct platform_device *dev, int port)
 {

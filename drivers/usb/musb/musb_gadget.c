@@ -1499,14 +1499,13 @@ musb_gadget_set_self_powered(struct usb_gadget *gadget, int is_selfpowered)
 	return 0;
 }
 
-static void musb_pullup(struct musb *musb, int is_on)
+static void musb_pullup2(struct musb *musb, int is_on)
 {
 	u8 power;
 	u32 reg, stdby;
 
 	reg = omap_readl(OTG_SYSCONFIG);
 	stdby = omap_readl(OTG_FORCESTDBY);
-
 
 	power = musb_readb(musb->mregs, MUSB_POWER);
 	if (is_on) {
@@ -1533,6 +1532,29 @@ static void musb_pullup(struct musb *musb, int is_on)
 	DBG(3, "gadget %s D+ pullup %s\n",
 		musb->gadget_driver->function, is_on ? "on" : "off");
 	musb_writeb(musb->mregs, MUSB_POWER, power);
+}
+
+bool cpcap_usb;
+
+static void musb_pullup(struct musb *musb, int is_on)
+{
+	is_on = !!is_on;
+
+	if (is_on && !cpcap_usb) {
+		printk("Disable usb:\n");
+		musb_pullup2(musb, !is_on);
+		stop_activity(musb, musb->gadget_driver);
+	} else if (is_on && cpcap_usb) {
+		musb_pullup2(musb, is_on);
+		printk("Enable usb\n");
+	}
+}
+
+void cpcap_musb_notifier_call(bool event)
+{
+ 	struct musb *musb = g_musb;
+	cpcap_usb = event;
+	musb_pullup(musb,1);
 }
 
 #if 0
