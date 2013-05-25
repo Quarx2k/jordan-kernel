@@ -28,6 +28,7 @@
 #include <linux/kthread.h>
 #include <linux/mutex.h>
 #include <linux/slab.h>
+#include <linux/kernel_stat.h>
 #include <linux/input.h>
 #include <linux/earlysuspend.h>
 #include <asm/cputime.h>
@@ -85,7 +86,7 @@ static cpumask_t tune_cpumask;
 static spinlock_t tune_cpumask_lock;
 
 /* Consider IO as busy */
-static unsigned long io_is_busy;
+static bool io_is_busy = true;
 
 /* History for last freq before it went to suspend*/
 static unsigned int last_freq;
@@ -190,6 +191,43 @@ struct cpufreq_governor cpufreq_gov_interactive = {
 	.owner = THIS_MODULE,
 };
 
+static inline cputime64_t get_cpu_idle_time_jiffy(unsigned int cpu,
+              cputime64_t *wall)
+{
+  u64 idle_time;
+  u64 cur_wall_time;
+  u64 busy_time;
+
+  cur_wall_time = jiffies64_to_cputime64(get_jiffies_64());
+
+  busy_time  = kstat_cpu(cpu).cpustat.user;
+  busy_time += kstat_cpu(cpu).cpustat.system;
+  busy_time += kstat_cpu(cpu).cpustat.irq;
+  busy_time += kstat_cpu(cpu).cpustat.softirq;
+  busy_time += kstat_cpu(cpu).cpustat.steal;
+  busy_time += kstat_cpu(cpu).cpustat.nice;
+
+  idle_time = cur_wall_time - busy_time;
+  if (wall)
+    *wall = jiffies_to_usecs(cur_wall_time);
+
+  return jiffies_to_usecs(idle_time);
+}
+
+static inline cputime64_t get_cpu_idle_time(unsigned int cpu,
+              cputime64_t *wall)
+{
+  u64 idle_time = get_cpu_idle_time_us(cpu, wall);
+
+  if (idle_time == -1ULL)
+    idle_time = get_cpu_idle_time_jiffy(cpu, wall);
+  else if (!io_is_busy)
+    idle_time += get_cpu_iowait_time_us(cpu, wall);
+
+  return idle_time;
+}
+
+
 static inline cputime64_t get_cpu_iowait_time(
 	unsigned int cpu, cputime64_t *wall)
 {
@@ -241,7 +279,7 @@ static void cpufreq_interactive_timer(unsigned long data)
 	time_in_idle = pcpu->time_in_idle;
 	time_in_iowait = pcpu->time_in_iowait;
 	idle_exit_time = pcpu->idle_exit_time;
-	now_idle = get_cpu_idle_time_us(data, &pcpu->timer_run_time);
+	now_idle = get_cpu_idle_time(data, &pcpu->timer_run_time);
 	now_iowait = get_cpu_iowait_time(data, NULL);
 	smp_wmb();
 
@@ -448,7 +486,7 @@ rearm:
 			pcpu->timer_idlecancel = 1;
 		}
 
-		pcpu->time_in_idle = get_cpu_idle_time_us(
+		pcpu->time_in_idle = get_cpu_idle_time(
 			data, &pcpu->idle_exit_time);
 		pcpu->time_in_iowait = get_cpu_iowait_time(
 			data, NULL);
@@ -542,7 +580,7 @@ static void cpufreq_interactive_idle_start(void)
 		 * the CPUFreq driver.
 		 */
 		if (!pending) {
-			pcpu->time_in_idle = get_cpu_idle_time_us(
+			pcpu->time_in_idle = get_cpu_idle_time(
 				smp_processor_id(), &pcpu->idle_exit_time);
 			pcpu->time_in_iowait = get_cpu_iowait_time(
 				smp_processor_id(), NULL);
@@ -595,7 +633,7 @@ static void cpufreq_interactive_idle_end(void)
 	    pcpu->timer_run_time >= pcpu->idle_exit_time &&
 	    pcpu->governor_enabled) {
 		pcpu->time_in_idle =
-			get_cpu_idle_time_us(smp_processor_id(),
+			get_cpu_idle_time(smp_processor_id(),
 					     &pcpu->idle_exit_time);
 		pcpu->time_in_iowait =
 			get_cpu_iowait_time(smp_processor_id(),
@@ -772,7 +810,7 @@ static void cpufreq_interactive_boost(void)
 			pcpu->target_freq = input_boost_freq;
 			cpumask_set_cpu(i, &up_cpumask);
 			pcpu->target_set_time_in_idle =
-				get_cpu_idle_time_us(i, &pcpu->target_set_time);
+				get_cpu_idle_time(i, &pcpu->target_set_time);
 			pcpu->hispeed_validate_time = pcpu->target_set_time;
 			anyboost = 1;
 		}
@@ -932,15 +970,23 @@ static struct global_attr hispeed_freq_attr = __ATTR(hispeed_freq, 0644,
 static ssize_t show_io_is_busy(struct kobject *kobj,
 				     struct attribute *attr, char *buf)
 {
-	return sprintf(buf, "%lu\n", io_is_busy);
+	return sprintf(buf, "%u\n", io_is_busy);
 }
 
 static ssize_t store_io_is_busy(struct kobject *kobj,
 			struct attribute *attr, const char *buf, size_t count)
 {
-	if (!strict_strtoul(buf, 0, &io_is_busy))
-		return count;
-	return -EINVAL;
+	int ret;
+	unsigned long val;
+	
+	ret = strict_strtoul(buf, 0, &val);
+
+	if (ret < 0)
+		return ret;
+
+	io_is_busy = val;
+
+	return count;
 }
 
 static struct global_attr io_is_busy_attr = __ATTR(io_is_busy, 0644,
@@ -1330,7 +1376,7 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 			pcpu->target_freq = policy->cur;
 			pcpu->freq_table = freq_table;
 			pcpu->target_set_time_in_idle =
-				get_cpu_idle_time_us(j,
+				get_cpu_idle_time(j,
 					     &pcpu->target_set_time);
 			pcpu->floor_freq = pcpu->target_freq;
 			pcpu->floor_validate_time =
@@ -1358,6 +1404,7 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 		}
 		history_load_index = 0;
 
+		
 		/*
 		 * Do not register the idle hook and create sysfs
 		 * entries if we have already done so.
