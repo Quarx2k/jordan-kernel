@@ -1,6 +1,6 @@
 /**********************************************************************
  *
- * Copyright (C) Imagination Technologies Ltd. All rights reserved.
+ * Copyright(c) 2008 Imagination Technologies Ltd. All rights reserved.
  * 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -24,37 +24,20 @@
  *
  ******************************************************************************/
 
-#ifndef _HOTKEY_
-#define _HOTKEY_
+#ifndef __REGPATHS_H__
+#define __REGPATHS_H__
+
+#define POWERVR_REG_ROOT 	   			"Drivers\\Display\\PowerVR"
+#define POWERVR_CHIP_KEY				"\\SGX1\\"
+
+#define POWERVR_EURASIA_KEY				"PowerVREurasia\\"
+
+#define POWERVR_SERVICES_KEY			"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\PowerVR\\"
+
+#define PVRSRV_REGISTRY_ROOT			POWERVR_EURASIA_KEY "HWSettings\\PVRSRVKM"
 
 
-typedef struct _hotkeyinfo
-{
-	IMG_UINT8 ui8ScanCode;
-	IMG_UINT8 ui8Type;
-	IMG_UINT8 ui8Flag;
-	IMG_UINT8 ui8Filler1;
-	IMG_UINT32 ui32ShiftState;
-	IMG_UINT32 ui32HotKeyProc;
-	IMG_VOID *pvStream;
-	IMG_UINT32 hHotKey;			
-} HOTKEYINFO, *PHOTKEYINFO;
-
-typedef struct _privatehotkeydata
-{
-	IMG_UINT32		ui32ScanCode;
-	IMG_UINT32		ui32ShiftState;
-	HOTKEYINFO	sHotKeyInfo;
-} PRIVATEHOTKEYDATA, *PPRIVATEHOTKEYDATA;
+#define MAX_REG_STRING_SIZE 128
 
 
-IMG_VOID ReadInHotKeys (IMG_VOID);
-IMG_VOID ActivateHotKeys(PDBG_STREAM psStream);
-IMG_VOID DeactivateHotKeys(IMG_VOID);
-
-IMG_VOID RemoveHotKey (IMG_UINT32 hHotKey);
-IMG_VOID DefineHotKey (IMG_UINT32 ui32ScanCode, IMG_UINT32 ui32ShiftState, PHOTKEYINFO psInfo);
-IMG_VOID RegisterKeyPressed (IMG_UINT32 ui32ScanCode, PHOTKEYINFO psInfo);
-
-#endif
-
+#endif 

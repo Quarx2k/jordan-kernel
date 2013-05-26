@@ -1,26 +1,26 @@
 /**********************************************************************
  *
- * Copyright (C) Imagination Technologies Ltd. All rights reserved.
- * 
+ * Copyright(c) 2008 Imagination Technologies Ltd. All rights reserved.
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
  * version 2, as published by the Free Software Foundation.
- * 
- * This program is distributed in the hope it will be useful but, except 
- * as otherwise stated in writing, without any warranty; without even the 
- * implied warranty of merchantability or fitness for a particular purpose. 
+ *
+ * This program is distributed in the hope it will be useful but, except
+ * as otherwise stated in writing, without any warranty; without even the
+ * implied warranty of merchantability or fitness for a particular purpose.
  * See the GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License along with
  * this program; if not, write to the Free Software Foundation, Inc.,
  * 51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
- * 
+ *
  * The full GNU General Public License is included in this distribution in
  * the file called "COPYING".
  *
  * Contact Information:
  * Imagination Technologies Ltd. <gpl-support@imgtec.com>
- * Home Park Estate, Kings Langley, Herts, WD4 8LZ, UK 
+ * Home Park Estate, Kings Langley, Herts, WD4 8LZ, UK
  *
  ******************************************************************************/
 
@@ -66,7 +66,7 @@
 #include "pvr_drm_shared.h"
 #include "pvr_drm.h"
 
-#else 
+#else
 
 #define DRVNAME "dbgdrv"
 MODULE_SUPPORTED_DEVICE(DRVNAME);
@@ -102,7 +102,7 @@ static struct file_operations dbgdrv_fops = {
 	.mmap           = dbgdrv_mmap,
 };
 
-#endif  
+#endif
 
 IMG_VOID DBGDrvGetServiceTable(IMG_VOID **fn_table);
 
@@ -116,7 +116,7 @@ IMG_VOID DBGDrvGetServiceTable(IMG_VOID **fn_table)
 #if defined(SUPPORT_DRI_DRM)
 void dbgdrv_cleanup(void)
 #else
-static void __exit dbgdrv_cleanup(void)
+void __exit dbgdrv_cleanup_module(void)
 #endif
 {
 #if !defined(SUPPORT_DRI_DRM)
@@ -125,7 +125,7 @@ static void __exit dbgdrv_cleanup(void)
 	class_destroy(psDbgDrvClass);
 #endif
 	unregister_chrdev(AssignedMajorNumber, DRVNAME);
-#endif 
+#endif
 #if defined(SUPPORT_DBGDRV_EVENT_OBJECTS)
 	HostDestroyEventObjects();
 #endif
@@ -136,7 +136,7 @@ static void __exit dbgdrv_cleanup(void)
 #if defined(SUPPORT_DRI_DRM)
 IMG_INT dbgdrv_init(void)
 #else
-static int __init dbgdrv_init(void)
+int __init dbgdrv_init_module(void)
 #endif
 {
 #if (defined(LDM_PLATFORM) || defined(LDM_PCI)) && !defined(SUPPORT_DRI_DRM)
@@ -147,14 +147,14 @@ static int __init dbgdrv_init(void)
 	int err = -EBUSY;
 #endif
 
-	
+
 	if ((g_pvAPIMutex=HostCreateMutex()) == IMG_NULL)
 	{
 		return -ENOMEM;
 	}
 
 #if defined(SUPPORT_DBGDRV_EVENT_OBJECTS)
-	
+
 	(void) HostCreateEventObjects();
 #endif
 
@@ -169,7 +169,7 @@ static int __init dbgdrv_init(void)
 	}
 
 #if defined(LDM_PLATFORM) || defined(LDM_PCI)
-	
+
 	psDbgDrvClass = class_create(THIS_MODULE, DRVNAME);
 	if (IS_ERR(psDbgDrvClass))
 	{
@@ -189,8 +189,8 @@ static int __init dbgdrv_init(void)
 								__func__, PTR_ERR(psDev)));
 		goto ErrDestroyClass;
 	}
-#endif 
-#endif 
+#endif
+#endif
 
 	return 0;
 
@@ -206,7 +206,7 @@ ErrDestroyClass:
 	class_destroy(psDbgDrvClass);
 #endif
 	return err;
-#endif 
+#endif
 }
 
 #if defined(SUPPORT_DRI_DRM)
@@ -240,8 +240,7 @@ long dbgdrv_ioctl(struct file *file, unsigned int ioctlCmd, unsigned long arg)
 		goto init_failed;
 	}
 
-	
-	cmd = MAKEIOCTLINDEX(pIP->ui32Cmd) - DEBUG_SERVICE_IOCTL_BASE - 1;
+	cmd = ((pIP->ui32Cmd >> 2) & 0xFFF) - 0x801;
 
 	if(pIP->ui32Cmd == DEBUG_SERVICE_READ)
 	{
@@ -311,7 +310,5 @@ IMG_VOID DefineHotKey (IMG_UINT32 ui32ScanCode, IMG_UINT32 ui32ShiftState, PHOTK
 
 EXPORT_SYMBOL(DBGDrvGetServiceTable);
 
-#if !defined(SUPPORT_DRI_DRM)
-subsys_initcall(dbgdrv_init);
-module_exit(dbgdrv_cleanup);
-#endif
+module_init(dbgdrv_init_module);
+module_exit(dbgdrv_cleanup_module);
