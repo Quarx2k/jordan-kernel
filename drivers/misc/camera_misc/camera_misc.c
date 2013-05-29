@@ -33,7 +33,7 @@
 
 #define GPIO_SENSOR_NAME "camera_misc"
 
-#define DEBUG 2
+#define DEBUG 0
 
 #define err_print(fmt, args...) \
 	printk(KERN_ERR "fun %s "fmt"\n", __func__, ##args)
