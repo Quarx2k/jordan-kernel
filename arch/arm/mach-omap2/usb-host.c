@@ -67,7 +67,10 @@ static struct usbhs_wakeup {
 static struct omap_device_pad port1_phy_pads[] __initdata = {
 	{
 		.name = "usbb1_ulpitll_stp.usbb1_ulpiphy_stp",
+		.flags  = OMAP_DEVICE_PAD_REMUX,
 		.enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE4,
+		.idle = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE7,
+		.off = OMAP_PIN_OFF_OUTPUT_LOW | OMAP_MUX_MODE7,
 	},
 	{
 		.name = "usbb1_ulpitll_clk.usbb1_ulpiphy_clk",
@@ -171,7 +174,10 @@ static struct omap_device_pad port1_tll_pads[] __initdata = {
 static struct omap_device_pad port2_phy_pads[] __initdata = {
 	{
 		.name = "usbb2_ulpitll_stp.usbb2_ulpiphy_stp",
+		.flags  = OMAP_DEVICE_PAD_REMUX,
 		.enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE4,
+		.idle = OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE7,
+		.off = OMAP_PIN_OFF_OUTPUT_LOW | OMAP_MUX_MODE7,
 	},
 	{
 		.name = "usbb2_ulpitll_clk.usbb2_ulpiphy_clk",
