@@ -90,7 +90,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <linux/workqueue.h>
 #include <linux/fb.h>
 #include <linux/console.h>
-#include <../drivers/video/omap2/omapfb/omapfb.h>
+#include <linux/omapfb.h>
 #include <linux/mutex.h>
 
 #if defined(PVR_OMAPLFB_DRM_FB)
@@ -422,9 +422,8 @@ void OMAPLFBFlip(OMAPLFB_DEVINFO *psDevInfo, OMAPLFB_BUFFER *psBuffer)
 }
 
 #if !defined(PVR_OMAPLFB_DRM_FB) || defined(DEBUG)
-static OMAPLFB_BOOL OMAPLFBValidateDSSUpdateMode(OMAPLFB_UPDATE_MODE eMode)
+static OMAPLFB_BOOL OMAPLFBValidateDSSUpdateMode(enum omap_dss_update_mode eMode)
 {
-#if 1
 	switch (eMode)
 	{
 		case OMAP_DSS_UPDATE_AUTO:
@@ -436,13 +435,10 @@ static OMAPLFB_BOOL OMAPLFBValidateDSSUpdateMode(OMAPLFB_UPDATE_MODE eMode)
 	}
 
 	return OMAPLFB_FALSE;
-#endif
-//	return OMAPLFB_TRUE;
 }
 
-static OMAPLFB_UPDATE_MODE OMAPLFBFromDSSUpdateMode(OMAPLFB_UPDATE_MODE eMode)
+static OMAPLFB_UPDATE_MODE OMAPLFBFromDSSUpdateMode(enum omap_dss_update_mode eMode)
 {
-#if 1
 	switch (eMode)
 	{
 		case OMAP_DSS_UPDATE_AUTO:
@@ -456,8 +452,6 @@ static OMAPLFB_UPDATE_MODE OMAPLFBFromDSSUpdateMode(OMAPLFB_UPDATE_MODE eMode)
 	}
 
 	return OMAPLFB_UPDATE_MODE_UNDEFINED;
-#endif
-//	return OMAPLFB_UPDATE_MODE_AUTO;
 }
 #endif
 
@@ -476,16 +470,16 @@ static OMAPLFB_BOOL OMAPLFBValidateUpdateMode(OMAPLFB_UPDATE_MODE eMode)
 	return OMAPLFB_FALSE;
 }
 
-static OMAPLFB_UPDATE_MODE OMAPLFBToDSSUpdateMode(OMAPLFB_UPDATE_MODE eMode)
+static enum omap_dss_update_mode OMAPLFBToDSSUpdateMode(OMAPLFB_UPDATE_MODE eMode)
 {
 	switch(eMode)
 	{
 		case OMAPLFB_UPDATE_MODE_AUTO:
-			return OMAPLFB_UPDATE_MODE_AUTO;
+			return OMAP_DSS_UPDATE_AUTO;
 		case OMAPLFB_UPDATE_MODE_MANUAL:
-			return OMAPLFB_UPDATE_MODE_MANUAL;
+			return OMAP_DSS_UPDATE_MANUAL;
 		case OMAPLFB_UPDATE_MODE_DISABLED:
-			return OMAPLFB_UPDATE_MODE_DISABLED;
+			return OMAP_DSS_UPDATE_DISABLED;
 		default:
 			break;
 	}
@@ -513,7 +507,7 @@ static const char *OMAPLFBUpdateModeToString(OMAPLFB_UPDATE_MODE eMode)
 	return "Unknown Update Mode";
 }
 
-static const char *OMAPLFBDSSUpdateModeToString(OMAPLFB_UPDATE_MODE eMode)
+static const char *OMAPLFBDSSUpdateModeToString(enum omap_dss_update_mode eMode)
 {
 	if (!OMAPLFBValidateDSSUpdateMode(eMode))
 	{
@@ -569,7 +563,6 @@ void OMAPLFBPrintInfo(OMAPLFB_DEVINFO *psDevInfo)
  */
 OMAPLFB_UPDATE_MODE OMAPLFBGetUpdateMode(OMAPLFB_DEVINFO *psDevInfo)
 {
-//#if 0
 #if defined(PVR_OMAPLFB_DRM_FB)
 	struct drm_connector *psConnector;
 	OMAPLFB_UPDATE_MODE eMode = OMAPLFB_UPDATE_MODE_UNDEFINED;
@@ -636,15 +629,12 @@ OMAPLFB_UPDATE_MODE OMAPLFBGetUpdateMode(OMAPLFB_DEVINFO *psDevInfo)
 
 	return OMAPLFBFromDSSUpdateMode(eMode);
 #endif	/* defined(PVR_OMAPLFB_DRM_FB) */
-//#endif
-return OMAPLFB_UPDATE_MODE_UNDEFINED;
-	//return OMAPLFB_UPDATE_MODE_AUTO;
 }
 
 /* Set display update mode */
 OMAPLFB_BOOL OMAPLFBSetUpdateMode(OMAPLFB_DEVINFO *psDevInfo, OMAPLFB_UPDATE_MODE eMode)
 {
-#if 0//defined(PVR_OMAPLFB_DRM_FB)
+#if defined(PVR_OMAPLFB_DRM_FB)
 	struct drm_connector *psConnector;
 	enum omap_dss_update_mode eDSSMode;
 	OMAPLFB_BOOL bSuccess = OMAPLFB_FALSE;
@@ -720,8 +710,6 @@ OMAPLFB_BOOL OMAPLFBSetUpdateMode(OMAPLFB_DEVINFO *psDevInfo, OMAPLFB_UPDATE_MOD
 
 	return (res == 0);
 #endif	/* defined(PVR_OMAPLFB_DRM_FB) */
-//#endif
-	//return OMAPLFB_TRUE;
 }
 
 /* Wait for VSync */
@@ -761,7 +749,7 @@ OMAPLFB_BOOL OMAPLFBWaitForVSync(OMAPLFB_DEVINFO *psDevInfo)
  */
 OMAPLFB_BOOL OMAPLFBManualSync(OMAPLFB_DEVINFO *psDevInfo)
 {
-#if 0
+#if defined(PVR_OMAPLFB_DRM_FB)
 	struct drm_connector *psConnector;
 
 	for (psConnector = NULL;
@@ -791,7 +779,6 @@ OMAPLFB_BOOL OMAPLFBManualSync(OMAPLFB_DEVINFO *psDevInfo)
 
 	return OMAPLFB_TRUE;
 #endif	/* defined(PVR_OMAPLFB_DRM_FB) */
-//	return OMAPLFB_TRUE;
 }
 
 /*
