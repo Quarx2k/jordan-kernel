@@ -611,7 +611,8 @@ static unsigned ohci_omap3_fslsmode(enum usbhs_omap_port_mode mode)
 		return OMAP_TLL_FSLSMODE_6PIN_PHY_DAT_SE0;
 	}
 }
-
+#define	OMAP_TLL_CHANNEL_CONF_CHANMODE(x)		(((x)&0x3) << 1)
+#define	OMAP_TLL_CHANNEL_CONF_FSLSMODE(x)               (((x)&0xf)<<24)
 static void usbhs_omap_tll_init(struct device *dev, u8 tll_channel_count)
 {
 	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
@@ -627,6 +628,9 @@ static void usbhs_omap_tll_init(struct device *dev, u8 tll_channel_count)
 
 	usbhs_write(omap->tll_base, OMAP_TLL_SHARED_CONF, reg);
 
+	usbhs_write(omap->tll_base, OMAP_TLL_SHARED_CONF,
+			 OMAP_TLL_SHARED_CONF_FCLK_IS_ON
+			| OMAP_TLL_SHARED_CONF_USB_DIVRATION);
 	/* Enable channels now */
 	for (i = 0; i < tll_channel_count; i++) {
 		reg = usbhs_read(omap->tll_base,
@@ -639,15 +643,22 @@ static void usbhs_omap_tll_init(struct device *dev, u8 tll_channel_count)
 		} else if (pdata->port_mode[i] == OMAP_EHCI_PORT_MODE_TLL) {
 			/* Disable AutoIdle, BitStuffing and use SDR Mode */
 			reg &= ~(OMAP_TLL_CHANNEL_CONF_UTMIAUTOIDLE
-#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
-				| OMAP_TLL_CHANNEL_CONF_ULPINOBITSTUFF);
-#endif
+				| OMAP_TLL_CHANNEL_CONF_ULPINOBITSTUFF
 				| OMAP_TLL_CHANNEL_CONF_ULPIDDRMODE);
-
+		} else if (pdata->port_mode[i] == OMAP_EHCI_HCD_OMAP_MODE_ULPI_TLL_SDR) {  //From Moto 2.6.32, ehci-omap.c
+			reg &= ~(OMAP_TLL_CHANNEL_CONF_CHANMODE(3)
+				| ~OMAP_TLL_CHANNEL_CONF_FSLSMODE(0xf)
+			 	| ~OMAP_TLL_CHANNEL_CONF_UTMIAUTOIDLE
+			 	| ~OMAP_TLL_CHANNEL_CONF_ULPI_ULPIAUTOIDLE
+				| ~OMAP_TLL_CHANNEL_CONF_ULPIDDRMODE);
+			reg |= (OMAP_TLL_CHANNEL_CONF_CHANEN
+				| OMAP_TLL_CHANNEL_CONF_ULPINOBITSTUFF
+				| OMAP_TLL_CHANNEL_CONF_FSLSMODE(OMAP_EHCI_HCD_OMAP_MODE_ULPI_TLL_SDR));
 		} else
 			continue;
 
 		reg |= OMAP_TLL_CHANNEL_CONF_CHANEN;
+
 		usbhs_write(omap->tll_base,
 				OMAP_TLL_CHANNEL_CONF(i), reg);
 
