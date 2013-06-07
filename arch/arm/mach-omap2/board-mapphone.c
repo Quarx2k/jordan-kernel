@@ -48,17 +48,7 @@
 
 #define ATAG_FLAT_DEV_TREE_ADDRESS 0xf100040A
 
-char *bp_model = "CDMA";
-static char boot_mode[BOOT_MODE_MAX_LEN+1];
-
-int __init board_boot_mode_init(char *s)
-{
-	strncpy(boot_mode, s, BOOT_MODE_MAX_LEN);
-	boot_mode[BOOT_MODE_MAX_LEN] = '\0';
-	pr_debug("boot_mode=%s\n", boot_mode);
-	return 1;
-}
-__setup("androidboot.mode=", board_boot_mode_init);
+char *bp_model = "UMTS";
 
 struct tag_flat_dev_tree_address {
 	u32 address;
@@ -218,32 +208,6 @@ static void mapphone_pm_power_off(void)
 	local_irq_enable();
 }
 
-static void mapphone_pm_reset(void)
-{
-	arch_reset('h', NULL);
-}
-
-static int cpcap_charger_connected_probe(struct platform_device *pdev)
-{
-	pm_power_off = mapphone_pm_reset;
-	return 0;
-}
-
-static int cpcap_charger_connected_remove(struct platform_device *pdev)
-{
-	pm_power_off = mapphone_pm_power_off;
-	return 0;
-}
-
-static struct platform_driver cpcap_charger_connected_driver = {
-	.probe          = cpcap_charger_connected_probe,
-	.remove         = cpcap_charger_connected_remove,
-	.driver         = {
-		.name   = "cpcap_charger_connected",
-		.owner  = THIS_MODULE,
-	},
-};
-
 static void __init mapphone_power_off_init(void)
 {
 	gpio_request(MAPPHONE_POWER_OFF_GPIO, "mapphone power off");
@@ -253,8 +217,6 @@ static void __init mapphone_power_off_init(void)
 	 * glitch at reboot */
 	omap_writew(0x1F, 0x480021D2);
 	pm_power_off = mapphone_pm_power_off;
-
-	platform_driver_register(&cpcap_charger_connected_driver);
 }
 
 
