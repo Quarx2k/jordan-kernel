@@ -619,6 +619,7 @@ static void usbhs_omap_tll_init(struct device *dev, u8 tll_channel_count)
 	struct usbhs_omap_platform_data	*pdata = dev->platform_data;
 	unsigned			reg;
 	int				i;
+#if 0
 	/* Program Common TLL register */
 	reg = usbhs_read(omap->tll_base, OMAP_TLL_SHARED_CONF);
 	reg |= (OMAP_TLL_SHARED_CONF_FCLK_IS_ON
@@ -648,12 +649,12 @@ static void usbhs_omap_tll_init(struct device *dev, u8 tll_channel_count)
 		} else if (pdata->port_mode[i] == OMAP_EHCI_HCD_OMAP_MODE_ULPI_TLL_SDR) {  //From Moto 2.6.32, ehci-omap.c
 			reg &= ~(OMAP_TLL_CHANNEL_CONF_CHANMODE(3)
 				| ~OMAP_TLL_CHANNEL_CONF_FSLSMODE(0xf)
-			 	| ~OMAP_TLL_CHANNEL_CONF_UTMIAUTOIDLE
-			 	| ~OMAP_TLL_CHANNEL_CONF_ULPI_ULPIAUTOIDLE
+				| ~OMAP_TLL_CHANNEL_CONF_UTMIAUTOIDLE
 				| ~OMAP_TLL_CHANNEL_CONF_ULPIDDRMODE);
 			reg |= (OMAP_TLL_CHANNEL_CONF_CHANEN
 				| OMAP_TLL_CHANNEL_CONF_ULPINOBITSTUFF
-				| OMAP_TLL_CHANNEL_CONF_FSLSMODE(OMAP_EHCI_HCD_OMAP_MODE_ULPI_TLL_SDR));
+				| OMAP_TLL_CHANNEL_CONF_FSLSMODE(0x0));
+
 		} else
 			continue;
 
@@ -665,6 +666,28 @@ static void usbhs_omap_tll_init(struct device *dev, u8 tll_channel_count)
 		usbhs_writeb(omap->tll_base,
 				OMAP_TLL_ULPI_SCRATCH_REGISTER(i), 0xbe);
 	}
+#else
+		/* Program Common TLL register */
+	usbhs_write(omap->tll_base, OMAP_TLL_SHARED_CONF,
+			 OMAP_TLL_SHARED_CONF_FCLK_IS_ON
+			| OMAP_TLL_SHARED_CONF_USB_DIVRATION);
+
+	/* Program the 3 TLL channels upfront */
+	for (i = 0; i < OMAP_TLL_CHANNEL_COUNT; i++) {
+		reg = usbhs_read(omap->tll_base, OMAP_TLL_CHANNEL_CONF(i));
+
+		reg |= OMAP_TLL_CHANNEL_CONF_ULPINOBITSTUFF;
+		reg |= OMAP_TLL_CHANNEL_CONF_UTMIAUTOIDLE;
+		reg &= ~OMAP_TLL_CHANNEL_CONF_ULPIDDRMODE;
+		reg |= OMAP_TLL_CHANNEL_CONF_CHANEN;
+		reg &= ~OMAP_TLL_CHANNEL_CONF_CHANMODE(3);
+		reg &= ~(OMAP_TLL_CHANNEL_CONF_FSLSMODE(0xf));
+		reg |= OMAP_TLL_CHANNEL_CONF_FSLSMODE(0x0);
+		usbhs_write(omap->tll_base, OMAP_TLL_CHANNEL_CONF(i), reg);
+		usbhs_writeb(omap->tll_base,
+				OMAP_TLL_ULPI_SCRATCH_REGISTER(i), 0xbe);
+	}
+#endif
 }
 
 static int usbhs_runtime_resume(struct device *dev)
