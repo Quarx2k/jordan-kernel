@@ -620,7 +620,6 @@ static int cpufreq_interactive_speedchange_task(void *data)
 			 * Only enable it, if user wants to
 			 */
 			if (suspend_enabled && suspend_state) {
-				printk("interactive: current cpu load: %u \n", cpu_load);
 					if ((ktime_to_us(ktime_get()) + 1000000) && cpu_load > 7000) {
 						/*
 						 * The screen is off, we are near deep-sleep.
@@ -632,7 +631,6 @@ static int cpufreq_interactive_speedchange_task(void *data)
 						 */
 						suspend_state = false;
 						pcpu->target_freq = last_freq;
-						printk("interactive: continue normal scaling %u \n", last_freq);
 						continue;
 					}
 
@@ -658,8 +656,6 @@ static int cpufreq_interactive_speedchange_task(void *data)
 						     pcpu->target_freq,
 						     pcpu->policy->cur);
 
-			printk("interactive: Current Freq: %u \n", pcpu->policy->cur);
-
 			up_read(&pcpu->enable_sem);
 
 		}
@@ -678,7 +674,6 @@ static void interactive_early_suspend(struct early_suspend *handler)
 	if (suspend_enabled) {
 		/* Safe the last frequency, so we can restore it later */
 		last_freq = pcpu->target_freq;
-		printk("interactive: Entering suspend with: %u \n", last_freq);
 
 		/* set it to the lowest possible frequency */
 		pcpu->target_freq = pcpu->policy->min;
@@ -697,8 +692,6 @@ static void interactive_late_resume(struct early_suspend *handler)
 	if (suspend_enabled) {
 		/* Resume */
 		pcpu->target_freq = last_freq;
-
-		printk("interactive: Wake up with: %u \n", last_freq);
 		suspend_state = false;	
 	}
 }
