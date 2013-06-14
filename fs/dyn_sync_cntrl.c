@@ -34,7 +34,7 @@ bool early_suspend_active = true;
 extern bool fsynccontrol_fsync_enabled(void);
 #endif
 // Enabled by default, because FSync is enabled by default
-static bool dyn_fsync_active = true;
+static bool dyn_fsync_active = false;
 
 
 static ssize_t dyn_fsync_active_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
