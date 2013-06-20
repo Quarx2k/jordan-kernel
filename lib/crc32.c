@@ -49,20 +49,12 @@ MODULE_LICENSE("GPL");
 #if CRC_LE_BITS == 8 || CRC_BE_BITS == 8
 
 static inline u32
-crc32_body(u32 crc, unsigned char const *buf, size_t len, const u32 (*tab)[256])
+crc32_body(u32 crc, unsigned char const *buf, size_t len, const u32 *tab)
 {
 # ifdef __LITTLE_ENDIAN
-#  define DO_CRC(x) crc = tab[0][(crc ^ (x)) & 255] ^ (crc >> 8)
-#  define DO_CRC4 crc = tab[3][(crc) & 255] ^ \
-		tab[2][(crc >> 8) & 255] ^ \
-		tab[1][(crc >> 16) & 255] ^ \
-		tab[0][(crc >> 24) & 255]
+#  define DO_CRC(x) crc = tab[(crc ^ (x)) & 255 ] ^ (crc >> 8)
 # else
-#  define DO_CRC(x) crc = tab[0][((crc >> 24) ^ (x)) & 255] ^ (crc << 8)
-#  define DO_CRC4 crc = tab[0][(crc) & 255] ^ \
-		tab[1][(crc >> 8) & 255] ^ \
-		tab[2][(crc >> 16) & 255] ^ \
-		tab[3][(crc >> 24) & 255]
+#  define DO_CRC(x) crc = tab[((crc >> 24) ^ (x)) & 255] ^ (crc << 8)
 # endif
 	const u32 *b;
 	size_t    rem_len;
@@ -79,7 +71,10 @@ crc32_body(u32 crc, unsigned char const *buf, size_t len, const u32 (*tab)[256])
 	b = (const u32 *)buf;
 	for (--b; len; --len) {
 		crc ^= *++b; /* use pre increment for speed */
-		DO_CRC4;
+		DO_CRC(0);
+		DO_CRC(0);
+		DO_CRC(0);
+		DO_CRC(0);
 	}
 	len = rem_len;
 	/* And the last few bytes */
@@ -91,7 +86,6 @@ crc32_body(u32 crc, unsigned char const *buf, size_t len, const u32 (*tab)[256])
 	}
 	return crc;
 #undef DO_CRC
-#undef DO_CRC4
 }
 #endif
 /**
@@ -124,7 +118,7 @@ u32 __pure crc32_le(u32 crc, unsigned char const *p, size_t len)
 u32 __pure crc32_le(u32 crc, unsigned char const *p, size_t len)
 {
 # if CRC_LE_BITS == 8
-	const u32      (*tab)[] = crc32table_le;
+	const u32      *tab = crc32table_le;
 
 	crc = __cpu_to_le32(crc);
 	crc = crc32_body(crc, p, len, tab);
@@ -181,7 +175,7 @@ u32 __pure crc32_be(u32 crc, unsigned char const *p, size_t len)
 u32 __pure crc32_be(u32 crc, unsigned char const *p, size_t len)
 {
 # if CRC_BE_BITS == 8
-	const u32      (*tab)[] = crc32table_be;
+	const u32      *tab = crc32table_be;
 
 	crc = __cpu_to_be32(crc);
 	crc = crc32_body(crc, p, len, tab);
