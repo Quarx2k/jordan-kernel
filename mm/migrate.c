@@ -32,6 +32,8 @@
 #include <linux/security.h>
 #include <linux/memcontrol.h>
 #include <linux/syscalls.h>
+#include <linux/gfp.h>
+#include <asm/tlbflush.h>
 
 #include "internal.h"
 
