@@ -200,7 +200,7 @@ static char *zbud_data(struct zbud_hdr *zh, unsigned size)
 	budnum = zbud_budnum(zh);
 	BUG_ON(size == 0 || size > zbud_max_buddy_size());
 	zbpg = container_of(zh, struct zbud_page, buddy[budnum]);
-	ASSERT_SPINLOCK(&zbpg->lock);
+	//ASSERT_SPINLOCK(&zbpg->lock);
 	p = (char *)zbpg;
 	if (budnum == 0)
 		p += ((sizeof(struct zbud_page) + CHUNK_SIZE - 1) &
@@ -260,7 +260,7 @@ static void zbud_free_raw_page(struct zbud_page *zbpg)
 
 	ASSERT_SENTINEL(zbpg, ZBPG);
 	BUG_ON(!list_empty(&zbpg->bud_list));
-	ASSERT_SPINLOCK(&zbpg->lock);
+	//ASSERT_SPINLOCK(&zbpg->lock);
 	BUG_ON(zh0->size != 0 || tmem_oid_valid(&zh0->oid));
 	BUG_ON(zh1->size != 0 || tmem_oid_valid(&zh1->oid));
 	INVERT_SENTINEL(zbpg, ZBPG);
@@ -306,7 +306,7 @@ static void zbud_free_and_delist(struct zbud_hdr *zh)
 		return;
 	}
 	size = zbud_free(zh);
-	ASSERT_SPINLOCK(&zbpg->lock);
+	//ASSERT_SPINLOCK(&zbpg->lock);
 	zh_other = &zbpg->buddy[(budnum == 0) ? 1 : 0];
 	if (zh_other->size == 0) { /* was unbuddied: unlist and free */
 		chunks = zbud_size_to_chunks(size) ;
@@ -366,7 +366,7 @@ static struct zbud_hdr *zbud_create(uint16_t client_id, uint16_t pool_id,
 	goto init_zh;
 
 found_unbuddied:
-	ASSERT_SPINLOCK(&zbpg->lock);
+	//ASSERT_SPINLOCK(&zbpg->lock);
 	zh0 = &zbpg->buddy[0]; zh1 = &zbpg->buddy[1];
 	BUG_ON(!((zh0->size == 0) ^ (zh1->size == 0)));
 	if (zh0->size != 0) { /* buddy0 in use, buddy1 is vacant */
@@ -459,7 +459,7 @@ static void zbud_evict_zbpg(struct zbud_page *zbpg)
 	struct tmem_oid oid[ZBUD_MAX_BUDS];
 	struct tmem_pool *pool;
 
-	ASSERT_SPINLOCK(&zbpg->lock);
+	//ASSERT_SPINLOCK(&zbpg->lock);
 	BUG_ON(!list_empty(&zbpg->bud_list));
 	for (i = 0, j = 0; i < ZBUD_MAX_BUDS; i++) {
 		zh = &zbpg->buddy[i];
@@ -787,7 +787,7 @@ static ssize_t zv_max_zsize_store(struct kobject *kobj,
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
 
-	err = kstrtoul(buf, 10, &val);
+	err = strict_strtoul(buf, 10, &val);
 	if (err || (val == 0) || (val > (PAGE_SIZE / 8) * 7))
 		return -EINVAL;
 	zv_max_zsize = val;
@@ -819,7 +819,7 @@ static ssize_t zv_max_mean_zsize_store(struct kobject *kobj,
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
 
-	err = kstrtoul(buf, 10, &val);
+	err = strict_strtoul(buf, 10, &val);
 	if (err || (val == 0) || (val > (PAGE_SIZE / 8) * 7))
 		return -EINVAL;
 	zv_max_mean_zsize = val;
@@ -853,7 +853,7 @@ static ssize_t zv_page_count_policy_percent_store(struct kobject *kobj,
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
 
-	err = kstrtoul(buf, 10, &val);
+	err = strict_strtoul(buf, 10, &val);
 	if (err || (val == 0) || (val > 150))
 		return -EINVAL;
 	zv_page_count_policy_percent = val;
