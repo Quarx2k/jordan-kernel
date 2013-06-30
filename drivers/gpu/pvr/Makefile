@@ -127,7 +127,8 @@ pvr540-$(CONFIG_SGX540) := \
 
 pvr530-y := \
 	omap3/sysconfig.o \
-	omap3/sysutils.o
+	omap3/sysutils.o \
+	omap3/gpu_control.o
 
 sgx-y :=  \
 	sgx/bridged_sgx_bridge.o \

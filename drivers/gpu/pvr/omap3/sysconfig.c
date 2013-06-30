@@ -51,6 +51,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "ocpdefs.h"
 
+extern int gpu_main_control(void);
+
 /* top level system data anchor point*/
 SYS_DATA* gpsSysData = (SYS_DATA*)IMG_NULL;
 SYS_DATA  gsSysData;
@@ -387,7 +389,7 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 #if !defined(SGX_DYNAMIC_TIMING_INFO)
 	/* Set up timing information*/
 	psTimingInfo = &gsSGXDeviceMap.sTimingInfo;
-	psTimingInfo->ui32CoreClockSpeed = SYS_SGX_CLOCK_SPEED;
+	psTimingInfo->ui32CoreClockSpeed = gpu_main_control();
 	psTimingInfo->ui32HWRecoveryFreq = SYS_SGX_HWRECOVERY_TIMEOUT_FREQ; 
 #if defined(SUPPORT_ACTIVE_POWER_MANAGEMENT)
 	psTimingInfo->bEnableActivePM = IMG_TRUE;

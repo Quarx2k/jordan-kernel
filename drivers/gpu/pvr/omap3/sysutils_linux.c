@@ -87,6 +87,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 extern struct platform_device *gpsPVRLDMDev;
 #endif
 
+extern int gpu_main_control(void);
+
 static PVRSRV_ERROR PowerLockWrap(SYS_SPECIFIC_DATA *psSysSpecData, IMG_BOOL bTryLock)
 {
 	if (!in_interrupt())
@@ -164,7 +166,8 @@ IMG_VOID SysGetSGXTimingInformation(SGX_TIMING_INFORMATION *psTimingInfo)
 	psTimingInfo->ui32CoreClockSpeed =
 		gpsSysSpecificData->pui32SGXFreqList[gpsSysSpecificData->ui32SGXFreqListIndex];
 #else /* defined(SYS_OMAP4_HAS_DVFS_FRAMEWORK) */
-	psTimingInfo->ui32CoreClockSpeed = SYS_SGX_CLOCK_SPEED;
+	psTimingInfo->ui32CoreClockSpeed = gpu_main_control();
+	printk("!!FREQ OF GPU: %u !!!\n", psTimingInfo->ui32CoreClockSpeed);  
 #endif
 	psTimingInfo->ui32HWRecoveryFreq = SYS_SGX_HWRECOVERY_TIMEOUT_FREQ;
 	psTimingInfo->ui32uKernelFreq = SYS_SGX_PDS_TIMER_FREQ;
@@ -658,7 +661,7 @@ static PVRSRV_ERROR AcquireGPTimer(SYS_SPECIFIC_DATA *psSysSpecData)
 	if (IS_ERR(psCLK))
 	{
 		PVR_DPF((PVR_DBG_ERROR, "EnableSystemClocks: Couldn't get SGX Interface Clock"));
-		return;
+		return 0;
 	}
 
 	clk_enable(psCLK);
@@ -668,7 +671,7 @@ static PVRSRV_ERROR AcquireGPTimer(SYS_SPECIFIC_DATA *psSysSpecData)
 	if (IS_ERR(psCLK))
 	{
 		PVR_DPF((PVR_DBG_ERROR, "EnableSystemClocks: Couldn't get SGX Interface Clock"));
-		return;
+		return 0;
 	}
 
 	clk_enable(psCLK);
