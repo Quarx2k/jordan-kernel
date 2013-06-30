@@ -23,6 +23,7 @@ extern bool fsynccontrol_fsync_enabled(void);
 #endif
 #ifdef CONFIG_DYNAMIC_FSYNC
 extern bool early_suspend_active;
+extern bool dyn_fsync_active;
 #endif
 
 
@@ -229,7 +230,7 @@ int vfs_fsync_range(struct file *file, struct dentry *dentry, loff_t start,
 		    loff_t end, int datasync)
 {
 #ifdef CONFIG_DYNAMIC_FSYNC
-	if (!early_suspend_active)
+	if (likely(dyn_fsync_active && !early_suspend_active))
 		return 0;
 	else {
 #endif
@@ -326,7 +327,7 @@ static int do_fsync(unsigned int fd, int datasync)
 SYSCALL_DEFINE1(fsync, unsigned int, fd)
 {
 #ifdef CONFIG_DYNAMIC_FSYNC
-	if (!early_suspend_active)
+	if (likely(dyn_fsync_active && !early_suspend_active))
 		return 0;
 	else
 #endif
@@ -340,12 +341,12 @@ SYSCALL_DEFINE1(fsync, unsigned int, fd)
 
 SYSCALL_DEFINE1(fdatasync, unsigned int, fd)
 {
-#ifdef CONFIG_DYNAMIC_FSYNC
-	if (!early_suspend_active)
+#if 0
+	if (likely(dyn_fsync_active && !early_suspend_active))
 		return 0;
 	else
 #endif
-#ifdef CONFIG_FSYNC_CONTROL
+#if 0
 	if (!fsynccontrol_fsync_enabled())
 	    return 0;
 #endif
@@ -368,7 +369,7 @@ int generic_write_sync(struct file *file, loff_t pos, loff_t count)
 	    return 0;
 #endif
 #ifdef CONFIG_DYNAMIC_FSYNC
-	if (!early_suspend_active)
+	if (likely(dyn_fsync_active && !early_suspend_active))
 		return 0;
 	else {
 #endif
@@ -521,6 +522,11 @@ SYSCALL_ALIAS(sys_sync_file_range, SyS_sync_file_range);
 SYSCALL_DEFINE(sync_file_range2)(int fd, unsigned int flags,
 				 loff_t offset, loff_t nbytes)
 {
+#ifdef CONFIG_DYNAMIC_FSYNC
+	if (likely(dyn_fsync_active && !early_suspend_active))
+		return 0;
+	else
+#endif
 	return sys_sync_file_range(fd, offset, nbytes, flags);
 }
 #ifdef CONFIG_HAVE_SYSCALL_WRAPPERS
