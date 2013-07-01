@@ -14,28 +14,21 @@
  *
  */
 
-#include <linux/module.h>
 #include <linux/kobject.h>
 #include <linux/sysfs.h>
 #include <linux/earlysuspend.h>
-#include <linux/mutex.h>
-#include <linux/notifier.h>
-#include <linux/reboot.h>
-#include <linux/writeback.h>
 #include <linux/init.h>
-#include <linux/device.h>
-#include <linux/miscdevice.h>
+#include <linux/module.h>
+#include <linux/input.h>
+#include <linux/cpufreq.h>
 
 #define GPU_CONTROL_VERSION 1
 
 #if defined(SGX530) && (SGX_CORE_REV == 125)
 #define SYS_SGX_CLOCK_SPEED		200000000
-#define SYS_SGX_CLOCK_SPEED_OC		220000000
 #else
 #define SYS_SGX_CLOCK_SPEED		110666666
 #endif
-
-#define SYS_SGX_CLOCK_SPEED_SUSPEND	50000000
 
 /*
  * Enable or disable gpu_control:
@@ -43,40 +36,108 @@
 static bool gpu_control_active = true;
 
 /*
- * Set the Default Clock; 200mhz
+ * Our current frequency:
  */
-static int gpu_freq = SYS_SGX_CLOCK_SPEED;
-
 static int current_freq;
 
-static bool suspend_state;
+/*
+ * Locks freq while screen is off to this value;
+ */
+static int suspend_freq = 5000;
 
-struct miscdevice gpu_control_device =
+/*
+ * Maximum possible frequency:
+ */
+static int max_freq_val = 2000;
+
+/*
+ * Check if suspended or not:
+ */
+static bool suspend_state = false;
+
+
+static ssize_t show_gpu_control_active(struct kobject *kobj,
+		struct kobj_attribute *attr, char *buf)
 {
-	.minor 	= MISC_DYNAMIC_MINOR,
-	.name 	= "gpu_control",
-};
+	return sprintf(buf, "%u\n", (gpu_control_active ? 1 : 0));
+}
+
+static ssize_t store_gpu_control_active(struct kobject *kobj,
+		struct kobj_attribute *attr, const char *buf, size_t count)
+{
+	unsigned int data;
+
+	if(sscanf(buf, "%u\n", &data) == 1) {
+		if (data == 1) {
+			pr_info("%s: gpu control enabled\n", __FUNCTION__);
+			gpu_control_active = true;
+		}
+		else if (data == 0) {
+			pr_info("%s: gpu control disabled\n", __FUNCTION__);
+			gpu_control_active = false;
+		}
+		else
+			pr_info("%s: bad value: %u\n", __FUNCTION__, data);
+	} else
+		pr_info("%s: unknown input!\n", __FUNCTION__);
+
+	return count;
+}
+
+
+static ssize_t show_max_freq(struct kobject *kobj,
+					struct attribute *attr, char *buf)
+{
+	return sprintf(buf, "%u\n", max_freq_val);
+}
+
+static ssize_t store_max_freq(struct kobject *kobj,
+					 struct attribute *attr,
+					 const char *buf, size_t count)
+{
+	int ret;
+	unsigned long val;
+
+	ret = strict_strtoul(buf, 0, &val);
+	if (ret < 0)
+		return ret;
+
+	if (val <= 2500)
+		max_freq_val = val;
+
+	pr_info("gpu control overclocked to: %u \n", max_freq_val * 100000);
+
+	return count;
+}
+
+define_one_global_rw(max_freq);
 
 int gpu_main_control(int gpu_tmp)
 {
-	// If we boot up the device, we want to have some sort of default clock;
-	if (!gpu_tmp && !suspend_state) {
-		gpu_tmp = SYS_SGX_CLOCK_SPEED;
-		gpu_freq = gpu_tmp;
-	}
-	else {
-		if(current_freq)
-			gpu_freq = current_freq;
-	}
-
-	if (suspend_state)
-		gpu_freq = SYS_SGX_CLOCK_SPEED_SUSPEND;
-	else
-		gpu_freq = current_freq;
-			
-	printk("!! GPU FREQ IS NOW %u \n", gpu_freq);	
+	int ret;
 	
-	return gpu_freq;
+	// Is it even active?
+	if (gpu_control_active) {
+		if (suspend_state) {
+			ret = suspend_freq * 10000;
+		}
+		else {
+			// Check if overclocked value is our default value;
+			if ((max_freq_val * 100000) != current_freq)
+				ret = max_freq_val * 100000;
+			else
+				ret = current_freq;
+		}
+
+		printk("!! GPU FREQ IS NOW AT %u \n", ret);
+		return ret;
+	} 
+	else {
+	
+	ret = SYS_SGX_CLOCK_SPEED;
+	
+	return ret;
+	}
 }
 EXPORT_SYMBOL(gpu_main_control);
 
@@ -99,74 +160,17 @@ static struct early_suspend gpu_control_suspend_handler  = {
 	.resume    = gpu_control_late_resume,
 };
 
-static ssize_t show_gpu_freq(struct device * dev, struct device_attribute * attr, char * buf)
-{
-    return sprintf(buf, "%u\n", current_freq);
-}
 
-static ssize_t store_gpu_freq(struct device * dev, struct device_attribute * attr, const char * buf, size_t size)
-{
-    	int ret;
-	long unsigned int val;
+static struct kobj_attribute gpu_control_active_attribute = 
+	__ATTR(gpu_control_active, 0666,
+		show_gpu_control_active,
+		store_gpu_control_active);
 
-	ret = strict_strtoul(buf, 0, &val);
-	if (ret < 0)
-		return ret;
-	current_freq = val;
-	return size;
-}
-
-static ssize_t gpu_control_status_read(struct device * dev, struct device_attribute * attr, char * buf)
-{
-    return sprintf(buf, "%u\n", (gpu_control_active ? 1 : 0));
-}
-
-static ssize_t gpu_control_status_write(struct device * dev, struct device_attribute * attr, const char * buf, size_t size)
-{
-    unsigned int data;
-
-    if(sscanf(buf, "%u\n", &data) == 1) 
-	{
-	    if (data == 1) 
-		{
-		    pr_info("%s: GPUCONTROL enabled\n", __FUNCTION__);
-
-		    gpu_control_active = true;
-
-		} 
-	    else if (data == 0) 
-		{
-		    pr_info("%s: GPUCONTROL disabled\n", __FUNCTION__);
-
-		    gpu_control_active = false;
-		} 
-	    else 
-		{
-		    pr_info("%s: invalid input range %u\n", __FUNCTION__, data);
-		}
-	} 
-    else 
-	{
-	    pr_info("%s: invalid input\n", __FUNCTION__);
-	}
-
-    return size;
-}
-
-static ssize_t gpu_control_version(struct device * dev, struct device_attribute * attr, char * buf)
-{
-    return sprintf(buf, "%u\n", GPU_CONTROL_VERSION);
-}
-
-static DEVICE_ATTR(gpu_control_active, S_IRUGO | S_IWUGO, gpu_control_status_read, gpu_control_status_write);
-static DEVICE_ATTR(gpu_current_freq, S_IRUGO | S_IWUGO, show_gpu_freq, store_gpu_freq);
-static DEVICE_ATTR(version, S_IRUGO , gpu_control_version, NULL);
 
 static struct attribute *gpu_control_attributes[] = 
     {
-	&dev_attr_gpu_control_active.attr,
-	&dev_attr_gpu_current_freq.attr,
-	&dev_attr_version.attr,
+	&gpu_control_active_attribute.attr,
+	&max_freq.attr,
 	NULL
     };
 
@@ -175,6 +179,8 @@ static struct attribute_group gpu_control_group =
 	.attrs  = gpu_control_attributes,
     };
 
+static struct kobject *gpu_control_kobj;
+
 
 static int __init gpu_control_init(void)
 {
@@ -182,26 +188,39 @@ static int __init gpu_control_init(void)
 
 	register_early_suspend(&gpu_control_suspend_handler);
 	
-	ret = misc_register(&gpu_control_device);
 	
-	current_freq = gpu_freq;
+	gpu_control_kobj = kobject_create_and_add("gpu_control", kernel_kobj);
+	if (!gpu_control_kobj) {
+		pr_err("%s gpu_control kobject create failed!\n", __FUNCTION__);
+		return -ENOMEM;
+        }
+	
+	ret = sysfs_create_group(gpu_control_kobj,
+			&gpu_control_group);
+
+        if (ret) {
+		pr_info("%s gpu_control sysfs create failed!\n", __FUNCTION__);
+		kobject_put(gpu_control_kobj);
+	}
+
+	current_freq = SYS_SGX_CLOCK_SPEED;
 
 	// Basic init with current default freq;
 	gpu_main_control(current_freq);
-	
-	if (ret) 
-	{
-	    pr_err("%s misc_register(%s) fail\n", __FUNCTION__, gpu_control_device.name);
-	    return 1;
-	}
 
-	if (sysfs_create_group(&gpu_control_device.this_device->kobj, &gpu_control_group) < 0) 
-	{
-	    pr_err("%s sysfs_create_group fail\n", __FUNCTION__);
-	    pr_err("Failed to create sysfs group for device (%s)!\n", gpu_control_device.name);
-	}
-	
-	return 0;
+	return ret;
 }
 
-device_initcall(gpu_control_init);
+static void __exit gpu_control_exit(void)
+{
+	unregister_early_suspend(&gpu_control_suspend_handler);
+}
+
+module_init(gpu_control_init);
+module_exit(gpu_control_exit);
+
+
+MODULE_AUTHOR("Alexander Christ <alex.christ@hotmail.de>");
+MODULE_DESCRIPTION("'interactive gpu governor' - A gpufreq governor for "
+	"Latency sensitive workloads");
+MODULE_LICENSE("GPL");

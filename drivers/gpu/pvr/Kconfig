@@ -100,3 +100,9 @@ config SGX_PDUMP
 	  This option enables the PDump (Parameter Dump) build to debug
 	  the SGX driver. The user side of the driver must be built with
 	  this option enabled as well
+
+config GPU_CONTROL
+	bool "Enable GPU Control Driver here"
+	default y
+	help
+	  Say Y here to enable GPU Control

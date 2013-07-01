@@ -127,8 +127,7 @@ pvr540-$(CONFIG_SGX540) := \
 
 pvr530-y := \
 	omap3/sysconfig.o \
-	omap3/sysutils.o \
-	omap3/gpu_control.o
+	omap3/sysutils.o
 
 sgx-y :=  \
 	sgx/bridged_sgx_bridge.o \
@@ -160,7 +159,6 @@ obj-$(CONFIG_SGX530) := pvr_common.o sgx.o omaplfb.o pvr530.o
 
 obj-$(CONFIG_VIRTUAL_DISPLAY_SUPPORT) := pvr_common.o sgx.o \
 	sgx_displayclass.o pvr540.o
-obj-$(CONFIG_SGX_PDUMP) += dbgdrv.o
-
-
+obj-$(CONFIG_SGX_PDUMP) 	+= dbgdrv.o
+obj-$(CONFIG_GPU_CONTROL)	+= omap3/gpu_control.o
 
