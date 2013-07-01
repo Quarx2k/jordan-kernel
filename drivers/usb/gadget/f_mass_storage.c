@@ -300,6 +300,9 @@
 
 /*------------------------------------------------------------------------*/
 
+#define VENDOR_NAME_ANDROID	"Motorola"
+#define PRODUCT_NAME_ANDROID	"MB526"
+
 #define FSG_DRIVER_DESC		"Mass Storage Function"
 #define FSG_DRIVER_VERSION	"2009/09/11"
 
@@ -2725,6 +2728,9 @@ static struct fsg_common *fsg_common_init(struct fsg_common *common,
 	struct fsg_lun_config *lcfg;
 	int nluns, i, rc;
 	char *pathbuf;
+
+	cfg->vendor_name = VENDOR_NAME_ANDROID;
+	cfg->product_name = PRODUCT_NAME_ANDROID;
 
 	/* Find out how many LUNs there should be */
 	nluns = cfg->nluns;
