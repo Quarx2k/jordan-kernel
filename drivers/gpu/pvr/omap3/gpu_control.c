@@ -76,6 +76,10 @@ void gpu_set_clock(int freq)
 	int ret;
 	struct clk *sgx_fck;
 
+	if (!gpu_control_active) {
+		printk("GPU Control is disabled\n");
+		return;
+	}
 
 	sgx_fck = clk_get(NULL, "sgx_fck");
 
