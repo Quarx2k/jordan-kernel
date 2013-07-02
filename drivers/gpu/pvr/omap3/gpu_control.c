@@ -21,14 +21,10 @@
 #include <linux/module.h>
 #include <linux/input.h>
 #include <linux/cpufreq.h>
+#include <linux/clk.h>
+#include "sysconfig.h"
 
 #define GPU_CONTROL_VERSION 1
-
-#if defined(SGX530) && (SGX_CORE_REV == 125)
-#define SYS_SGX_CLOCK_SPEED		200000000
-#else
-#define SYS_SGX_CLOCK_SPEED		110666666
-#endif
 
 /*
  * Enable or disable gpu_control:
@@ -36,25 +32,9 @@
 static bool gpu_control_active = true;
 
 /*
- * Our current frequency:
- */
-static int current_freq;
-
-/*
- * Locks freq while screen is off to this value;
- */
-static int suspend_freq = 5000;
-
-/*
  * Maximum possible frequency:
  */
-static int max_freq_val = 2000;
-
-/*
- * Check if suspended or not:
- */
-static bool suspend_state = false;
-
+static int max_freq_val = SYS_SGX_CLOCK_SPEED;
 
 static ssize_t show_gpu_control_active(struct kobject *kobj,
 		struct kobj_attribute *attr, char *buf)
@@ -91,6 +71,25 @@ static ssize_t show_max_freq(struct kobject *kobj,
 	return sprintf(buf, "%u\n", max_freq_val);
 }
 
+void gpu_set_clock(int freq)
+{
+	int ret;
+	struct clk *sgx_fck;
+
+
+	sgx_fck = clk_get(NULL, "sgx_fck");
+
+	ret = clk_set_rate(sgx_fck, freq);
+
+	if (ret) {
+		max_freq_val = SYS_SGX_CLOCK_SPEED;
+		clk_set_rate(sgx_fck, SYS_SGX_CLOCK_SPEED);
+		pr_err("GPU clock rate change failed: %d. Default value restored %d MHz\n", ret, max_freq_val/1000000);
+	} else {
+		printk("GPU clock changed to: %lu MHz \n", clk_get_rate(sgx_fck)/1000000);
+	}
+
+}
 static ssize_t store_max_freq(struct kobject *kobj,
 					 struct attribute *attr,
 					 const char *buf, size_t count)
@@ -102,57 +101,24 @@ static ssize_t store_max_freq(struct kobject *kobj,
 	if (ret < 0)
 		return ret;
 
-	if (val <= 2500)
-		max_freq_val = val;
+	if (val <= 300)
+		max_freq_val = val*1000000;
 
-	pr_info("gpu control overclocked to: %u \n", max_freq_val * 100000);
-
+	gpu_set_clock(max_freq_val);
 	return count;
 }
 
 define_one_global_rw(max_freq);
 
-int gpu_main_control(int gpu_tmp)
-{
-	int ret;
-	
-	// Is it even active?
-	if (gpu_control_active) {
-		if (suspend_state) {
-			ret = suspend_freq * 10000;
-		}
-		else {
-			// Check if overclocked value is our default value;
-			if ((max_freq_val * 100000) != current_freq)
-				ret = max_freq_val * 100000;
-			else
-				ret = current_freq;
-		}
-
-		printk("!! GPU FREQ IS NOW AT %u \n", ret);
-		return ret;
-	} 
-	else {
-	
-	ret = SYS_SGX_CLOCK_SPEED;
-	
-	return ret;
-	}
-}
-EXPORT_SYMBOL(gpu_main_control);
-
 static void gpu_control_early_suspend(struct early_suspend *h)
 {
-	if (gpu_control_active) {
-		suspend_state = true;
-	}
+	int suspend_freq = 100000000; //100 MHz
+	gpu_set_clock(suspend_freq);
 }
 
 static void gpu_control_late_resume(struct early_suspend *h)
 {
-	if (gpu_control_active) {
-		suspend_state = false;
-	}
+	gpu_set_clock(max_freq_val);
 }
 
 static struct early_suspend gpu_control_suspend_handler  = {
@@ -203,11 +169,6 @@ static int __init gpu_control_init(void)
 		kobject_put(gpu_control_kobj);
 	}
 
-	current_freq = SYS_SGX_CLOCK_SPEED;
-
-	// Basic init with current default freq;
-	gpu_main_control(current_freq);
-
 	return ret;
 }
 
@@ -220,7 +181,7 @@ module_init(gpu_control_init);
 module_exit(gpu_control_exit);
 
 
-MODULE_AUTHOR("Alexander Christ <alex.christ@hotmail.de>");
+MODULE_AUTHOR("Alexander Christ <alex.christ@hotmail.de>, Nicholas Semendyaev <agent00791@gmail.com>");
 MODULE_DESCRIPTION("'interactive gpu governor' - A gpufreq governor for "
 	"Latency sensitive workloads");
 MODULE_LICENSE("GPL");

@@ -166,8 +166,7 @@ IMG_VOID SysGetSGXTimingInformation(SGX_TIMING_INFORMATION *psTimingInfo)
 	psTimingInfo->ui32CoreClockSpeed =
 		gpsSysSpecificData->pui32SGXFreqList[gpsSysSpecificData->ui32SGXFreqListIndex];
 #else /* defined(SYS_OMAP4_HAS_DVFS_FRAMEWORK) */
-	psTimingInfo->ui32CoreClockSpeed = gpu_main_control();
-	printk("!!FREQ OF GPU: %u !!!\n", psTimingInfo->ui32CoreClockSpeed);  
+	psTimingInfo->ui32CoreClockSpeed = SYS_SGX_CLOCK_SPEED;
 #endif
 	psTimingInfo->ui32HWRecoveryFreq = SYS_SGX_HWRECOVERY_TIMEOUT_FREQ;
 	psTimingInfo->ui32uKernelFreq = SYS_SGX_PDS_TIMER_FREQ;
