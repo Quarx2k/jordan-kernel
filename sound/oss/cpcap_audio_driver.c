@@ -43,7 +43,6 @@
 #define STM_STDAC_EN_TEST_POST                 0x0000
 #define STM_STDAC_EN_ST_TEST1_PRE      0x2400
 #define STM_STDAC_EN_ST_TEST1_POST     0x0400
-
 #ifdef CPCAP_AUDIO_DEBUG
 #define CPCAP_AUDIO_DEBUG_LOG(args...)  \
 				printk(KERN_DEBUG "CPCAP_AUDIO_DRIVER:" args)
@@ -1136,7 +1135,6 @@ static void cpcap_audio_configure_power(int power)
 			regulator_enable(audio_reg);
 			regulator_set_mode(audio_reg, REGULATOR_MODE_NORMAL);
 		} else {
-			printk(KERN_DEBUG "turning off regulator\n");
 			regulator_set_mode(audio_reg, REGULATOR_MODE_STANDBY);
 			regulator_disable(audio_reg);
 		}
