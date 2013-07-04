@@ -234,7 +234,7 @@ static char *zbud_data(struct zbud_hdr *zh, unsigned size)
 	budnum = zbud_budnum(zh);
 	BUG_ON(size == 0 || size > zbud_max_buddy_size());
 	zbpg = container_of(zh, struct zbud_page, buddy[budnum]);
-	//ASSERT_SPINLOCK(&zbpg->lock);
+	ASSERT_SPINLOCK(&zbpg->lock);
 	p = (char *)zbpg;
 	if (budnum == 0)
 		p += ((sizeof(struct zbud_page) + CHUNK_SIZE - 1) &
@@ -294,7 +294,7 @@ static void zbud_free_raw_page(struct zbud_page *zbpg)
 
 	ASSERT_SENTINEL(zbpg, ZBPG);
 	BUG_ON(!list_empty(&zbpg->bud_list));
-	//ASSERT_SPINLOCK(&zbpg->lock);
+	ASSERT_SPINLOCK(&zbpg->lock);
 	BUG_ON(zh0->size != 0 || tmem_oid_valid(&zh0->oid));
 	BUG_ON(zh1->size != 0 || tmem_oid_valid(&zh1->oid));
 	INVERT_SENTINEL(zbpg, ZBPG);
@@ -342,7 +342,7 @@ static void zbud_free_and_delist(struct zbud_hdr *zh)
 		return;
 	}
 	size = zbud_free(zh);
-	//ASSERT_SPINLOCK(&zbpg->lock);
+	ASSERT_SPINLOCK(&zbpg->lock);
 	zh_other = &zbpg->buddy[(budnum == 0) ? 1 : 0];
 	if (zh_other->size == 0) { /* was unbuddied: unlist and free */
 		chunks = zbud_size_to_chunks(size) ;
@@ -400,7 +400,7 @@ static struct zbud_hdr *zbud_create(uint16_t client_id, uint16_t pool_id,
 	goto init_zh;
 
 found_unbuddied:
-	//ASSERT_SPINLOCK(&zbpg->lock);
+	ASSERT_SPINLOCK(&zbpg->lock);
 	zh0 = &zbpg->buddy[0]; zh1 = &zbpg->buddy[1];
 	BUG_ON(!((zh0->size == 0) ^ (zh1->size == 0)));
 	if (zh0->size != 0) { /* buddy0 in use, buddy1 is vacant */
@@ -455,14 +455,14 @@ static int zbud_decompress(struct page *page, struct zbud_hdr *zh)
 	}
 	ASSERT_SENTINEL(zh, ZBH);
 	BUG_ON(zh->size == 0 || zh->size > zbud_max_buddy_size());
-	to_va = kmap_atomic(page);
+	to_va = kmap_atomic(page, KM_USER0);
 	size = zh->size;
 	from_va = zbud_data(zh, size);
 	ret = zcache_comp_op(ZCACHE_COMPOP_DECOMPRESS, from_va, size,
 				to_va, &out_len);
 	BUG_ON(ret);
 	BUG_ON(out_len != PAGE_SIZE);
-	kunmap_atomic(to_va);
+	kunmap_atomic(to_va, KM_USER0);
 out:
 	spin_unlock(&zbpg->lock);
 	return ret;
@@ -493,7 +493,7 @@ static void zbud_evict_zbpg(struct zbud_page *zbpg)
 	struct tmem_oid oid[ZBUD_MAX_BUDS];
 	struct tmem_pool *pool;
 
-	//ASSERT_SPINLOCK(&zbpg->lock);
+	ASSERT_SPINLOCK(&zbpg->lock);
 	BUG_ON(!list_empty(&zbpg->bud_list));
 	for (i = 0, j = 0; i < ZBUD_MAX_BUDS; i++) {
 		zh = &zbpg->buddy[i];
@@ -711,13 +711,13 @@ static struct zv_hdr *zv_create(struct xv_pool *xvpool, uint32_t pool_id,
 		goto out;
 	atomic_inc(&zv_curr_dist_counts[chunks]);
 	atomic_inc(&zv_cumul_dist_counts[chunks]);
-	zv = kmap_atomic(page) + offset;
+	zv = kmap_atomic(page, KM_USER0) + offset;
 	zv->index = index;
 	zv->oid = *oid;
 	zv->pool_id = pool_id;
 	SET_SENTINEL(zv, ZVH);
 	memcpy((char *)zv + sizeof(struct zv_hdr), cdata, clen);
-	kunmap_atomic(zv);
+	kunmap_atomic(zv, KM_USER0);
 out:
 	return zv;
 }
@@ -753,10 +753,10 @@ static void zv_decompress(struct page *page, struct zv_hdr *zv)
 	ASSERT_SENTINEL(zv, ZVH);
 	size = xv_get_object_size(zv) - sizeof(*zv);
 	BUG_ON(size == 0);
-	to_va = kmap_atomic(page);
+	to_va = kmap_atomic(page, KM_USER0);
 	ret = zcache_comp_op(ZCACHE_COMPOP_DECOMPRESS, (char *)zv + sizeof(*zv),
 				size, to_va, &clen);
-	kunmap_atomic(to_va);
+	kunmap_atomic(to_va, KM_USER0);
 	BUG_ON(ret);
 	BUG_ON(clen != PAGE_SIZE);
 }
@@ -1330,16 +1330,16 @@ static int zcache_compress(struct page *from, void **out_va, unsigned *out_len)
 	char *from_va;
 
 	BUG_ON(!irqs_disabled());
-	if (unlikely(dmem == NULL || wmem == NULL))
+	if (unlikely(dmem == NULL))
 		goto out;   /* no buffer, so can't compress */
 	*out_len = PAGE_SIZE << ZCACHE_DSTMEM_ORDER;
-	from_va = kmap_atomic(from);
+	from_va = kmap_atomic(from, KM_USER0);
 	mb();
 	ret = zcache_comp_op(ZCACHE_COMPOP_COMPRESS, from_va, PAGE_SIZE, dmem,
 				out_len);
 	BUG_ON(ret);
 	*out_va = dmem;
-	kunmap_atomic(from_va);
+	kunmap_atomic(from_va, KM_USER0);
 	ret = 1;
 out:
 	return ret;
