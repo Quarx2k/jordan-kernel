@@ -24,7 +24,7 @@ config ZRAM
 config ZRAM_DEBUG
 	bool "Compressed RAM block device debug support"
 	depends on ZRAM
-	default n
+	default y
 	help
 	  This option adds additional debugging code to the compressed
 	  RAM block device driver.
@@ -32,6 +32,6 @@ config ZRAM_DEBUG
 config ZRAM_FOR_ANDROID
 	bool "Optimize zram behavior for android"
 	depends on ZRAM && ANDROID
-	default n
+	default y
 	help
 	  This option enables modified zram behavior optimized for android

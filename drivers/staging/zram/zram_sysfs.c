@@ -34,7 +34,7 @@ static struct zram *dev_to_zram(struct device *dev)
 	int i;
 	struct zram *zram = NULL;
 
-	for (i = 0; i < num_devices; i++) {
+	for (i = 0; i < zram_num_devices; i++) {
 		zram = &zram_devices[i];
 		if (disk_to_dev(zram->disk) == dev)
 			break;
@@ -81,7 +81,9 @@ static ssize_t initstate_show(struct device *dev,
 }
 
 #ifdef CONFIG_ZRAM_FOR_ANDROID
+#ifdef CONFIG_SWAP
 extern int swapon(const char*specialfile, int swap_flags);
+#endif /* CONFIG_SWAP */
 
 static ssize_t initstate_store(struct device *dev,
 			       struct device_attribute *attr, const char *buf,
@@ -103,7 +105,9 @@ static ssize_t initstate_store(struct device *dev,
 		return -EINVAL;
 
 	zram_init_device(zram);
+#ifdef CONFIG_SWAP
 	swapon("/dev/block/zram0", 0);
+#endif /* CONFIG_SWAP */
 	return len;
 }
 #else

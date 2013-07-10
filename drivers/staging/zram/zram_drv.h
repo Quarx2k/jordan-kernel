@@ -22,7 +22,7 @@
 
 /*
  * Some arbitrary value. This is just to catch
- * invalid value for num_devices module parameter.
+ * invalid value for zram_num_devices module parameter.
  */
 static const unsigned max_num_devices = 32;
 
@@ -124,7 +124,7 @@ struct zram {
 };
 
 extern struct zram *zram_devices;
-extern unsigned int num_devices;
+extern unsigned int zram_num_devices;
 #ifdef CONFIG_SYSFS
 extern struct attribute_group zram_disk_attr_group;
 #endif

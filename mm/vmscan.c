@@ -1427,7 +1427,7 @@ zone_id_shrink_pagelist(struct zone *zone, struct list_head *page_list)
 
 	spin_unlock_irq(&zone->lru_lock);
 
-	nr_reclaimed = shrink_page_list(&page_list, &sc, PAGEOUT_IO_SYNC);
+	nr_reclaimed = shrink_page_list(page_list, &sc, PAGEOUT_IO_SYNC);
 
 	__count_zone_vm_events(PGSTEAL, zone, nr_reclaimed);
 
