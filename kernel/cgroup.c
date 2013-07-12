@@ -1529,6 +1529,24 @@ int cgroup_path(const struct cgroup *cgrp, char *buf, int buflen)
 	return 0;
 }
 
+static int cgroup_allow_attach(struct cgroup *cgrp, struct task_struct *tsk)
+{
+	struct cgroup_subsys *ss;
+	int ret;
+
+	for_each_subsys(cgrp->root, ss) {
+		if (ss->allow_attach) {
+			ret = ss->allow_attach(cgrp, tsk);
+			if (ret)
+				return ret;
+		} else {
+			return -EACCES;
+		}
+	}
+
+	return 0;
+}
+
 /**
  * cgroup_attach_task - attach task 'tsk' to cgroup 'cgrp'
  * @cgrp: the cgroup the task is attaching to
@@ -1540,6 +1558,7 @@ int cgroup_path(const struct cgroup *cgrp, char *buf, int buflen)
 int cgroup_attach_task(struct cgroup *cgrp, struct task_struct *tsk)
 {
 	int retval = 0;
+	int ret;
 	struct cgroup_subsys *ss;
 	struct cgroup *oldcgrp;
 	struct css_set *cg;
@@ -1563,7 +1582,13 @@ int cgroup_attach_task(struct cgroup *cgrp, struct task_struct *tsk)
 			tcred = __task_cred(tsk);
 			if (cred->euid != tcred->uid &&
 			    cred->euid != tcred->suid) {
-				return -EACCES;
+				/*
+				 * if the default permission check fails, give each
+				 * cgroup a chance to extend the permission check
+				 */
+				ret = cgroup_allow_attach(cgrp, tsk);
+				if (ret)
+					return ret;
 			}
 		}
 	}
