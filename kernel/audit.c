@@ -176,8 +176,7 @@ void audit_panic(const char *message)
 	case AUDIT_FAIL_SILENT:
 		break;
 	case AUDIT_FAIL_PRINTK:
-		if (printk_ratelimit())
-			printk(KERN_ERR "audit: %s\n", message);
+		printk(KERN_ERR "audit: %s\n", message);
 		break;
 	case AUDIT_FAIL_PANIC:
 		/* test audit_pid since printk is always losey, why bother? */
@@ -247,13 +246,12 @@ void audit_log_lost(const char *message)
 	}
 
 	if (print) {
-		if (printk_ratelimit())
-			printk(KERN_WARNING
-				"audit: audit_lost=%d audit_rate_limit=%d "
-				"audit_backlog_limit=%d\n",
-				atomic_read(&audit_lost),
-				audit_rate_limit,
-				audit_backlog_limit);
+		printk(KERN_WARNING
+			"audit: audit_lost=%d audit_rate_limit=%d "
+			"audit_backlog_limit=%d\n",
+			atomic_read(&audit_lost),
+			audit_rate_limit,
+			audit_backlog_limit);
 		audit_panic(message);
 	}
 }
@@ -382,10 +380,8 @@ static void audit_printk_skb(struct sk_buff *skb)
 	char *data = NLMSG_DATA(nlh);
 
 	if (nlh->nlmsg_type != AUDIT_EOE) {
-		if (printk_ratelimit())
-			printk(KERN_NOTICE "type=%d %s\n", nlh->nlmsg_type, data);
-		else
-			audit_log_lost("printk limit exceeded\n");
+		printk(KERN_NOTICE "type=%d %s\n", nlh->nlmsg_type, data);
+		audit_log_lost("printk limit exceeded\n");
 	}
 
 	audit_hold_skb(skb);
@@ -1180,7 +1176,7 @@ struct audit_buffer *audit_log_start(struct audit_context *ctx, gfp_t gfp_mask,
 			remove_wait_queue(&audit_backlog_wait, &wait);
 			continue;
 		}
-		if (audit_rate_check() && printk_ratelimit())
+		if (audit_rate_check())
 			printk(KERN_WARNING
 			       "audit: audit_backlog=%d > "
 			       "audit_backlog_limit=%d\n",
