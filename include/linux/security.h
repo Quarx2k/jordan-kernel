@@ -1935,8 +1935,7 @@ static inline int security_binder_transfer_binder(struct task_struct *from, stru
 	return 0;
 }
 
-static inline int security_binder_transfer_file(struct task_struct *from, struct task_struct *to, st
-ruct file *file)
+static inline int security_binder_transfer_file(struct task_struct *from, struct task_struct *to, struct file *file)
 {
 	return 0;
 }

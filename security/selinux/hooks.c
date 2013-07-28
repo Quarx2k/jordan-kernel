@@ -1906,12 +1906,10 @@ static int selinux_binder_transfer_file(struct task_struct *from, struct task_st
 	struct inode *inode = file->f_path.dentry->d_inode;
 	struct inode_security_struct *isec = inode->i_security;
 	struct common_audit_data ad;
-	struct selinux_audit_data sad = {0,};
 	int rc;
 
-	COMMON_AUDIT_DATA_INIT(&ad, PATH);
-	ad.u.path = file->f_path;
-	ad.selinux_audit_data = &sad;
+	COMMON_AUDIT_DATA_INIT(&ad, FS);
+	ad.u.fs.path = file->f_path;
 
 	if (sid != fsec->sid) {
 		rc = avc_has_perm(sid, fsec->sid,
@@ -5529,6 +5527,11 @@ static int selinux_key_getsecurity(struct key *key, char **_buffer)
 
 static struct security_operations selinux_ops = {
 	.name =				"selinux",
+
+	.binder_set_context_mgr =	selinux_binder_set_context_mgr,
+	.binder_transaction =		selinux_binder_transaction,
+	.binder_transfer_binder =	selinux_binder_transfer_binder,
+	.binder_transfer_file =			selinux_binder_transfer_file,
 
 	.ptrace_access_check =		selinux_ptrace_access_check,
 	.ptrace_traceme =		selinux_ptrace_traceme,
