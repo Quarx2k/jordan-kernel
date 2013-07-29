@@ -2159,6 +2159,7 @@ static int __init omap34xxcam_init(void)
 	cam = kzalloc(sizeof(*cam), GFP_KERNEL);
 	if (!cam) {
 		printk(KERN_ERR "%s: could not allocate memory\n", __func__);
+		kfree(cam);
 		return -ENOMEM;
 	}
 
