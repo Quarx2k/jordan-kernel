@@ -67,6 +67,7 @@ static int ion_kernel_mapper_map_user(struct ion_mapper *mapper,
 {
 	int ret;
 
+	printk("ion: %s: mapping heap to userspace\n", __func__);
 	switch (buffer->heap->type) {
 	case ION_HEAP_KMALLOC:
 	{
@@ -74,10 +75,12 @@ static int ion_kernel_mapper_map_user(struct ion_mapper *mapper,
 		ret = remap_pfn_range(vma, vma->vm_start, pfn + vma->vm_pgoff,
 				      vma->vm_end - vma->vm_start,
 				      vma->vm_page_prot);
+		printk("ion: kmalloc: %u\n", ret);
 		break;
 	}
 	case ION_HEAP_VMALLOC:
 		ret = remap_vmalloc_range(vma, buffer->priv, vma->vm_pgoff);
+		printk("ion: vmalloc: %u\n", ret);
 		break;
 	default:
 		pr_err("%s: attempting to map unsupported heap to userspace\n",

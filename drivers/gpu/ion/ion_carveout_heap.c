@@ -120,11 +120,14 @@ void ion_carveout_heap_unmap_kernel(struct ion_heap *heap,
 int ion_carveout_heap_map_user(struct ion_heap *heap, struct ion_buffer *buffer,
 			       struct vm_area_struct *vma)
 {
-	printk("%s\n",__func__);
-	return remap_pfn_range(vma, vma->vm_start,
+	int ret;
+
+	ret = remap_pfn_range(vma, vma->vm_start,
 			       __phys_to_pfn(buffer->priv_phys) + vma->vm_pgoff,
 			       buffer->size,
 			       pgprot_noncached(vma->vm_page_prot));
+	printk("omap ion: %s: ret: %u\n",__func__, ret);	
+	return ret;
 }
 
 static struct ion_heap_ops carveout_heap_ops = {
@@ -140,7 +143,7 @@ struct ion_heap *ion_carveout_heap_create(struct ion_platform_heap *heap_data)
 {
 	struct ion_carveout_heap *carveout_heap;
 	int ret;
-	printk("%s\n",__func__);
+	printk("ion: %s\n",__func__);
 	carveout_heap = kzalloc(sizeof(struct ion_carveout_heap), GFP_KERNEL);
 	if (!carveout_heap)
 		return ERR_PTR(-ENOMEM);
@@ -153,21 +156,21 @@ struct ion_heap *ion_carveout_heap_create(struct ion_platform_heap *heap_data)
 	carveout_heap->base = heap_data->base;
 	ret = gen_pool_add(carveout_heap->pool, carveout_heap->base, heap_data->size,
 		     -1);
-	printk("%s:gen_pool_add ret %d\n",__func__,ret);
+	printk("ion: %s: gen_pool_add ret %d\n",__func__,ret);
 	carveout_heap->heap.ops = &carveout_heap_ops;
 	carveout_heap->heap.type = ION_HEAP_TYPE_CARVEOUT;
 
-	printk("%s: heap_data->size %zu\n",__func__,heap_data->size);
-	printk("%s: return OK\n",__func__);
+	printk("ion: %s: heap_data->size %zu\n",__func__,heap_data->size);
+	printk("ion: %s: return OK\n",__func__);
 	return &carveout_heap->heap;
 }
 
 void ion_carveout_heap_destroy(struct ion_heap *heap)
 {
-	printk("%s\n",__func__);
 	struct ion_carveout_heap *carveout_heap =
-	     container_of(heap, struct  ion_carveout_heap, heap);
-
+	     container_of(heap, struct ion_carveout_heap, heap);
+	printk("%s\n",__func__);
+	
 	gen_pool_destroy(carveout_heap->pool);
 	kfree(carveout_heap);
 	carveout_heap = NULL;

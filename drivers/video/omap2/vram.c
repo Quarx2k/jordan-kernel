@@ -511,11 +511,12 @@ static u32 omap_vram_sdram_size __initdata;
 static u32 omap_vram_def_sdram_size __initdata;
 static u32 omap_vram_def_sdram_start __initdata;
 
-static void __init omap_vram_early_vram(char **p)
+static int __init omap_vram_early_vram(char *p)
 {
-	omap_vram_def_sdram_size = memparse(*p, p);
-	if (**p == ',')
-		omap_vram_def_sdram_start = simple_strtoul((*p) + 1, p, 16);
+	omap_vram_def_sdram_size = memparse(p, &p);
+	if (*p == ',')
+		omap_vram_def_sdram_start = simple_strtoul(p + 1, &p, 16);
+	return 0;
 }
 early_param("vram", omap_vram_early_vram);
 

@@ -1193,8 +1193,8 @@ struct ion_device *ion_device_create(long (*custom_ioctl)
 {
 	struct ion_device *idev; 
 	int ret;
-	printk("ion_device_create!!!!\n");
 	idev = kzalloc(sizeof(struct ion_device), GFP_KERNEL);
+	printk("ion: %s: ion_device\n", __func__);
 	if (!idev)
 		return ERR_PTR(-ENOMEM);
 
@@ -1225,5 +1225,6 @@ void ion_device_destroy(struct ion_device *dev)
 {
 	misc_deregister(&dev->dev);
 	/* XXX need to free the heaps and clients ? */
+	printk("ion: %s: heaps will be free:\n", __func__);
 	kfree(dev);
 }

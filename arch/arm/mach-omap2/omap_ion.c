@@ -69,29 +69,30 @@ static struct platform_device omap_ion_device = {
 
 void __init omap_register_ion(void)
 {
-	printk("omap_register_ion!!!\n");
-	int ret;	
+	int ret;
+	printk("ion: %s: omap_register_ion\n", __func__);	
 	ret = platform_device_register(&omap_ion_device);
-	printk("latform_device_register RET %d\n", ret);
+	printk("ion: platform_device_register RET %d\n", ret);
 }
 
 void __init omap_ion_init(void)
 {
 	int i;
 	int ret;
-	printk("omap_ion_init!!! %d\n", omap_ion_data.nr);
+	printk("ion: %s: omap_ion_init %d\n", __func__, omap_ion_data.nr);
 	
 	for (i = 0; i < omap_ion_data.nr; i++)
-		printk("omap_ion_init: enter to for\n");
+		printk("ion: omap_ion_init: enter to for\n");
 		if (omap_ion_data.heaps[i].type == ION_HEAP_TYPE_CARVEOUT ||
 		    omap_ion_data.heaps[i].type == OMAP_ION_HEAP_TYPE_TILER) {
-			printk("omap_ion_init: after if\n");
+			printk("ion: omap_ion_init: after if\n");
 			ret = memblock_remove(omap_ion_data.heaps[i].base,
 					      omap_ion_data.heaps[i].size);
+			
 			if (ret)
-				pr_err("memblock remove of %x@%lx failed\n",
+				pr_err("ion: memblock remove of %x@%lx failed\n",
 				       omap_ion_data.heaps[i].size,
 				       omap_ion_data.heaps[i].base);
 		}
-	printk("omap_ion_init: exitr\n");
+	printk("ion: omap_ion_init: exit\n");
 }

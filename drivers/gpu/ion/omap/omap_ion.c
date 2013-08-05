@@ -81,14 +81,14 @@ int omap_ion_probe(struct platform_device *pdev)
 	struct ion_platform_data *pdata = pdev->dev.platform_data;
 	int err;
 	int i;
-	printk("omap_ion_probe!!!!!!!!!\n");
+	printk("ion: %s\n", __func__);
 	num_heaps = pdata->nr;
-	printk("!!!!num_heaps: %d\n",num_heaps);
+	printk("ion: %s: num heaps %d \n", __func__, num_heaps);
 	heaps = kzalloc(sizeof(struct ion_heap *) * pdata->nr, GFP_KERNEL);
-	printk("SIZE: %d\n",sizeof(struct ion_heap *) * pdata->nr);
+	printk("ion: SIZE: %d\n",sizeof(struct ion_heap *) * pdata->nr);
 	omap_ion_device = ion_device_create(omap_ion_ioctl);
 	if (IS_ERR_OR_NULL(omap_ion_device)) {
-		printk("heaps NULL!!!!\n");
+		printk("ion: %s: heaps null\n", __func__);
 		kfree(heaps);
 		return PTR_ERR(omap_ion_device);
 	}
@@ -155,13 +155,14 @@ static struct platform_driver ion_driver = {
 
 static int __init ion_init(void)
 {
-	printk("!!!!!!omap_ion_init!!!!!!!!!\n");
 	return platform_driver_register(&ion_driver);
+	printk("ion: %s: ion init\n", __func__);
 }
 
 static void __exit ion_exit(void)
 {
 	platform_driver_unregister(&ion_driver);
+	printk("ion: %s: ion exit\n", __func__);
 }
 
 subsys_initcall(ion_init);

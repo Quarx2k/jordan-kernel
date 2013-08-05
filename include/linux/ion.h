@@ -63,6 +63,7 @@ struct ion_buffer;
  * @name:	used for debug purposes
  * @base:	base address of heap in physical memory if applicable
  * @size:	size of the heap in bytes if applicable
+ * @priv:		heap private data
  *
  * Provided by the board file.
  */
@@ -72,6 +73,7 @@ struct ion_platform_heap {
 	const char *name;
 	ion_phys_addr_t base;
 	size_t size;
+	void *priv;
 };
 
 /**

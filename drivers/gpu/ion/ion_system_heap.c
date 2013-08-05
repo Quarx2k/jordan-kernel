@@ -77,6 +77,7 @@ void ion_system_heap_unmap_dma(struct ion_heap *heap,
 void *ion_system_heap_map_kernel(struct ion_heap *heap,
 				 struct ion_buffer *buffer)
 {
+	printk ("ion: %s: priv_virt: %u\n", __func__, buffer->priv_virt);
 	return buffer->priv_virt;
 }
 
