@@ -288,6 +288,11 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 	struct ion_handle *handle;
 	struct ion_device *dev = client->dev;
 	struct ion_buffer *buffer = NULL;
+	const unsigned int MAX_DBG_STR_LEN = 64;
+	char dbg_str[MAX_DBG_STR_LEN];
+	unsigned int dbg_str_idx = 0;
+
+	dbg_str[0] = '\0';
 
 	/*
 	 * traverse the list of heaps available in this system in priority
@@ -307,16 +312,39 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 		buffer = ion_buffer_create(heap, dev, len, align, flags);
 		if (!IS_ERR_OR_NULL(buffer))
 			break;
+		
+		if (dbg_str_idx < MAX_DBG_STR_LEN) {
+			unsigned int len_left = MAX_DBG_STR_LEN-dbg_str_idx-1;
+			int ret_value = snprintf(&dbg_str[dbg_str_idx],
+				len_left, "%s ", heap->name);
+			if (ret_value >= len_left) {
+				/* overflow */
+				dbg_str[MAX_DBG_STR_LEN-1] = '\0';
+				dbg_str_idx = MAX_DBG_STR_LEN;
+			} else if (ret_value >= 0) {
+				dbg_str_idx += ret_value;
+			} else {
+				/* error */
+				dbg_str[MAX_DBG_STR_LEN-1] = '\0';
+			}
+		}
+
 	}
 	mutex_unlock(&dev->lock);
 
-	if (IS_ERR_OR_NULL(buffer))
+	if (buffer == NULL)
+     		return ERR_PTR(-ENODEV);
+
+	if (IS_ERR(buffer)) {
+		printk("ION is unable to allocate 0x%x bytes (alignment: "
+			 "0x%x) from heap(s) %sfor client %s with heap "
+			 "mask 0x%x\n",
+			len, align, dbg_str, client->name, client->heap_mask);
 		return ERR_PTR(PTR_ERR(buffer));
+	}
+
 
 	handle = ion_handle_create(client, buffer);
-
-	if (IS_ERR_OR_NULL(handle))
-		goto end;
 
 	/*
 	 * ion_buffer_create will create a buffer with a ref_cnt of 1,
@@ -324,13 +352,12 @@ struct ion_handle *ion_alloc(struct ion_client *client, size_t len,
 	 */
 	ion_buffer_put(buffer);
 
-	mutex_lock(&client->lock);
-	ion_handle_add(client, handle);
-	mutex_unlock(&client->lock);
-	return handle;
+	if (!IS_ERR(handle)) {
+		mutex_lock(&client->lock);
+		ion_handle_add(client, handle);
+		mutex_unlock(&client->lock);
+	}
 
-end:
-	ion_buffer_put(buffer);
 	return handle;
 }
 EXPORT_SYMBOL(ion_alloc);
