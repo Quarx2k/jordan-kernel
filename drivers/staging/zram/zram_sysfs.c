@@ -102,7 +102,7 @@ static ssize_t reset_store(struct device *dev,
 	if (bdev)
 		fsync_bdev(bdev);
 
-	zram_reset_device(zram);
+	zram_reset_device(zram, true);
 	return len;
 }
 

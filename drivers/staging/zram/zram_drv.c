@@ -564,7 +564,7 @@ error:
 	return 0;
 }
 
-static void __zram_reset_device(struct zram *zram)
+static void __zram_reset_device(struct zram *zram, bool reset_capacity)
 {
 	size_t index;
 
@@ -607,13 +607,14 @@ static void __zram_reset_device(struct zram *zram)
 	memset(&zram->stats, 0, sizeof(zram->stats));
 
 	zram->disksize = 0;
-	set_capacity(zram->disk, 0);
+	if (reset_capacity)
+		set_capacity(zram->disk, 0);
 }
 
-void zram_reset_device(struct zram *zram)
+void zram_reset_device(struct zram *zram, bool reset_capacity)
 {
 	down_write(&zram->init_lock);
-	__zram_reset_device(zram);
+	__zram_reset_device(zram, reset_capacity);
 	up_write(&zram->init_lock);
 }
 
@@ -679,7 +680,7 @@ fail_no_table:
 	/* To prevent accessing table entries during cleanup */
 	zram->disksize = 0;
 fail:
-	__zram_reset_device(zram);
+	__zram_reset_device(zram, true);
 	pr_err("Initialization failed: err=%d\n", ret);
 	return ret;
 }
@@ -835,10 +836,12 @@ static void __exit zram_exit(void)
 	for (i = 0; i < num_devices; i++) {
 		zram = &zram_devices[i];
 
-		get_disk(zram->disk);
 		destroy_device(zram);
-		zram_reset_device(zram);
-		put_disk(zram->disk);
+		/*
+		 * Shouldn't access zram->disk after destroy_device
+		 * because destroy_device already released zram->disk.
+		 */
+		zram_reset_device(zram, false);
 	}
 
 	unregister_blkdev(zram_major, "zram");
