@@ -98,6 +98,11 @@ struct zram_stats {
 	u32 pages_expand;	/* % of incompressible pages */
 };
 
+struct zram_slot_free {
+	unsigned long index;
+	struct zram_slot_free *next;
+};
+
 struct zram {
 	struct xv_pool *mem_pool;
 	void *compress_workmem;
@@ -107,6 +112,10 @@ struct zram {
 	struct rw_semaphore lock; /* protect compression buffers, table,
 				   * 32bit stat counters against concurrent
 				   * notifications, reads and writes */
+
+	struct work_struct free_work;  /* handle pending free request */
+	struct zram_slot_free *slot_free_rq; /* list head of free request */
+
 	struct request_queue *queue;
 	struct gendisk *disk;
 	int init_done;
@@ -117,6 +126,7 @@ struct zram {
 	 * we can store in a disk.
 	 */
 	u64 disksize;	/* bytes */
+	spinlock_t slot_free_lock;
 
 	struct zram_stats stats;
 };
