@@ -176,7 +176,8 @@ static void zram_set_disksize(struct zram *zram, size_t totalram_bytes)
 		);
 	}
 
-	zram->disksize &= PAGE_MASK;
+	/* can't use PAGE_MASK because it does not extend correctly to 64 bit */
+	zram->disksize &= ~((1ULL << PAGE_SHIFT) - 1);
 }
 
 #ifdef CONFIG_ZRAM_FOR_ANDROID
