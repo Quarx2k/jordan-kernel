@@ -80,12 +80,14 @@ static unsigned int last_freq;
 
 /* Suspend/Resume flag */
 static bool suspend_state;
+#define DEFAULT_SAMPLING_RATE_SUSPEND_TIME 1000
+u64 sampling_rate_suspend_time = DEFAULT_SAMPLING_RATE_SUSPEND_TIME * 1000;
 
 /* Suspend Optimization Enabled ? */
 static bool suspend_enabled = true;
 
 /* Hi speed to bump to from lo speed when load burst (default max) */
-#define DEFAULT_HISPEED_FREQ 1000000
+#define DEFAULT_HISPEED_FREQ 800000
 static unsigned int hispeed_freq = DEFAULT_HISPEED_FREQ;
 
 /* Go to hi speed when CPU load at or above this value. */
@@ -144,7 +146,8 @@ static struct workqueue_struct *inputopen_wq;
 
 static int boost_val;
 /* Duration of a boot pulse in usecs */
-static int boostpulse_duration_val = DEFAULT_TIMER_RATE;
+#define DEFAULT_INPUT_BOOST_FREQ_DURATION 2000
+static int boostpulse_duration_val = DEFAULT_INPUT_BOOST_FREQ_DURATION * 1000;
 /* End time of boost pulse in ktime converted to usecs */
 static u64 boostpulse_endtime;
 
@@ -161,7 +164,7 @@ static int timer_slack_val = DEFAULT_TIMER_SLACK;
  * touched. input_boost needs to be enabled.
  */
 
-static int input_boost_freq = DEFAULT_HISPEED_FREQ;
+static int input_boost_freq = DEFAULT_HISPEED_FREQ + 200000;
 
 
 static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
@@ -434,12 +437,12 @@ static void cpufreq_interactive_timer(unsigned long data)
 
         if (cpu_load >= go_hispeed_load || boosted) {
                 if (pcpu->target_freq < hispeed_freq) {
-                        new_freq = hispeed_freq;
+                        new_freq = pcpu->policy->max;
                 } else {
                         new_freq = choose_freq(pcpu, loadadjfreq);
 
                         if (new_freq < hispeed_freq)
-                                new_freq = hispeed_freq;
+                                new_freq = pcpu->policy->max;
                 }
         } else {
                 new_freq = choose_freq(pcpu, loadadjfreq);
@@ -505,6 +508,7 @@ static void cpufreq_interactive_timer(unsigned long data)
         cpumask_set_cpu(data, &speedchange_cpumask);
         spin_unlock_irqrestore(&speedchange_cpumask_lock, flags);
         wake_up_process(speedchange_task);
+	
 
 rearm_if_notmax:
         /*
@@ -627,7 +631,7 @@ static int cpufreq_interactive_speedchange_task(void *data)
 			 * Only enable it, if user wants to
 			 */
 			if (suspend_enabled && suspend_state) {
-					if ((ktime_to_us(ktime_get()) + 1000000) && cpu_load > 7000) {
+					if ((ktime_to_us(ktime_get()) + sampling_rate_suspend_time) && cpu_load > 7000) {
 						/*
 						 * The screen is off, we are near deep-sleep.
 						 * Something needs power and it needs it fast!
@@ -662,7 +666,7 @@ static int cpufreq_interactive_speedchange_task(void *data)
 			trace_cpufreq_interactive_setspeed(cpu,
 						     pcpu->target_freq,
 						     pcpu->policy->cur);
-
+	
 			up_read(&pcpu->enable_sem);
 
 		}
@@ -1445,7 +1449,7 @@ static int __init cpufreq_interactive_init(void)
 	unsigned int i;
 	struct cpufreq_interactive_cpuinfo *pcpu;
 	struct sched_param param = { .sched_priority = MAX_RT_PRIO-1 };
-
+	
 	/* suspend/resume call */
 	register_early_suspend(&interactive_suspend);
 
@@ -1460,7 +1464,6 @@ static int __init cpufreq_interactive_init(void)
 		spin_lock_init(&pcpu->load_lock);
 		init_rwsem(&pcpu->enable_sem);
 	}
-
 
 	spin_lock_init(&target_loads_lock);
 	spin_lock_init(&speedchange_cpumask_lock);
