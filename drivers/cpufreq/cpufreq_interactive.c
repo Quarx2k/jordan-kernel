@@ -95,7 +95,7 @@ static unsigned int hispeed_freq = DEFAULT_HISPEED_FREQ;
 static unsigned long go_hispeed_load = DEFAULT_GO_HISPEED_LOAD;
 
 /* Target load.  Lower values result in higher CPU speeds. */
-#define DEFAULT_TARGET_LOAD 80
+#define DEFAULT_TARGET_LOAD 85
 static unsigned int default_target_loads[] = {DEFAULT_TARGET_LOAD};
 static spinlock_t target_loads_lock;
 static unsigned int *target_loads = default_target_loads;
@@ -146,8 +146,8 @@ static struct workqueue_struct *inputopen_wq;
 
 static int boost_val;
 /* Duration of a boot pulse in usecs */
-#define DEFAULT_INPUT_BOOST_FREQ_DURATION 2000
-static int boostpulse_duration_val = DEFAULT_INPUT_BOOST_FREQ_DURATION * 1000;
+#define DEFAULT_INPUT_BOOST_FREQ_DURATION (20 * USEC_PER_MSEC)
+static int boostpulse_duration_val = DEFAULT_INPUT_BOOST_FREQ_DURATION * 10;
 /* End time of boost pulse in ktime converted to usecs */
 static u64 boostpulse_endtime;
 
@@ -156,7 +156,7 @@ static u64 boostpulse_endtime;
  * Max additional time to wait in idle, beyond timer_rate, at speeds above
  * minimum before wakeup to reduce speed, or -1 if unnecessary.
  */
-#define DEFAULT_TIMER_SLACK (20 * USEC_PER_MSEC)
+#define DEFAULT_TIMER_SLACK (40 * USEC_PER_MSEC)
 static int timer_slack_val = DEFAULT_TIMER_SLACK;
 
 /*
