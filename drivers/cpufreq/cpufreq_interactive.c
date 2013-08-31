@@ -80,8 +80,6 @@ static unsigned int last_freq;
 
 /* Suspend/Resume flag */
 static bool suspend_state;
-#define DEFAULT_SAMPLING_RATE_SUSPEND_TIME 1000
-u64 sampling_rate_suspend_time = DEFAULT_SAMPLING_RATE_SUSPEND_TIME * 1000;
 
 /* Suspend Optimization Enabled ? */
 static bool suspend_enabled = true;
@@ -631,7 +629,7 @@ static int cpufreq_interactive_speedchange_task(void *data)
 			 * Only enable it, if user wants to
 			 */
 			if (suspend_enabled && suspend_state) {
-					if ((ktime_to_us(ktime_get()) + sampling_rate_suspend_time) && cpu_load > 7000) {
+					if ((ktime_to_us(ktime_get()) + 1000000) && cpu_load > 7000) {
 						/*
 						 * The screen is off, we are near deep-sleep.
 						 * Something needs power and it needs it fast!
