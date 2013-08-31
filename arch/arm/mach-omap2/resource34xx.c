@@ -32,8 +32,6 @@
 #include "cm.h"
 #include "cm-regbits-34xx.h"
 
-static DEFINE_SPINLOCK(dpll3_clock_lock);
-
 #ifndef CONFIG_CPU_IDLE
 #warning MPU latency constraints require CONFIG_CPU_IDLE to function!
 #endif

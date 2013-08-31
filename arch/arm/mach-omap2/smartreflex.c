@@ -1162,30 +1162,6 @@ static void sr_vp_configure(struct omap_sr *sr)
 		pr_crit("SR[%d] CONFIGURE VP failed!!\n", sr->srid);
 }
 
-/**
- * @brief sr_vp_reset_voltage - reset the voltages back to DVFS values
- *
- * @param srid -SRID
- *
- * @return 0 if ok, else result
- */
-static int sr_vp_reset_voltage(u8 srid)
-{
-	u32 target_opp_no;
-	u32 target_vsel;
-	u32 prm_vpx_voltage;
-	struct omap_sr *sr;
-
-	sr = get_sr(srid);
-	target_opp_no = sr->req_opp_no;
-	target_vsel = get_vsel_for_opp(sr, target_opp_no);
-	prm_vpx_voltage = prm_read_mod_reg(OMAP3430_GR_MOD,
-					   sr->vp.prm_vpx_voltage_offset);
-	return SR_CHOSEN_VOLTAGE_UPDATE_MECH(sr, target_opp_no,
-					     target_vsel, prm_vpx_voltage);
-
-}
-
 /*********************** SR functions *************************/
 
 /**

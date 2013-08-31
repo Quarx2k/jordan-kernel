@@ -79,6 +79,7 @@ static unsigned long __init unflatten_dt_node(unsigned long mem,
 	char *pathp;
 	u32 tag;
 	unsigned int l, allocl;
+	int n = 0;
 	int has_name = 0;
 	int new_format = 0;
 
@@ -123,7 +124,7 @@ static unsigned long __init unflatten_dt_node(unsigned long mem,
 		memset(np, 0, sizeof(*np));
 		np->full_name = ((char *)np) + sizeof(struct device_node);
 		if (new_format) {
-			int n = scnprintf(np->full_name, allocl, "%s/%s",
+			n = scnprintf(np->full_name, allocl, "%s/%s",
 				dad && dad->parent ? dad->full_name : "",
 				pathp);
 #ifdef DEBUG
