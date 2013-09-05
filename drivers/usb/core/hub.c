@@ -2600,6 +2600,14 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 	enum usb_device_speed	oldspeed = udev->speed;
 	char 			*speed, *type;
 	int			devnum = udev->devnum;
+	bool do_reset = true;
+
+#ifdef CONFIG_MAPPHONE_2NDBOOT
+	// do not reset first USB bus (modem) on 2ndboot,
+	// but reset on device connect in host mode
+	if (hdev->bus->busnum == 1)
+		do_reset = false;
+#endif
 
 	/* root hub ports have a slightly longer reset period
 	 * (from USB 2.0 spec, section 7.1.7.5)
@@ -2630,11 +2638,10 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 	} else {
 		/* Reset the device; full speed may morph to high speed */
 		/* FIXME a USB 2.0 device may morph into SuperSpeed on reset. */
-#ifndef CONFIG_MAPPHONE_2NDBOOT
-		retval = hub_port_reset(hub, port1, udev, delay);
-#else
-		retval = 0;
-#endif
+		if (do_reset)
+			retval = hub_port_reset(hub, port1, udev, delay);
+		else
+			retval = 0;
 		if (retval < 0)		/* error or disconnect */
 			goto fail;
 		/* success, speed is known */
@@ -2646,10 +2653,10 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 		goto fail;
 	}
 
-#ifdef CONFIG_MAPPHONE_2NDBOOT
-	udev->speed = USB_SPEED_HIGH;
-	udev->state = USB_STATE_UNAUTHENTICATED;
-#endif
+	if(!do_reset) {
+		udev->speed = USB_SPEED_HIGH;
+		udev->state = USB_STATE_UNAUTHENTICATED;
+	}
 
 	oldspeed = udev->speed;
 
@@ -2773,11 +2780,10 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 					buf->bMaxPacketSize0;
 			kfree(buf);
 
-#ifndef CONFIG_MAPPHONE_2NDBOOT
-			retval = hub_port_reset(hub, port1, udev, delay);
-#else
-			retval = 0;
-#endif
+			if (do_reset)
+				retval = hub_port_reset(hub, port1, udev, delay);
+			else
+				retval = 0;
 			if (retval < 0)		/* error or disconnect */
 				goto fail;
 			if (oldspeed != udev->speed) {
@@ -2802,21 +2808,21 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
  		 * authorization will assign the final address.
  		 */
 		if (udev->wusb == 0) {
-#ifndef CONFIG_MAPPHONE_2NDBOOT
-			for (j = 0; j < SET_ADDRESS_TRIES; ++j) {
-				retval = hub_set_address(udev, devnum);
-				if (retval >= 0)
-					break;
-				msleep(200);
-			}
-#else
-			/* Make device use proper address. */
-			update_address(udev, devnum);
+			if (do_reset) {
+				for (j = 0; j < SET_ADDRESS_TRIES; ++j) {
+					retval = hub_set_address(udev, devnum);
+					if (retval >= 0)
+						break;
+					msleep(200);
+				}
+			} else {
+				/* Make device use proper address. */
+				update_address(udev, devnum);
 			
-			usb_set_device_state(udev, USB_STATE_ADDRESS);
-			usb_ep0_reinit(udev);
-			retval = 0;
-#endif
+				usb_set_device_state(udev, USB_STATE_ADDRESS);
+				usb_ep0_reinit(udev);
+				retval = 0;
+			}
 			
 			if (retval < 0) {
 				dev_err(&udev->dev,

@@ -1534,14 +1534,15 @@ static void musb_pullup2(struct musb *musb, int is_on)
 	musb_writeb(musb->mregs, MUSB_POWER, power);
 }
 
-bool cpcap_usb;
+bool cpcap_usb = false;
+bool cpcap_otg = false;
 
 static void musb_pullup(struct musb *musb, int is_on)
 {
 	is_on = !!is_on;
 
 	if (is_on && !cpcap_usb) {
-		printk("Disable usb:\n");
+		printk("Disable usb\n");
 		musb_pullup2(musb, !is_on);
 		stop_activity(musb, musb->gadget_driver);
 	} else if (is_on && cpcap_usb) {
@@ -1550,11 +1551,63 @@ static void musb_pullup(struct musb *musb, int is_on)
 	}
 }
 
-void cpcap_musb_notifier_call(bool event)
+void cpcap_musb_notifier_call(unsigned char event)
 {
  	struct musb *musb = g_musb;
-	cpcap_usb = event;
-	musb_pullup(musb,1);
+	u8 power;
+	u32 stdby;
+	u32 reg;
+
+
+	if ((event == 0) && cpcap_otg) {
+		printk("Disable otg\n");
+		reg = omap_readl(OTG_SYSCONFIG);
+		stdby = omap_readl(OTG_FORCESTDBY);
+		power = musb_readb(musb->mregs, MUSB_POWER);
+
+		reg &= ~NOSTDBY;          /* remove possible nostdby */
+		reg &= ~NOIDLE;           /* remove possible noidle */
+		power &= ~MUSB_POWER_SOFTCONN;
+		stdby |= ENABLEFORCE;     /* enable MSTANDBY */
+
+		omap_writel(stdby, OTG_FORCESTDBY);
+		omap_writel(reg, OTG_SYSCONFIG);
+		musb_writeb(musb->mregs, MUSB_POWER, power);
+
+		musb->xceiv->state = OTG_STATE_B_IDLE;
+		musb->is_host = false;				
+		musb_g_reset(musb);
+		musb_stop(musb);
+
+		cpcap_otg = false;
+		return;
+
+	} else if ((event == 2) && !cpcap_otg) {
+		printk("Enable otg\n");
+
+		stdby = omap_readl(OTG_FORCESTDBY);
+		power = musb_readb(musb->mregs, MUSB_POWER);
+
+		reg = 0x11;
+		power |= MUSB_POWER_SOFTCONN;
+		stdby &= ~ENABLEFORCE;	/* disable MSTANDBY */
+
+		omap_writel(stdby, OTG_FORCESTDBY);
+		omap_writel(reg, OTG_SYSCONFIG);
+		musb_writeb(musb->mregs, MUSB_POWER, power);
+
+		musb->xceiv->state = OTG_STATE_A_IDLE;
+		musb->is_host = true;
+		musb_start(musb);
+ 		musb_g_reset(musb);
+
+		cpcap_otg = true;
+		return;
+
+	} else if (!cpcap_otg) {
+		cpcap_usb = (event == 1);
+		musb_pullup(musb,1);
+	}
 }
 
 #if 0
@@ -2059,7 +2112,7 @@ __acquires(musb->lock)
 	void __iomem	*mbase = musb->mregs;
 	u8		devctl = musb_readb(mbase, MUSB_DEVCTL);
 	u8		power;
-
+	printk(KERN_INFO "musb RESET!");
 	DBG(3, "<== %s addr=%x driver '%s'\n",
 			(devctl & MUSB_DEVCTL_BDEVICE)
 				? "B-Device" : "A-Device",

@@ -215,7 +215,7 @@ static struct musb_hdrc_platform_data musb_plat = {
 	 * 100 mA ... but this value is board-specific, like
 	 * "mode", and should be passed to usb_musb_init().
 	 */
-	.power		= 50,			/* up to 100 mA */
+	.power		= 100,			/* up to 100 mA */
 };
 
 static u64 musb_dmamask = DMA_BIT_MASK(32);

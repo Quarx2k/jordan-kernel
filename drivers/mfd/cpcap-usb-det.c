@@ -70,6 +70,20 @@
 				 CPCAP_BIT_DM_S_LS     | \
 				 CPCAP_BIT_DP_S_LS)
 
+#define SENSE_OTG_CABLE (CPCAP_BIT_ID_GROUND_S | \
+			     CPCAP_BIT_CHRGCURR1_S)
+
+#define SENSE_OTG_DEVICE (CPCAP_BIT_ID_GROUND_S | \
+			     CPCAP_BIT_VBUSVLD_S   | \
+			     CPCAP_BIT_SESSVLD_S   | \
+			     CPCAP_BIT_CHRGCURR1_S | \
+			     CPCAP_BIT_DP_S_LS)
+
+#define SENSE_OTG (CPCAP_BIT_ID_GROUND_S | \
+			     CPCAP_BIT_CHRGCURR1_S | \
+			     CPCAP_BIT_SESSVLD_S)
+
+
 #define UNDETECT_TRIES		5
 
 enum cpcap_det_state {
@@ -79,16 +93,27 @@ enum cpcap_det_state {
 	IDENTIFY,
 	USB,
 	FACTORY,
+    USB_DEVICE,
 };
 
 enum cpcap_accy {
 	CPCAP_ACCY_USB,
 	CPCAP_ACCY_FACTORY,
 	CPCAP_ACCY_CHARGER,
+	CPCAP_ACCY_USB_DEVICE,
 	CPCAP_ACCY_NONE,
 
 	/* Used while debouncing the accessory. */
 	CPCAP_ACCY_UNKNOWN,
+};
+
+static const char *accy_names[8] = {
+	"USB",
+	"FACTORY",
+	"CHARGER",
+	"USB DEVICE",
+	"NONE",
+	"UNKNOWN",
 };
 
 struct cpcap_usb_det_data {
@@ -112,6 +137,9 @@ static const char *accy_devices[] = {
 	"cpcap_factory",
 	"cpcap_charger",
 };
+
+/* Expects values from 0 to 2: 0=no_log, 1=basic_log, 2=max_log */
+static int cpcap_usb_det_debug = 2;
 
 #ifdef CONFIG_USB_TESTING_POWER
 static int testing_power_enable = -1;
@@ -138,6 +166,44 @@ static void vusb_disable(struct cpcap_usb_det_data *data)
 	}
 }
 
+static void dump_sense_bits(struct cpcap_usb_det_data *data)
+{
+	if (CPCAP_BIT_CHRGCURR1_S & data->sense)
+		pr_info("cpcap_usb_det: SenseBit = CPCAP_BIT_CHRGCURR1_S\n");
+	if (CPCAP_BIT_DM_S_LS & data->sense)
+		pr_info("cpcap_usb_det: SenseBit = CPCAP_BIT_DM_S_LS\n");
+	if (CPCAP_BIT_DP_S_LS & data->sense)
+		pr_info("cpcap_usb_det: SenseBit = CPCAP_BIT_DP_S_LS)\n");
+	if (CPCAP_BIT_ID_FLOAT_S & data->sense)
+		pr_info("cpcap_usb_det: SenseBit = CPCAP_BIT_ID_FLOAT_S\n");
+	if (CPCAP_BIT_ID_GROUND_S & data->sense)
+		pr_info("cpcap_usb_det: SenseBit = CPCAP_BIT_ID_GROUND_S\n");
+	if (CPCAP_BIT_SE1_S & data->sense)
+		pr_info("cpcap_usb_det: SenseBit = CPCAP_BIT_SE1_S\n");
+	if (CPCAP_BIT_SESSVLD_S & data->sense)
+		pr_info("cpcap_usb_det: SenseBit = CPCAP_BIT_SESSVLD_S\n");
+	if (CPCAP_BIT_VBUSVLD_S & data->sense)
+		pr_info("cpcap_usb_det: SenseBit = CPCAP_BIT_VBUSVLD_S\n");
+
+	if (SENSE_CHARGER == data->sense)
+		pr_info("cpcap_usb_det: Sense Pattern = SENSE_CHARGER\n");
+	if (SENSE_CHARGER_FLOAT == data->sense)
+		pr_info("cpcap_usb_det: Sense Pattern = SENSE_CHARGER_FLOAT\n");
+	if (SENSE_FACTORY == data->sense)
+		pr_info("cpcap_usb_det: Sense Pattern = SENSE_FACTORY\n");
+	if (SENSE_FACTORY_COM == data->sense)
+		pr_info("cpcap_usb_det: Sense Pattern = SENSE_FACTORY_COM\n");
+	if (SENSE_USB == data->sense)
+		pr_info("cpcap_usb_det: Sense Pattern = SENSE_USB\n");
+	if (SENSE_USB_FLASH == data->sense)
+		pr_info("cpcap_usb_det: Sense Pattern = SENSE_USB_FLASH\n");
+	if (SENSE_OTG_CABLE == data->sense)
+		pr_info("cpcap_usb_det: Sense Pattern = SENSE_OTG_CABLE\n");
+	if (SENSE_OTG_DEVICE == data->sense)
+		pr_info("cpcap_usb_det: Sense Pattern = SENSE_OTG_DEVICE\n");
+
+}
+
 static int get_sense(struct cpcap_usb_det_data *data)
 {
 	int retval = -EFAULT;
@@ -155,8 +221,10 @@ static int get_sense(struct cpcap_usb_det_data *data)
 	/* Clear ASAP after read. */
 	retval = cpcap_regacc_write(cpcap, CPCAP_REG_INT1,
 				     (CPCAP_BIT_CHRG_DET_I |
+				      CPCAP_BIT_ID_FLOAT_I |
 				      CPCAP_BIT_ID_GROUND_I),
 				     (CPCAP_BIT_CHRG_DET_I |
+				      CPCAP_BIT_ID_FLOAT_I |
 				      CPCAP_BIT_ID_GROUND_I));
 	if (retval)
 		return retval;
@@ -202,6 +270,13 @@ static int get_sense(struct cpcap_usb_det_data *data)
 	data->sense |= (value & (CPCAP_BIT_DP_S |
 			       CPCAP_BIT_DM_S)) << CPCAP_SENSE4_LS;
 
+	if (cpcap_usb_det_debug && data->state > SAMPLE_2) {
+		pr_info("cpcap_usb_det: SenseBits = 0x%04x\n", data->sense);
+		if (cpcap_usb_det_debug > 1) {
+		    dump_sense_bits(data);
+		}
+	}
+
 	return 0;
 }
 
@@ -223,8 +298,10 @@ static int configure_hardware(struct cpcap_usb_det_data *data,
 	switch (accy) {
 	case CPCAP_ACCY_USB:
 	case CPCAP_ACCY_FACTORY:
+		/* Disable VBus PullDown */
 		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC1, 0,
 					     CPCAP_BIT_VBUSPD);
+		/* Enable USB xceiver */
 		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC2,
 					     CPCAP_BIT_USBXCVREN,
 					     CPCAP_BIT_USBXCVREN);
@@ -244,18 +321,55 @@ static int configure_hardware(struct cpcap_usb_det_data *data,
 		break;
 
 	case CPCAP_ACCY_CHARGER:
+		/* Disable Reverse Mode */
+		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_CRM,
+					     0, CPCAP_BIT_RVRSMODE);
+		/* Enable VBus PullDown */
 		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC1,
 					     CPCAP_BIT_VBUSPD,
 					     CPCAP_BIT_VBUSPD);
 		break;
 
-	case CPCAP_ACCY_UNKNOWN:
+	case CPCAP_ACCY_USB_DEVICE:
+		/* Remove VBus PullDown */
 		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC1, 0,
 					     CPCAP_BIT_VBUSPD);
+		/* Enable Reverse Mode */
+		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_CRM,
+					     CPCAP_BIT_RVRSMODE,
+					     CPCAP_BIT_RVRSMODE);
+		/* enable USB xceiver */
+		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC2, 
+					     CPCAP_BIT_USBXCVREN,
+					     CPCAP_BIT_USBXCVREN);
+		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC3,
+					     0,
+					     CPCAP_BIT_DMPD_SPI |
+					     CPCAP_BIT_DPPD_SPI |
+					     CPCAP_BIT_SUSPEND_SPI |
+					     CPCAP_BIT_ULPI_SPI_SEL);
+		/* disable VBUS standby */
+		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC3, 0,
+					     CPCAP_BIT_VBUSSTBY_EN);
+		break;
+
+	case CPCAP_ACCY_UNKNOWN:
+		/* Remove VBus PullDown */
+		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC1, 0,
+					     CPCAP_BIT_VBUSPD);
+		/* Disable Reverse Mode */
+		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_CRM,
+					     0, CPCAP_BIT_RVRSMODE);
 		break;
 
 	case CPCAP_ACCY_NONE:
 	default:
+		/* Disable Reverse Mode */
+		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_CRM,
+					     0, CPCAP_BIT_RVRSMODE);
+	//	retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_VUSBC, 0,
+	//				     CPCAP_BIT_VBUS_SWITCH);
+		/* Enable VBus PullDown */
 		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC1,
 					     CPCAP_BIT_VBUSPD,
 					     CPCAP_BIT_VBUSPD);
@@ -265,11 +379,13 @@ static int configure_hardware(struct cpcap_usb_det_data *data,
 					     CPCAP_BIT_DMPD_SPI |
 					     CPCAP_BIT_DPPD_SPI |
 					     CPCAP_BIT_SUSPEND_SPI |
-					     CPCAP_BIT_ULPI_SPI_SEL,
+					     CPCAP_BIT_ULPI_SPI_SEL |
+					     CPCAP_BIT_VBUSSTBY_EN,
 					     CPCAP_BIT_DMPD_SPI |
 					     CPCAP_BIT_DPPD_SPI |
 					     CPCAP_BIT_SUSPEND_SPI |
-					     CPCAP_BIT_ULPI_SPI_SEL);
+					     CPCAP_BIT_ULPI_SPI_SEL |
+					     CPCAP_BIT_VBUSSTBY_EN);
 		break;
 	}
 
@@ -279,10 +395,13 @@ static int configure_hardware(struct cpcap_usb_det_data *data,
 	return retval;
 }
 
-extern void cpcap_musb_notifier_call(bool event);
+extern void cpcap_musb_notifier_call(unsigned char event);
 
 static void notify_accy(struct cpcap_usb_det_data *data, enum cpcap_accy accy)
 {
+	if (cpcap_usb_det_debug > 1)
+		pr_info("cpcap_usb_det %s: accy=%s\n", __func__, accy_names[accy]);
+
 	dev_info(&data->cpcap->spi->dev, "notify_accy: accy=%d\n", accy);
 
 	if ((data->usb_accy != CPCAP_ACCY_NONE) && (data->usb_dev != NULL)) {
@@ -290,11 +409,20 @@ static void notify_accy(struct cpcap_usb_det_data *data, enum cpcap_accy accy)
 		data->usb_dev = NULL;
 	}
 
+	if ((accy == CPCAP_ACCY_USB) || (accy == CPCAP_ACCY_FACTORY)) {
+		printk("USB connected!\n");
+		cpcap_musb_notifier_call(1);
+	} else if (accy == CPCAP_ACCY_USB_DEVICE) {
+		printk("OTG connected!\n");
+		cpcap_musb_notifier_call(2);
+	}
+
 	configure_hardware(data, accy);
 	data->usb_accy = accy;
 
 	if (accy != CPCAP_ACCY_NONE) {
-		data->usb_dev = platform_device_alloc(accy_devices[accy], -1);
+		if (accy != CPCAP_ACCY_USB_DEVICE)
+			data->usb_dev = platform_device_alloc(accy_devices[accy], -1);
 		if (data->usb_dev) {
 			data->usb_dev->dev.platform_data = data->cpcap;
 			platform_device_add(data->usb_dev);
@@ -302,7 +430,7 @@ static void notify_accy(struct cpcap_usb_det_data *data, enum cpcap_accy accy)
 	} else
 		vusb_disable(data);
 
-	if ((accy == CPCAP_ACCY_USB) || (accy == CPCAP_ACCY_FACTORY)) {
+	if ((accy == CPCAP_ACCY_USB) || (accy == CPCAP_ACCY_FACTORY) || (accy == CPCAP_ACCY_USB_DEVICE)) {
 		if (!data->usb_connected_dev) {
 			data->usb_connected_dev =
 			    platform_device_alloc("cpcap_usb_connected", -1);
@@ -313,13 +441,9 @@ static void notify_accy(struct cpcap_usb_det_data *data, enum cpcap_accy accy)
 		data->usb_connected_dev = NULL;
 	}
 
-
 	if (accy == CPCAP_ACCY_NONE || accy == CPCAP_ACCY_CHARGER) {
 		printk("USB disconnected!\n");
-		cpcap_musb_notifier_call(false);
-	} else if ((accy == CPCAP_ACCY_USB) || (accy == CPCAP_ACCY_FACTORY)) {
-		printk("USB connected!\n");
-		cpcap_musb_notifier_call(true);
+		cpcap_musb_notifier_call(0);
 	}
 
 	if (accy == CPCAP_ACCY_CHARGER) {
@@ -348,6 +472,7 @@ static void detection_work(struct work_struct *work)
 		cpcap_irq_mask(data->cpcap, CPCAP_IRQ_SE1);
 		cpcap_irq_mask(data->cpcap, CPCAP_IRQ_IDGND);
 		cpcap_irq_mask(data->cpcap, CPCAP_IRQ_VBUSVLD);
+		cpcap_irq_mask(data->cpcap, CPCAP_IRQ_IDFLOAT);
 		cpcap_irq_mask(data->cpcap, CPCAP_IRQ_DPI);
 		cpcap_irq_mask(data->cpcap, CPCAP_IRQ_DMI);
 		cpcap_irq_mask(data->cpcap, CPCAP_IRQ_SESSVLD);
@@ -378,10 +503,16 @@ static void detection_work(struct work_struct *work)
 			   (data->sense & CPCAP_BIT_ID_FLOAT_S) &&
 			   !(data->sense & CPCAP_BIT_ID_GROUND_S) &&
 			   !(data->sense & CPCAP_BIT_SESSVLD_S)) {
+			/* cable may not be fully inserted: wait a bit more & try again... */
+			if (cpcap_usb_det_debug > 1)
+				pr_info("cpcap_usb_det: SAMPLE_2 cable may not be fully inserted\n");
 			data->state = IDENTIFY;
 			schedule_delayed_work(&data->work,
 					      msecs_to_jiffies(100));
 		} else {
+			/* cable connected: try to identify what was connected... */
+			if (cpcap_usb_det_debug > 1)
+				pr_info("cpcap_usb_det: cable connected.\n");
 			data->state = IDENTIFY;
 			schedule_delayed_work(&data->work, 0);
 		}
@@ -393,6 +524,8 @@ static void detection_work(struct work_struct *work)
 
 		if ((data->sense == SENSE_USB) ||
 		    (data->sense == SENSE_USB_FLASH)) {
+			if (cpcap_usb_det_debug)
+				pr_info("cpcap_usb_det: USB or USB_FLASH\n");
 			notify_accy(data, CPCAP_ACCY_USB);
 
 			cpcap_irq_unmask(data->cpcap, CPCAP_IRQ_CHRG_DET);
@@ -404,6 +537,8 @@ static void detection_work(struct work_struct *work)
 			data->state = USB;
 		} else if ((data->sense == SENSE_FACTORY) ||
 			   (data->sense == SENSE_FACTORY_COM)) {
+			if (cpcap_usb_det_debug)
+				pr_info("cpcap_usb_det: FACTORY Cable\n");
 #ifdef CONFIG_USB_TESTING_POWER
 			if (testing_power_enable > 0) {
 				notify_accy(data, CPCAP_ACCY_NONE);
@@ -430,6 +565,20 @@ static void detection_work(struct work_struct *work)
 			cpcap_irq_unmask(data->cpcap, CPCAP_IRQ_IDGND);
 
 			data->state = CONFIG;
+		} else if (data->sense & CPCAP_BIT_ID_GROUND_S) {
+			if (cpcap_usb_det_debug)
+				pr_info("cpcap_usb_det: OTG cable attached\n");
+			data->state = USB_DEVICE;
+
+			/* mask VBUSVLD, CHGDET, SESSVLD as Reverse Mode enable may raise these */
+			cpcap_irq_mask(data->cpcap, CPCAP_IRQ_VBUSVLD);
+			cpcap_irq_mask(data->cpcap, CPCAP_IRQ_CHRG_DET);
+			cpcap_irq_mask(data->cpcap, CPCAP_IRQ_SESSVLD);
+
+			notify_accy(data, CPCAP_ACCY_USB_DEVICE);
+			cpcap_irq_unmask(data->cpcap, CPCAP_IRQ_IDFLOAT);
+			cpcap_irq_unmask(data->cpcap, CPCAP_IRQ_IDGND);
+
 		} else if ((data->sense & CPCAP_BIT_VBUSVLD_S) &&
 				(data->usb_accy == CPCAP_ACCY_NONE)) {
 			data->state = CONFIG;
@@ -458,6 +607,8 @@ static void detection_work(struct work_struct *work)
 			 * See cpcap_usb_det_suspend() for details.
 			 */
 			cpcap_irq_unmask(data->cpcap, CPCAP_IRQ_VBUSVLD);
+
+			cpcap_irq_unmask(data->cpcap, CPCAP_IRQ_IDFLOAT);
 		}
 		break;
 
@@ -510,6 +661,21 @@ static void detection_work(struct work_struct *work)
 		}
 		break;
 
+	case USB_DEVICE:
+		get_sense(data);
+
+		if (!(data->sense & CPCAP_BIT_ID_GROUND_S)) {
+			pr_info("cpcap_usb_det: OTG cable detached\n");
+			data->state = CONFIG;
+			cpcap_irq_unmask(data->cpcap, CPCAP_IRQ_VBUSVLD);
+			cpcap_irq_unmask(data->cpcap, CPCAP_IRQ_CHRG_DET);
+			cpcap_irq_unmask(data->cpcap, CPCAP_IRQ_SESSVLD);
+
+			notify_accy(data, CPCAP_ACCY_NONE);
+			schedule_delayed_work(&data->work, 0);
+		}
+		break;
+
 	default:
 		/* This shouldn't happen.  Need to reset state machine. */
 		vusb_disable(data);
@@ -555,7 +721,20 @@ static int __init cpcap_usb_det_probe(struct platform_device *pdev)
 	}
 	regulator_set_voltage(data->regulator, 3300000, 3300000);
 
-	retval = cpcap_irq_register(data->cpcap, CPCAP_IRQ_CHRG_DET,
+	/* Clear the interrupts so they are in a known state when starting detection. */
+	retval = cpcap_irq_clear(data->cpcap, CPCAP_IRQ_CHRG_DET);
+	retval |= cpcap_irq_clear(data->cpcap, CPCAP_IRQ_CHRG_CURR1);
+	retval |= cpcap_irq_clear(data->cpcap, CPCAP_IRQ_SE1);
+	retval |= cpcap_irq_clear(data->cpcap, CPCAP_IRQ_IDGND);
+	retval |= cpcap_irq_clear(data->cpcap, CPCAP_IRQ_VBUSVLD);
+	retval |= cpcap_irq_clear(data->cpcap, CPCAP_IRQ_IDFLOAT);
+	retval |= cpcap_irq_clear(data->cpcap, CPCAP_IRQ_DPI);
+	retval |= cpcap_irq_clear(data->cpcap, CPCAP_IRQ_DMI);
+	retval |= cpcap_irq_clear(data->cpcap, CPCAP_IRQ_SESSVLD);
+
+	/* Register the interrupt handler, please be aware this will enable the
+	   interrupts. */
+	retval |= cpcap_irq_register(data->cpcap, CPCAP_IRQ_CHRG_DET,
 				    int_handler, data);
 	retval |= cpcap_irq_register(data->cpcap, CPCAP_IRQ_CHRG_CURR1,
 				     int_handler, data);
@@ -564,6 +743,8 @@ static int __init cpcap_usb_det_probe(struct platform_device *pdev)
 	retval |= cpcap_irq_register(data->cpcap, CPCAP_IRQ_IDGND,
 				     int_handler, data);
 	retval |= cpcap_irq_register(data->cpcap, CPCAP_IRQ_VBUSVLD,
+				     int_handler, data);
+	retval |= cpcap_irq_register(data->cpcap, CPCAP_IRQ_IDFLOAT,
 				     int_handler, data);
 	retval |= cpcap_irq_register(data->cpcap, CPCAP_IRQ_DPI,
 				     int_handler, data);
@@ -595,6 +776,7 @@ free_irqs:
 	cpcap_irq_free(data->cpcap, CPCAP_IRQ_SE1);
 	cpcap_irq_free(data->cpcap, CPCAP_IRQ_CHRG_CURR1);
 	cpcap_irq_free(data->cpcap, CPCAP_IRQ_CHRG_DET);
+	cpcap_irq_free(data->cpcap, CPCAP_IRQ_IDFLOAT);
 	cpcap_irq_free(data->cpcap, CPCAP_IRQ_DPI);
 	cpcap_irq_free(data->cpcap, CPCAP_IRQ_DMI);
 	cpcap_irq_free(data->cpcap, CPCAP_IRQ_SESSVLD);
@@ -615,6 +797,9 @@ static int __exit cpcap_usb_det_remove(struct platform_device *pdev)
 	cpcap_irq_free(data->cpcap, CPCAP_IRQ_SE1);
 	cpcap_irq_free(data->cpcap, CPCAP_IRQ_IDGND);
 	cpcap_irq_free(data->cpcap, CPCAP_IRQ_VBUSVLD);
+	cpcap_irq_free(data->cpcap, CPCAP_IRQ_IDFLOAT);
+	cpcap_irq_free(data->cpcap, CPCAP_IRQ_DPI);
+	cpcap_irq_free(data->cpcap, CPCAP_IRQ_DMI);
 	cpcap_irq_free(data->cpcap, CPCAP_IRQ_SESSVLD);
 
 	configure_hardware(data, CPCAP_ACCY_NONE);
