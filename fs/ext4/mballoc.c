@@ -335,8 +335,7 @@
  *
  */
 
-/* Spinlock for trim */
-static DEFINE_SPINLOCK(ext4_trim_lock);
+DEFINE_MUTEX(ext4_trim_lock);
 
 static struct kmem_cache *ext4_pspace_cachep;
 static struct kmem_cache *ext4_ac_cachep;
@@ -4710,13 +4709,14 @@ ext4_trim_all_free(struct super_block *sb, ext4_group_t group,
 	ext4_grpblk_t next, count = 0, free_count = 0;
 	struct ext4_buddy e4b;
 	int ret;
-	unsigned long flags;
+	
+	mutex_init(&ext4_trim_lock);
 
 	trace_ext4_trim_all_free(sb, group, start, max);
-
-	spin_lock_irqsave(&ext4_trim_lock, flags);
+	
+	mutex_lock(&ext4_trim_lock);
 	ret = ext4_mb_load_buddy(sb, group, &e4b);
-	spin_unlock_irqrestore(&ext4_trim_lock, flags);
+	mutex_unlock(&ext4_trim_lock);
 	if (ret) {
 		ext4_error(sb, "Error in loading buddy "
 				"information for %u", group);
