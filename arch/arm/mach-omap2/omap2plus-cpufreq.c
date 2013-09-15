@@ -44,6 +44,8 @@
 
 #include "dvfs.h"
 
+#include "omap2plus-cpufreq.h"
+
 #ifdef CONFIG_SMP
 struct lpj_info {
 	unsigned long	ref;
@@ -117,6 +119,13 @@ static struct kernel_param_ops duration_ops = {
 late_param_cb(safe_suspend_freq, &duration_ops, &safe_suspend_freq, 0644);
 MODULE_PARM_DESC(safe_suspend_freq,
                  "Frequency value (OPP) to be used during suspend (if 0 - use current freq)");
+
+static struct omap_cpufreq_platform_data *cpufreq_pdata = NULL;
+
+void omap_cpufreq_set_platform_data(struct omap_cpufreq_platform_data *pdata)
+{
+	cpufreq_pdata = pdata;
+}
 
 static unsigned int omap_getspeed(unsigned int cpu)
 {
@@ -477,6 +486,10 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
 	policy->min = policy->cpuinfo.min_freq;
 	policy->max = policy->cpuinfo.max_freq;
 	policy->cur = omap_getspeed(policy->cpu);
+
+	/* Clamp clock to the maximum nominal frequency provided by board */
+	if (cpufreq_pdata)
+		policy->max = cpufreq_pdata->max_nominal_freq;
 
 	for (i = 0; freq_table[i].frequency != CPUFREQ_TABLE_END; i++)
 		max_freq = max(freq_table[i].frequency, max_freq);
