@@ -80,7 +80,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #if defined(SUPPORT_OMAP3430_SGXFCLK_96M)
 #define SGX_PARENT_CLOCK "cm_96m_fck"
 #else
-#define SGX_PARENT_CLOCK "core_ck"
+#define SGX_PARENT_CLOCK "corex2_fck"
 #endif
 
 #if defined(LDM_PLATFORM) && !defined(PVR_DRI_DRM_NOT_PCI)

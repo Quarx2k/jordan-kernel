@@ -24,6 +24,15 @@
 #include <linux/clk.h>
 #include "sysconfig.h"
 
+// Engle, Add proc fs API, start
+#include <asm/uaccess.h>
+#include <linux/proc_fs.h>
+#include <linux/vmalloc.h>
+
+struct proc_dir_entry *gpu_proc_root = NULL;
+#define BUF_SIZE 128
+// Engle, Add proc fs API, end
+
 #define GPU_CONTROL_VERSION 1
 
 /*
@@ -71,27 +80,28 @@ static ssize_t show_max_freq(struct kobject *kobj,
 	return sprintf(buf, "%u\n", max_freq_val);
 }
 
-void gpu_set_clock(int freq)
+int gpu_set_clock(int freq)
 {
 	int ret;
 	struct clk *sgx_fck;
 
 	if (!gpu_control_active) {
 		printk("GPU Control is disabled\n");
-		return;
+		return -ENOTSUPP;
 	}
 
 	sgx_fck = clk_get(NULL, "sgx_fck");
-
+    printk("GPU Control try to set clock rate to %d MHz\n", freq/1000000);
 	ret = clk_set_rate(sgx_fck, freq);
 
 	if (ret) {
-		max_freq_val = SYS_SGX_CLOCK_SPEED;
-		clk_set_rate(sgx_fck, SYS_SGX_CLOCK_SPEED);
-		pr_err("GPU clock rate change failed: %d. Default value restored %d MHz\n", ret, max_freq_val/1000000);
+		//max_freq_val = SYS_SGX_CLOCK_SPEED;
+		//clk_set_rate(sgx_fck, SYS_SGX_CLOCK_SPEED);
+		pr_err("GPU clock rate change failed: %d. Default value restored %lu MHz\n", ret, clk_get_rate(sgx_fck)/1000000);
 	} else {
 		printk("GPU clock changed to: %lu MHz \n", clk_get_rate(sgx_fck)/1000000);
 	}
+	return ret;
 
 }
 static ssize_t store_max_freq(struct kobject *kobj,
@@ -106,9 +116,11 @@ static ssize_t store_max_freq(struct kobject *kobj,
 		return ret;
 
 	if (val <= 300)
-		max_freq_val = val*1000000;
+		val = val*1000000;
 
-	gpu_set_clock(max_freq_val);
+	if (gpu_set_clock(val) == 0) {
+		max_freq_val = val;
+	}
 	return count;
 }
 
@@ -116,7 +128,7 @@ define_one_global_rw(max_freq);
 
 static void gpu_control_early_suspend(struct early_suspend *h)
 {
-	int suspend_freq = 100000000; //100 MHz
+	int suspend_freq = SYS_SGX_SUSPEND_CLOCK_SPEED;
 	gpu_set_clock(suspend_freq);
 }
 
@@ -151,13 +163,82 @@ static struct attribute_group gpu_control_group =
 
 static struct kobject *gpu_control_kobj;
 
+// Engle, Add proc fs API, start
+
+static int proc_cur_rate_read(char *buffer, char **buffer_location,
+		off_t offset, int count, int *eof, void *data)
+{
+	int ret = 0;
+	struct clk *sgx_fck;
+
+	if (offset > 0)
+		ret = 0;
+	else {
+		sgx_fck = clk_get(NULL, "sgx_fck");
+		if (sgx_fck) {
+			ret = scnprintf(buffer, count, "%lu\n", clk_get_rate(sgx_fck));
+		}
+	}
+
+	return ret;
+}
+
+static int proc_max_rate_read(char *buffer, char **buffer_location,
+		off_t offset, int count, int *eof, void *data)
+{
+	int ret;
+
+	if (offset > 0)
+		ret = 0;
+	else
+		ret = scnprintf(buffer, count, "%u\n", max_freq_val);
+
+	return ret;
+}
+
+static int proc_max_rate_write(struct file *filp, const char __user *buffer,
+		unsigned long len, void *data)
+{
+	ulong newrate;
+	int result;
+	char gpu_proc_fs_buf[BUF_SIZE];
+
+	if(!len || len >= BUF_SIZE)
+		return -ENOSPC;
+	if(copy_from_user(gpu_proc_fs_buf, buffer, len))
+		return -EFAULT;
+	gpu_proc_fs_buf[len] = 0;
+	if((result = strict_strtoul(gpu_proc_fs_buf, 0, &newrate)))
+		return result;
+	if(max_freq_val != newrate) {
+		if (gpu_set_clock(newrate) == 0) {
+			max_freq_val = newrate;
+		}
+	}
+
+	return len;
+}
+
+static void init_gpu_proc_fs(void) {
+	struct proc_dir_entry *proc_entry;
+	gpu_proc_root = proc_mkdir("gpu", NULL);
+	proc_entry = create_proc_read_entry("gpu/cur_rate", 0644, NULL, proc_cur_rate_read, NULL);
+	proc_entry = create_proc_read_entry("gpu/max_rate", 0644, NULL, proc_max_rate_read, NULL);
+	proc_entry->write_proc = proc_max_rate_write;
+}
+
+static void exit_gpu_proc_fs(void) {
+	remove_proc_entry("gpu/max_rate", NULL);
+	remove_proc_entry("gpu/cur_rate", NULL);
+	remove_proc_entry("gpu", NULL);
+}
+// Engle, Add proc fs API, end
 
 static int __init gpu_control_init(void)
 {
 	int ret;
 
 	register_early_suspend(&gpu_control_suspend_handler);
-	
 	
 	gpu_control_kobj = kobject_create_and_add("gpu_control", kernel_kobj);
 	if (!gpu_control_kobj) {
@@ -173,12 +254,14 @@ static int __init gpu_control_init(void)
 		kobject_put(gpu_control_kobj);
 	}
 
+    init_gpu_proc_fs();
 	return ret;
 }
 
 static void __exit gpu_control_exit(void)
 {
 	unregister_early_suspend(&gpu_control_suspend_handler);
+	exit_gpu_proc_fs();
 }
 
 module_init(gpu_control_init);

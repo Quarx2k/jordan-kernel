@@ -1017,6 +1017,7 @@ static struct clk corex2_fck = {
 	.ops		= &clkops_null,
 	.parent		= &dpll3_m2x2_ck,
 	.recalc		= &followparent_recalc,
+	//.recalc		= &omap3_clkoutx2_recalc,
 };
 
 /* DPLL power domain clock controls */
@@ -1238,7 +1239,7 @@ static const struct clksel_rate sgx_core_rates[] = {
 	{ .div = 2, .val = 5, .flags = RATE_IN_363X | DEFAULT_RATE },
 	{ .div = 3, .val = 0, .flags = RATE_IN_343X | DEFAULT_RATE },
 	{ .div = 4, .val = 1, .flags = RATE_IN_343X },
-	{ .div = 6, .val = 2, .flags = RATE_IN_343X },
+	{ .div = 12, .val = 2, .flags = RATE_IN_343X },
 	{ .div = 0 },
 };
 
@@ -1248,8 +1249,24 @@ static const struct clksel_rate sgx_192m_rates[] = {
 };
 
 static const struct clksel_rate sgx_corex2_rates[] = {
-	{ .div = 3, .val = 6, .flags = RATE_IN_363X | DEFAULT_RATE },
+	{ .div = 3, .val = 6, .flags = RATE_IN_363X },
+
+	// Engle, add for SGX530 to run at 200 MHz
+	{ .div = 4, .val = 5, .flags = RATE_IN_363X | DEFAULT_RATE },
+
 	{ .div = 5, .val = 7, .flags = RATE_IN_363X },
+
+	// Engle, add for SGX530 to run at 133 MHz
+	{ .div = 6, .val = 0, .flags = RATE_IN_343X },
+	// Engle, add for SGX530 to run at 100 MHz
+	{ .div = 8, .val = 1, .flags = RATE_IN_343X },
+	// Engle, add for SGX530 to run at 66 MHz
+	{ .div = 12, .val = 2, .flags = RATE_IN_343X },
+	// Engle, add for SGX530 to run at 33 MHz
+	{ .div = 24, .val = 3, .flags = RATE_IN_343X },
+	// Engle, add for SGX530 to run at 16 MHz
+	{ .div = 48, .val = 4, .flags = RATE_IN_343X },
+
 	{ .div = 0 },
 };
 
@@ -1259,11 +1276,10 @@ static const struct clksel_rate sgx_96m_rates[] = {
 };
 
 static const struct clksel sgx_clksel[] = {
-	{ .parent = &core_ck,	 .rates = sgx_core_rates },
-	{ .parent = &cm_96m_fck, .rates = sgx_96m_rates },
-	{ .parent = &omap_192m_alwon_ck, .rates = sgx_192m_rates },
 	{ .parent = &corex2_fck, .rates = sgx_corex2_rates },
-
+//	{ .parent = &core_ck,	 .rates = sgx_core_rates },
+//	{ .parent = &cm_96m_fck, .rates = sgx_96m_rates },
+//	{ .parent = &omap_192m_alwon_ck, .rates = sgx_192m_rates },
 	{ .parent = NULL },
 };
 

@@ -89,6 +89,8 @@ static void _omap2xxx_clk_commit(struct clk *clk)
 	if (!(clk->flags & DELAYED_APP))
 		return;
 
+	// printk("%s: Set %s frequence to %lu\n", __FUNCTION__, clk->name, clk->rate);
+
 	prm_write_mod_reg(OMAP24XX_VALID_CONFIG, OMAP24XX_GR_MOD,
 		OMAP2_PRCM_CLKCFG_CTRL_OFFSET);
 	/* OCP barrier */
@@ -583,13 +585,13 @@ static const struct clksel *omap2_get_clksel_by_parent(struct clk *clk,
 u32 omap2_clksel_round_rate_div(struct clk *clk, unsigned long target_rate,
 				u32 *new_div)
 {
-	unsigned long test_rate;
+	unsigned long test_rate, parent_rate;
 	const struct clksel *clks;
 	const struct clksel_rate *clkr;
 	u32 last_div = 0;
 
 	pr_debug("clock: clksel_round_rate_div: %s target_rate %ld\n",
-		 clk->name, target_rate);
+				clk->name, target_rate);
 
 	*new_div = 1;
 
@@ -608,7 +610,17 @@ u32 omap2_clksel_round_rate_div(struct clk *clk, unsigned long target_rate,
 
 		last_div = clkr->div;
 
-		test_rate = clk->parent->rate / clkr->div;
+		// Engle, Add for SGX530 frequence control, start
+		// test_rate = clk->parent->rate / clkr->div;
+		parent_rate = clk->parent->rate;
+		if (strcmp(clk->name, "sgx_fck") == 0 && S800M != clk->parent->rate) {
+			parent_rate = S800M;
+			printk("%s: force change to S800M\n", __FUNCTION__);
+		}
+		test_rate = parent_rate / clkr->div;
+		//printk("After recalc %lu, parent is %s, test_rate %lu, div %d \n",
+		//		clk->parent->rate, clk->parent->name, test_rate, clkr->div);
+		// Engle, Add for SGX530 frequence control, end
 
 		if (test_rate <= target_rate)
 			break; /* found it */
@@ -621,12 +633,16 @@ u32 omap2_clksel_round_rate_div(struct clk *clk, unsigned long target_rate,
 		return ~0;
 	}
 
+	//printk("%s: last_div %d, clkr->div %d\n", __FUNCTION__, last_div, clkr->div);
 	*new_div = clkr->div;
 
 	pr_debug("clock: new_div = %d, new_rate = %ld\n", *new_div,
 		 (clk->parent->rate / clkr->div));
 
-	return (clk->parent->rate / clkr->div);
+	// Engle, Add for SGX530 frequence control, start
+	// return (clk->parent->rate / clkr->div);
+	return (parent_rate / clkr->div);
+	// Engle, Add for SGX530 frequence control, end
 }
 
 /**
@@ -755,17 +771,24 @@ u32 omap2_clksel_get_divisor(struct clk *clk)
 int omap2_clksel_set_rate(struct clk *clk, unsigned long rate)
 {
 	u32 v, field_val, validrate, new_div = 0;
+	unsigned long parent_rate;
 
-	if (!clk->clksel_mask)
+	if (!clk->clksel_mask) {
+		printk("%s: clk->clksel_mask is %d\n ", __FUNCTION__, clk->clksel_mask);
 		return -EINVAL;
+	}
 
 	validrate = omap2_clksel_round_rate_div(clk, rate, &new_div);
-	if (validrate != rate)
+	if (validrate != rate) {
+		printk("%s: validrate (%lu) != rate (%lu)\n", __FUNCTION__, validrate, rate);
 		return -EINVAL;
+	}
 
 	field_val = omap2_divisor_to_clksel(clk, new_div);
-	if (field_val == ~0)
+	if (field_val == ~0) {
+		printk("%s: field_val == ~0\n", __FUNCTION__);
 		return -EINVAL;
+	}
 
 	v = __raw_readl(clk->clksel_reg);
 	v &= ~clk->clksel_mask;
@@ -773,7 +796,15 @@ int omap2_clksel_set_rate(struct clk *clk, unsigned long rate)
 	__raw_writel(v, clk->clksel_reg);
 	v = __raw_readl(clk->clksel_reg); /* OCP barrier */
 
-	clk->rate = clk->parent->rate / new_div;
+	// Engle, Add for SGX530 frequence control, start
+	// clk->rate = clk->parent->rate / new_div;
+	parent_rate = clk->parent->rate;
+	if (strcmp(clk->name, "sgx_fck") == 0 && S800M != parent_rate) {
+		parent_rate =  S800M;
+	}
+	// printk("%s: parent_rate %lu, new_div %d\n", __FUNCTION__, parent_rate, new_div);
+	clk->rate = parent_rate / new_div;
+	// Engle, Add for SGX530 frequence control, end
 
 	_omap2xxx_clk_commit(clk);
 
