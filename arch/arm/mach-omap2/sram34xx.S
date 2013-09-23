@@ -34,6 +34,9 @@
 #include "sdrc.h"
 #include "cm2xxx_3xxx.h"
 
+#include "prcm-common.h"
+#include "prm2xxx_3xxx.h"
+
 /*
  * This file needs be built unconditionally as ARM to interoperate correctly
  * with non-Thumb-2-capable firmware.
@@ -81,6 +84,9 @@
 #define DISPC_LCD_EN		(1 << 0)
 #define DISPC_VSYNC_ST		(1 << 1)
 #define CM_DSS_FCLK_ST		(1 << 0)
+
+/* PRM_RSTCTRL bit setting */
+#define EN_DPLL3_RESET			0x4
 
 /*
  * omap3_sram_configure_core_dpll - change DPLL3 M2 divider
@@ -379,3 +385,48 @@ omap3_dispc_irq_st:
 ENTRY(omap3_sram_configure_core_dpll_sz)
 	.word	. - omap3_sram_configure_core_dpll
 
+/*
+ * omap3_sram_configure_core_dpll_warmreset
+ * Enable SDRC self refresh on idle request, put SDRC in idle,
+ * wait until SDRC goes to idle
+ * Enable DPLL3 reset bit in RM_RSTCTRL
+ */
+
+ENTRY(omap3_sram_configure_core_dpll_warmreset)
+
+	bl	sdram_in_selfrefresh1
+	ldr	r11, omap3_reset_cntrl
+	ldr	r12, [r11]
+	orr	r12, r12, #EN_DPLL3_RESET	@ Enable DPLL3 reset bit
+	str	r12, [r11]
+
+sdram_in_selfrefresh1:
+	ldr	r11, omap3_sdrc_power1		@ read the SDRC_POWER register
+	ldr	r12, [r11]			@ read the contents of SDRC_POWER
+	mov	r9, r12				@ keep a copy of SDRC_POWER bits
+	orr	r12, r12, #SRFRONIDLEREQ_MASK	@ enable self refresh on idle
+	str	r12, [r11]			@ write back to SDRC_POWER register
+	ldr	r12, [r11]			@ posted-write barrier for SDRC
+	ldr	r11, omap3_cm_iclken1_core1	@ read the CM_ICLKEN1_CORE reg
+	ldr	r12, [r11]
+	bic	r12, r12, #EN_SDRC_MASK		@ disable iclk bit for SDRC
+	str	r12, [r11]
+wait_sdrc_idle2:
+	ldr	r11, omap3_cm_idlest1_core1
+	ldr	r12, [r11]
+	and	r12, r12, #ST_SDRC_MASK		@ check for SDRC idle
+	cmp	r12, #ST_SDRC_MASK
+	bne	wait_sdrc_idle2
+	bx	lr
+
+omap3_reset_cntrl:
+	.word OMAP34XX_PRM_REGADDR(OMAP3430_GR_MOD, OMAP2_RM_RSTCTRL)
+omap3_sdrc_power1:
+	.word OMAP34XX_SDRC_REGADDR(SDRC_POWER)
+omap3_cm_idlest1_core1:
+	.word OMAP34XX_CM_REGADDR(CORE_MOD, CM_IDLEST)
+omap3_cm_iclken1_core1:
+	.word OMAP34XX_CM_REGADDR(CORE_MOD, CM_ICLKEN1)
+
+ENTRY(omap3_sram_configure_core_dpll_warmreset_sz)
+	.word	. - omap3_sram_configure_core_dpll_warmreset

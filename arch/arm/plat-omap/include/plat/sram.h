@@ -40,6 +40,9 @@ extern u32 omap3_configure_core_dpll(
 			u32 sdrc_actim_ctrl_b_0, u32 sdrc_mr_0,
 			u32 sdrc_rfr_ctrl_1, u32 sdrc_actim_ctrl_a_1,
 			u32 sdrc_actim_ctrl_b_1, u32 sdrc_mr_1);
+
+extern u32 omap3_configure_core_dpll_warmreset(void);
+
 extern void omap3_sram_restore_context(void);
 
 /* Do not use these */
@@ -81,6 +84,10 @@ extern u32 omap3_sram_configure_core_dpll(
 			u32 sdrc_rfr_ctrl_1, u32 sdrc_actim_ctrl_a_1,
 			u32 sdrc_actim_ctrl_b_1, u32 sdrc_mr_1);
 extern unsigned long omap3_sram_configure_core_dpll_sz;
+
+extern u32 omap3_sram_configure_core_dpll_warmreset(void);
+
+extern unsigned long omap3_sram_configure_core_dpll_warmreset_sz;
 
 #ifdef CONFIG_PM
 extern void omap_push_sram_idle(void);
