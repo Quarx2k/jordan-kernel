@@ -1,4 +1,4 @@
-*
+/*
  * linux/drivers/video/omap2/dss/dsi.c
  *
  * Copyright (C) 2009 Nokia Corporation
