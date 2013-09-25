@@ -15,6 +15,7 @@
 #include <linux/ti_wilink_st.h>
 #include <linux/wl12xx.h>
 #include <linux/regulator/machine.h>
+#include <linux/wakelock.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -102,6 +103,47 @@ static struct omap_musb_board_data musb_board_data = {
 #endif
 	.power                  = 100,
 };
+static bool uart_req;
+static struct wake_lock st_wk_lock;
+/* Call the uart disable of serial driver */
+static int plat_uart_disable(void)
+{
+	int port_id = 0;
+	int err = 0;
+	if (uart_req) {
+		sscanf(WILINK_UART_DEV_NAME, "/dev/ttyS%d", &port_id);
+		err = omap_serial_ext_uart_disable(port_id);
+		if (!err)
+			uart_req = false;
+	}
+	wake_unlock(&st_wk_lock);
+	return err;
+}
+
+/* Call the uart enable of serial driver */
+static int plat_uart_enable(void)
+{
+	int port_id = 0;
+	int err = 0;
+	if (!uart_req) {
+		sscanf(WILINK_UART_DEV_NAME, "/dev/ttyS%d", &port_id);
+		err = omap_serial_ext_uart_enable(port_id);
+		if (!err)
+			uart_req = true;
+	}
+	wake_lock(&st_wk_lock);	
+	return err;
+}
+
+static int plat_kim_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	/* TODO: wait for HCI-LL sleep */
+	return 0;
+}
+static int plat_kim_resume(struct platform_device *pdev)
+{
+	return 0;
+}
 
 /* wl127x BT, FM, GPS connectivity chip */
 struct ti_st_plat_data wilink_pdata = {
@@ -109,8 +151,12 @@ struct ti_st_plat_data wilink_pdata = {
 	.dev_name = WILINK_UART_DEV_NAME,
 	.flow_cntrl = 1,
 	.baud_rate = 3686400,
-	.suspend = 0,
-	.resume = 0,
+	.suspend = plat_kim_suspend,
+	.resume = plat_kim_resume,
+	.chip_asleep = plat_uart_disable,
+	.chip_awake = plat_uart_enable,
+	.chip_enable = plat_uart_enable,
+	.chip_disable = plat_uart_disable,
 };
 static struct platform_device wl127x_device = {
 	.name           = "kim",
@@ -326,6 +372,7 @@ static void __init omap_mapphone_init(void)
 	mapphone_padconf_init();
 	omap_register_ion();
 	platform_add_devices(mapphone_devices, ARRAY_SIZE(mapphone_devices));
+	wake_lock_init(&st_wk_lock, WAKE_LOCK_SUSPEND, "st_wake_lock");
 	mapphone_spi_init();
 	mapphone_cpcap_client_init();
 	mapphone_panel_init();
