@@ -563,6 +563,14 @@ void omap_sram_idle(bool suspend)
 	if (per_next_state < PWRDM_POWER_ON) {
 		per_prev_state = pwrdm_read_prev_pwrst(per_pwrdm);
 		omap2_gpio_resume_after_idle(per_going_off);
+
+		// modified for mp3 playback current
+		if (per_prev_state == PWRDM_POWER_OFF) {
+			/* Don't attach mcbsp interrupt */
+			omap2_prm_clear_mod_reg_bits(OMAP3430_EN_MCBSP2_MASK,
+				  OMAP3430_PER_MOD, OMAP3430_PM_MPUGRPSEL);
+		}
+
 	}
 
 	/* Disable IO-PAD and IO-CHAIN wakeup */
