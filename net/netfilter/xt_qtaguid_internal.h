@@ -91,6 +91,8 @@
 #define DR_DEBUG(...) no_printk(__VA_ARGS__)
 #endif
 
+extern uint qtaguid_debug_mask;
+
 /*---------------------------------------------------------------------------*/
 /*
  * Tags:
@@ -199,6 +201,25 @@ struct data_counters {
 	struct byte_packet_counters bpc[IFS_MAX_COUNTER_SETS][IFS_MAX_DIRECTIONS][IFS_MAX_PROTOS];
 };
 
+static inline uint64_t dc_sum_bytes(struct data_counters *counters,
+				    int set,
+				    enum ifs_tx_rx direction)
+{
+	return counters->bpc[set][direction][IFS_TCP].bytes
+		+ counters->bpc[set][direction][IFS_UDP].bytes
+		+ counters->bpc[set][direction][IFS_PROTO_OTHER].bytes;
+}
+
+static inline uint64_t dc_sum_packets(struct data_counters *counters,
+				      int set,
+				      enum ifs_tx_rx direction)
+{
+	return counters->bpc[set][direction][IFS_TCP].packets
+		+ counters->bpc[set][direction][IFS_UDP].packets
+		+ counters->bpc[set][direction][IFS_PROTO_OTHER].packets;
+}
+
+
 /* Generic X based nodes used as a base for rb_tree ops */
 struct tag_node {
 	struct rb_node node;
@@ -222,7 +243,8 @@ struct iface_stat {
 	/* net_dev is only valid for active iface_stat */
 	struct net_device *net_dev;
 
-	struct byte_packet_counters totals[IFS_MAX_DIRECTIONS];
+	struct byte_packet_counters totals_via_dev[IFS_MAX_DIRECTIONS];
+	struct data_counters totals_via_skb;
 	/*
 	 * We keep the last_known, because some devices reset their counters
 	 * just before NETDEV_UP, while some will reset just before
@@ -274,6 +296,8 @@ struct qtaguid_event_counts {
 	atomic64_t iface_events;  /* Number of NETDEV_* events handled */
 
 	atomic64_t match_calls;   /* Number of times iptables called mt */
+	/* Number of times iptables called mt from pre or post routing hooks */
+	atomic64_t match_calls_prepost;
 	/*
 	 * match_found_sk_*: numbers related to the netfilter matching
 	 * function finding a sock for the sk_buff.
@@ -345,27 +369,6 @@ struct proc_qtu_data {
 	struct list_head sock_tag_list;
 	/* No spinlock_t sock_tag_list_lock; use the global one. */
 };
-
-/* internal functions */
-struct uid_tag_data *get_uid_data(uid_t uid, bool *found_res);
-
-/*----------------------------------------------*/
-
-#ifdef TAG
-
-/* TAG is defined before the includes only in main module file */
-unsigned int qtaguid_debug_mask = DEFAULT_DEBUG_MASK;
-unsigned int qtaguid_get_debug_mask(void) {
-	return qtaguid_debug_mask;
-}
-EXPORT_SYMBOL(qtaguid_get_debug_mask);
-
-#else
-
-extern unsigned int qtaguid_get_debug_mask(void);
-#define qtaguid_debug_mask qtaguid_get_debug_mask()
-
-#endif /* TAG */
 
 /*----------------------------------------------*/
 #endif  /* ifndef __XT_QTAGUID_INTERNAL_H__ */
