@@ -1499,6 +1499,7 @@ module_init(cpufreq_interactive_init);
 
 static void __exit cpufreq_interactive_exit(void)
 {
+	unregister_early_suspend(&interactive_suspend);
 	cpufreq_unregister_governor(&cpufreq_gov_interactive);
 	kthread_stop(speedchange_task);
 	put_task_struct(speedchange_task);
