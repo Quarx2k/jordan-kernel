@@ -99,7 +99,8 @@ static enum power_supply_property cpcap_batt_props[] = {
 
 static enum power_supply_property cpcap_batt_ac_props[] =
 {
-	POWER_SUPPLY_PROP_ONLINE
+	POWER_SUPPLY_PROP_ONLINE,
+	POWER_SUPPLY_PROP_MODEL_NAME
 };
 
 static enum power_supply_property cpcap_batt_usb_props[] =
@@ -318,6 +319,10 @@ static int cpcap_batt_ioctl(struct inode *inode,
 	return ret;
 }
 
+static char *cpcap_batt_ac_models[] = {
+	"none", "charger"
+};
+
 static int cpcap_batt_ac_get_property(struct power_supply *psy,
 				      enum power_supply_property psp,
 				      union power_supply_propval *val)
@@ -329,6 +334,9 @@ static int cpcap_batt_ac_get_property(struct power_supply *psy,
 	switch (psp) {
 	case POWER_SUPPLY_PROP_ONLINE:
 		val->intval = sply->ac_state.online;
+		break;
+	case POWER_SUPPLY_PROP_MODEL_NAME:
+		val->strval = cpcap_batt_ac_models[sply->ac_state.online];
 		break;
 	default:
 		ret = -EINVAL;
