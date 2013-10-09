@@ -221,14 +221,6 @@ static void ondemand_powersave_bias_init(void)
 
 /************************** sysfs interface ************************/
 
-static ssize_t show_sampling_rate_max(struct kobject *kobj,
-				      struct attribute *attr, char *buf)
-{
-	printk_once(KERN_INFO "CPUFREQ: ondemand sampling_rate_max "
-	       "sysfs file is deprecated - used by: %s\n", current->comm);
-	return sprintf(buf, "%u\n", -1U);
-}
-
 static ssize_t show_sampling_rate_min(struct kobject *kobj,
 				      struct attribute *attr, char *buf)
 {
@@ -239,7 +231,6 @@ static ssize_t show_sampling_rate_min(struct kobject *kobj,
 static struct global_attr _name =	\
 __ATTR(_name, 0444, show_##_name, NULL)
 
-define_one_ro(sampling_rate_max);
 define_one_ro(sampling_rate_min);
 
 /* cpufreq_ondemand Governor Tunables */
@@ -273,14 +264,12 @@ show_one_old(up_threshold);
 show_one_old(ignore_nice_load);
 show_one_old(powersave_bias);
 show_one_old(sampling_rate_min);
-show_one_old(sampling_rate_max);
 
 #define define_one_ro_old(object, _name)       \
 static struct freq_attr object =               \
 __ATTR(_name, 0444, show_##_name##_old, NULL)
 
 define_one_ro_old(sampling_rate_min_old, sampling_rate_min);
-define_one_ro_old(sampling_rate_max_old, sampling_rate_max);
 
 /*** delete after deprecation time ***/
 
@@ -387,7 +376,6 @@ define_one_rw(ignore_nice_load);
 define_one_rw(powersave_bias);
 
 static struct attribute *dbs_attributes[] = {
-	&sampling_rate_max.attr,
 	&sampling_rate_min.attr,
 	&sampling_rate.attr,
 	&up_threshold.attr,
@@ -426,7 +414,6 @@ define_one_rw_old(ignore_nice_load_old, ignore_nice_load);
 define_one_rw_old(powersave_bias_old, powersave_bias);
 
 static struct attribute *dbs_attributes_old[] = {
-       &sampling_rate_max_old.attr,
        &sampling_rate_min_old.attr,
        &sampling_rate_old.attr,
        &up_threshold_old.attr,
