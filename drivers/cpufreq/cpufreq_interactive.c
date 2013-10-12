@@ -82,7 +82,7 @@ static unsigned int last_freq;
 static bool suspend_state;
 
 /* Suspend Optimization Enabled ? */
-static bool suspend_enabled = true;
+static bool suspend_enabled = false;
 
 /* Hi speed to bump to from lo speed when load burst (default max) */
 #define DEFAULT_HISPEED_FREQ 800000
@@ -144,8 +144,8 @@ static struct workqueue_struct *inputopen_wq;
 
 static int boost_val;
 /* Duration of a boot pulse in usecs */
-#define DEFAULT_INPUT_BOOST_FREQ_DURATION (20 * USEC_PER_MSEC)
-static int boostpulse_duration_val = DEFAULT_INPUT_BOOST_FREQ_DURATION * 10;
+#define DEFAULT_INPUT_BOOST_FREQ_DURATION (10 * USEC_PER_MSEC)
+static int boostpulse_duration_val = DEFAULT_INPUT_BOOST_FREQ_DURATION * 100;
 /* End time of boost pulse in ktime converted to usecs */
 static u64 boostpulse_endtime;
 
@@ -1233,7 +1233,7 @@ static ssize_t store_boostpulse(struct kobject *kobj, struct attribute *attr,
 }
 
 static struct global_attr boostpulse =
-	__ATTR(boostpulse, 0644, NULL, store_boostpulse);
+	__ATTR(boostpulse, 0664, NULL, store_boostpulse);
 
 static ssize_t show_boostpulse_duration(
 	struct kobject *kobj, struct attribute *attr, char *buf)
