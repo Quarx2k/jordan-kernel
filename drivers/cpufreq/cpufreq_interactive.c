@@ -75,14 +75,14 @@ static struct mutex gov_lock;
 /* Consider IO as busy */
 static bool io_is_busy = true;
 
-/* History for last freq before it went to suspend*/
-static unsigned int last_freq;
-
 /* Suspend/Resume flag */
-static bool suspend_state;
+static bool suspend_state = false;
 
 /* Suspend Optimization Enabled ? */
-static bool suspend_enabled = false;
+static bool suspend_enabled = true;
+
+/* Suspend Frequency */
+static unsigned int suspend_freq = 300000;
 
 /* Hi speed to bump to from lo speed when load burst (default max) */
 #define DEFAULT_HISPEED_FREQ 800000
@@ -612,9 +612,6 @@ static int cpufreq_interactive_speedchange_task(void *data)
 		for_each_cpu(cpu, &tmp_mask) {
 			unsigned int j;
 			unsigned int max_freq = 0;
-			int cpu_load;
-
-			cpu_load = ((unsigned int)pcpu->cputime_speedadj * 100) / pcpu->target_freq;
 
 			pcpu = &per_cpu(cpuinfo, cpu);
 			if (!down_read_trylock(&pcpu->enable_sem))
@@ -622,30 +619,6 @@ static int cpufreq_interactive_speedchange_task(void *data)
 			if (!pcpu->governor_enabled) {
 				up_read(&pcpu->enable_sem);
 				continue;
-			}
-
-			/*
-			 * Make a break point here, if suspended it should not scale
-			 * Only enable it, if user wants to
-			 */
-			if (suspend_enabled && suspend_state) {
-					if ((ktime_to_us(ktime_get()) + 1000000) && cpu_load > 7000) {
-						/*
-						 * The screen is off, we are near deep-sleep.
-						 * Something needs power and it needs it fast!
-						 * So break out of the suspend code and go into normal
-						 * scheduling algorithm and never go back.
-						 * We want to wait at least one second until load is
-						 * settled.
-						 */
-						suspend_state = false;
-						pcpu->target_freq = last_freq;
-						continue;
-					}
-
-					else {
-						break;
-					}
 			}
 
 			for_each_cpu(j, pcpu->policy->cpus) {
@@ -656,7 +629,7 @@ static int cpufreq_interactive_speedchange_task(void *data)
 					max_freq = pjcpu->target_freq;
 			}
 
-			if (max_freq != pcpu->policy->cur)
+			if (max_freq != pcpu->policy->cur && !suspend_state)
 				__cpufreq_driver_target(pcpu->policy,
 							max_freq,
 							CPUFREQ_RELATION_H);
@@ -673,41 +646,45 @@ static int cpufreq_interactive_speedchange_task(void *data)
 	return 0;
 }
 
-static void interactive_early_suspend(struct early_suspend *handler)
+static void interactive_suspend(int suspend)
 {
 	struct cpufreq_interactive_cpuinfo *pcpu;
+        unsigned int max_speed;
 	unsigned int cpu;
-	pcpu = &per_cpu(cpuinfo, cpu);	
+	pcpu = &per_cpu(cpuinfo, cpu);  
 
+        max_speed = input_boost_freq;
 
-	if (suspend_enabled) {
-		/* Safe the last frequency, so we can restore it later */
-		last_freq = pcpu->target_freq;
+        if (!suspend_enabled) 
+		return;
 
-		/* set it to the lowest possible frequency */
-		pcpu->target_freq = pcpu->policy->min;
-		suspend_state = true;
-
-	}
+        if (!suspend) { 
+                suspend_state = 0;
+                __cpufreq_driver_target(pcpu->policy, max_speed, CPUFREQ_RELATION_L);
+                printk("[interactive] awake at %d\n", max_speed);
+        } else {
+		// Going in suspend, take saved suspend_freq
+                suspend_state = 1;
+                __cpufreq_driver_target(pcpu->policy, suspend_freq, CPUFREQ_RELATION_H);
+                printk("[interactive] suspended at %d\n", pcpu->policy->cur);
+        }
 }
 
+static void interactive_early_suspend(struct early_suspend *handler)
+{
+	
+	interactive_suspend(1);
+}
 
 static void interactive_late_resume(struct early_suspend *handler)
 {
-	struct cpufreq_interactive_cpuinfo *pcpu;
-	unsigned int cpu;
-	pcpu = &per_cpu(cpuinfo, cpu);
-
-	if (suspend_enabled) {
-		/* Resume */
-		pcpu->target_freq = last_freq;
-		suspend_state = false;	
-	}
+	interactive_suspend(0);
 }
 
-static struct early_suspend interactive_suspend  = {
+static struct early_suspend interactive_suspend_handler  = {
 	.suspend 	= interactive_early_suspend,
 	.resume 	= interactive_late_resume,
+	.level 		= EARLY_SUSPEND_LEVEL_DISABLE_FB + 1,
 };
 
 static void cpufreq_interactive_boost(void)
@@ -1002,6 +979,7 @@ static struct global_attr above_hispeed_delay_attr =
 	__ATTR(above_hispeed_delay, S_IRUGO | S_IWUSR,
 		show_above_hispeed_delay, store_above_hispeed_delay);
 
+
 static ssize_t show_hispeed_freq(struct kobject *kobj,
 				 struct attribute *attr, char *buf)
 {
@@ -1049,6 +1027,29 @@ static ssize_t store_io_is_busy(struct kobject *kobj,
 
 static struct global_attr io_is_busy_attr = __ATTR(io_is_busy, 0644,
 		show_io_is_busy, store_io_is_busy);
+
+static ssize_t show_suspend_freq(struct kobject *kobj,
+				 struct attribute *attr, char *buf)
+{
+	return sprintf(buf, "%u\n", suspend_freq);
+}
+
+static ssize_t store_suspend_freq(struct kobject *kobj,
+				  struct attribute *attr, const char *buf,
+				  size_t count)
+{
+	int ret;
+	long unsigned int val;
+
+	ret = strict_strtoul(buf, 0, &val);
+	if (ret < 0)
+		return ret;
+	suspend_freq = val;
+	return count;
+}
+
+static struct global_attr suspend_freq_attr = __ATTR(suspend_freq, 0644,
+		show_suspend_freq, store_suspend_freq);
 
 static ssize_t show_suspend_enabled(struct kobject *kobj,
 				    struct attribute *attr, char *buf)
@@ -1294,6 +1295,7 @@ static struct attribute *interactive_attributes[] = {
 	&timer_slack.attr,
 	&input_boost.attr,
 	&suspend_enabled_attr.attr,
+	&suspend_freq_attr.attr,
 	&boost.attr,
 	&boostpulse.attr,
 	&boostpulse_duration.attr,
@@ -1449,7 +1451,7 @@ static int __init cpufreq_interactive_init(void)
 	struct sched_param param = { .sched_priority = MAX_RT_PRIO-1 };
 	
 	/* suspend/resume call */
-	register_early_suspend(&interactive_suspend);
+	register_early_suspend(&interactive_suspend_handler);
 
 	/* Initalize per-cpu timers */
 	for_each_possible_cpu(i) {
@@ -1499,7 +1501,7 @@ module_init(cpufreq_interactive_init);
 
 static void __exit cpufreq_interactive_exit(void)
 {
-	unregister_early_suspend(&interactive_suspend);
+	unregister_early_suspend(&interactive_suspend_handler);
 	cpufreq_unregister_governor(&cpufreq_gov_interactive);
 	kthread_stop(speedchange_task);
 	put_task_struct(speedchange_task);
