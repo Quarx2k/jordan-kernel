@@ -92,6 +92,7 @@ struct zram_stats {
 	u64 failed_writes;	/* can happen when memory is too low */
 	u64 invalid_io;		/* non-page-aligned I/O requests */
 	u64 notify_free;	/* no. of swap slot free notifications */
+	u64 discard;		/* no. of discards */
 	u32 pages_zero;		/* no. of zero filled pages */
 	u32 pages_stored;	/* no. of pages currently stored */
 	u32 good_compress;	/* % of pages with compression ratio<=50% */

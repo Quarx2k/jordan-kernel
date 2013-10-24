@@ -148,6 +148,26 @@ out:
 	zram->table[index].offset = 0;
 }
 
+static void zram_discard(struct zram *zram, struct bio *bio)
+{
+	u32 i, npages, index;
+
+	if (unlikely(!zram->init_done))
+		goto out;
+
+	npages = bio->bi_size / PAGE_SIZE;
+	index = bio->bi_sector >> SECTORS_PER_PAGE_SHIFT;
+
+	down_write(&zram->lock);
+	for (i = 0; i < npages; i++)
+		zram_free_page(zram, index++);
+	up_write(&zram->lock);
+
+out:
+	zram_stat64_inc(zram, &zram->stats.discard);
+	bio_endio(bio, 0);
+}
+
 static inline int is_partial_io(struct bio_vec *bvec)
 {
 	return bvec->bv_len != PAGE_SIZE;
@@ -480,6 +500,11 @@ static void __zram_make_request(struct zram *zram, struct bio *bio, int rw)
 	u32 index;
 	struct bio_vec *bvec;
 
+	if (unlikely(bio->bi_rw & REQ_DISCARD)) {
+		zram_discard(zram, bio);
+		return;
+	}
+
 	switch (rw) {
 	case READ:
 		zram_stat64_inc(zram, &zram->stats.num_reads);
@@ -793,6 +818,10 @@ static int create_device(struct zram *zram, int device_id)
 					ZRAM_LOGICAL_BLOCK_SIZE);
 	blk_queue_io_min(zram->disk->queue, PAGE_SIZE);
 	blk_queue_io_opt(zram->disk->queue, PAGE_SIZE);
+
+	zram->disk->queue->limits.discard_granularity = PAGE_SIZE;
+	zram->disk->queue->limits.max_discard_sectors = UINT_MAX;
+	queue_flag_set_unlocked(QUEUE_FLAG_DISCARD, zram->disk->queue);
 
 	add_disk(zram->disk);
 
