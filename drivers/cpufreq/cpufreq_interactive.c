@@ -610,8 +610,12 @@ static int cpufreq_interactive_speedchange_task(void *data)
 		spin_unlock_irqrestore(&speedchange_cpumask_lock, flags);
 
 		for_each_cpu(cpu, &tmp_mask) {
+			int cpu_load;
+			int new_freq;
 			unsigned int j;
 			unsigned int max_freq = 0;
+			unsigned int loadadjfreq;
+			u64 cputime_speedadj;
 
 			pcpu = &per_cpu(cpuinfo, cpu);
 			if (!down_read_trylock(&pcpu->enable_sem))
@@ -629,10 +633,27 @@ static int cpufreq_interactive_speedchange_task(void *data)
 					max_freq = pjcpu->target_freq;
 			}
 
+			/* Get CPU-Load */
+			cputime_speedadj = pcpu->cputime_speedadj;
+			loadadjfreq = (unsigned int)cputime_speedadj * 100;
+        		cpu_load = (loadadjfreq / pcpu->target_freq);
+			cpu_load = do_div(cpu_load, 100);
+
 			if (max_freq != pcpu->policy->cur && !suspend_state)
 				__cpufreq_driver_target(pcpu->policy,
 							max_freq,
 							CPUFREQ_RELATION_H);
+
+			/* 
+			 * If suspended and over this loadlevel,
+			 * we might want to scale up
+			 */
+			if (cpu_load >= 85 && suspend_state) {
+				new_freq = 2 * suspend_freq;
+				__cpufreq_driver_target(pcpu->policy,
+							new_freq,
+							CPUFREQ_RELATION_L);
+			}
 
 			trace_cpufreq_interactive_setspeed(cpu,
 						     pcpu->target_freq,
@@ -648,43 +669,42 @@ static int cpufreq_interactive_speedchange_task(void *data)
 
 static void interactive_suspend(int suspend)
 {
-	struct cpufreq_interactive_cpuinfo *pcpu;
-        unsigned int max_speed;
-	unsigned int cpu;
+	struct cpufreq_interactive_cpuinfo *pcpu;    
+	int cpu;	
 	pcpu = &per_cpu(cpuinfo, cpu);  
-
-        max_speed = input_boost_freq;
 
         if (!suspend_enabled) 
 		return;
 
         if (!suspend) { 
                 suspend_state = 0;
-                __cpufreq_driver_target(pcpu->policy, max_speed, CPUFREQ_RELATION_L);
-                printk("[interactive] awake at %d\n", max_speed);
+                __cpufreq_driver_target(pcpu->policy, pcpu->policy->max, CPUFREQ_RELATION_L);
+                printk("[interactive] awake at %d\n", pcpu->policy->max);
         } else {
-		// Going in suspend, take saved suspend_freq
+		/* Going in suspend, take saved suspend_freq */
                 suspend_state = 1;
-                __cpufreq_driver_target(pcpu->policy, suspend_freq, CPUFREQ_RELATION_H);
+                __cpufreq_driver_target(pcpu->policy, suspend_freq, CPUFREQ_RELATION_L);
                 printk("[interactive] suspended at %d\n", pcpu->policy->cur);
         }
 }
 
 static void interactive_early_suspend(struct early_suspend *handler)
 {
-	
-	interactive_suspend(1);
+	int i;
+	for_each_online_cpu(i)
+		interactive_suspend(1);
 }
 
 static void interactive_late_resume(struct early_suspend *handler)
 {
-	interactive_suspend(0);
+	int i;
+	for_each_online_cpu(i)
+		interactive_suspend(0);
 }
 
 static struct early_suspend interactive_suspend_handler  = {
 	.suspend 	= interactive_early_suspend,
 	.resume 	= interactive_late_resume,
-	.level 		= EARLY_SUSPEND_LEVEL_DISABLE_FB + 1,
 };
 
 static void cpufreq_interactive_boost(void)
