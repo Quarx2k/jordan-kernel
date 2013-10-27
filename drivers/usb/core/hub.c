@@ -835,9 +835,7 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 		 */
 		if (!(portstatus & USB_PORT_STAT_CONNECTION) ||
 				(portchange & USB_PORT_STAT_C_CONNECTION)) {
-#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 			clear_bit(port1, hub->removed_bits);
-#endif
 		}
 
 		if (!udev || udev->state == USB_STATE_NOTATTACHED) {
