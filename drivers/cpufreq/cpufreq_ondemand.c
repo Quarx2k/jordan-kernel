@@ -23,6 +23,9 @@
 #include <linux/ktime.h>
 #include <linux/sched.h>
 #include <linux/platform_device.h>
+#include <linux/input.h>
+#include <linux/workqueue.h>
+#include <linux/slab.h>
 
 /*
  * dbs is used in this file as a shortform for demandbased switching
@@ -105,6 +108,10 @@ static unsigned int dbs_enable;	/* number of CPUs using this policy */
  */
 static DEFINE_MUTEX(dbs_mutex);
 
+static struct workqueue_struct *input_wq;
+
+static DEFINE_PER_CPU(struct work_struct, dbs_refresh_work);
+
 static struct dbs_tuners {
 	unsigned int sampling_rate;
 	unsigned int up_threshold;
@@ -113,12 +120,14 @@ static struct dbs_tuners {
 	unsigned int sampling_down_factor;
 	unsigned int powersave_bias;
 	unsigned int io_is_busy;
+	unsigned int input_boost;
 } dbs_tuners_ins = {
 	.up_threshold = DEF_FREQUENCY_UP_THRESHOLD,
 	.sampling_down_factor = DEF_SAMPLING_DOWN_FACTOR,
 	.down_differential = DEF_FREQUENCY_DOWN_DIFFERENTIAL,
 	.ignore_nice = 0,
 	.powersave_bias = 0,
+	.input_boost = 0,
 };
 
 static inline cputime64_t get_cpu_idle_time_jiffy(unsigned int cpu,
@@ -263,6 +272,7 @@ show_one(up_threshold, up_threshold);
 show_one(sampling_down_factor, sampling_down_factor);
 show_one(ignore_nice_load, ignore_nice);
 show_one(powersave_bias, powersave_bias);
+show_one(input_boost, input_boost);
 
 /**
  * update_sampling_rate - update sampling rate effective immediately if needed.
@@ -313,7 +323,7 @@ static void update_sampling_rate(unsigned int new_rate)
 			mutex_lock(&dbs_info->timer_mutex);
 
 			schedule_delayed_work_on(dbs_info->cpu, &dbs_info->work,
-						 usecs_to_jiffies(new_rate));
+				usecs_to_jiffies(new_rate));
 
 		}
 		mutex_unlock(&dbs_info->timer_mutex);
@@ -453,6 +463,18 @@ static ssize_t store_powersave_bias(struct kobject *a, struct attribute *b,
 	return count;
 }
 
+static ssize_t store_input_boost(struct kobject *a, struct attribute *b,
+	const char *buf, size_t count)
+{
+	unsigned int input;
+	int ret;
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1)
+	return -EINVAL;
+	dbs_tuners_ins.input_boost = input;
+	return count;
+}
+
 #define define_one_rw(_name) \
 static struct global_attr _name = \
 __ATTR(_name, 0644, show_##_name, store_##_name)
@@ -463,6 +485,7 @@ define_one_rw(up_threshold);
 define_one_rw(ignore_nice_load);
 define_one_rw(sampling_down_factor);
 define_one_rw(powersave_bias);
+define_one_rw(input_boost);
 
 static struct attribute *dbs_attributes[] = {
 	&sampling_rate_min.attr,
@@ -472,6 +495,7 @@ static struct attribute *dbs_attributes[] = {
 	&ignore_nice_load.attr,
 	&powersave_bias.attr,
 	&io_is_busy.attr,
+	&input_boost.attr,
 	NULL
 };
 
@@ -758,6 +782,121 @@ static int should_io_be_busy(void)
 	return 0;
 }
 
+static void dbs_refresh_callback(struct work_struct *unused)
+{
+        struct cpufreq_policy *policy;
+        struct cpu_dbs_info_s *this_dbs_info;
+	unsigned int cpu = smp_processor_id();
+	unsigned int target_freq;
+
+        if (lock_policy_rwsem_write(cpu) < 0)
+                return;
+
+        this_dbs_info = &per_cpu(od_cpu_dbs_info, cpu);
+        policy = this_dbs_info->cur_policy;
+
+	if (!policy) {
+		/* CPU not using ondemand governor */
+		unlock_policy_rwsem_write(cpu);
+		return;
+	}
+
+        if (dbs_tuners_ins.input_boost)
+		target_freq = dbs_tuners_ins.input_boost;
+	else
+		target_freq = policy->max;
+
+	if (policy->cur < target_freq) {
+                if (__cpufreq_driver_target(policy, target_freq,
+			CPUFREQ_RELATION_L) >= 0)
+			policy->cur = target_freq;
+
+                this_dbs_info->prev_cpu_idle = get_cpu_idle_time(cpu,
+                                &this_dbs_info->prev_cpu_wall);
+        }
+        unlock_policy_rwsem_write(cpu);
+}
+
+static void dbs_input_event(struct input_handle *handle, unsigned int type,
+                unsigned int code, int value)
+{
+	int i;
+
+	for_each_online_cpu(i)
+        	queue_work_on(i, input_wq, &per_cpu(dbs_refresh_work, i));
+}
+
+static int dbs_input_connect(struct input_handler *handler,
+                struct input_dev *dev, const struct input_device_id *id)
+{
+        struct input_handle *handle;
+        int error;
+
+        handle = kzalloc(sizeof(struct input_handle), GFP_KERNEL);
+        if (!handle)
+                return -ENOMEM;
+
+        handle->dev = dev;
+        handle->handler = handler;
+        handle->name = "cpufreq";
+
+        error = input_register_handle(handle);
+        if (error)
+                goto err2;
+
+        error = input_open_device(handle);
+        if (error)
+                goto err1;
+
+        return 0;
+err1:
+        input_unregister_handle(handle);
+err2:
+        kfree(handle);
+        return error;
+}
+
+static void dbs_input_disconnect(struct input_handle *handle)
+{
+        input_close_device(handle);
+        input_unregister_handle(handle);
+        kfree(handle);
+}
+
+static const struct input_device_id dbs_ids[] = {
+        /* multi-touch touchscreen */
+        {
+                .flags = INPUT_DEVICE_ID_MATCH_EVBIT |
+                        INPUT_DEVICE_ID_MATCH_ABSBIT,
+                .evbit = { BIT_MASK(EV_ABS) },
+                .absbit = { [BIT_WORD(ABS_MT_POSITION_X)] =
+                        BIT_MASK(ABS_MT_POSITION_X) |
+                        BIT_MASK(ABS_MT_POSITION_Y) },
+        },
+        /* touchpad */
+        {
+                .flags = INPUT_DEVICE_ID_MATCH_KEYBIT |
+                        INPUT_DEVICE_ID_MATCH_ABSBIT,
+                .keybit = { [BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH) },
+                .absbit = { [BIT_WORD(ABS_X)] =
+                        BIT_MASK(ABS_X) | BIT_MASK(ABS_Y) },
+        },
+        /* Keypad */
+        {
+                .flags = INPUT_DEVICE_ID_MATCH_EVBIT,
+                .evbit = { BIT_MASK(EV_KEY) },
+        },
+        { },
+};
+
+static struct input_handler dbs_input_handler = {
+        .event                = dbs_input_event,
+        .connect        = dbs_input_connect,
+        .disconnect        = dbs_input_disconnect,
+        .name                = "cpufreq_ond",
+        .id_table        = dbs_ids,
+};
+
 static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 				   unsigned int event)
 {
@@ -819,6 +958,8 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 					NULL, 0);
 			dbs_tuners_ins.io_is_busy = should_io_be_busy();
 		}
+		if (!cpu)
+			rc = input_register_handler(&dbs_input_handler);
 		mutex_unlock(&dbs_mutex);
 
 		mutex_init(&this_dbs_info->timer_mutex);
@@ -831,6 +972,14 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		mutex_lock(&dbs_mutex);
 		mutex_destroy(&this_dbs_info->timer_mutex);
 		dbs_enable--;
+
+		/* 
+		 * If device is being removed, policy is no longer
+		 * valid. 
+		 */
+		this_dbs_info->cur_policy = NULL;
+		if (!cpu)
+			input_unregister_handler(&dbs_input_handler);
 		mutex_unlock(&dbs_mutex);
 		if (!dbs_enable) {
 			sysfs_remove_group(cpufreq_global_kobject,
@@ -858,6 +1007,7 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 static int __init cpufreq_gov_dbs_init(void)
 {
 	u64 idle_time;
+	unsigned int i;
 	int cpu = get_cpu();
 
 	idle_time = get_cpu_idle_time_us(cpu, NULL);
@@ -879,6 +1029,15 @@ static int __init cpufreq_gov_dbs_init(void)
 			MIN_SAMPLING_RATE_RATIO * jiffies_to_usecs(10);
 	}
 
+	input_wq = create_workqueue("iewq");
+	if (!input_wq) {
+		printk(KERN_ERR "Failed to create iewq workqueue\n");
+		return -EFAULT;
+	}
+	for_each_possible_cpu(i) {
+		INIT_WORK(&per_cpu(dbs_refresh_work, i), dbs_refresh_callback);
+	}
+
 	return cpufreq_register_governor(&cpufreq_gov_ondemand);
 }
 
@@ -886,6 +1045,7 @@ static void __exit cpufreq_gov_dbs_exit(void)
 {
 	platform_driver_unregister(&ondemand_dummy_driver);
 	cpufreq_unregister_governor(&cpufreq_gov_ondemand);
+	destroy_workqueue(input_wq);
 }
 
 
