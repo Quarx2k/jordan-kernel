@@ -86,7 +86,7 @@ static struct usbhs_omap_board_data usbhs_bdata  = {
 	.es2_compatibility = false,
 	.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED,
 	.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED,
-	.port_mode[2] = OMAP_EHCI_HCD_OMAP_MODE_ULPI_TLL_SDR,
+	.port_mode[2] = OMAP_EHCI_PORT_MODE_TLL,
 };
 
 
