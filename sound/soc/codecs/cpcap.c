@@ -36,7 +36,7 @@
 
 #include "cpcap.h"
 
-#define CPCAP_AUDIO_DEBUG
+/* #define CPCAP_AUDIO_DEBUG */
 #ifdef CPCAP_AUDIO_DEBUG
 #define CPCAP_AUDIO_DEBUG_LOG(args...) printk(KERN_INFO "ALSA CPCAP:" args)
 #else
@@ -1435,7 +1435,6 @@ static void audio_callback(struct cpcap_device *cpcap, int status)
 	} else
 		cache = codec->reg_cache;
 
-	printk("Status %d\n",status);
 	/* HS insertion status = 1, HS detach status = 0 */
 	if (status == 0 || status == 1) {
 		if (cache[5] & CPCAP_BIT_HS_MIC_MUX)
