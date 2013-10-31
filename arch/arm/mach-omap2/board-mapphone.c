@@ -129,7 +129,7 @@ static int plat_uart_disable(void)
 	int port_id = 0;
 	int err = 0;
 	if (uart_req) {
-		sscanf(WILINK_UART_DEV_NAME, "/dev/ttyS%d", &port_id);
+		sscanf(WILINK_UART_DEV_NAME, "/dev/ttyO%d", &port_id);
 		err = omap_serial_ext_uart_disable(port_id);
 		if (!err)
 			uart_req = false;
@@ -144,7 +144,7 @@ static int plat_uart_enable(void)
 	int port_id = 0;
 	int err = 0;
 	if (!uart_req) {
-		sscanf(WILINK_UART_DEV_NAME, "/dev/ttyS%d", &port_id);
+		sscanf(WILINK_UART_DEV_NAME, "/dev/ttyO%d", &port_id);
 		err = omap_serial_ext_uart_enable(port_id);
 		if (!err)
 			uart_req = true;
