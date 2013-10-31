@@ -23,9 +23,15 @@
 #include <linux/slab.h>
 #include <linux/suspend.h>
 #include <linux/syscore_ops.h>
+
 #include <trace/events/power.h>
 
 #include "power.h"
+
+#ifdef CONFIG_QUICK_WAKEUP
+#include <linux/quickwakeup.h>
+#include <linux/wakelock.h>
+#endif
 
 const char *const pm_states[PM_SUSPEND_MAX] = {
 #ifdef CONFIG_EARLYSUSPEND
@@ -173,6 +179,9 @@ static int suspend_enter(suspend_state_t state)
 			events_check_enabled = false;
 		}
 		syscore_resume();
+#ifdef CONFIG_QUICK_WAKEUP
+		quickwakeup_check();
+#endif
 	}
 
 	arch_suspend_enable_irqs();
@@ -224,7 +233,13 @@ int suspend_devices_and_enter(suspend_state_t state)
 		goto Recover_platform;
 
 	error = suspend_enter(state);
-
+#ifdef CONFIG_QUICK_WAKEUP
+	while (!error && !quickwakeup_execute()) {
+		if (has_wake_lock(WAKE_LOCK_SUSPEND))
+			break;
+		error = suspend_devices_and_enter(state);
+	}
+#endif
  Resume_devices:
 	suspend_test_start();
 	dpm_resume_end(PMSG_RESUME);

@@ -38,6 +38,9 @@ struct wake_lock {
 	int                 flags;
 	const char         *name;
 	unsigned long       expires;
+#ifdef CONFIG_PM_DEEPSLEEP
+	pid_t   pid;
+#endif
 #ifdef CONFIG_WAKELOCK_STAT
 	struct {
 		int             count;
