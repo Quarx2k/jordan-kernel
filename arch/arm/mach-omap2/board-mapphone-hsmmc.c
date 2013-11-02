@@ -234,7 +234,7 @@ static struct omap2_hsmmc_info mmc_controllers[] = {
 	 * controller for microSD, controller for eMMC, controller for wifi
 	 */
 	{
-		.mmc		= 1,
+		.mmc		= 2,
 		.caps		= MMC_CAP_4_BIT_DATA,
 		.gpio_cd	= -EINVAL,
 		.gpio_wp	= -EINVAL,
@@ -244,7 +244,7 @@ static struct omap2_hsmmc_info mmc_controllers[] = {
 					MMC_VDD_165_195,
 	},
 	{
-		.mmc            = 2,
+		.mmc            = 1,
 		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
 		.gpio_cd        = -EINVAL,
 		.gpio_wp        = -EINVAL,
