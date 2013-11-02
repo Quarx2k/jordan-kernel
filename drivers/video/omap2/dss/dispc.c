@@ -536,8 +536,10 @@ int dispc_runtime_get(void)
 		 * The Workaround suggested by Hardware team is to keep the L3_1
 		 * and L3_2 CD in NO_SLEEP mode, when DSS is active.
 		 */
-		clkdm_deny_idle(l3_1_clkdm);
-		clkdm_deny_idle(l3_2_clkdm);
+		if (cpu_is_omap44xx()) {
+			clkdm_deny_idle(l3_1_clkdm);
+			clkdm_deny_idle(l3_2_clkdm);
+		}
 
 		r = dss_runtime_get();
 		if (r)
@@ -598,8 +600,10 @@ void dispc_runtime_put(void)
 		 * Restore L3_1 amd L3_2 CD to HW_AUTO, when DSS module idles.
 		 * When DSS is idle, we can allow L3_1 and L3_2 to idle.
 		 */
-		clkdm_allow_idle(l3_1_clkdm);
-		clkdm_allow_idle(l3_2_clkdm);
+		if (cpu_is_omap44xx()) {
+			clkdm_allow_idle(l3_1_clkdm);
+			clkdm_allow_idle(l3_2_clkdm);
+		}
 
 	}
 
@@ -2240,11 +2244,6 @@ int dispc_setup_plane(enum omap_plane plane,
 	u16 frame_height = height;
 	unsigned int field_offset = 0;
 	int pixpg;
-	if (cpu_is_omap44xx()) {
-		pixpg = (color_mode &
-			(OMAP_DSS_COLOR_YUV2 | OMAP_DSS_COLOR_UYVY)) ? 2 : 1;
-	}
-
 	unsigned long tiler_width, tiler_height;
 	u32 fifo_high, fifo_low;
 
@@ -2255,6 +2254,11 @@ int dispc_setup_plane(enum omap_plane plane,
 	       out_width, out_height,
 	       ilace, color_mode,
 	       rotation, mirror, channel, five_taps ? 5 : 3);
+
+	if (cpu_is_omap44xx()) {
+		pixpg = (color_mode &
+			(OMAP_DSS_COLOR_YUV2 | OMAP_DSS_COLOR_UYVY)) ? 2 : 1;
+	}
 
 	if (paddr == 0)
 		return -EINVAL;
@@ -4072,15 +4076,18 @@ static void _omap_dispc_initial_config(void)
 		dispc_write_reg(DISPC_DIVISOR, l);
 	}
 
-	l3_1_clkdm = clkdm_lookup("l3_1_clkdm");
-	l3_2_clkdm = clkdm_lookup("l3_2_clkdm");
+	if (cpu_is_omap44xx()) {
+		l3_1_clkdm = clkdm_lookup("l3_1_clkdm");
+		l3_2_clkdm = clkdm_lookup("l3_2_clkdm");
+	}
 
 	/* FUNCGATED */
 	if (dss_has_feature(FEAT_FUNCGATED))
 		REG_FLD_MOD(DISPC_CONFIG, 1, 9, 9);
 
-	REG_FLD_MOD(DISPC_CONFIG, 1, 17, 17);
-
+	if (cpu_is_omap44xx()) {
+		REG_FLD_MOD(DISPC_CONFIG, 1, 17, 17);
+	}
 	/* L3 firewall setting: enable access to OCM RAM */
 	/* XXX this should be somewhere in plat-omap */
 	if (cpu_is_omap24xx())
