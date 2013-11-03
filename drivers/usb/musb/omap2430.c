@@ -528,9 +528,11 @@ static const struct musb_platform_ops omap2430_ops = {
 
 	.set_mode	= omap2430_musb_set_mode,
 	.try_idle	= omap2430_musb_try_idle,
-
+#ifndef CONFIG_USB_MOT_ANDROID
 	.set_vbus	= omap2430_musb_set_vbus,
-
+#else
+	.set_vbus	= 0,
+#endif
 	.enable		= omap2430_musb_enable,
 	.disable	= omap2430_musb_disable,
 };
