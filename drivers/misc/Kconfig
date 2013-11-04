@@ -595,4 +595,11 @@ source "drivers/misc/gc-core/Kconfig"
 source "drivers/misc/netmux/Kconfig"
 source "drivers/misc/netmux_linkdriver/Kconfig"
 source "drivers/misc/modem_pm_driver/Kconfig"
+
+config WRITEBACK_CONTROL
+	bool "Support for dynamic writeback support"
+	default y
+	help
+	  Say Y here to enable dynamic Writeback
+
 endif # MISC_DEVICES
