@@ -34,8 +34,11 @@
 #include <linux/syscalls.h>
 #include <linux/buffer_head.h>
 #include <linux/pagevec.h>
+#ifdef CONFIG_WRITEBACK_CONTROL
 #include <linux/earlysuspend.h>
 
+extern bool writeback(void);
+#endif
 
 /*
  * After a CPU has dirtied this many pages, balance_dirty_pages_ratelimited
@@ -90,7 +93,11 @@ unsigned long vm_dirty_bytes;
 /*
  * The interval between `kupdate'-style writebacks
  */
+#ifdef CONFIG_WRITEBACK_CONTROL
 unsigned int dirty_writeback_interval = 10 * 100; /* centiseconds */
+#else
+unsigned int dirty_writeback_interval = 6 * 100; /* centiseconds */
+#endif
 
 /*
  * The longest time for which data is allowed to remain dirty
@@ -774,22 +781,38 @@ static struct notifier_block __cpuinitdata ratelimit_nb = {
 	.next		= NULL,
 };
 
+#ifdef CONFIG_WRITEBACK_CONTROL
 static void dirty_early_suspend(struct early_suspend *handler)
 {
-	dirty_writeback_interval = 3 * 100;
-	dirty_expire_interval = 30 * 100;
+        if (writeback()) {
+                dirty_writeback_interval = 5 * 100;
+                dirty_expire_interval = 5 * 1000;
+        }
+        else {
+                // We need to set it to default:
+                dirty_writeback_interval = 6 * 100;
+                dirty_expire_interval = 6 * 1000;
+        }
 }
 
 static void dirty_late_resume(struct early_suspend *handler)
 {
-	dirty_writeback_interval = 10 * 100;
-	dirty_expire_interval = 6 * 1000; 
+        if (writeback()) {
+                dirty_writeback_interval = 2 * 2000;
+                dirty_expire_interval = 10 * 1000; 
+        }
+        else {
+                // We need to set it to default:
+                dirty_writeback_interval = 6 * 100;
+                dirty_expire_interval = 6 * 1000;
+        }
 }
 
 static struct early_suspend dirty_suspend = {
-	.suspend = dirty_early_suspend,
-	.resume = dirty_late_resume,
+        .suspend = dirty_early_suspend,
+        .resume = dirty_late_resume,
 };
+#endif
 
 /*
  * Called early on to tune the page writeback dirty limits.
@@ -813,8 +836,9 @@ void __init page_writeback_init(void)
 {
 	int shift;
 
+#ifdef CONFIG_WRITEBACK_CONTROL
 	register_early_suspend(&dirty_suspend);
-
+#endif
 	writeback_set_ratelimit();
 	register_cpu_notifier(&ratelimit_nb);
 

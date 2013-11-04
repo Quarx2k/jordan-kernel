@@ -428,4 +428,10 @@ config FSYNC_CONTROL
 	help
 	  Say Y here to enable FSync Control
 
+config WRITEBACK_CONTROL
+	bool "Support for dynamic writeback support"
+	default y
+	help
+	  Say Y here to enable dynamic Writeback
+
 endif # MISC_DEVICES
