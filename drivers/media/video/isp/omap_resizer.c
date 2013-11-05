@@ -213,7 +213,7 @@ int rsz_ioc_run_engine(struct rsz_fhdl *fhdl)
 
 	/* Unmap and free the memory allocated for buffers */
 	if (sq->bufs[fhdl->src_buff_index] != NULL) {
-		videobuf_dma_unmap(sq, videobuf_to_dma(
+		videobuf_dma_unmap(sq->dev, videobuf_to_dma(
 				   sq->bufs[fhdl->src_buff_index]));
 		videobuf_dma_free(videobuf_to_dma(
 				  sq->bufs[fhdl->src_buff_index]));
@@ -221,7 +221,7 @@ int rsz_ioc_run_engine(struct rsz_fhdl *fhdl)
 	}
 
 	if (dq->bufs[fhdl->dst_buff_index] != NULL) {
-		videobuf_dma_unmap(dq, videobuf_to_dma(
+		videobuf_dma_unmap(dq->dev, videobuf_to_dma(
 				   dq->bufs[fhdl->dst_buff_index]));
 		videobuf_dma_free(videobuf_to_dma(
 				  dq->bufs[fhdl->dst_buff_index]));
@@ -352,7 +352,7 @@ static void rsz_vbq_release(struct videobuf_queue *q,
 	}
 
 	if (vb->memory != V4L2_MEMORY_MMAP) {
-		videobuf_dma_unmap(q, videobuf_to_dma(vb));
+		videobuf_dma_unmap(q->dev, videobuf_to_dma(vb));
 		videobuf_dma_free(videobuf_to_dma(vb));
 	}
 

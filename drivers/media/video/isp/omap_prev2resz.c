@@ -305,7 +305,7 @@ static void prev2resz_vbq_release(struct videobuf_queue *q,
 	}
 
 	if (vb->memory != V4L2_MEMORY_MMAP) {
-		videobuf_dma_unmap(q, videobuf_to_dma(vb));
+		videobuf_dma_unmap(q->dev, videobuf_to_dma(vb));
 		videobuf_dma_free(videobuf_to_dma(vb));
 	}
 }

@@ -844,7 +844,7 @@ static void isp_csi_memvs_vout_buf_release(struct videobuf_queue *q,
 	ispmmu_vunmap(dev, bufs->isp_addr_capture[vb->i]);
 	bufs->isp_addr_capture[vb->i] = (dma_addr_t)NULL;
 	isp_csi_memvs_vout_vb_lock_vma(vb, 0);
-	videobuf_dma_unmap(q, videobuf_to_dma(vb));
+	videobuf_dma_unmap(q->dev, videobuf_to_dma(vb));
 	videobuf_dma_free(videobuf_to_dma(vb));
 	vb->state = VIDEOBUF_NEEDS_INIT;
 }

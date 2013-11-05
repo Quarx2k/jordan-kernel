@@ -251,7 +251,7 @@ static void omap34xxcam_vbq_release(struct videobuf_queue *vbq,
 	if (!vbq->streaming) {
 		isp_vbq_release(isp, vbq, vb);
 		omap34xxcam_vb_lock_vma(vb, 0);
-		videobuf_dma_unmap(vbq, videobuf_to_dma(vb));
+		videobuf_dma_unmap(vbq->dev, videobuf_to_dma(vb));
 		videobuf_dma_free(videobuf_to_dma(vb));
 		vb->state = VIDEOBUF_NEEDS_INIT;
 	}
