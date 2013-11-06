@@ -274,4 +274,10 @@ endif
 source "fs/nls/Kconfig"
 source "fs/dlm/Kconfig"
 
+config DYNAMIC_FSYNC
+	bool "dynamic file sync control"
+	default n
+	help
+	  An experimental file sync control using early suspend driver 
+
 endmenu
