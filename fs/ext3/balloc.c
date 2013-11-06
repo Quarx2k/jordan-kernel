@@ -1985,8 +1985,7 @@ ext3_grpblk_t ext3_trim_all_free(struct super_block *sb, unsigned int group,
 			goto free_extent;
 
 		 /* Send the TRIM command down to the device */
-		err = sb_issue_discard(sb, discard_block, next - start,
-				       GFP_NOFS, 0);
+		err = sb_issue_discard(sb, discard_block, next - start);
 		count += (next - start);
 free_extent:
 		freed = 0;
