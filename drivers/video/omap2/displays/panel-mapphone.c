@@ -30,6 +30,9 @@
  * (when CONFIG_OMAP2_DSS_DEBUG_SUPPORT is enabled).
  */
 
+/* Display Control Hook */
+extern u8 display_brightness(void);
+
 static unsigned int panel_debug;
 #define DBG(format, ...) \
 	if (panel_debug) \
@@ -1938,10 +1941,12 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 	/* AUO displays require a different setting */
 	if (dssdev->panel.panel_id == MOT_DISP_MIPI_CM_370_480_854) {
 		printk("AUO displays require a different setting: 0x09\n");
-		data[1] = 0x09;
+		data[1] = display_brightness();
+		printk("Set display to :%u\n", display_brightness());
 	} else {
 		printk("AUO displays require a different setting: 0x09: 0x1f\n");
-		data[1] = 0x1f;
+		data[1] = display_brightness();
+		printk("Set display to :%u\n", display_brightness());
 	}
 
 	ret = mapphone_panel_lp_cmd_wrt_sync(dssdev,
@@ -1949,6 +1954,7 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 					data, 2,
 					EDISCO_CMD_SET_BCKLGHT_PWM, 1,
 					data[1], 0x1f);
+
 	DBG("EDISCO_CMD_SET_BCKLGHT_PWM\n");
 	if (ret)
 		printk(KERN_ERR "failed to send CABC/PWM\n");
@@ -4225,10 +4231,10 @@ static void mapphone_panel_disable_local(struct omap_dss_device *dssdev)
 	 * Note: might have sticking image, but did not see it yet.
 	 */
 
-	data[0] = EDISCO_CMD_ENTER_SLEEP_MODE;
+	data[0] = EDISCO_CMD_SET_DISPLAY_OFF;
 	dsi_vc_dcs_write_nosync(dssdev, dsi_vc_cmd, data, 1);
 
-	data[0] = EDISCO_CMD_SET_DISPLAY_OFF;
+	data[0] = EDISCO_CMD_ENTER_SLEEP_MODE;
 	dsi_vc_dcs_write_nosync(dssdev, dsi_vc_cmd, data, 1);
 
 	msleep(120);
