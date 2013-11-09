@@ -434,4 +434,10 @@ config WRITEBACK_CONTROL
 	help
 	  Say Y here to enable dynamic Writeback
 
+config DISPLAY_CONTROL
+	bool "Enables support for display control"
+	default y
+	help
+	  Say Y here to enable display control
+
 endif # MISC_DEVICES

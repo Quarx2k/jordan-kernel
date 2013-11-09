@@ -55,3 +55,4 @@ obj-$(CONFIG_CAMERA_MISC)	+= camera_misc/
 obj-$(CONFIG_FSYNC_CONTROL)	+= fsync_control.o
 obj-y				+= ti-st/
 obj-$(CONFIG_WRITEBACK_CONTROL)  += writeback_control.o
+obj-$(CONFIG_DISPLAY_CONTROL)  += display_control.o

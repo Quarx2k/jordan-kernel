@@ -89,6 +89,9 @@
 
 static bool mapphone_panel_device_read_dt;
 
+/* Display Control Hook */
+extern u8 display_brightness(void);
+
 /* these enum must be matched with MOT DT */
 enum omap_dss_device_disp_pxl_fmt {
 	OMAP_DSS_DISP_PXL_FMT_RGB565	= 1,
@@ -844,14 +847,18 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 	 * D[0]=0 (Enhanced Image Correction OFF) */
 	data[0] = EDISCO_CMD_SET_BCKLGHT_PWM;
 	/* AUO displays require a different setting */
-	if (dssdev->panel.panel_id == MOT_DISP_370_MIPI_480_854_CM)
-		data[1] = 0x09;
-	else
-		data[1] = 0x1f;
+        if (dssdev->panel.panel_id == MOT_DISP_370_MIPI_480_854_CM) {
+                data[1] = display_brightness();
+                printk("Set display to :%u\n", display_brightness());
+        } else {
+                data[1] = display_brightness();
+                printk("Set display to :%u\n", display_brightness());
+        }
 	ret = mapphone_panel_lp_cmd_wrt_sync(true, 0x00,
 					data, 2,
 					EDISCO_CMD_SET_BCKLGHT_PWM, 1,
 					data[1], 0x1f);
+
 	if (ret)
 		printk(KERN_ERR "failed to send CABC/PWM \n");
 
