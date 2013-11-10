@@ -175,7 +175,7 @@ const char *pcmcia_error_ret(int ret);
 			   pcmcia_error_func(func),	\
 			   pcmcia_error_ret(ret));	\
 	}
-
+#if 0
 /* CIS access.
  * Use the pcmcia_* versions in PCMCIA drivers
  */
@@ -194,7 +194,7 @@ int pccard_get_next_tuple(struct pcmcia_socket *s, unsigned int function,
 int pccard_get_tuple_data(struct pcmcia_socket *s, tuple_t *tuple);
 #define pcmcia_get_tuple_data(p_dev, tuple) \
 		pccard_get_tuple_data(p_dev->socket, tuple)
-
+#endif
 
 /* loop CIS entries for valid configuration */
 int pcmcia_loop_config(struct pcmcia_device *p_dev,

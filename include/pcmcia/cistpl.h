@@ -551,7 +551,7 @@ typedef union cisparse_t {
     cistpl_org_t		org;
     cistpl_format_t		format;
 } cisparse_t;
-
+#if 0
 typedef struct tuple_t {
     u_int	Attributes;
     cisdata_t 	DesiredTuple;
@@ -565,7 +565,7 @@ typedef struct tuple_t {
     cisdata_t	TupleDataLen;
     cisdata_t	*TupleData;
 } tuple_t;
-
+#endif
 /* Special cisdata_t value */
 #define RETURN_FIRST_TUPLE	0xff
 
