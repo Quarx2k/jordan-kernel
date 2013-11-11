@@ -288,7 +288,14 @@ done_calib:
 			u_volt_margin = pmic->vsel_to_uv(u_volt_margin);
 			u_volt_margin -= u_volt_current;
 		} else {
-			u_volt_margin = volt_data->volt_margin;
+			if (u_volt_margin & SR1P5_MARGIN_DISABLE_SR) {
+				/* XXX This should be impossible! */
+				pr_err("%s: SR calibration ran for %s OPP with vnom %d"
+					"for which SR was disabled??!\n", __func__,
+					voltdm->name, volt_data->volt_nominal);
+			} else {
+				u_volt_safe += u_volt_margin;
+			}
 		}
 
 		u_volt_safe += u_volt_margin;
@@ -418,6 +425,13 @@ static int sr_class1p5_enable(struct voltagedomain *voltdm,
 	if (IS_ERR_OR_NULL(voltdm) || IS_ERR_OR_NULL(volt_data)) {
 		pr_err("%s: bad parameters!\n", __func__);
 		return -EINVAL;
+	}
+
+	/* SR is disabled for this OPP, don't calibrate */
+	if (volt_data->volt_margin == SR1P5_MARGIN_DISABLE_SR) {
+		pr_info_once("%s: %s: SR is disabled for this OPP, volt_nominal=%d\n",
+		__func__, voltdm->name, volt_data->volt_nominal);
+		return 0;
 	}
 
 	/* If already calibrated, nothing to do here.. */
