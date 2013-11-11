@@ -25,6 +25,7 @@
 #include <plat/system.h>
 #include <plat/hdq.h>
 #include <plat/omap-serial.h>
+#include "omap_ram_console.h"
 
 #include <mach/board-mapphone.h>
 
@@ -41,6 +42,12 @@
 #include <../drivers/w1/w1_family.h> /* for W1_EEPROM_DS2502 */
 
 #define WILINK_UART_DEV_NAME "/dev/ttyO1"
+
+#ifdef CONFIG_OMAP_RAM_CONSOLE
+#define ENCORE_RAM_CONSOLE_START  PLAT_PHYS_OFFSET + 0xE000000
+/* XXX: size is ridiculously large, but system won't boot with smaller */
+#define ENCORE_RAM_CONSOLE_SIZE    SZ_1M
+#endif
 
 #define MAPPHONE_POWER_OFF_GPIO 176
 #define MAPPHONE_WIFI_PMENA_GPIO 186
@@ -413,6 +420,11 @@ static void __init omap_mapphone_init(void)
 
 static void __init mapphone_reserve(void)
 {
+#ifdef CONFIG_OMAP_RAM_CONSOLE
+        omap_ram_console_init(ENCORE_RAM_CONSOLE_START,
+                        ENCORE_RAM_CONSOLE_SIZE);
+#endif
+
 #ifdef CONFIG_ION_OMAP
 	omap_ion_init();
 #endif
