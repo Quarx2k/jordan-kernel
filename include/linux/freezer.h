@@ -167,9 +167,10 @@ static inline void set_freezable_with_signal(void)
 #define wait_event_freezable_exclusive(wq, condition)			\
 ({									\
 	int __retval;							\
-	freezer_do_not_count();						\
-	__retval = wait_event_interruptible_exclusive(wq, condition);	\
-	freezer_count();						\
+	do {								\
+		__retval = wait_event_interruptible_exclusive(wq, 	\
+				(condition) || freezing(current));	\
+	} while (try_to_freeze());					\
 	__retval;							\
 })
 
