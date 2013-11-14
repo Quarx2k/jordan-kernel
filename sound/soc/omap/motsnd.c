@@ -57,7 +57,7 @@
 
 #include "../../../arch/arm/mach-omap2/clock.h"
 
-/* #define MOTSND_DEBUG */
+#define MOTSND_DEBUG
 #ifdef MOTSND_DEBUG
 #define MOTSND_DEBUG_LOG(args...) printk(KERN_INFO "ALSA MOTSND:" args)
 #else
@@ -177,7 +177,7 @@ static struct snd_soc_ops motsnd_voice_ops = {
 
 static int motsnd_incall_startup(struct snd_pcm_substream *substream)
 {
-#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_codec *codec = rtd->codec_dai->codec;
 	struct platform_device *pdev = container_of(codec->dev,
@@ -185,7 +185,7 @@ static int motsnd_incall_startup(struct snd_pcm_substream *substream)
 	struct cpcap_audio_pdata *pdata = pdev->dev.platform_data;
 
 	MOTSND_DEBUG_LOG("%s: entered\n", __func__);
-
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	if (pdata->voice_type == VOICE_TYPE_STE) {
 		/* STE_M570 */
 		mcbsp3_i2s1_pin_mux_switch(1);
@@ -197,7 +197,7 @@ static int motsnd_incall_startup(struct snd_pcm_substream *substream)
 
 static void motsnd_incall_shutdown(struct snd_pcm_substream *substream)
 {
-#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_codec *codec = rtd->codec_dai->codec;
 	struct platform_device *pdev = container_of(codec->dev,
@@ -205,7 +205,7 @@ static void motsnd_incall_shutdown(struct snd_pcm_substream *substream)
 	struct cpcap_audio_pdata *pdata = pdev->dev.platform_data;
 
 	MOTSND_DEBUG_LOG("%s: entered\n", __func__);
-
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	if (pdata->voice_type == VOICE_TYPE_STE) {
 		/* STE_M570 */
 		mcbsp3_i2s1_pin_mux_switch(0);

@@ -343,6 +343,8 @@ static void get_cpcap_audio_data(void)
 		break;
 	}
 
+	data.voice_type = VOICE_TYPE_QC; //Check for correct value. We don't have bp_type in devtree
+
 	node = of_find_node_by_path(DT_PATH_AUDIO);
 	if (!node) {
 		pr_err("Unable to read node %s from device tree!\n",

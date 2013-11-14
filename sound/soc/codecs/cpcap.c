@@ -751,7 +751,7 @@ static int snd_soc_put_cpcap_switch(struct snd_kcontrol *kcontrol,
 	cpcap = state->cpcap;
 	cache = codec->reg_cache;
 
-	CPCAP_AUDIO_DEBUG_LOG("%s: kcontrol named %s\n", __func__, name);
+	printk("%s: kcontrol named %s\n", __func__, name);
 
 	val = (ucontrol->value.integer.value[0] << shift);
 
@@ -1094,7 +1094,7 @@ static int snd_soc_put_cpcap_mixer(struct snd_kcontrol *kcontrol,
 	}
 	cache = codec->reg_cache;
 
-	CPCAP_AUDIO_DEBUG_LOG("%s: kcontrol named %s\n", __func__, name);
+	printk("%s: kcontrol named %s\n", __func__, name);
 
 	val = (ucontrol->value.integer.value[0] << shift);
 	if (strcmp(name, "CPCAP Mixer Voice Codec") == 0) {
@@ -1328,10 +1328,12 @@ static int snd_soc_put_cpcap_dai_mode(struct snd_kcontrol *kcontrol,
 	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
 	unsigned short *cache = codec->reg_cache;
 
-	CPCAP_AUDIO_DEBUG_LOG("%s: %s - %d\n",
+	printk("%s: %s - %d\n",
 			      __func__, kcontrol->id.name, value);
 
 	switch (value) {
+	case 0: /* Audio mode, just stub to prevent error in logcat. */
+		break;
 	case 1: /* cpcap_codec_op_modes_texts[1]: Voice Call Handset*/
 		cpcap_audio_reg_write(codec,
 			CPCAP_AUDIO_REG_INDEX(CPCAP_REG_CC),
@@ -1553,7 +1555,7 @@ static int cpcap_mm_hw_params(struct snd_pcm_substream *substream,
 	unsigned short *cache;
 	struct snd_soc_codec *codec = dai->codec;
 
-	CPCAP_AUDIO_DEBUG_LOG("%s entered\n", __func__);
+	printk("%s entered\n", __func__);
 
 	cache = (unsigned short *)codec->reg_cache;
 	reg = CPCAP_AUDIO_REG_INDEX(CPCAP_REG_SDAC);
@@ -1561,6 +1563,9 @@ static int cpcap_mm_hw_params(struct snd_pcm_substream *substream,
 		~(CPCAP_BIT_ST_SR3 | CPCAP_BIT_ST_SR2 |
 		  CPCAP_BIT_ST_SR1 | CPCAP_BIT_ST_SR0);
 	rate = params_rate(params);
+
+	printk("%s: set rate: %d \n", __func__, rate);
+
 	switch (rate) {
 	case 48000:
 		value |= CPCAP_BIT_ST_SR3;
@@ -1634,7 +1639,7 @@ static int cpcap_mm_set_dai_sysclk(struct snd_soc_dai *codec_dai,
 	unsigned short *cache;
 	struct snd_soc_codec *codec = codec_dai->codec;
 
-	CPCAP_AUDIO_DEBUG_LOG("%s(%d, %u, %d) entered\n",
+	printk("%s(%d, freq: %u, %d) entered\n",
 			      __func__, clk_id, freq, dir);
 
 	cache = (unsigned short *)codec->reg_cache;
@@ -1660,6 +1665,7 @@ static int cpcap_mm_set_dai_sysclk(struct snd_soc_dai *codec_dai,
 	value = cache[reg] & ~(CPCAP_BIT_ST_DAC_CLK2 |
 			       CPCAP_BIT_ST_DAC_CLK1 |
 			       CPCAP_BIT_ST_DAC_CLK0);
+
 	switch (freq) {
 	case 15360000:
 		value |= CPCAP_BIT_ST_DAC_CLK0;
@@ -1699,7 +1705,7 @@ static int cpcap_mm_set_dai_fmt(struct snd_soc_dai *codec_dai,
 	unsigned short *cache;
 	struct snd_soc_codec *codec = codec_dai->codec;
 
-	CPCAP_AUDIO_DEBUG_LOG("%s(%u) entered\n", __func__, fmt);
+	printk("%s(%u) entered\n", __func__, fmt);
 
 	/*
 	 * cpcap_dai[0] for "HiFi Playback" is always configured as
@@ -1790,7 +1796,7 @@ static int cpcap_voice_startup(struct snd_pcm_substream *substream,
 	struct snd_soc_codec *codec = dai->codec;
 	struct cpcap_audio_state *state = snd_soc_codec_get_drvdata(codec);
 
-	CPCAP_AUDIO_DEBUG_LOG("%s: Entered, %d codec streams\n",
+	printk("%s: Entered, %d codec streams\n",
 			      __func__, state->codec_strm_cnt);
 
 	if (state->codec_strm_cnt == 0 &&
@@ -1811,7 +1817,7 @@ static void cpcap_voice_shutdown(struct snd_pcm_substream *substream,
 	struct cpcap_audio_state *state = snd_soc_codec_get_drvdata(codec);
 	unsigned short *cache = (unsigned short *)codec->reg_cache;
 
-	CPCAP_AUDIO_DEBUG_LOG("%s: Entered, %d codec streams\n",
+	printk("%s: Entered, %d codec streams\n",
 			      __func__, state->codec_strm_cnt);
 
 	if (state->codec_strm_cnt <= 0) {
@@ -1860,7 +1866,7 @@ static int cpcap_voice_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_codec *codec = dai->codec;
 	struct cpcap_audio_state *state = snd_soc_codec_get_drvdata(codec);
 
-	CPCAP_AUDIO_DEBUG_LOG("%s entered, %d codec streams\n",
+	printk("%s entered, %d codec streams\n",
 			      __func__, state->codec_strm_cnt);
 
 	cache = (unsigned short *)codec->reg_cache;
@@ -1872,6 +1878,7 @@ static int cpcap_voice_hw_params(struct snd_pcm_substream *substream,
 		~(CPCAP_BIT_CDC_SR3 | CPCAP_BIT_CDC_SR2 |
 		  CPCAP_BIT_CDC_SR1 | CPCAP_BIT_CDC_SR0);
 	rate = params_rate(params);
+	printk("%s: set rate: %d \n", __func__, rate);
 	switch (rate) {
 	case 48000:
 		value |= CPCAP_BIT_CDC_SR3;
@@ -1979,7 +1986,7 @@ static int cpcap_voice_set_dai_sysclk(struct snd_soc_dai *codec_dai,
 	struct snd_soc_codec *codec = codec_dai->codec;
 	struct cpcap_audio_state *state = snd_soc_codec_get_drvdata(codec);
 
-	CPCAP_AUDIO_DEBUG_LOG("%s(%d, %u, %d) entered, %d codec streams\n",
+	printk("%s(%d, %u, %d) entered, %d codec streams\n",
 			      __func__, clk_id, freq, dir,
 			      state->codec_strm_cnt);
 
@@ -2050,7 +2057,7 @@ static int cpcap_voice_set_dai_fmt(struct snd_soc_dai *codec_dai,
 	struct snd_soc_codec *codec = codec_dai->codec;
 	struct cpcap_audio_state *state = snd_soc_codec_get_drvdata(codec);
 
-	CPCAP_AUDIO_DEBUG_LOG("%s(%u) entered, %d codec streams\n",
+	printk("%s(%u) entered, %d codec streams\n",
 			      __func__, fmt, state->codec_strm_cnt);
 
 	if (state->codec_strm_cnt > 1) /* stay with current settings */
@@ -2123,7 +2130,7 @@ static int cpcap_voice_mute(struct snd_soc_dai *dai, int mute)
 	unsigned short *cache;
 	struct snd_soc_codec *codec = dai->codec;
 
-	CPCAP_AUDIO_DEBUG_LOG("%s(%d) entered\n", __func__, mute);
+	printk("%s(%d) entered\n", __func__, mute);
 
 	cache = (unsigned short *)codec->reg_cache;
 	reg = CPCAP_AUDIO_REG_INDEX(CPCAP_REG_RXCOA);
@@ -2144,38 +2151,46 @@ static int cpcap_incall_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_codec *codec = dai->codec;
 	struct cpcap_audio_state *state = snd_soc_codec_get_drvdata(codec);
 
-	CPCAP_AUDIO_DEBUG_LOG("%s entered, %d codec streams\n",
+	printk("%s entered, %d codec streams\n",
 			      __func__, state->codec_strm_cnt);
 
 	cache = (unsigned short *)codec->reg_cache;
 	if (state->codec_strm_cnt == 1) {
+		printk("%s, state->codec_strm_cnt == 1\n",__func__);
 		struct platform_device *pdev = container_of(codec->dev,
 				struct platform_device, dev);
 		struct cpcap_audio_pdata *pdata = pdev->dev.platform_data;
 		int rate = params_rate(params);
-
 		if (pdata->voice_type == VOICE_TYPE_STE) {
 			/* STE_M570 */
 			ret = cpcap_audio_reg_write(codec, 2, 0xAE06);
-			if (rate == 16000)
+			printk("Start Configure STE codec: rate = %d\n", rate);
+			if (rate == 16000) {
 				ret |= cpcap_audio_reg_write(codec, 1, 0x8720);
-			else
+			} else {
 				ret |= cpcap_audio_reg_write(codec, 1, 0x8120);
+			}
+			printk("End Configure STE codec\n");
 		} else if (pdata->voice_type == VOICE_TYPE_QC) {
 			/* MDM6600 */
+			printk("Start Configure QC codec: rate = %d\n", rate);
 			ret = cpcap_audio_reg_write(codec, 2, 0xAE02);
 			if (rate == 16000) {
 				ret |= cpcap_audio_reg_write(codec, 1, 0x6720);
 			} else {
 				ret |= cpcap_audio_reg_write(codec, 1, 0x6120);
 			}
+			printk("End Configure QC codec\n");
 		} else {
 			ret = -EIO;
 			printk(KERN_ERR "%s: voice_type = %u, not valid modem",
 				__func__, pdata->voice_type);
 		}
-		if (ret)
+		if (ret) {
+			printk("%s: ret\n",__func__);
 			return ret;
+		}
+			printk("%s: No ret\n",__func__);
 		/* Wait for clock tree reset to complete */
 		mdelay(CLOCK_TREE_RESET_TIME);
 		value = cpcap_audio_reg_read(codec, 1);
@@ -2186,7 +2201,11 @@ static int cpcap_incall_hw_params(struct snd_pcm_substream *substream,
 				"self-cleared\n", __func__, value);
 		}
 	}
+
+	printk("%s: 12345\n",__func__);
+
 	if (substream->stream) { /* up link */
+	printk("%s: up link\n",__func__);
 		ret = cpcap_audio_reg_write(codec, 1,
 			cache[1] | CPCAP_BIT_AUDIHPF_1 |
 				   CPCAP_BIT_AUDIHPF_0);
@@ -2196,13 +2215,14 @@ static int cpcap_incall_hw_params(struct snd_pcm_substream *substream,
 		if (ret)
 			return ret;
 	} else { /* down link */
+	printk("%s: down link\n",__func__);
 		ret = cpcap_audio_reg_write(codec, 1,
 			cache[1] | CPCAP_BIT_AUDOHPF_1 |
 				   CPCAP_BIT_AUDOHPF_0);
 		if (ret)
 			return ret;
 	}
-
+	printk("%s: return 0\n",__func__);
 	return 0;
 }
 
