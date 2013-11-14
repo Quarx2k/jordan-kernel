@@ -399,10 +399,9 @@ static int isl29030_report_prox(struct isl29030_data *isl, int force_report)
 	if (force_report || (isl->prox_near != isl->last_prox_near)) {
 		isl->last_prox_near = isl->prox_near;
 		input_report_abs(isl->dev, ABS_DISTANCE,
-			isl->prox_near ? PROXIMITY_NEAR : PROXIMITY_FAR);
+			(isl->prox_near ? PROXIMITY_NEAR : PROXIMITY_FAR));
 		input_sync(isl->dev);
 	}
-
 	return !isl->prox_near;
 }
 
@@ -584,6 +583,7 @@ static int isl29030_enable_prox(struct isl29030_data *isl)
 		}
 
 		isl29030_report_prox(isl, 1);
+		
 	}
 
 	isl->prox_enabled = 1;
