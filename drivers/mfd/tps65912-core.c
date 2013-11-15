@@ -156,9 +156,17 @@ int tps65912_device_init(struct tps65912 *tps65912)
 	if (ret < 0)
 		goto err;
 
+#ifdef CONFIG_MFD_TPS65912_DEBUGFS
+	ret = tps65912_debugfs_create(tps65912);
+	if (ret < 0)
+		goto err_debugfs;
+#endif
+
 	kfree(init_data);
 	return ret;
 
+err_debugfs:
+	tps65912_irq_exit(tps65912);
 err:
 	kfree(init_data);
 	mfd_remove_devices(tps65912->dev);
@@ -168,6 +176,9 @@ err:
 
 void tps65912_device_exit(struct tps65912 *tps65912)
 {
+#ifdef CONFIG_MFD_TPS65912_DEBUGFS
+	tps65912_debugfs_remove(tps65912);
+#endif
 	mfd_remove_devices(tps65912->dev);
 	tps65912_irq_exit(tps65912);
 	kfree(tps65912);

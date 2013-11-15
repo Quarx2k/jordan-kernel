@@ -237,7 +237,7 @@ static int __of_device_is_compatible(const struct device_node *device,
 				     const char *compat)
 {
 	const char* cp;
-	int cplen, l;
+	int cplen = 0, l;
 
 	cp = __of_get_property(device, "compatible", &cplen);
 	if (cp == NULL)
@@ -301,7 +301,7 @@ EXPORT_SYMBOL(of_machine_is_compatible);
 static int __of_device_is_available(const struct device_node *device)
 {
 	const char *status;
-	int statlen;
+	int statlen = 0;
 
 	status = __of_get_property(device, "status", &statlen);
 	if (status == NULL)

@@ -2326,8 +2326,6 @@ static int omapfb_init_display(struct omapfb2_device *fbdev,
 	d->fbdev = fbdev;
 
 	if (dssdev->caps & OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE) {
-		u16 w, h;
-
 		if (auto_update) {
 			omapfb_start_auto_update(fbdev, dssdev);
 			d->update_mode = OMAPFB_AUTO_UPDATE;
@@ -2341,14 +2339,6 @@ static int omapfb_init_display(struct omapfb2_device *fbdev,
 				dev_err(fbdev->dev, "Failed to set TE\n");
 				return r;
 			}
-		}
-
-		dssdrv->get_resolution(dssdev, &w, &h);
-		r = dssdrv->update(dssdev, 0, 0, w, h);
-		if (r) {
-			dev_err(fbdev->dev,
-					"Failed to update display\n");
-			return r;
 		}
 	} else {
 		d->update_mode = OMAPFB_AUTO_UPDATE;

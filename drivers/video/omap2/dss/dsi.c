@@ -4272,10 +4272,6 @@ static void dsi_update_screen_dispc(struct platform_device *dsidev)
 
 	dsi_perf_mark_start(dsidev);
 
-	r = schedule_delayed_work(&dsi->framedone_timeout_work,
-		msecs_to_jiffies(250));
-	BUG_ON(r == 0);
-
 	dss_mgr_set_timings(mgr, &dsi->timings);
 
 	dss_mgr_start_update(mgr);
@@ -4291,6 +4287,11 @@ static void dsi_update_screen_dispc(struct platform_device *dsidev)
 		mod_timer(&dsi->te_timer, jiffies + msecs_to_jiffies(250));
 #endif
 	}
+	/* Start timer at bottom to avoid dispc update start delayed sometimes
+	 */
+	r = schedule_delayed_work(&dsi->framedone_timeout_work,
+		msecs_to_jiffies(250));
+	BUG_ON(r == 0);
 }
 
 #ifdef DSI_CATCH_MISSING_TE
@@ -4592,6 +4593,9 @@ int omapdss_dsi_display_enable(struct omap_dss_device *dssdev)
 		goto err_get_dsi;
 
 	dsi_enable_pll_clock(dsidev, 1);
+
+	dsi_vc_enable(dsidev, 0, 0);
+	dsi_vc_enable(dsidev, 1, 0);
 
 	_dsi_initialize_irq(dsidev);
 
@@ -5521,13 +5525,6 @@ static int omap_dsihw_probe(struct platform_device *dsidev)
 		return -ENODEV;
 	}
 
-	r = devm_request_irq(&dsidev->dev, dsi->irq, omap_dsi_irq_handler,
-			     IRQF_SHARED, dev_name(&dsidev->dev), dsi->pdev);
-	if (r < 0) {
-		DSSERR("request_irq failed\n");
-		return r;
-	}
-
 	/* DSI VCs initialization */
 	for (i = 0; i < ARRAY_SIZE(dsi->vc); i++) {
 		dsi->vc[i].source = DSI_VC_SOURCE_L4;
@@ -5546,6 +5543,13 @@ static int omap_dsihw_probe(struct platform_device *dsidev)
 	r = dsi_runtime_get(dsidev);
 	if (r)
 		goto err_runtime_get;
+
+	r = devm_request_irq(&dsidev->dev, dsi->irq, omap_dsi_irq_handler,
+			     IRQF_SHARED, dev_name(&dsidev->dev), dsi->pdev);
+	if (r < 0) {
+		DSSERR("request_irq failed\n");
+		goto err_runtime_get;
+	}
 
 	rev = dsi_read_reg(dsidev, DSI_REVISION);
 	dev_dbg(&dsidev->dev, "OMAP DSI rev %d.%d\n",

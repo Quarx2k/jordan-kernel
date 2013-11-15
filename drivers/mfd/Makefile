@@ -64,6 +64,7 @@ tps65912-objs                   := tps65912-core.o tps65912-irq.o
 obj-$(CONFIG_MFD_TPS65912)	+= tps65912.o
 obj-$(CONFIG_MFD_TPS65912_I2C)	+= tps65912-i2c.o
 obj-$(CONFIG_MFD_TPS65912_SPI)  += tps65912-spi.o
+obj-$(CONFIG_MFD_TPS65912_DEBUGFS)	+= tps65912-debugfs.o
 obj-$(CONFIG_MFD_TPS80031)	+= tps80031.o
 obj-$(CONFIG_MENELAUS)		+= menelaus.o
 
@@ -155,3 +156,21 @@ obj-$(CONFIG_MFD_LM3533)	+= lm3533-core.o lm3533-ctrlbank.o
 obj-$(CONFIG_VEXPRESS_CONFIG)	+= vexpress-config.o vexpress-sysreg.o
 obj-$(CONFIG_MFD_RETU)		+= retu-mfd.o
 obj-$(CONFIG_MFD_AS3711)	+= as3711.o
+
+cpcap-objs                      := cpcap-core.o \
+                                   cpcap-irq.o \
+                                   cpcap-regacc.o \
+                                   cpcap-usb-det.o \
+                                   cpcap-key.o \
+                                   cpcap-adc.o \
+                                   cpcap-uc.o
+obj-$(CONFIG_MFD_CPCAP)          += cpcap.o
+
+m4sensorhub-objs                := m4sensorhub-core.o \
+                                   m4sensorhub-reg.o \
+                                   m4sensorhub-irq.o \
+                                   m4sensorhub-panic.o \
+                                   m4sensorhub-stm32-fw.o
+
+obj-$(CONFIG_MFD_M4SENSORHUB)   += m4sensorhub.o
+

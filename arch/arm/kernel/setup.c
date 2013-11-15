@@ -788,6 +788,17 @@ void __init setup_arch(char **cmdline_p)
 	arm_memblock_init(&meminfo, mdesc);
 
 	paging_init(mdesc);
+
+#ifdef CONFIG_MACH_MINNOW
+	if (flat_dev_tree_address) {
+		struct boot_param_header *dt =
+			phys_to_virt(flat_dev_tree_address);
+		if (be32_to_cpu(dt->magic) == OF_DT_HEADER) {
+			pr_info("Use ATAG dev_tree from this point.\n");
+			initial_boot_params = dt;
+		}
+	}
+#endif
 	request_standard_resources(mdesc);
 
 	if (mdesc->restart)

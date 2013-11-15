@@ -249,3 +249,29 @@ void __init omap_4430sdp_display_init_of(void)
 
 	omap_display_init(&sdp4430_dss_data);
 }
+
+static struct omap_dss_device minnow_panel_lcd_device = {
+	.name = "lcd",
+	.driver_name = "minnow-panel",
+	.type = OMAP_DISPLAY_TYPE_DSI,
+	.data = NULL,
+	.phy.dsi		= {
+		.module		= 0,
+	},
+	.channel		= OMAP_DSS_CHANNEL_LCD,
+};
+
+static struct omap_dss_device *minnow_panel_dss_devices[] = {
+	&minnow_panel_lcd_device,
+};
+
+static struct omap_dss_board_info minnow_panel_dss_data = {
+	.num_devices		= ARRAY_SIZE(minnow_panel_dss_devices),
+	.devices		= minnow_panel_dss_devices,
+	.default_device		= &minnow_panel_lcd_device,
+};
+
+void __init omap_minnow_display_init(void)
+{
+	omap_display_init(&minnow_panel_dss_data);
+}

@@ -604,7 +604,7 @@ static int pinconf_dbg_config_print(struct seq_file *s, void *d)
 	const struct pinctrl_map *map;
 	struct pinctrl_dev *pctldev = NULL;
 	const struct pinconf_ops *confops = NULL;
-	const struct pinctrl_map_configs *configs;
+	const struct pinctrl_map_configs *configs = NULL;
 	struct dbg_cfg *dbg = &pinconf_dbg_conf;
 	int i, j;
 	bool found = false;
@@ -682,7 +682,7 @@ static int pinconf_dbg_config_write(struct file *file,
 	struct pinctrl_dev *pctldev = NULL;
 	const struct pinconf_ops *confops = NULL;
 	struct dbg_cfg *dbg = &pinconf_dbg_conf;
-	const struct pinctrl_map_configs *configs;
+	const struct pinctrl_map_configs *configs = NULL;
 	char config[MAX_NAME_LEN+1];
 	bool found = false;
 	char buf[128];

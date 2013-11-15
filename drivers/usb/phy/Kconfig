@@ -217,5 +217,9 @@ config USB_ULPI_VIEWPORT
 	help
 	  Provides read/write operations to the ULPI phy register set for
 	  controllers with a viewport register (e.g. Chipidea/ARC controllers).
-
+config CPCAP_USB
+	bool "CPCAP USB Transceiver Driver"
+	help
+	  Enable this to support the USB OTG transceiver on the
+	  Motorola CPCAP PMIC
 endif # USB_PHY

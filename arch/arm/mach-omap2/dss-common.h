@@ -11,4 +11,6 @@ void __init omap4_panda_display_init_of(void);
 void __init omap_4430sdp_display_init(void);
 void __init omap_4430sdp_display_init_of(void);
 
+void __init omap_minnow_display_init(void);
+
 #endif

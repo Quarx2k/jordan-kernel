@@ -303,6 +303,18 @@ static int omapfb_update_window(struct fb_info *fbi,
 	return display->driver->update(display, x, y, w, h);
 }
 
+static int omapfb_update_display(struct fb_info *fbi)
+{
+	struct omap_dss_device *display = fb2display(fbi);
+	u16 dw, dh;
+
+	if (!display)
+		return 0;
+
+	display->driver->get_resolution(display, &dw, &dh);
+	return display->driver->update(display, 0, 0, dw, dh);
+}
+
 int omapfb_set_update_mode(struct fb_info *fbi,
 				   enum omapfb_update_mode mode)
 {
@@ -604,6 +616,10 @@ int omapfb_ioctl(struct fb_info *fbi, unsigned int cmd, unsigned long arg)
 	int r = 0;
 
 	switch (cmd) {
+	case FBIO_UPDATE_DISPLAY:
+		DBG("ioctl FBIO_UPDATE_DISPLAY\n");
+		r = omapfb_update_display(fbi);
+		break;
 	case OMAPFB_SYNC_GFX:
 		DBG("ioctl SYNC_GFX\n");
 		if (!display || !display->driver->sync) {

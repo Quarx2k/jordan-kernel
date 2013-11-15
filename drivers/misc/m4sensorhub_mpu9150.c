@@ -1,0 +1,1243 @@
+/*
+ *  Copyright (C) 2012 Motorola, Inc.
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ *  Adds ability to program periodic interrupts from user space that
+ *  can wake the phone out of low power modes.
+ *
+ */
+
+#include <linux/module.h>
+#include <linux/types.h>
+#include <linux/kernel.h>
+#include <linux/miscdevice.h>
+#include <linux/platform_device.h>
+#include <linux/proc_fs.h>
+#include <linux/input.h>
+#include <linux/m4sensorhub.h>
+#include <linux/m4sensorhub_client_ioctl.h>
+#include <linux/m4sensorhub/MemMapGyroSensor.h>
+#include <linux/m4sensorhub/MemMapAccelSensor.h>
+#include <linux/m4sensorhub/MemMapCompassSensor.h>
+#include <linux/m4sensorhub/MemMapFusionSensor.h>
+#include <linux/uaccess.h>
+#include <linux/slab.h>
+
+#ifdef CONFIG_DEBUG_FS
+#define MPU9150_DEBUG 1
+#else
+#define MPU9150_DEBUG 0
+#endif
+
+#define MPU9150_CLIENT_DRIVER_NAME	"m4sensorhub_mpu9150"
+#define SENSOR_IRQ_ENABLE 1
+#define SENSOR_IRQ_DISABLE 0
+
+struct mpu9150_accel_data {
+	int x;
+	int y;
+	int z;
+};
+struct mpu9150_gyro_data {
+	int rx;
+	int ry;
+	int rz;
+};
+struct mpu9150_compass_data {
+	int cx;
+	int cy;
+	int cz;
+	int ca;
+};
+struct mpu9150_accel_local_data {
+	int lx;
+	int ly;
+	int lz;
+};
+struct mpu9150_accel_world_data {
+	int wx;
+	int wy;
+	int wz;
+};
+struct mpu9150_euler_data {
+	int roll;
+	int pitch;
+	int yaw;
+};
+struct mpu9150_heading_data {
+	int heading;
+	int accuracy;
+};
+enum mpu9150_sensor {
+	TYPE_GYRO,
+	TYPE_COMPASS,
+	TYPE_ACCEL,
+	TYPE_FUSION,
+
+	NUM_TYPES,    /* Leave as last element */
+} sensor;
+
+struct mpu9150_client {
+	struct m4sensorhub_data *m4sensorhub;
+	struct input_dev *input_dev;
+	signed short samplerate[NUM_TYPES];
+	struct mpu9150_accel_data accel_data;
+	struct mpu9150_gyro_data gyro_data;
+	struct mpu9150_compass_data compass_data;
+	struct mpu9150_accel_local_data accel_local_data;
+	struct mpu9150_accel_world_data accel_world_data;
+	struct mpu9150_euler_data euler_data;
+	struct mpu9150_heading_data heading_data;
+};
+
+struct mpu9150_client *misc_mpu9150_data;
+static int mpu9150_irq_enable_disable(struct mpu9150_client *mpu9150_client_data,
+					enum mpu9150_sensor type, int flag);
+
+static int mpu9150_client_open(struct inode *inode, struct file *file)
+{
+	int err = 0;
+
+	err = nonseekable_open(inode, file);
+	if (err < 0) {
+		KDEBUG(M4SH_ERROR, "%s failed\n", __func__);
+		return err;
+	}
+	file->private_data = misc_mpu9150_data;
+
+	return 0;
+}
+
+static int mpu9150_client_close(struct inode *inode, struct file *file)
+{
+	KDEBUG(M4SH_DEBUG, "mpu9150_client in %s\n", __func__);
+	return 0;
+}
+
+static void m4_report_mpu9150_inputevent(
+		struct mpu9150_client *mpu9150_client_data,
+		enum mpu9150_sensor type)
+{
+	switch (type) {
+	case TYPE_GYRO:
+		input_report_rel(mpu9150_client_data->input_dev, REL_RX,
+			mpu9150_client_data->gyro_data.rx);
+		input_report_rel(mpu9150_client_data->input_dev, REL_RY,
+			mpu9150_client_data->gyro_data.ry);
+		input_report_rel(mpu9150_client_data->input_dev, REL_RZ,
+			mpu9150_client_data->gyro_data.rz);
+		input_sync(mpu9150_client_data->input_dev);
+		break;
+	case TYPE_ACCEL:
+		input_report_abs(mpu9150_client_data->input_dev, ABS_X,
+			mpu9150_client_data->accel_data.x);
+		input_report_abs(mpu9150_client_data->input_dev, ABS_Y,
+			mpu9150_client_data->accel_data.y);
+		input_report_abs(mpu9150_client_data->input_dev, ABS_Z,
+			mpu9150_client_data->accel_data.z);
+		input_sync(mpu9150_client_data->input_dev);
+		break;
+	case TYPE_COMPASS:
+		input_report_abs(mpu9150_client_data->input_dev, ABS_COMPASS_X,
+			 mpu9150_client_data->compass_data.cx);
+		input_report_abs(mpu9150_client_data->input_dev, ABS_COMPASS_Y,
+			mpu9150_client_data->compass_data.cy);
+		input_report_abs(mpu9150_client_data->input_dev, ABS_COMPASS_Z,
+			mpu9150_client_data->compass_data.cz);
+		input_report_abs(mpu9150_client_data->input_dev,
+			ABS_COMPASS_ACCURACY,
+			mpu9150_client_data->compass_data.ca);
+		input_sync(mpu9150_client_data->input_dev);
+		break;
+	case TYPE_FUSION:
+		input_report_rel(mpu9150_client_data->input_dev, REL_X,
+			mpu9150_client_data->accel_data.x);
+		input_report_rel(mpu9150_client_data->input_dev, REL_Y,
+			mpu9150_client_data->accel_data.y);
+		input_report_rel(mpu9150_client_data->input_dev, REL_Z,
+			mpu9150_client_data->accel_data.z);
+		input_report_rel(mpu9150_client_data->input_dev, REL_GX,
+			 mpu9150_client_data->gyro_data.rx);
+		input_report_rel(mpu9150_client_data->input_dev, REL_GY,
+			mpu9150_client_data->gyro_data.ry);
+		input_report_rel(mpu9150_client_data->input_dev, REL_GZ,
+			mpu9150_client_data->gyro_data.rz);
+		input_report_rel(mpu9150_client_data->input_dev, REL_LX,
+			 mpu9150_client_data->accel_local_data.lx);
+		input_report_rel(mpu9150_client_data->input_dev, REL_LY,
+			mpu9150_client_data->accel_local_data.ly);
+		input_report_rel(mpu9150_client_data->input_dev, REL_LZ,
+			mpu9150_client_data->accel_local_data.lz);
+		input_report_rel(mpu9150_client_data->input_dev, REL_WX,
+			mpu9150_client_data->accel_world_data.wx);
+		input_report_rel(mpu9150_client_data->input_dev, REL_WY,
+			mpu9150_client_data->accel_world_data.wy);
+		input_report_rel(mpu9150_client_data->input_dev, REL_WZ,
+			mpu9150_client_data->accel_world_data.wz);
+		input_report_rel(mpu9150_client_data->input_dev, REL_ROLL,
+			mpu9150_client_data->euler_data.roll);
+		input_report_rel(mpu9150_client_data->input_dev, REL_PITCH,
+			mpu9150_client_data->euler_data.pitch);
+		input_report_rel(mpu9150_client_data->input_dev, REL_YAW,
+			mpu9150_client_data->euler_data.yaw);
+		input_report_rel(mpu9150_client_data->input_dev, REL_HEADING,
+			mpu9150_client_data->heading_data.heading);
+		input_report_rel(mpu9150_client_data->input_dev,
+			REL_HEADING_ACCURACY,
+			mpu9150_client_data->heading_data.accuracy);
+		input_sync(mpu9150_client_data->input_dev);
+		break;
+	default:
+		break;
+	}
+}
+
+/* TO DO
+***** implement the delay functionality when M4 changes will be ready
+*/
+static void m4_set_mpu9150_delay(struct mpu9150_client *mpu9150_client_data,
+			int delay, enum mpu9150_sensor type)
+{
+	if (delay != mpu9150_client_data->samplerate[type]) {
+		switch (type) {
+		case TYPE_GYRO:
+			m4sensorhub_reg_write(mpu9150_client_data->m4sensorhub,
+				M4SH_REG_GYRO_SAMPLERATE, (char *)&delay, m4sh_no_mask);
+			break;
+		case TYPE_ACCEL:
+			m4sensorhub_reg_write(mpu9150_client_data->m4sensorhub,
+				M4SH_REG_ACCEL_SAMPLERATE, (char *)&delay, m4sh_no_mask);
+			break;
+		case TYPE_COMPASS:
+			m4sensorhub_reg_write(mpu9150_client_data->m4sensorhub,
+				M4SH_REG_COMPASS_SAMPLERATE, (char *)&delay, m4sh_no_mask);
+			break;
+		case TYPE_FUSION:
+			m4sensorhub_reg_write(mpu9150_client_data->m4sensorhub,
+				M4SH_REG_FUSION_SAMPLERATE, (char *)&delay, m4sh_no_mask);
+			break;
+		default:
+			return;
+			break;
+		}
+		KDEBUG(M4SH_DEBUG, "%s() updating samplerate for type %d from"
+				   " %d to %d\n", __func__, type,
+				   mpu9150_client_data->samplerate[type],
+				   delay);
+
+		mpu9150_client_data->samplerate[type] = delay;
+	}
+}
+
+static void m4_read_mpu9150_data(struct mpu9150_client *mpu9150_client_data,
+			enum mpu9150_sensor type)
+{
+	sFusionData fusiondata;
+	sCompassData compassdata;
+	sAccelData acceldata;
+	sGyroData gyrodata;
+
+	switch (type) {
+	case TYPE_GYRO:
+		m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
+			M4SH_REG_GYRO_X, (char *)&gyrodata.x);
+		m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
+			M4SH_REG_GYRO_Y, (char *)&gyrodata.y);
+		m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
+			M4SH_REG_GYRO_Z, (char *)&gyrodata.z);
+		mpu9150_client_data->gyro_data.rx = gyrodata.x;
+		mpu9150_client_data->gyro_data.ry = gyrodata.y;
+		mpu9150_client_data->gyro_data.rz = gyrodata.z;
+		break;
+	case TYPE_ACCEL:
+		m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
+			M4SH_REG_ACCEL_X, (char *)&acceldata.x);
+		m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
+			M4SH_REG_ACCEL_Y, (char *)&acceldata.y);
+		m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
+			M4SH_REG_ACCEL_Z, (char *)&acceldata.z);
+		mpu9150_client_data->accel_data.x = acceldata.x;
+		mpu9150_client_data->accel_data.y = acceldata.y;
+		mpu9150_client_data->accel_data.z = acceldata.z;
+		break;
+	case TYPE_COMPASS:
+		m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
+			M4SH_REG_COMPASS_X, (char *)&compassdata.x);
+		m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
+			M4SH_REG_COMPASS_Y, (char *)&compassdata.y);
+		m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
+			M4SH_REG_COMPASS_Z, (char *)&compassdata.z);
+		m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
+			M4SH_REG_COMPASS_ACCURACY,
+			(char *)&compassdata.accuracy);
+
+		mpu9150_client_data->compass_data.cx =  compassdata.x;
+		mpu9150_client_data->compass_data.cy =  compassdata.y;
+		mpu9150_client_data->compass_data.cz =  compassdata.z;
+		mpu9150_client_data->compass_data.ca =  compassdata.accuracy;
+
+		break;
+	case TYPE_FUSION:
+		m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
+			M4SH_REG_ACCEL_X, (char *)&acceldata.x);
+		m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
+			M4SH_REG_ACCEL_Y, (char *)&acceldata.y);
+		m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
+			M4SH_REG_ACCEL_Z, (char *)&acceldata.z);
+		mpu9150_client_data->accel_data.x = acceldata.x;
+		mpu9150_client_data->accel_data.y = acceldata.y;
+		mpu9150_client_data->accel_data.z = acceldata.z;
+
+		m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
+			M4SH_REG_GYRO_X, (char *)&gyrodata.x);
+		m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
+			M4SH_REG_GYRO_Y, (char *)&gyrodata.y);
+		m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
+			M4SH_REG_GYRO_Z, (char *)&gyrodata.z);
+		mpu9150_client_data->gyro_data.rx = gyrodata.x;
+		mpu9150_client_data->gyro_data.ry = gyrodata.y;
+		mpu9150_client_data->gyro_data.rz = gyrodata.z;
+
+		m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
+			M4SH_REG_FUSION_LOCALX, (char *)&fusiondata.localX);
+		m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
+			M4SH_REG_FUSION_LOCALY, (char *)&fusiondata.localY);
+		m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
+			M4SH_REG_FUSION_LOCALZ, (char *)&fusiondata.localZ);
+		mpu9150_client_data->accel_local_data.lx = fusiondata.localX;
+		mpu9150_client_data->accel_local_data.ly = fusiondata.localY;
+		mpu9150_client_data->accel_local_data.lz = fusiondata.localZ;
+
+		m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
+			M4SH_REG_FUSION_WORLDX, (char *)&fusiondata.worldX);
+		m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
+			M4SH_REG_FUSION_WORLDY, (char *)&fusiondata.worldY);
+		m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
+			M4SH_REG_FUSION_WORLDZ, (char *)&fusiondata.worldZ);
+		mpu9150_client_data->accel_world_data.wx = fusiondata.worldX;
+		mpu9150_client_data->accel_world_data.wy = fusiondata.worldY;
+		mpu9150_client_data->accel_world_data.wz = fusiondata.worldZ;
+
+		m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
+			M4SH_REG_FUSION_EULERPITCH,
+			(char *)&fusiondata.eulerPitch);
+		m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
+			M4SH_REG_FUSION_EULERROLL,
+			(char *)&fusiondata.eulerRoll);
+		m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
+			M4SH_REG_FUSION_EULERYAW,
+			(char *)&fusiondata.eulerYaw);
+		mpu9150_client_data->euler_data.pitch = fusiondata.eulerPitch;
+		mpu9150_client_data->euler_data.roll = fusiondata.eulerRoll;
+		mpu9150_client_data->euler_data.yaw = fusiondata.eulerYaw;
+
+
+		m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
+			M4SH_REG_FUSION_HEADING,
+			(char *)&fusiondata.heading);
+		m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
+			M4SH_REG_FUSION_HEADING_ACCURACY,
+			(char *)&fusiondata.heading_accuracy);
+		mpu9150_client_data->heading_data.heading = fusiondata.heading;
+		mpu9150_client_data->heading_data.accuracy =
+			fusiondata.heading_accuracy;
+
+		break;
+	default:
+		break;
+	}
+
+}
+static void m4_handle_mpu9150_gyro_irq(enum m4sensorhub_irqs int_event,
+					 void *mpu9150_data)
+{
+	struct mpu9150_client *mpu9150_client_data = mpu9150_data;
+
+	m4_read_mpu9150_data(mpu9150_client_data, TYPE_GYRO);
+	m4_report_mpu9150_inputevent(mpu9150_client_data, TYPE_GYRO);
+}
+
+static void m4_handle_mpu9150_accel_irq(enum m4sensorhub_irqs int_event,
+					 void *mpu9150_data)
+{
+	struct mpu9150_client *mpu9150_client_data = mpu9150_data;
+
+	m4_read_mpu9150_data(mpu9150_client_data, TYPE_ACCEL);
+	m4_report_mpu9150_inputevent(mpu9150_client_data, TYPE_ACCEL);
+}
+
+static void m4_handle_mpu9150_compass_irq(enum m4sensorhub_irqs int_event,
+					void *mpu9150_data)
+{
+	struct mpu9150_client *mpu9150_client_data = mpu9150_data;
+
+	m4_read_mpu9150_data(mpu9150_client_data, TYPE_COMPASS);
+	m4_report_mpu9150_inputevent(mpu9150_client_data, TYPE_COMPASS);
+}
+
+static void m4_handle_mpu9150_fusion_irq(enum m4sensorhub_irqs int_event,
+					void *mpu9150_data)
+{
+	struct mpu9150_client *mpu9150_client_data = mpu9150_data;
+
+	m4_read_mpu9150_data(mpu9150_client_data, TYPE_FUSION);
+	m4_report_mpu9150_inputevent(mpu9150_client_data, TYPE_FUSION);
+}
+
+/*
+ * Handle commands from user-space.
+ */
+static long mpu9150_client_ioctl(struct file *filp,
+				 unsigned int cmd, unsigned long arg)
+{
+	int ret = 0;
+	int delay;
+	static int status;
+	void __user *argp = (void __user *)arg;
+	struct mpu9150_client *mpu9150_client_data = filp->private_data;
+
+	switch (cmd) {
+	case M4_SENSOR_IOCTL_APP_GET_FLAG:
+		if (copy_to_user(argp, &status, sizeof(status)))
+			return -EFAULT;
+		break;
+	case M4_SENSOR_IOCTL_APP_SET_FLAG:
+		if (copy_from_user(&status, argp, sizeof(status)))
+			return -EFAULT;
+		break;
+	case M4_SENSOR_IOCTL_GYRO_SET_DELAY:
+		if (copy_from_user(&delay, argp, sizeof(delay)))
+			return -EFAULT;
+		m4_set_mpu9150_delay(mpu9150_client_data, delay, TYPE_GYRO);
+		mpu9150_irq_enable_disable(mpu9150_client_data, TYPE_GYRO,
+						SENSOR_IRQ_ENABLE);
+		break;
+	case M4_SENSOR_IOCTL_COMPASS_SET_DELAY:
+		if (copy_from_user(&delay, argp, sizeof(delay)))
+			return -EFAULT;
+		m4_set_mpu9150_delay(mpu9150_client_data, delay, TYPE_COMPASS);
+		mpu9150_irq_enable_disable(mpu9150_client_data, TYPE_COMPASS,
+						SENSOR_IRQ_ENABLE);
+		break;
+	case M4_SENSOR_IOCTL_ACCEL_SET_DELAY:
+		if (copy_from_user(&delay, argp, sizeof(delay)))
+			return -EFAULT;
+		m4_set_mpu9150_delay(mpu9150_client_data, delay, TYPE_ACCEL);
+		mpu9150_irq_enable_disable(mpu9150_client_data, TYPE_ACCEL,
+						SENSOR_IRQ_ENABLE);
+		break;
+	case M4_SENSOR_IOCTL_FUSION_SET_DELAY:
+		if (copy_from_user(&delay, argp, sizeof(delay)))
+			return -EFAULT;
+		if (delay >=  0)
+			m4_set_mpu9150_delay(mpu9150_client_data, delay, TYPE_FUSION);
+		if (delay)
+			mpu9150_irq_enable_disable(mpu9150_client_data, TYPE_FUSION,
+						SENSOR_IRQ_ENABLE);
+		else
+			mpu9150_irq_enable_disable(mpu9150_client_data, TYPE_FUSION,
+						SENSOR_IRQ_DISABLE);
+		break;
+	default:
+		KDEBUG(M4SH_ERROR, "Invalid IOCTL Command in %s\n", __func__);
+		 ret = -EINVAL;
+	}
+	return ret;
+}
+
+#ifdef MPU9150_DEBUG
+static ssize_t m4_mpu9150_local_x(struct device *dev,
+			      struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
+
+	KDEBUG(M4SH_DEBUG, "%s  : x_local = %d\n",
+			__func__, mpu9150_client_data->accel_local_data.lx);
+	return sprintf(buf, "%d \n", mpu9150_client_data->accel_local_data.lx);
+}
+
+static ssize_t m4_mpu9150_local_y(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
+
+	KDEBUG(M4SH_DEBUG, "%s  : y_local = %d\n",
+			__func__, mpu9150_client_data->accel_local_data.ly);
+	return sprintf(buf, "%d \n", mpu9150_client_data->accel_local_data.ly);
+}
+
+static ssize_t m4_mpu9150_local_z(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
+
+	KDEBUG(M4SH_DEBUG, "%s  : z_local = %d\n",
+			__func__, mpu9150_client_data->accel_local_data.lz);
+	return sprintf(buf, "%d \n", mpu9150_client_data->accel_local_data.lz);
+}
+static ssize_t m4_mpu9150_world_x(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
+
+	KDEBUG(M4SH_DEBUG, "%s  : x_world = %d\n",
+			__func__, mpu9150_client_data->accel_world_data.wx);
+	return sprintf(buf, "%d \n", mpu9150_client_data->accel_world_data.wx);
+}
+
+static ssize_t m4_mpu9150_world_y(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
+
+	KDEBUG(M4SH_DEBUG, "%s  : y_world = %d\n",
+			__func__, mpu9150_client_data->accel_world_data.wy);
+	return sprintf(buf, "%d \n", mpu9150_client_data->accel_world_data.wy);
+}
+
+static ssize_t m4_mpu9150_world_z(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
+
+	KDEBUG(M4SH_DEBUG, "%s  : z_world = %d\n",
+			__func__, mpu9150_client_data->accel_world_data.wz);
+	return sprintf(buf, "%d \n", mpu9150_client_data->accel_world_data.wz);
+}
+static ssize_t m4_mpu9150_pitch(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
+
+	KDEBUG(M4SH_DEBUG, "%s  : pitch = %d\n",
+			__func__, mpu9150_client_data->euler_data.pitch);
+	return sprintf(buf, "%d \n", mpu9150_client_data->euler_data.pitch);
+}
+
+static ssize_t m4_mpu9150_roll(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
+
+	KDEBUG(M4SH_DEBUG, "%s  : roll = %d\n",
+			__func__, mpu9150_client_data->euler_data.roll);
+	return sprintf(buf, "%d \n", mpu9150_client_data->euler_data.roll);
+}
+
+static ssize_t m4_mpu9150_yaw(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
+
+	KDEBUG(M4SH_DEBUG, "%s  : yaw = %d\n",
+			__func__, mpu9150_client_data->euler_data.yaw);
+	return sprintf(buf, "%d \n", mpu9150_client_data->euler_data.yaw);
+}
+
+static ssize_t m4_mpu9150_heading(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
+
+	KDEBUG(M4SH_DEBUG, "%s  : heading = %d\n",
+			__func__, mpu9150_client_data->heading_data.heading);
+	return sprintf(buf, "%d \n", mpu9150_client_data->heading_data.heading);
+}
+
+static ssize_t m4_mpu9150_heading_acc(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
+
+	KDEBUG(M4SH_DEBUG, "%s  : heading_acc = %d\n",
+			__func__, mpu9150_client_data->heading_data.accuracy);
+	return sprintf(buf, "%d\n", mpu9150_client_data->heading_data.accuracy);
+}
+
+static ssize_t m4_mpu9150_x(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
+
+	KDEBUG(M4SH_DEBUG, "%s  : raw x = %d\n",
+			__func__, mpu9150_client_data->accel_data.x);
+	return sprintf(buf, "%d \n", mpu9150_client_data->accel_data.x);
+}
+
+static ssize_t m4_mpu9150_y(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
+
+	KDEBUG(M4SH_DEBUG, "%s  : raw y = %d\n",
+			__func__, mpu9150_client_data->accel_data.y);
+	return sprintf(buf, "%d \n", mpu9150_client_data->accel_data.y);
+}
+
+static ssize_t m4_mpu9150_z(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
+
+	KDEBUG(M4SH_DEBUG, "%s  : raw z = %d\n",
+			__func__, mpu9150_client_data->accel_data.z);
+	return sprintf(buf, "%d \n", mpu9150_client_data->accel_data.z);
+}
+
+static ssize_t m4_mpu9150_cx(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
+
+	KDEBUG(M4SH_DEBUG, "%s  : compass cx = %d\n",
+			__func__, mpu9150_client_data->compass_data.cx);
+	return sprintf(buf, "%d \n", mpu9150_client_data->compass_data.cx);
+}
+
+static ssize_t m4_mpu9150_cy(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
+
+	KDEBUG(M4SH_DEBUG, "%s  : compass cy = %d\n",
+			__func__, mpu9150_client_data->compass_data.cy);
+	return sprintf(buf, "%d \n", mpu9150_client_data->compass_data.cy);
+}
+
+static ssize_t m4_mpu9150_cz(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
+
+	KDEBUG(M4SH_DEBUG, "%s  : compass cz = %d\n",
+			__func__, mpu9150_client_data->compass_data.cz);
+	return sprintf(buf, "%d \n", mpu9150_client_data->compass_data.cz);
+}
+
+static ssize_t m4_mpu9150_ca(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
+
+	KDEBUG(M4SH_DEBUG, "%s  : compass ca = %d\n",
+			__func__, mpu9150_client_data->compass_data.ca);
+	return sprintf(buf, "%d \n", mpu9150_client_data->compass_data.ca);
+}
+
+static ssize_t m4_mpu9150_rx(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
+
+	KDEBUG(M4SH_DEBUG, "%s  : rx = %d\n",
+			__func__, mpu9150_client_data->gyro_data.rx);
+	return sprintf(buf, "%d \n", mpu9150_client_data->gyro_data.rx);
+}
+static ssize_t m4_mpu9150_ry(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
+
+	KDEBUG(M4SH_DEBUG, "%s  : ry = %d\n",
+			__func__, mpu9150_client_data->gyro_data.ry);
+	return sprintf(buf, "%d \n", mpu9150_client_data->gyro_data.ry);
+}
+
+static ssize_t m4_mpu9150_rz(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
+
+	KDEBUG(M4SH_DEBUG, "%s  : rz = %d\n",
+			__func__, mpu9150_client_data->gyro_data.rz);
+	return sprintf(buf, "%d \n", mpu9150_client_data->gyro_data.rz);
+}
+
+static int mpu9150_set_loglevel(struct mpu9150_client *mpu9150_client_data,
+	unsigned long long level, enum mpu9150_sensor type)
+{
+	unsigned long long mask;
+	if (level > M4_MAX_LOG_LEVEL) {
+		KDEBUG(M4SH_ERROR, " Invalid log level - %llu !!!\n", level);
+		return -1;
+	}
+	switch (type) {
+	case TYPE_GYRO:
+	mask = (1ULL << GYRO_MASK_BIT_1) | (1ULL << GYRO_MASK_BIT_2);
+	level = (level << GYRO_MASK_BIT_1);
+	break;
+	case TYPE_ACCEL:
+	mask = (1ULL << ACCEL_MASK_BIT_1) | (1ULL << ACCEL_MASK_BIT_2);
+	level = (level << ACCEL_MASK_BIT_1);
+	break;
+	case TYPE_COMPASS:
+	mask = (1ULL << COMPASS_MASK_BIT_1) | (1ULL << COMPASS_MASK_BIT_2);
+	level = (level << COMPASS_MASK_BIT_1);
+	break;
+	case TYPE_FUSION:
+	mask = (1ULL << FUSION_MASK_BIT_1) | (1ULL << FUSION_MASK_BIT_2);
+	level = (level << FUSION_MASK_BIT_1);
+	break;
+	default:
+		return -1;
+	}
+	return m4sensorhub_reg_write(mpu9150_client_data->m4sensorhub,
+		M4SH_REG_LOG_LOGENABLE, (char *)&level, (unsigned char *)&mask);
+}
+
+static ssize_t gyro_set_loglevel(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf, size_t size)
+{
+	unsigned long level;
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
+
+	if ((strict_strtoul(buf, 10, &level)) < 0)
+		return -1;
+	return mpu9150_set_loglevel(mpu9150_client_data, level, TYPE_GYRO);
+}
+
+static ssize_t gyro_get_loglevel(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	unsigned long long loglevel;
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
+
+	m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
+		M4SH_REG_LOG_LOGENABLE, (char *)&loglevel);
+	loglevel = get_log_level(loglevel, GYRO_MASK_BIT_1);
+	return sprintf(buf, "%llu\n", loglevel);
+}
+
+static ssize_t accel_set_loglevel(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf, size_t size)
+{
+	unsigned long level;
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
+
+	if ((strict_strtoul(buf, 10, &level)) < 0)
+		return -1;
+	return mpu9150_set_loglevel(mpu9150_client_data, level, TYPE_ACCEL);
+}
+
+static ssize_t accel_get_loglevel(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	int loglevel;
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
+
+	m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
+		M4SH_REG_LOG_LOGENABLE, (char *)&loglevel);
+	loglevel = get_log_level(loglevel, ACCEL_MASK_BIT_1);
+	return sprintf(buf, "%d\n", loglevel);
+}
+
+static ssize_t compass_set_loglevel(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf, size_t size)
+{
+	unsigned long level;
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
+
+	if ((strict_strtoul(buf, 10, &level)) < 0)
+		return -1;
+	return mpu9150_set_loglevel(mpu9150_client_data, level, TYPE_COMPASS);
+}
+
+static ssize_t compass_get_loglevel(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	int loglevel;
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
+
+	m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
+		M4SH_REG_LOG_LOGENABLE, (char *)&loglevel);
+	loglevel = get_log_level(loglevel, COMPASS_MASK_BIT_1);
+	return sprintf(buf, "%d\n", loglevel);
+}
+
+static ssize_t fusion_set_loglevel(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf, size_t size)
+{
+	unsigned long level;
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
+
+	if ((strict_strtoul(buf, 10, &level)) < 0)
+		return -1;
+	return mpu9150_set_loglevel(mpu9150_client_data, level, TYPE_FUSION);
+}
+static ssize_t fusion_get_loglevel(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	int loglevel;
+	struct platform_device *pdev = to_platform_device(dev);
+	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
+
+	m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
+		M4SH_REG_LOG_LOGENABLE, (char *)&loglevel);
+	loglevel = get_log_level(loglevel, FUSION_MASK_BIT_1);
+	return sprintf(buf, "%d\n", loglevel);
+}
+
+static DEVICE_ATTR(x_local, 0444, m4_mpu9150_local_x, NULL);
+static DEVICE_ATTR(y_local, 0444, m4_mpu9150_local_y, NULL);
+static DEVICE_ATTR(z_local, 0444, m4_mpu9150_local_z, NULL);
+static DEVICE_ATTR(x_world, 0444, m4_mpu9150_world_x, NULL);
+static DEVICE_ATTR(y_world, 0444, m4_mpu9150_world_y, NULL);
+static DEVICE_ATTR(z_world, 0444, m4_mpu9150_world_z, NULL);
+static DEVICE_ATTR(pitch, 0444, m4_mpu9150_pitch, NULL);
+static DEVICE_ATTR(roll, 0444, m4_mpu9150_roll, NULL);
+static DEVICE_ATTR(yaw, 0444, m4_mpu9150_yaw, NULL);
+static DEVICE_ATTR(heading, 0444, m4_mpu9150_heading, NULL);
+static DEVICE_ATTR(heading_acc, 0444, m4_mpu9150_heading_acc, NULL);
+static DEVICE_ATTR(raw_x, 0444, m4_mpu9150_x, NULL);
+static DEVICE_ATTR(raw_y, 0444, m4_mpu9150_y, NULL);
+static DEVICE_ATTR(raw_z, 0444, m4_mpu9150_z, NULL);
+static DEVICE_ATTR(compass_cx, 0444, m4_mpu9150_cx, NULL);
+static DEVICE_ATTR(compass_cy, 0444, m4_mpu9150_cy, NULL);
+static DEVICE_ATTR(compass_cz, 0444, m4_mpu9150_cz, NULL);
+static DEVICE_ATTR(compass_ca, 0444, m4_mpu9150_ca, NULL);
+static DEVICE_ATTR(rx, 0444, m4_mpu9150_rx, NULL);
+static DEVICE_ATTR(ry, 0444, m4_mpu9150_ry, NULL);
+static DEVICE_ATTR(rz, 0444, m4_mpu9150_rz, NULL);
+static DEVICE_ATTR(gyroLogLevel, 0644, gyro_get_loglevel,
+				gyro_set_loglevel);
+static DEVICE_ATTR(accelLogLevel, 0644, accel_get_loglevel,
+				accel_set_loglevel);
+static DEVICE_ATTR(compassLogLevel, 0644, compass_get_loglevel,
+				compass_set_loglevel);
+static DEVICE_ATTR(fusionLogLevel, 0644, fusion_get_loglevel,
+				fusion_set_loglevel);
+
+static struct attribute *mpu9150_attributes[] = {
+	&dev_attr_x_local.attr,
+	&dev_attr_y_local.attr,
+	&dev_attr_z_local.attr,
+	&dev_attr_x_world.attr,
+	&dev_attr_y_world.attr,
+	&dev_attr_z_world.attr,
+	&dev_attr_pitch.attr,
+	&dev_attr_roll.attr,
+	&dev_attr_yaw.attr,
+	&dev_attr_heading.attr,
+	&dev_attr_heading_acc.attr,
+	&dev_attr_raw_x.attr,
+	&dev_attr_raw_y.attr,
+	&dev_attr_raw_z.attr,
+	&dev_attr_compass_cx.attr,
+	&dev_attr_compass_cy.attr,
+	&dev_attr_compass_cz.attr,
+	&dev_attr_compass_ca.attr,
+	&dev_attr_rx.attr,
+	&dev_attr_ry.attr,
+	&dev_attr_rz.attr,
+	&dev_attr_gyroLogLevel.attr,
+	&dev_attr_accelLogLevel.attr,
+	&dev_attr_compassLogLevel.attr,
+	&dev_attr_fusionLogLevel.attr,
+	NULL
+};
+
+static const struct attribute_group mpu9150_group = {
+	.attrs = mpu9150_attributes,
+};
+#endif
+
+static const struct file_operations mpu9150_client_fops = {
+	.owner = THIS_MODULE,
+	.unlocked_ioctl = mpu9150_client_ioctl,
+	.open  = mpu9150_client_open,
+	.release = mpu9150_client_close,
+};
+
+static struct miscdevice mpu9150_client_miscdrv = {
+	.minor = MISC_DYNAMIC_MINOR,
+	.name  = MPU9150_CLIENT_DRIVER_NAME,
+	.fops = &mpu9150_client_fops,
+};
+
+static int mpu9150_irq_init(struct mpu9150_client *mpu9150_client_data)
+{
+	int ret = -1;
+
+	ret = m4sensorhub_irq_register(mpu9150_client_data->m4sensorhub,
+				M4SH_IRQ_GYRO_DATA_READY,
+				m4_handle_mpu9150_gyro_irq,
+				mpu9150_client_data);
+	if (ret < 0) {
+		KDEBUG(M4SH_ERROR, "Error registering int %d (%d)\n",
+					M4SH_IRQ_GYRO_DATA_READY, ret);
+		return ret;
+	}
+	ret = m4sensorhub_irq_register(mpu9150_client_data->m4sensorhub,
+				M4SH_IRQ_ACCEL_DATA_READY,
+				m4_handle_mpu9150_accel_irq,
+				mpu9150_client_data);
+	if (ret < 0) {
+		KDEBUG(M4SH_ERROR, "Error registering int %d (%d)\n",
+					M4SH_IRQ_ACCEL_DATA_READY, ret);
+		goto unregister_gyro_irq;
+	}
+	ret = m4sensorhub_irq_register(mpu9150_client_data->m4sensorhub,
+				M4SH_IRQ_COMPASS_DATA_READY,
+				m4_handle_mpu9150_compass_irq,
+				mpu9150_client_data);
+	if (ret < 0) {
+		KDEBUG(M4SH_ERROR, "Error registering int %d (%d)\n",
+				M4SH_IRQ_COMPASS_DATA_READY, ret);
+		goto unregister_accel_irq;
+	}
+	ret = m4sensorhub_irq_register(mpu9150_client_data->m4sensorhub,
+				M4SH_IRQ_FUSION_DATA_READY,
+				m4_handle_mpu9150_fusion_irq,
+				mpu9150_client_data);
+	if (ret < 0) {
+		KDEBUG(M4SH_ERROR, "Error registering int %d (%d)\n",
+				M4SH_IRQ_FUSION_DATA_READY, ret);
+		goto unregister_compass_irq;
+	}
+	return ret;
+
+unregister_compass_irq:
+	m4sensorhub_irq_unregister(mpu9150_client_data->m4sensorhub,
+				M4SH_IRQ_COMPASS_DATA_READY);
+unregister_accel_irq:
+	m4sensorhub_irq_unregister(mpu9150_client_data->m4sensorhub,
+				M4SH_IRQ_ACCEL_DATA_READY);
+unregister_gyro_irq:
+	m4sensorhub_irq_unregister(mpu9150_client_data->m4sensorhub,
+				M4SH_IRQ_GYRO_DATA_READY);
+	return ret;
+}
+
+static void mpu9150_irq_deinit(struct mpu9150_client *mpu9150_client_data)
+{
+	m4sensorhub_irq_unregister(mpu9150_client_data->m4sensorhub,
+				M4SH_IRQ_FUSION_DATA_READY);
+	m4sensorhub_irq_unregister(mpu9150_client_data->m4sensorhub,
+				M4SH_IRQ_COMPASS_DATA_READY);
+	m4sensorhub_irq_unregister(mpu9150_client_data->m4sensorhub,
+				M4SH_IRQ_ACCEL_DATA_READY);
+	m4sensorhub_irq_unregister(mpu9150_client_data->m4sensorhub,
+				M4SH_IRQ_GYRO_DATA_READY);
+}
+
+static int mpu9150_irq_enable_disable(struct mpu9150_client *mpu9150_client_data,
+				enum mpu9150_sensor type, int flag)
+{
+	int ret = 0;
+	int irq_status = 0;
+
+	switch (type) {
+	case TYPE_GYRO:
+		irq_status = m4sensorhub_irq_enable_get(
+				mpu9150_client_data->m4sensorhub,
+				M4SH_IRQ_GYRO_DATA_READY);
+		if (flag && (!irq_status)) {
+			ret = m4sensorhub_irq_enable(
+					mpu9150_client_data->m4sensorhub,
+					M4SH_IRQ_GYRO_DATA_READY);
+			if (ret < 0) {
+				KDEBUG(M4SH_ERROR, "Error enabling int %d (%d)\n",
+					M4SH_IRQ_GYRO_DATA_READY, ret);
+				return ret;
+			}
+		} else if ((!flag) && irq_status)
+			m4sensorhub_irq_disable(
+					mpu9150_client_data->m4sensorhub,
+					M4SH_IRQ_GYRO_DATA_READY);
+		break;
+	case TYPE_ACCEL:
+		irq_status = m4sensorhub_irq_enable_get(
+				mpu9150_client_data->m4sensorhub,
+				M4SH_IRQ_ACCEL_DATA_READY);
+		if (flag && (!irq_status)) {
+			ret = m4sensorhub_irq_enable(
+					mpu9150_client_data->m4sensorhub,
+					M4SH_IRQ_ACCEL_DATA_READY);
+			if (ret < 0) {
+				KDEBUG(M4SH_ERROR, "Error enabling int %d (%d)\n",
+					M4SH_IRQ_ACCEL_DATA_READY, ret);
+				return ret;
+			}
+		} else if ((!flag) && irq_status)
+			m4sensorhub_irq_disable(
+					mpu9150_client_data->m4sensorhub,
+					M4SH_IRQ_ACCEL_DATA_READY);
+		break;
+	case TYPE_COMPASS:
+		irq_status = m4sensorhub_irq_enable_get(
+				mpu9150_client_data->m4sensorhub,
+				 M4SH_IRQ_COMPASS_DATA_READY);
+		if (flag && (!irq_status)) {
+			ret = m4sensorhub_irq_enable(
+					mpu9150_client_data->m4sensorhub,
+					M4SH_IRQ_COMPASS_DATA_READY);
+			if (ret < 0) {
+				KDEBUG(M4SH_ERROR, "Error enabling int %d (%d)\n",
+					M4SH_IRQ_COMPASS_DATA_READY, ret);
+				return ret;
+			}
+		} else if ((!flag) && irq_status)
+			m4sensorhub_irq_disable(
+					mpu9150_client_data->m4sensorhub,
+					M4SH_IRQ_COMPASS_DATA_READY);
+		break;
+	case TYPE_FUSION:
+		irq_status = m4sensorhub_irq_enable_get(
+				mpu9150_client_data->m4sensorhub,
+				M4SH_IRQ_FUSION_DATA_READY);
+		if (flag && (!irq_status)) {
+			ret = m4sensorhub_irq_enable(
+					mpu9150_client_data->m4sensorhub,
+					M4SH_IRQ_FUSION_DATA_READY);
+			if (ret < 0) {
+				KDEBUG(M4SH_ERROR, "Error enabling int %d (%d)\n",
+					M4SH_IRQ_FUSION_DATA_READY, ret);
+				return ret;
+			}
+		} else if ((!flag) && irq_status)
+			m4sensorhub_irq_disable(
+					mpu9150_client_data->m4sensorhub,
+					M4SH_IRQ_FUSION_DATA_READY);
+		break;
+	default:
+		ret = -EINVAL;
+		break;
+	}
+	return ret;
+}
+
+static int mpu9150_client_probe(struct platform_device *pdev)
+{
+	int ret = -1;
+	struct mpu9150_client *mpu9150_client_data;
+	struct m4sensorhub_data *m4sensorhub = m4sensorhub_client_get_drvdata();
+
+	if (!m4sensorhub)
+		return -EFAULT;
+
+	mpu9150_client_data = kzalloc(sizeof(*mpu9150_client_data),
+						GFP_KERNEL);
+	if (!mpu9150_client_data)
+		return -ENOMEM;
+
+	mpu9150_client_data->m4sensorhub = m4sensorhub;
+	platform_set_drvdata(pdev, mpu9150_client_data);
+
+	mpu9150_client_data->input_dev = input_allocate_device();
+	if (!mpu9150_client_data->input_dev) {
+		ret = -ENOMEM;
+		KDEBUG(M4SH_ERROR, "%s: input device allocate failed: %d\n",
+			__func__, ret);
+		goto free_mem;
+	}
+
+	mpu9150_client_data->input_dev->name = MPU9150_CLIENT_DRIVER_NAME;
+	set_bit(EV_ABS, mpu9150_client_data->input_dev->evbit);
+	set_bit(EV_REL, mpu9150_client_data->input_dev->evbit);
+
+	set_bit(ABS_COMPASS_X, mpu9150_client_data->input_dev->absbit);
+	set_bit(ABS_COMPASS_Y, mpu9150_client_data->input_dev->absbit);
+	set_bit(ABS_COMPASS_Z, mpu9150_client_data->input_dev->absbit);
+	set_bit(ABS_COMPASS_ACCURACY, mpu9150_client_data->input_dev->absbit);
+	set_bit(ABS_X, mpu9150_client_data->input_dev->absbit);
+	set_bit(ABS_Y, mpu9150_client_data->input_dev->absbit);
+	set_bit(ABS_Z, mpu9150_client_data->input_dev->absbit);
+
+	set_bit(REL_X, mpu9150_client_data->input_dev->relbit);
+	set_bit(REL_Y, mpu9150_client_data->input_dev->relbit);
+	set_bit(REL_Z, mpu9150_client_data->input_dev->relbit);
+	set_bit(REL_GX, mpu9150_client_data->input_dev->relbit);
+	set_bit(REL_GY, mpu9150_client_data->input_dev->relbit);
+	set_bit(REL_GZ, mpu9150_client_data->input_dev->relbit);
+	set_bit(REL_LX, mpu9150_client_data->input_dev->relbit);
+	set_bit(REL_LY, mpu9150_client_data->input_dev->relbit);
+	set_bit(REL_LZ, mpu9150_client_data->input_dev->relbit);
+	set_bit(REL_WX, mpu9150_client_data->input_dev->relbit);
+	set_bit(REL_WY, mpu9150_client_data->input_dev->relbit);
+	set_bit(REL_WZ, mpu9150_client_data->input_dev->relbit);
+	set_bit(REL_ROLL, mpu9150_client_data->input_dev->relbit);
+	set_bit(REL_PITCH, mpu9150_client_data->input_dev->relbit);
+	set_bit(REL_YAW, mpu9150_client_data->input_dev->relbit);
+	set_bit(REL_RX, mpu9150_client_data->input_dev->relbit);
+	set_bit(REL_RY, mpu9150_client_data->input_dev->relbit);
+	set_bit(REL_RZ, mpu9150_client_data->input_dev->relbit);
+	set_bit(REL_HEADING, mpu9150_client_data->input_dev->relbit);
+	set_bit(REL_HEADING_ACCURACY, mpu9150_client_data->input_dev->relbit);
+
+	if (input_register_device(mpu9150_client_data->input_dev)) {
+		KDEBUG(M4SH_ERROR, "%s: input device register failed\n",
+			__func__);
+		input_free_device(mpu9150_client_data->input_dev);
+		goto free_mem;
+	}
+
+	ret = misc_register(&mpu9150_client_miscdrv);
+	if (ret < 0) {
+		KDEBUG(M4SH_ERROR, "Error registering %s driver\n", __func__);
+		goto unregister_input_device;
+	}
+	misc_mpu9150_data = mpu9150_client_data;
+	ret = mpu9150_irq_init(mpu9150_client_data);
+	if (ret < 0)
+		goto unregister_misc_device;
+
+#ifdef MPU9150_DEBUG
+	ret = sysfs_create_group(&pdev->dev.kobj, &mpu9150_group);
+	if (ret)
+		goto unregister_irq;
+#endif
+	KDEBUG(M4SH_INFO, "Initialized %s driver\n", __func__);
+	return 0;
+
+#ifdef MPU9150_DEBUG
+unregister_irq:
+	mpu9150_irq_deinit(mpu9150_client_data);
+#endif
+unregister_misc_device:
+	misc_mpu9150_data = NULL;
+	misc_deregister(&mpu9150_client_miscdrv);
+unregister_input_device:
+	input_unregister_device(mpu9150_client_data->input_dev);
+free_mem:
+	platform_set_drvdata(pdev, NULL);
+	mpu9150_client_data->m4sensorhub = NULL;
+	kfree(mpu9150_client_data);
+	mpu9150_client_data = NULL;
+	return ret;
+}
+
+static int __exit mpu9150_client_remove(struct platform_device *pdev)
+{
+	struct mpu9150_client *mpu9150_client_data =
+						platform_get_drvdata(pdev);
+#ifdef MPU9150_DEBUG
+	sysfs_remove_group(&pdev->dev.kobj, &mpu9150_group);
+#endif
+	mpu9150_irq_deinit(mpu9150_client_data);
+	misc_mpu9150_data = NULL;
+	misc_deregister(&mpu9150_client_miscdrv);
+	input_unregister_device(mpu9150_client_data->input_dev);
+	platform_set_drvdata(pdev, NULL);
+	mpu9150_client_data->m4sensorhub = NULL;
+	kfree(mpu9150_client_data);
+	mpu9150_client_data = NULL;
+	return 0;
+}
+
+static void mpu9150_client_shutdown(struct platform_device *pdev)
+{
+	return;
+}
+#ifdef CONFIG_PM
+static int mpu9150_client_suspend(struct platform_device *pdev,
+				pm_message_t message)
+{
+	struct mpu9150_client *mpu9150_client_data =
+						platform_get_drvdata(pdev);
+
+	mpu9150_irq_enable_disable(mpu9150_client_data, TYPE_COMPASS,
+				SENSOR_IRQ_DISABLE);
+	mpu9150_irq_enable_disable(mpu9150_client_data, TYPE_GYRO,
+				SENSOR_IRQ_DISABLE);
+	mpu9150_irq_enable_disable(mpu9150_client_data, TYPE_ACCEL,
+				SENSOR_IRQ_DISABLE);
+	mpu9150_irq_enable_disable(mpu9150_client_data, TYPE_FUSION,
+				SENSOR_IRQ_DISABLE);
+
+	m4_set_mpu9150_delay(mpu9150_client_data, -1, TYPE_COMPASS);
+	m4_set_mpu9150_delay(mpu9150_client_data, -1, TYPE_GYRO);
+	m4_set_mpu9150_delay(mpu9150_client_data, -1, TYPE_ACCEL);
+	m4_set_mpu9150_delay(mpu9150_client_data, -1, TYPE_FUSION);
+
+	return 0;
+}
+
+static int mpu9150_client_resume(struct platform_device *pdev)
+{
+	return 0;
+}
+#else
+#define mpu9150_client_suspend NULL
+#define mpu9150_client_resume  NULL
+#endif
+
+static struct of_device_id m4mpu9150_match_tbl[] = {
+	{ .compatible = "mot,m4mpu9150" },
+	{},
+};
+
+static struct platform_driver mpu9150_client_driver = {
+	.probe		= mpu9150_client_probe,
+	.remove		= __exit_p(mpu9150_client_remove),
+	.shutdown	= mpu9150_client_shutdown,
+	.suspend	= mpu9150_client_suspend,
+	.resume		= mpu9150_client_resume,
+	.driver		= {
+		.name	= MPU9150_CLIENT_DRIVER_NAME,
+		.owner	= THIS_MODULE,
+		.of_match_table = of_match_ptr(m4mpu9150_match_tbl),
+	},
+};
+
+static int __init mpu9150_client_init(void)
+{
+	return platform_driver_register(&mpu9150_client_driver);
+}
+
+static void __exit mpu9150_client_exit(void)
+{
+	platform_driver_unregister(&mpu9150_client_driver);
+}
+
+module_init(mpu9150_client_init);
+module_exit(mpu9150_client_exit);
+
+MODULE_ALIAS("platform:mpu9150_client");
+MODULE_DESCRIPTION("M4 Sensor Hub Mpu9150 client driver");
+MODULE_AUTHOR("Motorola");
+MODULE_LICENSE("GPL");

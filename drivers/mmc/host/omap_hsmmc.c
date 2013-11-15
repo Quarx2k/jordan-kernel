@@ -40,6 +40,8 @@
 #include <linux/pinctrl/consumer.h>
 #include <linux/pm_runtime.h>
 #include <linux/platform_data/mmc-omap.h>
+#include <linux/wl12xx.h>
+#include <asm-generic/gpio.h>
 
 /* OMAP HSMMC Host Controller Registers */
 #define OMAP_HSMMC_SYSSTATUS	0x0014
@@ -1716,9 +1718,10 @@ MODULE_DEVICE_TABLE(of, omap_mmc_of_match);
 static struct omap_mmc_platform_data *of_get_hsmmc_pdata(struct device *dev)
 {
 	struct omap_mmc_platform_data *pdata;
+	struct wl12xx_platform_data minnow_wlan_data;
 	struct device_node *np = dev->of_node;
 	u32 bus_width, max_freq;
-	int cd_gpio, wp_gpio;
+	int cd_gpio, wp_gpio, wl_host_wake_gpio = -1;
 
 	cd_gpio = of_get_named_gpio(np, "cd-gpios", 0);
 	wp_gpio = of_get_named_gpio(np, "wp-gpios", 0);
@@ -1755,6 +1758,30 @@ static struct omap_mmc_platform_data *of_get_hsmmc_pdata(struct device *dev)
 
 	if (of_find_property(np, "ti,needs-special-hs-handling", NULL))
 		pdata->slots[0].features |= HSMMC_HAS_HSPE_SUPPORT;
+
+	/* wlan_host_wake_gpio is needed by TI WLAN driver in TI proprietary
+	 * code under repo hardware/ti/wlan, retrieve this gpio here from dts
+	 * and pass to TI WLAN driver through the existing interface
+	 * of wl12xx_set_platform_data, so not to chanage TI code
+	 */
+	if (!of_property_read_u32(np, "wl_host_wake_gpio",
+					&wl_host_wake_gpio)) {
+		pr_info("wl_host_wake_gpio is %d\n", wl_host_wake_gpio);
+		if (gpio_request(wl_host_wake_gpio, "wifi_irq") < 0) {
+			printk(KERN_ERR "%s: can't reserve GPIO: %d\n",
+				__func__, wl_host_wake_gpio);
+			devm_kfree(dev, pdata);
+			return NULL;
+		}
+		gpio_direction_input(wl_host_wake_gpio);
+		minnow_wlan_data.irq = __gpio_to_irq(wl_host_wake_gpio);
+		if (wl12xx_set_platform_data(&minnow_wlan_data)) {
+			printk(KERN_ERR "%s: Error setting wl18xx data\n",
+				__func__);
+			devm_kfree(dev, pdata);
+			return NULL;
+		}
+	}
 
 	return pdata;
 }

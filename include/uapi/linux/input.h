@@ -468,6 +468,7 @@ struct input_keymap_entry {
 #define KEY_RFKILL		247	/* Key that controls all radios */
 
 #define KEY_MICMUTE		248	/* Mute / unmute the microphone */
+#define KEY_POWER_DOUBLE	249
 
 /* Code 255 is reserved for special needs of AT keyboard driver */
 
@@ -709,6 +710,7 @@ struct input_keymap_entry {
 #define KEY_ATTENDANT_OFF	0x21c
 #define KEY_ATTENDANT_TOGGLE	0x21d	/* Attendant call on or off */
 #define KEY_LIGHTS_TOGGLE	0x21e	/* Reading light on or off */
+#define KEY_POWER_SONG		0x220
 
 #define BTN_TRIGGER_HAPPY		0x2c0
 #define BTN_TRIGGER_HAPPY1		0x2c0
@@ -771,7 +773,22 @@ struct input_keymap_entry {
 #define REL_DIAL		0x07
 #define REL_WHEEL		0x08
 #define REL_MISC		0x09
-#define REL_MAX			0x0f
+#define REL_ROLL                0x0a
+#define REL_PITCH               0x0b
+#define REL_YAW                 0x0c
+#define REL_LX                  0x0d
+#define REL_LY                  0x0e
+#define REL_LZ                  0x0f
+#define REL_WX                  0x10
+#define REL_WY                  0x11
+#define REL_WZ                  0x12
+#define REL_GX                  0x13
+#define REL_GY                  0x14
+#define REL_GZ                  0x15
+#define REL_HEADING             0x16
+#define REL_HEADING_ACCURACY    0x17
+#define REL_ACTIVITY_LEVEL      0x18
+#define REL_MAX                 0x1f
 #define REL_CNT			(REL_MAX+1)
 
 /*
@@ -824,7 +841,33 @@ struct input_keymap_entry {
 #define ABS_MT_TOOL_Y		0x3d	/* Center Y tool position */
 
 
-#define ABS_MAX			0x3f
+/* MSP (sensor) related events */
+#define ABS_STEPCOUNT           0x40
+#define ABS_ACTIVITY            0x41
+#define ABS_SPEED               0x42
+#define ABS_CADENCE             0x43
+#define ABS_ALTITUDE            0x44
+#define ABS_PRESSURE_PASCAL     0x45
+#define ABS_ASCENT              0x46
+#define ABS_DESCENT             0x47
+#define ABS_INCLINATION         0x48
+#define ABS_STEPLENGTH          0x49
+#define ABS_3D_TAP_TAP          0x4a
+#define ABS_HEADING             0x4b
+#define ABS_TEMPERATURE         0x4c
+#define ABS_MSP_LATITUDE        0x4d
+#define ABS_MSP_LONGITUDE       0x4e
+#define ABS_MSP_HEADING         0x4f
+#define ABS_MSP_ACCURACY        0x50
+
+#define ABS_COMPASS_X           0x51
+#define ABS_COMPASS_Y           0x52
+#define ABS_COMPASS_Z           0x53
+#define ABS_COMPASS_ACCURACY    0x54
+
+#define ABS_TILTSCROLL          0x55
+
+#define ABS_MAX			0x7f
 #define ABS_CNT			(ABS_MAX+1)
 
 /*
@@ -847,6 +890,7 @@ struct input_keymap_entry {
 #define SW_FRONT_PROXIMITY	0x0b  /* set = front proximity sensor active */
 #define SW_ROTATE_LOCK		0x0c  /* set = rotate locked/disabled */
 #define SW_LINEIN_INSERT	0x0d  /* set = inserted */
+#define SW_STILL_MODE           0x0e  /* set = device is sitting still */
 #define SW_MAX			0x0f
 #define SW_CNT			(SW_MAX+1)
 
@@ -860,7 +904,29 @@ struct input_keymap_entry {
 #define MSC_RAW			0x03
 #define MSC_SCAN		0x04
 #define MSC_TIMESTAMP		0x05
-#define MSC_MAX			0x07
+#define MSC_GESTURE1            0x06
+#define MSC_GESTURE2            0x07
+#define MSC_GESTURE3            0x08
+#define MSC_GESTURE_CONFIDENCE1 0x09
+#define MSC_GESTURE_CONFIDENCE2 0x0a
+#define MSC_GESTURE_CONFIDENCE3 0x0b
+#define MSC_GESTURE_VALUE1      0x0c
+#define MSC_GESTURE_VALUE2      0x0d
+#define MSC_GESTURE_VALUE3      0x0e
+#define MSC_STEPCOUNT           0x0f
+#define MSC_DISTANCE            0x10
+#define MSC_SPEED               0x11
+#define MSC_ACTIVITY_TYPE       0x12
+#define MSC_METS                0x13
+#define MSC_CALORIES            0x14
+#define MSC_METSACTIVITY        0x15
+#define MSC_FLOORSCLIMBED       0x16
+#define MSC_PASSIVE_STEPS       0x17
+#define MSC_PASSIVE_METS        0x18
+#define MSC_PASSIVE_TIMESTAMP   0x19
+#define MSC_PASSIVE_FLOORSCLIMBED 0x1a
+
+#define MSC_MAX			0x1f
 #define MSC_CNT			(MSC_MAX+1)
 
 /*

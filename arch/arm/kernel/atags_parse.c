@@ -139,6 +139,29 @@ static int __init parse_tag_cmdline(const struct tag *tag)
 
 __tagtable(ATAG_CMDLINE, parse_tag_cmdline);
 
+u32 flat_dev_tree_address; /* 32bit physical address */
+
+#ifdef CONFIG_MACH_MINNOW
+/* process Motorola device tree */
+static int __init parse_tag_flat_dev_tree_address(const struct tag *tag)
+{
+	printk(KERN_INFO "flat_dev_tree tag == 0x%08x\n",
+		ATAG_FLAT_DEV_TREE_ADDRESS);
+	printk(KERN_INFO "flat_dev_tree_address (phys) == 0x%08x\n",
+		tag->u.flat_dev_tree.address);
+	printk(KERN_INFO "flat_dev_tree_address (virt) == 0x%p\n",
+		phys_to_virt(tag->u.flat_dev_tree.address));
+	printk(KERN_INFO "flat_dev_tree_size == 0x%08x\n",
+		tag->u.flat_dev_tree.size);
+
+	flat_dev_tree_address = tag->u.flat_dev_tree.address;
+	return 0;
+}
+
+__tagtable(ATAG_FLAT_DEV_TREE_ADDRESS, parse_tag_flat_dev_tree_address);
+
+#endif /* CONFIG_MACH_MINNOW */
+
 /*
  * Scan the tag table for this tag, and call its parse function.
  * The tag table is built by the linker from all the __tagtable

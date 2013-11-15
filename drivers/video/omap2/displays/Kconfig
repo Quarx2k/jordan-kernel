@@ -72,4 +72,11 @@ config PANEL_N8X0
 	depends on BACKLIGHT_CLASS_DEVICE
 	help
 	  This is the LCD panel used on Nokia N8x0
+
+config PANEL_MINNOW
+	tristate "Minnow DSI Command Mode Panel"
+	depends on OMAP2_DSS_DSI
+	help
+	  Driver for Minnow DSI command mode panels.
+
 endmenu

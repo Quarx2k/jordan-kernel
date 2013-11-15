@@ -16,6 +16,7 @@
 #define FBIOGETCMAP		0x4604
 #define FBIOPUTCMAP		0x4605
 #define FBIOPAN_DISPLAY		0x4606
+#define FBIO_UPDATE_DISPLAY	0x4607
 #ifndef __KERNEL__
 #define FBIO_CURSOR            _IOWR('F', 0x08, struct fb_cursor)
 #endif
