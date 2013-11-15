@@ -482,6 +482,14 @@ config VIDEO_MT9V032
 	  This is a Video4Linux2 sensor-level driver for the Micron
 	  MT9V032 752x480 CMOS sensor.
 
+config VIDEO_MT9P012
+       tristate "Micron MT9P012 raw sensor driver (5MP)"
+       depends on I2C && VIDEO_V4L2
+       ---help---
+         This is a Video4Linux2 sensor-level driver for the Micron
+         MT9P012 camera.  It is currently working with the TI OMAP3
+         camera controller.
+
 config VIDEO_TCM825X
 	tristate "TCM825x camera sensor support"
 	depends on I2C && VIDEO_V4L2

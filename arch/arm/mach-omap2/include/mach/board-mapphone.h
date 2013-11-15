@@ -12,6 +12,8 @@ extern void __init mapphone_i2c_init(void);
 extern void __init mapphone_padconf_init(void);
 extern void __init mapphone_usbhost_init(void);
 extern void __init mapphone_gadget_init(void);
+extern void __init mapphone_camera_init(void);
+
 extern struct attribute_group *mapphone_touch_vkey_prop_attr_group;
 
 #define BOOT_MODE_MAX_LEN 30

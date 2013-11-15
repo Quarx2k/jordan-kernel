@@ -22,6 +22,8 @@
 #include <linux/bu52014hfv.h>
 #include <linux/vib-gpio.h>
 
+#include <media/mt9p012.h>
+
 #define MAPPHONE_LM_3530_INT_GPIO	92
 #define MAPPHONE_AKM8973_INT_GPIO	175
 #define MAPPHONE_AKM8973_RESET_GPIO	28
@@ -30,7 +32,7 @@
 
 extern void __init mapphone_touch_panel_init(struct i2c_board_info *i2c_info);
 extern void __init mapphone_touch_btn_init(struct i2c_board_info *i2c_info);
-
+extern struct mt9p012_platform_data mapphone_mt9p012_platform_data;
 static struct i2c_board_info __initdata
 	mapphone_i2c_bus1_board_info[I2C_BUS_MAX_DEVICES];
 static struct i2c_board_info __initdata
@@ -878,6 +880,10 @@ static struct i2c_board_info __initdata
 		I2C_BOARD_INFO("lm3554_led", 0x53),
 		.platform_data = &mapphone_camera_flash_3554,
 	},
+	{
+		I2C_BOARD_INFO("mt9p012", 0x36),
+		.platform_data = &mapphone_mt9p012_platform_data,
+	},
 };
 
 static struct omap_i2c_bus_board_data __initdata mapphone_i2c_1_bus_pdata;
@@ -929,7 +935,7 @@ void __init mapphone_i2c_init(void)
 	mapphone_isl29030_init();
 	mapphone_bu52014hfv_init();
 	platform_device_register(&omap3430_hall_effect_dock);
-
+	mapphone_camera_init();
 	mapphone_vibrator_init();
 	platform_device_register(&mapphone_vib_gpio);
 
