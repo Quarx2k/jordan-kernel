@@ -584,6 +584,10 @@ config VIB_GPIO
 	bool "GPIO Vibrator"
 	default n
 
+config SYSPANIC
+	tristate "SYSPANIC driver used to detect BP panics"
+	default n
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"

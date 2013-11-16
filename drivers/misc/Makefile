@@ -65,3 +65,4 @@ obj-$(CONFIG_NETMUX_LINKDRIVER) += netmux_linkdriver/
 obj-$(CONFIG_MODEM_PM_DRIVER)   += modem_pm_driver/
 obj-$(CONFIG_WRITEBACK_CONTROL)  += writeback_control.o
 obj-$(CONFIG_DISPLAY_CONTROL)  += display_control.o
+obj-$(CONFIG_SYSPANIC)		+= syspanic.o
