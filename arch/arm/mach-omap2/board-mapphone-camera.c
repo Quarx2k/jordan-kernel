@@ -44,6 +44,8 @@ static int cam_standby_gpio = -1;
 
 void __init mapphone_camera_init(void)
 {
+	cam_standby_gpio = get_gpio_by_name("gpio_cam_pwdn");
+	cam_reset_gpio = get_gpio_by_name("gpio_cam_reset");
 }
 
 static struct omap34xxcam_sensor_config cam_hwc = {
