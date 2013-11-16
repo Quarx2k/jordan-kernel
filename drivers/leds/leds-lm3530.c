@@ -29,8 +29,6 @@
 #include <linux/types.h>
 #include <linux/slab.h>
 
-#undef CONFIG_HAS_EARLYSUSPEND
-
 #define GEN_CONFIG_PWM_BIT 0x20
 
 static int pwm_disable_manual = 0;
