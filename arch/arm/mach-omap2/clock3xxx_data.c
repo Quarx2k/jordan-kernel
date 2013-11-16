@@ -1328,7 +1328,7 @@ static struct clk d2d_26m_fck = {
 
 static struct clk modem_fck = {
 	.name		= "modem_fck",
-	.ops		= &clkops_omap2_dflt_wait,
+	.ops		= &clkops_omap2_mdmclk_dflt_wait,
 	.parent		= &sys_ck,
 	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
 	.enable_bit	= OMAP3430_EN_MODEM_SHIFT,
@@ -1338,7 +1338,7 @@ static struct clk modem_fck = {
 
 static struct clk sad2d_ick = {
 	.name		= "sad2d_ick",
-	.ops		= &clkops_omap2_dflt_wait,
+	.ops		= &clkops_omap2_iclk_dflt_wait,
 	.parent		= &l3_ick,
 	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
 	.enable_bit	= OMAP3430_EN_SAD2D_SHIFT,
@@ -1348,7 +1348,7 @@ static struct clk sad2d_ick = {
 
 static struct clk mad2d_ick = {
 	.name		= "mad2d_ick",
-	.ops		= &clkops_omap2_dflt_wait,
+	.ops		= &clkops_omap2_iclk_dflt_wait,
 	.parent		= &l3_ick,
 	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN3),
 	.enable_bit	= OMAP3430_EN_MAD2D_SHIFT,
