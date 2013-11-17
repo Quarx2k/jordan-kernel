@@ -409,8 +409,7 @@ static PVRSRV_ERROR AcquireGPTimer(SYS_SPECIFIC_DATA *psSysSpecData)
                   &hTimerEnable);
 
 	if (pui32TimerEnable == IMG_NULL) {
-		PVR_DPF((PVR_DBG_ERROR, "EnableSystemClocks:""
-					OSMapPhysToLin failed"));
+		PVR_DPF((PVR_DBG_ERROR, "EnableSystemClocks: OSMapPhysToLin failed"));
 		goto ExitDisableGPT11ICK;
 	}
 
