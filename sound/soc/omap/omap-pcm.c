@@ -225,6 +225,11 @@ static int omap_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 	unsigned long flags;
 	int ret = 0;
 
+	/* return if this is a bufferless transfer e.g.
+	 * codec <--> BT codec or GSM modem -- lg FIXME */
+	if (!prtd->dma_data)
+		return 0;
+
 	spin_lock_irqsave(&prtd->lock, flags);
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
