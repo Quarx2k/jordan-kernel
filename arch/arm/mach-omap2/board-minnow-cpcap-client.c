@@ -13,7 +13,7 @@
 #include <linux/irq.h>
 #include <linux/platform_device.h>
 #include <linux/spi/cpcap.h>
-#include <omap34xx.h>
+#include "omap34xx.h"
 
 /*
  * CPCAP devcies are common for different HW Rev.
