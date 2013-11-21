@@ -221,7 +221,6 @@ int m4sensorhub_irq_init(struct m4sensorhub_data *m4sensorhub)
 	retval = 0;
 	goto done;
 
-err_disa_irq:
 	disable_irq_wake(i2c->irq);
 err_free_irq:
 	free_irq(i2c->irq, data);
