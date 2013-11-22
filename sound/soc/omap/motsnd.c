@@ -526,9 +526,7 @@ static struct snd_soc_dai_link motsnd_dai[] = {
 	.ops = &motsnd_ops,
 	.ignore_suspend = 1,
 },
-#endif
-#ifndef ABE_BYPASS
-#ifdef MOTSND_CONFIG_ENABLE_ABE
+#else
 {
 	.name = "Multimedia LP",
 	.stream_name = "Multimedia",
@@ -541,19 +539,6 @@ static struct snd_soc_dai_link motsnd_dai[] = {
 //	.fe_playback_channels = 2,
 	.ignore_suspend = 1,
 },
-#else
-{
-	.name = "Multimedia",
-	.stream_name = "McBSP2-STDac",
-	.cpu_dai_name = "omap-mcbsp-dai.1",
-	.codec_dai_name = "cpcap stdac",
-	.platform_name = "omap-pcm-audio",
-	.codec_name = "cpcap_audio",
-	.init = motsnd_cpcap_init,
-	.ops = &motsnd_ops,
-	.ignore_suspend = 1,
-},
-#endif /*ENABLE_ABE*/
 #endif
 {
 	.name = "Voice",
