@@ -1,8 +1,7 @@
 /*
- * arch/arm/mach-omap2/board-mapphone-keypad.c
+ * arch/arm/mach-omap2/board-mapphone-camera.c
  *
  * Copyright (C) 2009 Google, Inc.
- * Copyright (C) 2009-2010 Motorola, Inc.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -37,7 +36,6 @@
 #define SENSOR_POWER_OFF	0
 #define SENSOR_POWER_STANDBY	1
 static enum v4l2_power mt9p012_previous_power = V4L2_POWER_OFF;
-static int  mapphone_camera_reg_power(bool);
 static char regulator_list[CAM_MAX_REGS][CAM_MAX_REG_NAME_LEN];
 static int cam_reset_gpio   = -1;
 static int cam_standby_gpio = -1;
@@ -57,7 +55,7 @@ static struct omap34xxcam_sensor_config cam_hwc = {
 static int mt9p012_sensor_set_prv_data(struct v4l2_int_device *s, void *priv)
 {
     struct omap34xxcam_hw_config *hwc = priv;
- 
+
     hwc->u.sensor.sensor_isp = cam_hwc.sensor_isp;
     hwc->u.sensor.capture_mem = cam_hwc.capture_mem;
     hwc->dev_index = 0;
@@ -87,75 +85,6 @@ static u32 mt9p012_sensor_set_xclk(struct v4l2_int_device *s, u32 xclkfreq)
     return isp_set_xclk(vdev->cam->isp, xclkfreq, OMAP34XXCAM_XCLK_A);
 }
 
-int mapphone_camera_reg_power(bool enable)
-{
-	static struct regulator *regulator[CAM_MAX_REGS];
-	static bool reg_resource_acquired;
-	int i, error;
-
-	error = 0;
-	printk("enter to mapphone_camera_reg_power\n");
-	if (reg_resource_acquired == false && enable) {
-		/* get list of regulators and enable*/
-		for (i = 0; i < CAM_MAX_REGS && \
-			regulator_list[i][0] != 0; i++) {
-			printk(KERN_INFO "%s - enable %s\n",\
-				__func__,\
-				regulator_list[i]);
-			regulator[i] = regulator_get(NULL, regulator_list[i]);
-			if (IS_ERR(regulator[i])) {
-				pr_err("%s: Cannot get %s "\
-					"regulator, err=%ld\n",\
-					__func__, regulator_list[i],
-					PTR_ERR(regulator[i]));
-				error = PTR_ERR(regulator[i]);
-				regulator[i] = NULL;
-				break;
-			}
-			if (regulator_enable(regulator[i]) != 0) {
-				pr_err("%s: Cannot enable regulator: %s \n",
-					__func__, regulator_list[i]);
-				error = -EIO;
-				regulator_put(regulator[i]);
-				regulator[i] = NULL;
-				break;
-			}
-		}
-
-		if (error != 0 && i > 0) {
-			/* return all acquired regulator resources if error */
-			while (--i && regulator[i]) {
-				regulator_disable(regulator[i]);
-				regulator_put(regulator[i]);
-				regulator[i] = NULL;
-			}
-		} else
-			reg_resource_acquired = true;
-
-	} else if (reg_resource_acquired && !enable) {
-		/* get list of regulators and disable*/
-		for (i = 0; i < CAM_MAX_REGS && \
-			regulator_list[i][0] != 0; i++) {
-			printk(KERN_INFO "%s - disable %s\n",\
-					 __func__,\
-					 regulator_list[i]);
-			if (regulator[i]) {
-				regulator_disable(regulator[i]);
-				regulator_put(regulator[i]);
-				regulator[i] = NULL;
-			}
-		}
-
-		reg_resource_acquired = false;
-	} else {
-		pr_err("%s: Invalid regulator state\n", __func__);
-		error = -EIO;
-    }
-
-    return error;
-
-}
-
 static int mt9p012_sensor_power_set(struct v4l2_int_device *s,
 				    enum v4l2_power power)
 {
@@ -163,79 +92,95 @@ static int mt9p012_sensor_power_set(struct v4l2_int_device *s,
 	struct isp_device *isp = dev_get_drvdata(vdev->cam->isp);
 
 	int error = 0;
-	printk("enter to mt9p012_sensor_power_set\n");
 
 	switch (power) {
 
 	case V4L2_POWER_OFF:
 		printk("V4L2_POWER_OFF\n");
-		/* Turn off power */
-		error = mapphone_camera_reg_power(false);
-		if (error != 0) {
-			pr_err("%s: Failed to power off regulators\n",
-				__func__);
+		/* Power Down Sequence */
+		if (cam_reset_gpio >= 0) {
+			gpio_set_value(cam_reset_gpio, 0);
+			/* free reset GPIO */
+			gpio_free(cam_reset_gpio);
+			cam_reset_gpio = -1;
 		}
 
+
+		/* Release pm constraints */
 		omap_pm_set_min_bus_tput(vdev->cam->isp, OCP_INITIATOR_AGENT, 0);
-
-		if (mt9p012_previous_power == V4L2_POWER_ON)
-			isp_disable_mclk(isp);
-
+		//omap_pm_set_max_mpu_wakeup_lat(dev, -1);
+		/* mt9p012 autofocus module needs the standby
+		   put the standby to high after safe mode */
+		if (cam_standby_gpio >= 0) {
+			gpio_set_value(cam_standby_gpio, 1);
+			gpio_free(cam_standby_gpio);
+			cam_standby_gpio = -1;
+		}
 	break;
 	case V4L2_POWER_ON:
 		printk("V4L2_POWER_ON\n");
-		/* Through-put requirement:
-		 * 2592 x 1944 x 2Bpp x 11fps x 3 memory ops = 324770 KByte/s
-		 */
-		omap_pm_set_min_bus_tput(vdev->cam->isp, OCP_INITIATOR_AGENT, 324770);
+		if (mt9p012_previous_power == V4L2_POWER_OFF) {
 
-		/* Power Up Sequence */
-		isp_configure_interface(vdev->cam->isp, &mt9p012_if_config);
+			/* mt9p012 autofocus module needs the standby
+			  put the standby to high after functional mode */
+			cam_standby_gpio = get_gpio_by_name("gpio_cam_pwdn");
 
-		/* set to output mode */
-		gpio_direction_output(cam_standby_gpio, true);
-		/* set to output mode */
-		gpio_direction_output(cam_reset_gpio, true);
+			/* Set min throughput to:
+			 *  2592 x 1944 x 2bpp x 30fps x 3 L3 accesses */
+			omap_pm_set_min_bus_tput(vdev->cam->isp, OCP_INITIATOR_AGENT, 885735);
+			/* Hold a constraint to keep MPU in C1 */
+			//omap_pm_set_max_mpu_wakeup_lat(dev, MPU_LATENCY_C1);
 
-		/* STANDBY_GPIO is active HIGH for set LOW to release */
-		gpio_set_value(cam_standby_gpio, 1);
+			/* Configure ISP */
+			isp_configure_interface(vdev->cam->isp, &mt9p012_if_config);
 
-		/* nRESET is active LOW. set HIGH to release reset */
-		gpio_set_value(cam_reset_gpio, 1);
-
-		/* turn on digital power */
-		//enable_fpga_vio_1v8(1);
-
-		/* turn on analog power */
-		error = mapphone_camera_reg_power(true);
-		if (error != 0) {
-			pr_err("%s: Failed to power on regulators\n",
-				__func__);
+			msleep(5);
 		}
+		mt9p012_sensor_set_xclk(s, MT9P012_XCLK_48MHZ);
+		msleep(3);
 
-		/* out of standby */
-		gpio_set_value(cam_standby_gpio, 0);
-		udelay(1000);
+		if (mt9p012_previous_power == V4L2_POWER_OFF) {
+			/* request for the GPIO's */
+			cam_reset_gpio = get_gpio_by_name("gpio_cam_reset");
+			if (cam_reset_gpio >= 0) {
+				printk(KERN_INFO "cam_reset_gpio %d\n",
+					cam_reset_gpio);
+				if (gpio_request(cam_reset_gpio,
+					"camera reset") != 0) {
+					printk(KERN_ERR "Failed to req cam reset\n");
+				}
+				gpio_direction_output(cam_reset_gpio, 0);
+			}
+			if (cam_standby_gpio >= 0) {
+				if (gpio_request(cam_standby_gpio,
+						"camera standby") != 0) {
+					printk(KERN_ERR "Failed to req cam standby\n");
+				}
+				gpio_direction_output(cam_standby_gpio, 0);
+				gpio_set_value(cam_standby_gpio, 1);
 
-		/* have to put sensor to reset to guarantee detection */
-		gpio_set_value(cam_reset_gpio, 0);
+			}
 
-		udelay(1500);
+			/* RESET is active LOW. set HIGH to release reset */
+			if (cam_reset_gpio >= 0)
+				gpio_set_value(cam_reset_gpio, 1);
 
-		/* nRESET is active LOW. set HIGH to release reset */
-		gpio_set_value(cam_reset_gpio, 1);
-		/* give sensor sometime to get out of the reset.
-		 * Datasheet says 2400 xclks. At 6 MHz, 400 usec is
-		 * enough
-		 */
-		udelay(300);
+			/* give sensor sometime to get out of the reset.
+			 * Datasheet says 2400 xclks.
+			 */
+			msleep(3);
+		}
 		break;
+
 	case V4L2_POWER_STANDBY:
+		printk("V4L2_POWER_STANDBY\n");
 		/* stand by */
+
 		gpio_set_value(cam_standby_gpio, 1);
 		omap_pm_set_min_bus_tput(vdev->cam->isp, OCP_INITIATOR_AGENT, 0);
 		if (mt9p012_previous_power == V4L2_POWER_ON)
 			isp_disable_mclk(isp);
+
 		break;
 	}
 	/* Save powerstate to know what was before calling POWER_ON. */

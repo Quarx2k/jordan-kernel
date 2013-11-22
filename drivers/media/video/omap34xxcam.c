@@ -1791,7 +1791,7 @@ static int omap34xxcam_open(struct file *file)
 	struct v4l2_format sensor_format;
 	int first_user = 0;
 	int i;
-
+	printk("Enter to omap34xxcam_open\n");
 	for (i = 0; i < OMAP34XXCAM_VIDEODEVS; i++) {
 		if (cam->vdevs[i].vfd && cam->vdevs[i].vfd->minor ==
 		    iminor(file->f_dentry->d_inode)) {
@@ -1840,7 +1840,7 @@ static int omap34xxcam_open(struct file *file)
 			goto out_isp_get;
 		}
 		cam->isp = isp;
-		if (omap34xxcam_slave_power_set(vdev, V4L2_POWER_STANDBY,
+		if (omap34xxcam_slave_power_set(vdev, V4L2_POWER_ON,
 						OMAP34XXCAM_SLAVE_POWER_ALL)) {
 			dev_err(&vdev->vfd->dev, "can't power up slaves\n");
 			rval = -EBUSY;
@@ -1928,8 +1928,8 @@ static int omap34xxcam_release(struct file *file)
 		isp_stop(isp);
 		videobuf_streamoff(&ofh->vbq);
 		isp_unset_callback(isp, CBK_CATCHALL);
-		omap34xxcam_slave_power_set(vdev, V4L2_POWER_STANDBY,
-					    OMAP34XXCAM_SLAVE_POWER_ALL);
+//		omap34xxcam_slave_power_set(vdev, V4L2_POWER_STANDBY,
+//					    OMAP34XXCAM_SLAVE_POWER_ALL);
 		vdev->cam->streaming = NULL;
 	}
 
@@ -2073,7 +2073,6 @@ static int omap34xxcam_device_register(struct v4l2_int_device *s)
 	struct omap34xxcam_hw_config hwc;
 	struct device *isp;
 	int rval;
-
 	/* We need to check rval just once. The place is here. */
 	if (vidioc_int_g_priv(s, &hwc))
 		return -ENODEV;
@@ -2109,7 +2108,12 @@ static int omap34xxcam_device_register(struct v4l2_int_device *s)
 		}
 		vdev->cam->isp = isp;
 	}
+#ifdef CONFIG_VIDEO_MT9P012
+        rval = omap34xxcam_slave_power_set(vdev, V4L2_POWER_ON,
+                                           1 << hwc.dev_type);
+#else
 	rval = vidioc_int_dev_init(s);
+#endif
 	if (rval)
 		goto err_omap34xxcam_slave_init;
 	if (hwc.dev_type == OMAP34XXCAM_SLAVE_SENSOR) {

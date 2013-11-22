@@ -29,15 +29,17 @@
 #define MT9P012_16BIT			2
 #define MT9P012_32BIT			4
 
+/* The ID values we are looking for */
+#define MT9P012_MOD_ID			0x2800
+#define MT9P012_MOD_ID_REV7		0x2801
+#define MT9P013_MOD_ID			0x2803
+#define MT9P012_MFR_ID			0x0006
+
 /* terminating token for reg list */
 #define MT9P012_TOK_TERM 		0xFF
 
 /* delay token for reg list */
 #define MT9P012_TOK_DELAY		100
-
-/* The ID values we are looking for */
-#define MT9P012_MOD_ID			0x2800
-#define MT9P012_MFR_ID			0x0006
 
 /* FPS Capabilities */
 #define MT9P012_MIN_FPS		11
@@ -1148,6 +1150,11 @@ static int mt9p012_configure(struct v4l2_int_device *s)
 	return err;
 }
 
+static inline u32 mt9p012_ver(u16 model, u16 rev)
+{
+	return ((model & 0xffff) << 16) | (rev & 0xffff);
+}
+
 /**
  * mt9p012_detect - Detect if an mt9p012 is present, and if so which revision
  * @client: pointer to the i2c client driver structure
@@ -1167,25 +1174,34 @@ static int mt9p012_detect(struct i2c_client *client)
 	u32 model_id, mfr_id, rev;
 
 	if (!client) {
-		printk("%s: i2c client error\n",__func__);
 		return -ENODEV;
 	}
 	if (mt9p012_read_reg(client, MT9P012_16BIT, REG_MODEL_ID, &model_id)) {
-		printk("%s: Read model id error\n",__func__);
 		return -ENODEV;
 	}
 	if (mt9p012_read_reg(client, MT9P012_8BIT, REG_MANUFACTURER_ID,
 				&mfr_id)) {
-		printk("%s: Read manufcaturer id error\n",__func__);
 		return -ENODEV;
 	}
 	if (mt9p012_read_reg(client, MT9P012_8BIT, REG_REVISION_NUMBER, &rev)) {
-		printk("%s: Read revision number error\n",__func__);
 		return -ENODEV;
 	}
+
 	dev_info(&client->dev, "model id detected 0x%x mfr 0x%x\n", model_id,
 								mfr_id);
-	if ((model_id != MT9P012_MOD_ID) || (mfr_id != MT9P012_MFR_ID)) {
+	if ((mfr_id != MT9P012_MFR_ID)) {
+		dev_warn(&client->dev, "mfgr id mismatch 0x%x\n", mfr_id);
+
+		return -ENODEV;
+	}
+
+	if (model_id == MT9P012_MOD_ID) {
+		rev = mt9p012_ver(12, 0);
+	} else if (model_id == MT9P012_MOD_ID_REV7) {
+		rev = mt9p012_ver(12, 7);
+	} else if (model_id == MT9P013_MOD_ID) {
+		rev = mt9p012_ver(13, 0);
+	} else {
 		/* We didn't read the values we expected, so
 		 * this must not be an MT9P012.
 		 */
@@ -1544,7 +1560,7 @@ static int ioctl_s_parm(struct v4l2_int_device *s, struct v4l2_streamparm *a)
 static int ioctl_g_priv(struct v4l2_int_device *s, void *p)
 {
 	struct mt9p012_sensor *sensor = s->priv;
-
+		printk("%s:  Enter to ioctl_g_priv\n",__func__);
 	return sensor->pdata->priv_data_set(s, p);
 }
 
@@ -1687,7 +1703,6 @@ static int ioctl_s_power(struct v4l2_int_device *s, enum v4l2_power new_power)
 
 	switch (new_power) {
 	case V4L2_POWER_ON:
-		printk("%s:  V4L2_POWER_ON\n",__func__);
 		rval = sensor->pdata->set_xclk(s, sensor->xclk_current);
 		if (rval == -EINVAL)
 			break;
@@ -1783,41 +1798,32 @@ static int mt9p012_probe(struct i2c_client *client,
 	struct mt9p012_sensor *sensor;
 	struct mt9p012_platform_data *pdata;
 	int err;
-	printk("enter to %s\n",__func__);
 
 	if (i2c_get_clientdata(client))
 		return -EBUSY;
-	printk("%s: i2c_get_clientdata(client) OK \n",__func__);
 
 	pdata = client->dev.platform_data;
 	if (!pdata) {
 		dev_err(&client->dev, "no platform data?\n");
 		return -EINVAL;
 	}
-	printk("%s: client->dev.platform_data OK \n",__func__);
 
 	sensor = kzalloc(sizeof(*sensor), GFP_KERNEL);
 	if (!sensor)
 		return -ENOMEM;
 
-	printk("%s: kzalloc(sizeof(*sensor) OK \n",__func__);
 	/* Don't keep pointer to platform data, copy elements instead */
 	sensor->pdata = kzalloc(sizeof(*sensor->pdata), GFP_KERNEL);
 	if (!sensor->pdata) {
 		err = -ENOMEM;
 		goto on_err1;
 	}
-	printk("%s: kzalloc(sizeof(*sensor->pdata) OK \n",__func__);
 
-	printk("%s: power_set\n",__func__);
 	sensor->pdata->power_set = pdata->power_set;
-	printk("%s: set_xclk\n",__func__);
 	sensor->pdata->set_xclk = pdata->set_xclk;
-	printk("%s: priv_data_set\n",__func__);
 	sensor->pdata->priv_data_set = pdata->priv_data_set;
 
 	/* Set sensor default values */
-	printk("%s: Set sensor default values\n",__func__);
 	sensor->timeperframe.numerator = 1;
 	sensor->timeperframe.denominator = 15;
 	sensor->xclk_current = MT9P012_XCLK_NOM_1;
@@ -1825,11 +1831,9 @@ static int mt9p012_probe(struct i2c_client *client,
 	sensor->pix.height = MT9P012_VIDEO_WIDTH_4X_BINN_SCALED;
 	sensor->pix.pixelformat = V4L2_PIX_FMT_SGRBG10;
 
-	printk("%s: sensor->v4l2_int_device = &mt9p012_int_device\n",__func__);
 	sensor->v4l2_int_device = &mt9p012_int_device;
 	sensor->v4l2_int_device->priv = sensor;
 	sensor->dev = &client->dev;
-	printk("%s: i2c_set_clientdata\n",__func__);
 	i2c_set_clientdata(client, sensor);
 
 	err = v4l2_int_device_register(sensor->v4l2_int_device);
