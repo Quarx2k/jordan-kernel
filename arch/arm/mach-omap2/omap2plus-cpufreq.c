@@ -80,7 +80,9 @@ static unsigned int omap_getspeed(unsigned int cpu)
 
 static int omap_cpufreq_scale(unsigned int target_freq, unsigned int cur_freq)
 {
+#ifdef CONFIG_SMP
 	unsigned int i;
+#endif
 	int ret;
 	struct cpufreq_freqs freqs;
 
@@ -421,13 +423,16 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
 	}
 
 	omap_cpufreq_cooling_init();
-
+#ifndef CONFIG_MACH_OMAP_MAPPHONE
 	/* XXX: This is almost certainly papering over a bug elsewhere */
 	if (cpu_is_omap3630() && omap_rev() < OMAP3630_REV_ES1_2)
 		policy->cpuinfo.transition_latency = 30 * 1000;
 	else
 		/* FIXME: what's the actual transition time? */
 		policy->cpuinfo.transition_latency = 300 * 1000;
+#else
+	policy->cpuinfo.transition_latency = 50 * 1000;
+#endif
 
 	return 0;
 
