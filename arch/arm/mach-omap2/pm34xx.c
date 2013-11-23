@@ -362,7 +362,7 @@ void omap_sram_idle(bool suspend)
 	int mpu_next_state = PWRDM_POWER_ON;
 	int per_next_state = PWRDM_POWER_ON;
 	int core_next_state = PWRDM_POWER_ON;
-	int per_going_off;
+	int per_going_off = 0;
 	int core_prev_state, per_prev_state;
 	u32 sdrc_pwr = 0;
 	int cam_fclken;
@@ -443,10 +443,10 @@ void omap_sram_idle(bool suspend)
 	}
 
 	/* PER */
-	if (per_next_state < PWRDM_POWER_ON) {
-		per_going_off = (per_next_state == PWRDM_POWER_OFF) ? 1 : 0;
-		omap2_gpio_prepare_for_idle(per_going_off, suspend);
-	}
+	if (per_next_state < PWRDM_POWER_ON && core_next_state < PWRDM_POWER_ON) {
+                //per_going_off = (per_next_state == PWRDM_POWER_OFF) ? 1 : 0;
+                omap2_gpio_prepare_for_idle(per_going_off, suspend);
+        }
 
 	/* CORE */
 	if (core_next_state < PWRDM_POWER_ON) {
@@ -464,6 +464,9 @@ void omap_sram_idle(bool suspend)
 
 
 		}
+		/* Enable IO-PAD and IO-CHAIN wakeups */
+                omap2_prm_set_mod_reg_bits(OMAP3430_EN_IO_MASK, WKUP_MOD, PM_WKEN);
+                omap3_enable_io_chain();
 	}
 
 	omap3_intc_prepare_idle();
@@ -525,7 +528,7 @@ void omap_sram_idle(bool suspend)
 	pwrdm_post_transition();
 
 	/* PER */
-	if (per_next_state < PWRDM_POWER_ON) {
+	if (per_next_state < PWRDM_POWER_ON && core_next_state < PWRDM_POWER_ON) {
 		per_prev_state = pwrdm_read_prev_pwrst(per_pwrdm);
 		omap2_gpio_resume_after_idle(per_going_off);
 	}
