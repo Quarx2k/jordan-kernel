@@ -85,6 +85,7 @@ struct omap_vdd_dep_info omap34xx_vddmpu_dep_info[] = {
 #define OMAP3630_VDD_MPU_OPP50_UV		1012500
 #define OMAP3630_VDD_MPU_OPP100_UV		1200000
 #define OMAP3630_VDD_MPU_OPP120_UV		1325000
+#define OMAP3630_VDD_MPU_OPP130_UV		1350000
 #define OMAP3630_VDD_MPU_OPP1G_UV		1375000
 
 /* Amount in uV to add to SmartReflex-calculated voltages as a safety margin */
@@ -95,7 +96,8 @@ struct omap_volt_data omap36xx_vddmpu_volt_data[] = {
 	VOLT_DATA_DEFINE(OMAP3630_VDD_MPU_OPP50_UV, OMAP3630_SR_MPU_DEFAULT_MARGIN, OMAP3630_CONTROL_FUSE_OPP50_VDD1, 0xf4, 0x0c, OMAP_ABB_NOMINAL_OPP),
 	VOLT_DATA_DEFINE(OMAP3630_VDD_MPU_OPP100_UV, OMAP3630_SR_MPU_DEFAULT_MARGIN, OMAP3630_CONTROL_FUSE_OPP100_VDD1, 0xf9, 0x16, OMAP_ABB_NOMINAL_OPP),
 	VOLT_DATA_DEFINE(OMAP3630_VDD_MPU_OPP120_UV, OMAP3630_SR_MPU_DEFAULT_MARGIN, OMAP3630_CONTROL_FUSE_OPP120_VDD1, 0xfa, 0x23, OMAP_ABB_NOMINAL_OPP),
-	VOLT_DATA_DEFINE(OMAP3630_VDD_MPU_OPP1G_UV, OMAP3630_SR_MPU_DEFAULT_MARGIN_1G, OMAP3630_CONTROL_FUSE_OPP1G_VDD1, 0xfa, 0x27, OMAP_ABB_FAST_OPP),
+	VOLT_DATA_DEFINE(OMAP3630_VDD_MPU_OPP130_UV, OMAP3630_SR_MPU_DEFAULT_MARGIN_1G, OMAP3630_CONTROL_FUSE_OPP1G_VDD1, 0xfa, 0x27, OMAP_ABB_FAST_OPP),
+	VOLT_DATA_DEFINE(OMAP3630_VDD_MPU_OPP1G_UV, SR1P5_MARGIN_DISABLE_SR, OMAP3630_CONTROL_FUSE_OPP1G_VDD1, 0xfa, 0x27, OMAP_ABB_FAST_OPP),
 	VOLT_DATA_DEFINE(0, 0, 0, 0, 0, 0),
 };
 
@@ -153,6 +155,9 @@ static struct omap_opp_def __initdata omap34xx_opp_def_list[] = {
 	OPP_INITIALIZER("iva", "dpll2_ck", "mpu_iva", true, 430000000, OMAP3430_VDD_MPU_OPP5_UV),
 };
 
+/* Overclocking Frequency */
+#define DEFY_MPU_OPP5_FREQ 1100000000
+
 static struct omap_opp_def __initdata omap36xx_opp_def_list[] = {
 	/* MPU OPP1 - OPP50 */
 	OPP_INITIALIZER("mpu", "dpll1_ck", "mpu_iva", true,  300000000, OMAP3630_VDD_MPU_OPP50_UV),
@@ -163,7 +168,10 @@ static struct omap_opp_def __initdata omap36xx_opp_def_list[] = {
 				800000000, OMAP3630_VDD_MPU_OPP120_UV),
 	/* MPU OPP4 - OPP-SB */
 	OPP_INITIALIZER("mpu", "dpll1_ck", "mpu_iva", true,
-				1000000000, OMAP3630_VDD_MPU_OPP1G_UV),
+				1000000000, OMAP3630_VDD_MPU_OPP130_UV),
+	/* MPU OPP5 - using highest voltage */
+	OPP_INITIALIZER("mpu", "dpll1_ck", "mpu_iva", false,
+		DEFY_MPU_OPP5_FREQ, OMAP3630_VDD_MPU_OPP1G_UV),
 
 	/* L3 OPP1 - OPP50 */
 	OPP_INITIALIZER("l3_main", "l3_ick", "core", true,
@@ -179,8 +187,11 @@ static struct omap_opp_def __initdata omap36xx_opp_def_list[] = {
 	/* DSP OPP3 - OPP-Turbo */
 	OPP_INITIALIZER("iva", "dpll2_ck", "mpu_iva", true,
 				660000000, OMAP3630_VDD_MPU_OPP120_UV),
-	/* DSP OPP4 - OPP-SB */
+	/* DSP OPP4 - Line up with mpu */
 	OPP_INITIALIZER("iva", "dpll2_ck", "mpu_iva", true,
+				800000000, OMAP3630_VDD_MPU_OPP130_UV),
+	/* DSP OPP5 - OPP-SB */
+	OPP_INITIALIZER("iva", "dpll2_ck", "mpu_iva", false,
 				800000000, OMAP3630_VDD_MPU_OPP1G_UV),
 };
 
@@ -189,6 +200,7 @@ static struct omap_vdd_dep_volt omap36xx_vdd_mpu_core_dep_data[] = {
 	{.main_vdd_volt = OMAP3630_VDD_MPU_OPP50_UV, .dep_vdd_volt = OMAP3630_VDD_CORE_OPP50_UV},
 	{.main_vdd_volt = OMAP3630_VDD_MPU_OPP100_UV, .dep_vdd_volt = OMAP3630_VDD_CORE_OPP100_UV},
 	{.main_vdd_volt = OMAP3630_VDD_MPU_OPP120_UV, .dep_vdd_volt = OMAP3630_VDD_CORE_OPP100_UV},
+	{.main_vdd_volt = OMAP3630_VDD_MPU_OPP130_UV, .dep_vdd_volt = OMAP3630_VDD_CORE_OPP100_UV},
 	{.main_vdd_volt = OMAP3630_VDD_MPU_OPP1G_UV, .dep_vdd_volt = OMAP3630_VDD_CORE_OPP100_UV},
 };
 
