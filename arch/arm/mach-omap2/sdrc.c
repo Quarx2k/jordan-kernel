@@ -162,6 +162,15 @@ void __init omap2_sdrc_init(struct omap_sdrc_params *sdrc_cs0,
 	 */
 	l = (1 << SDRC_POWER_EXTCLKDIS_SHIFT) |
 		(1 << SDRC_POWER_PAGEPOLICY_SHIFT);
+
+#ifdef CONFIG_MACH_OMAP_MAPPHONE
+	/* Remove Errata work around for OMAP3630 only
+	 * It is corrected,enable Power Down mode for power saving
+	 */
+	if (cpu_is_omap3630())
+		l |= 1 << SDRC_POWER_PWDENA_SHIFT;
+#endif
+
 	sdrc_write_reg(l, SDRC_POWER);
 	omap2_sms_save_context();
 }
