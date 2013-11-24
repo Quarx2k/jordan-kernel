@@ -403,12 +403,21 @@ void omap_sram_idle(bool suspend)
 	/* Enable IO-PAD and IO-CHAIN wakeups */
 	per_next_state = pwrdm_read_next_pwrst(per_pwrdm);
 	core_next_state = pwrdm_read_next_pwrst(core_pwrdm);
+#ifdef CONFIG_PM_DEEPSLEEP
+	if (omap3_has_io_wakeup() &&
+	    ((per_next_state < PWRDM_POWER_ON ||
+	     core_next_state < PWRDM_POWER_ON) && !get_deepsleep_mode())) {
+		omap2_prm_set_mod_reg_bits(OMAP3430_EN_IO_MASK, WKUP_MOD, PM_WKEN);
+		omap3_enable_io_chain();
+	}
+#else
 	if (omap3_has_io_wakeup() &&
 	    (per_next_state < PWRDM_POWER_ON ||
 	     core_next_state < PWRDM_POWER_ON)) {
 		omap2_prm_set_mod_reg_bits(OMAP3430_EN_IO_MASK, WKUP_MOD, PM_WKEN);
 		omap3_enable_io_chain();
 	}
+#endif
 
 	pwrdm_pre_transition();
 
@@ -534,6 +543,15 @@ void omap_sram_idle(bool suspend)
 	}
 
 	/* Disable IO-PAD and IO-CHAIN wakeup */
+#ifdef CONFIG_PM_DEEPSLEEP
+	if (omap3_has_io_wakeup() &&
+	    (per_next_state < PWRDM_POWER_ON ||
+	     core_next_state < PWRDM_POWER_ON) && !get_deepsleep_mode()) {
+		omap2_prm_clear_mod_reg_bits(OMAP3430_EN_IO_MASK, WKUP_MOD,
+					     PM_WKEN);
+		omap3_disable_io_chain();
+	}
+#else
 	if (omap3_has_io_wakeup() &&
 	    (per_next_state < PWRDM_POWER_ON ||
 	     core_next_state < PWRDM_POWER_ON)) {
@@ -541,7 +559,7 @@ void omap_sram_idle(bool suspend)
 					     PM_WKEN);
 		omap3_disable_io_chain();
 	}
-
+#endif
 	clkdm_allow_idle(mpu_pwrdm->pwrdm_clkdms[0]);
 }
 
@@ -750,11 +768,25 @@ static void __init prcm_setup_regs(void)
 	 * sys_clkreq. In the long run clock framework should
 	 * take care of this.
 	 */
-	omap2_prm_rmw_mod_reg_bits(OMAP_AUTOEXTCLKMODE_MASK,
+
+	/* FIXME
+	 * Deassert sys_clk only if it is in bypass mode.
+	 * Due to some h/w issue, the system can't be woken up from sleep mode
+	 * when it's in oscillator mode with sys_clk deasserted. So just keep
+	 * sys_clk asserted in this mode which will cause extra about 8mA
+	 * current drain. But new version h/w will fix this issue.
+	 */
+#ifdef CONFIG_MACH_OMAP_MAPPHONE
+	if ((omap2_prm_read_mod_reg(OMAP3430_GR_MOD, OMAP3_PRM_CLKSRC_CTRL_OFFSET)
+		& 0x3) == 0) {
+#endif
+		omap2_prm_rmw_mod_reg_bits(OMAP_AUTOEXTCLKMODE_MASK,
 			     1 << OMAP_AUTOEXTCLKMODE_SHIFT,
 			     OMAP3430_GR_MOD,
 			     OMAP3_PRM_CLKSRC_CTRL_OFFSET);
-
+#ifdef CONFIG_MACH_OMAP_MAPPHONE
+	}
+#endif
 	/* setup wakup source */
 	omap2_prm_write_mod_reg(OMAP3430_EN_IO_MASK | OMAP3430_EN_GPIO1_MASK |
 			  OMAP3430_EN_GPT1_MASK | OMAP3430_EN_GPT12_MASK,
@@ -811,6 +843,10 @@ static void __init prcm_setup_regs(void)
 
 	/* Clear any pending PRCM interrupts */
 	omap2_prm_write_mod_reg(0, OCP_MOD, OMAP3_PRM_IRQSTATUS_MPU_OFFSET);
+
+#ifdef CONFIG_PM_DEEPSLEEP
+	omap2_prm_clear_mod_reg_bits(OMAP3430_EN_IO_MASK, WKUP_MOD, PM_WKEN);
+#endif
 
 	omap3_iva_idle();
 	omap3_d2d_idle();
@@ -921,12 +957,29 @@ void omap_push_sram_idle(void)
 
 static void __init pm_errata_configure(void)
 {
+	int omap_is_SEC = 0;
+
 	if (cpu_is_omap3630()) {
 		pm34xx_errata |= PM_RTA_ERRATUM_i608;
 		/* Enable the l2 cache toggling in sleep logic */
 		enable_omap3630_toggle_l2_on_restore();
 		if (omap_rev() < OMAP3630_REV_ES1_2)
 			pm34xx_errata |= PM_SDRC_WAKEUP_ERRATUM_i583;
+	}
+	/*
+	 * Issue: failure is seen after second or minutes of operation
+	 * while doing intensive DSP operation like video record
+	 * or playback. It only happen on phones using SEC silicon
+	 *
+	 * Workaround: Disable MEM RTA (Retention Till Access)
+	 * for second source Samsung OMAP3630 Silicon
+	 */
+#ifndef CONFIG_MACH_OMAP_MAPPHONE
+	omap_is_SEC = 1;
+#endif
+	if (omap_is_SEC) {
+		omap_ctrl_readl(OMAP36XX_CONTROL_MEM_RTA_CTRL);
+		omap_ctrl_writel(0x0, OMAP36XX_CONTROL_MEM_RTA_CTRL);
 	}
 }
 

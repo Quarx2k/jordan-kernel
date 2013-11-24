@@ -473,6 +473,10 @@ config OMAP4_ARM_ERRATA_743622
 	  This is handled for HS devices in the PPA code and does not need to be
 	  enabled."
 
+config MACH_OMAP_3430_ES3_ARM_ERRATA
+	bool "OMAP 3430 ES3.x Cortex-A8 ARM Errata"
+	default y
+
 config EMU_UART_DEBUG
 	bool "Setting MiniUSB port as UART3 to debug kernel"
 	default n

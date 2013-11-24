@@ -140,7 +140,11 @@ void __attribute__ ((weak)) arch_suspend_enable_irqs(void)
  *
  *	This function should be called after devices have been suspended.
  */
+#ifdef CONFIG_QUICK_WAKEUP
+static int _suspend_enter(suspend_state_t state)
+#else
 static int suspend_enter(suspend_state_t state)
+#endif
 {
 	int error;
 
@@ -203,6 +207,24 @@ static int suspend_enter(suspend_state_t state)
 	return error;
 }
 
+#ifdef CONFIG_QUICK_WAKEUP
+static int suspend_enter(suspend_state_t state)
+{
+       int error = 0;
+
+       error = _suspend_enter(state);
+
+       while (!error && !quickwakeup_execute()) {
+               if (has_wake_lock(WAKE_LOCK_SUSPEND))
+                       break;
+               error = _suspend_enter(state);
+       }
+
+       return error;
+}
+#endif
+
+
 /**
  *	suspend_devices_and_enter - suspend devices and enter the desired system
  *				    sleep state.
@@ -233,13 +255,6 @@ int suspend_devices_and_enter(suspend_state_t state)
 		goto Recover_platform;
 
 	error = suspend_enter(state);
-#ifdef CONFIG_QUICK_WAKEUP
-	while (!error && !quickwakeup_execute()) {
-		if (has_wake_lock(WAKE_LOCK_SUSPEND))
-			break;
-		error = suspend_devices_and_enter(state);
-	}
-#endif
  Resume_devices:
 	suspend_test_start();
 	dpm_resume_end(PMSG_RESUME);
