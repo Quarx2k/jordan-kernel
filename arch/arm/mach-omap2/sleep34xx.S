@@ -721,7 +721,11 @@ pm_pwstctrl_mpu:
 scratchpad_base:
 	.word	SCRATCHPAD_BASE_P
 sram_base:
+#ifndef CONFIG_MACH_OMAP_MAPPHONE
 	.word	SRAM_BASE_P + 0x8000
+#else
+	.word	SRAM_BASE_P + 0xf000
+#endif
 sdrc_power:
 	.word	SDRC_POWER_V
 ttbrbit_mask:

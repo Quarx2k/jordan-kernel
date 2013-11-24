@@ -128,12 +128,25 @@ static void __init omap_detect_sram(void)
 	if (cpu_class_is_omap2()) {
 		if (is_sram_locked()) {
 			if (cpu_is_omap34xx()) {
+#ifndef CONFIG_MACH_OMAP_MAPPHONE
 				omap_sram_base = OMAP3_SRAM_PUB_VA;
 				omap_sram_start = OMAP3_SRAM_PUB_PA;
+#endif
 				if ((omap_type() == OMAP2_DEVICE_TYPE_EMU) ||
 				    (omap_type() == OMAP2_DEVICE_TYPE_SEC)) {
+#ifndef CONFIG_MACH_OMAP_MAPPHONE
 					omap_sram_size = 0x7000; /* 28K */
+#else
+					omap_sram_base = OMAP3_SRAM_VA + 0xf000;
+					omap_sram_start = OMAP3_SRAM_PA + 0xf000;
+					omap_sram_size = 0x1000; /* 4K */
+#endif
 				} else {
+
+#ifdef CONFIG_MACH_OMAP_MAPPHONE
+					omap_sram_base = OMAP3_SRAM_VA + 0x8000;
+					omap_sram_start = OMAP3_SRAM_PA + 0x8000;
+#endif
 					omap_sram_size = 0x8000; /* 32K */
 				}
 			} else if (cpu_is_omap44xx()) {
@@ -147,9 +160,22 @@ static void __init omap_detect_sram(void)
 			}
 		} else {
 			if (cpu_is_omap34xx()) {
+#ifndef CONFIG_MACH_OMAP_MAPPHONE
 				omap_sram_base = OMAP3_SRAM_VA;
 				omap_sram_start = OMAP3_SRAM_PA;
 				omap_sram_size = 0x10000; /* 64K */
+#else
+				if ((omap_type() == OMAP2_DEVICE_TYPE_EMU) ||
+				    (omap_type() == OMAP2_DEVICE_TYPE_SEC)) {
+					omap_sram_base = OMAP3_SRAM_VA + 0xf000;
+					omap_sram_start = OMAP3_SRAM_PA + 0xf000;
+					omap_sram_size = 0x1000; /* 4K */
+				} else {
+					omap_sram_base = OMAP3_SRAM_VA;
+					omap_sram_start = OMAP3_SRAM_PA;
+					omap_sram_size = 0x10000; /* 64K */
+				}
+#endif
 			} else if (cpu_is_omap44xx()) {
 				omap_sram_base = OMAP4_SRAM_VA;
 				omap_sram_start = OMAP4_SRAM_PA;
