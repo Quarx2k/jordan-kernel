@@ -41,10 +41,14 @@
 #define OMAP_CM_REGADDR		OMAP34XX_CM_REGADDR
 
 /* Maximum DPLL multiplier, divider values for OMAP3 */
+#ifndef CONFIG_MACH_OMAP_MAPPHONE
 #define OMAP3_MAX_DPLL_MULT		2047
-#define OMAP3630_MAX_JTYPE_DPLL_MULT	4095
 #define OMAP3_MAX_DPLL_DIV		128
-
+#else
+#define OMAP3_MAX_DPLL_MULT		2048
+#define OMAP3_MAX_DPLL_DIV		128
+#endif
+#define OMAP3630_MAX_JTYPE_DPLL_MULT	4095
 /*
  * DPLL1 supplies clock to the MPU.
  * DPLL2 supplies clock to the IVA2.
