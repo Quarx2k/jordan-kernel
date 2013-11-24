@@ -178,16 +178,6 @@ static void sr_class1p5_calib_work(struct work_struct *work)
 
 	volt_data = work_data->vdata;
 
-	/* Don't bother calibrating if SR is disabled for this OPP */
-        if (volt_data->volt_margin == SR1P5_MARGIN_DISABLE_SR) {
-                pr_info("%s: Calibration disabled for Vnom %d in voltdm %s",
-                                __func__, volt_data->volt_nominal,
-                                voltdm->name);
-                volt_data->volt_calibrated = volt_data->volt_nominal;
-                u_volt_current = omap_vp_get_curr_volt(voltdm);
-                goto finish;
-        }
-
 	work_data->num_calib_triggers++;
 	/* if we are triggered first time, we need to start isr to sample */
 	if (work_data->num_calib_triggers == 1) {
@@ -283,33 +273,33 @@ done_calib:
 	sr_disable(voltdm);
 
 	/* Add margin if needed */
-	if (volt_data->volt_margin) {
-		struct omap_voltdm_pmic *pmic = voltdm->pmic;
-		/* Convert to rounded to PMIC step level if available */
-		if (pmic && pmic->vsel_to_uv && pmic->uv_to_vsel) {
-			/*
-			 * To ensure conversion works:
-			 * use a proper base voltage - we use the current volt
-			 * then convert it with pmic routine to vsel and back
-			 * to voltage, and finally remove the base voltage
-			 */
-			u_volt_margin = u_volt_current + volt_data->volt_margin;
-			u_volt_margin = pmic->uv_to_vsel(u_volt_margin);
-			u_volt_margin = pmic->vsel_to_uv(u_volt_margin);
-			u_volt_margin -= u_volt_current;
-		} else {
+        if (volt_data->volt_margin) {
+                struct omap_voltdm_pmic *pmic = voltdm->pmic;
+                /* Convert to rounded to PMIC step level if available */
+                if (pmic && pmic->vsel_to_uv && pmic->uv_to_vsel) {
+                        /*
+                         * To ensure conversion works:
+                         * use a proper base voltage - we use the current volt
+                         * then convert it with pmic routine to vsel and back
+                         * to voltage, and finally remove the base voltage
+                         */
+                        u_volt_margin = u_volt_current + volt_data->volt_margin;
+                        u_volt_margin = pmic->uv_to_vsel(u_volt_margin);
+                        u_volt_margin = pmic->vsel_to_uv(u_volt_margin);
+                        u_volt_margin -= u_volt_current;
+                } else {
                         u_volt_margin = volt_data->volt_margin;
                 }
 
-		if (u_volt_margin & SR1P5_MARGIN_DISABLE_SR) {
-			/* XXX This should be impossible! */
-			pr_err("%s: SR calibration ran for %s OPP with vnom %d"
-				"for which SR was disabled??!\n", __func__,
-				voltdm->name, volt_data->volt_nominal);
-		} else {
-			u_volt_safe += u_volt_margin;
-		}
-	}
+                if (u_volt_margin & SR1P5_MARGIN_DISABLE_SR) {
+                        /* XXX This should be impossible! */
+                        pr_err("%s: SR calibration ran for %s OPP with vnom %d"
+                                "for which SR was disabled??!\n", __func__,
+                                voltdm->name, volt_data->volt_nominal);
+                } else {
+                        u_volt_safe += u_volt_margin;
+                }
+        }
 
 	if (u_volt_safe > volt_data->volt_nominal) {
 		pr_warning("%s: %s Vsafe %ld > Vnom %d. %ld[%d] margin on"
@@ -320,8 +310,6 @@ done_calib:
 	}
 
 	volt_data->volt_calibrated = u_volt_safe;
-
-finish:
 	/* Setup my dynamic voltage for the next calibration for this opp */
 	volt_data->volt_dynamic_nominal = omap_get_dyn_nominal(volt_data);
 
