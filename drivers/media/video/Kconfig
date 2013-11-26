@@ -490,6 +490,15 @@ config VIDEO_MT9P012
          MT9P012 camera.  It is currently working with the TI OMAP3
          camera controller.
 
+config VIDEO_CAM_ISE
+        bool "Motorola Camera ISE Interface"
+        depends on I2C && VIDEO_V4L2
+  default n
+        ---help---
+          This is a Video4Linux2 isp and vl42 configuration handler for
+          the motorole ISE driver, which resides in the user space.
+
+
 config VIDEO_TCM825X
 	tristate "TCM825x camera sensor support"
 	depends on I2C && VIDEO_V4L2

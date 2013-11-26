@@ -23,6 +23,9 @@
 #include <linux/vib-gpio.h>
 
 #include <media/mt9p012.h>
+#ifdef CONFIG_VIDEO_CAM_ISE
+#include <media/camise.h>
+#endif
 
 #define MAPPHONE_LM_3530_INT_GPIO	92
 #define MAPPHONE_AKM8973_INT_GPIO	175
@@ -32,7 +35,12 @@
 
 extern void __init mapphone_touch_panel_init(struct i2c_board_info *i2c_info);
 extern void __init mapphone_touch_btn_init(struct i2c_board_info *i2c_info);
+#ifdef CONFIG_VIDEO_MT9P012
 extern struct mt9p012_platform_data mapphone_mt9p012_platform_data;
+#endif
+#ifdef CONFIG_VIDEO_CAM_ISE
+extern struct camise_platform_data mapphone_camise_platform_data;
+#endif
 static struct i2c_board_info __initdata
 	mapphone_i2c_bus1_board_info[I2C_BUS_MAX_DEVICES];
 static struct i2c_board_info __initdata
@@ -880,10 +888,18 @@ static struct i2c_board_info __initdata
 		I2C_BOARD_INFO("lm3554_led", 0x53),
 		.platform_data = &mapphone_camera_flash_3554,
 	},
+#ifdef CONFIG_VIDEO_MT9P012
 	{
 		I2C_BOARD_INFO("mt9p012", 0x36),
 		.platform_data = &mapphone_mt9p012_platform_data,
 	},
+#endif
+#if defined(CONFIG_VIDEO_CAM_ISE)
+	{
+		I2C_BOARD_INFO("camise", CAMISE_I2C_ADDR),
+		.platform_data = &mapphone_camise_platform_data,
+	},
+#endif
 };
 
 static struct omap_i2c_bus_board_data __initdata mapphone_i2c_1_bus_pdata;
