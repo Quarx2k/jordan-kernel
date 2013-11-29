@@ -63,6 +63,118 @@ static PVRSRV_DEVICE_NODE *gpsSGXDevNode;
 static IMG_CPU_VIRTADDR gsSGXRegsCPUVAddr;
 #endif
 
+extern struct platform_device *gpsPVRLDMDev;
+extern char sgx_parent_clock[SYS_SGX_CLOCK_NAME_LEN];
+extern unsigned long sgx_clock_speed;
+
+static ssize_t sgx_fck_rate_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	return scnprintf(buf, PAGE_SIZE, "%lu\n", sgx_clock_speed);
+}
+
+static ssize_t sgx_fck_rate_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	SYS_DATA *psSysData;
+	SYS_SPECIFIC_DATA *psSysSpecData;
+	unsigned long clock_rate;
+	int ret;
+#if defined(SUPPORT_OMAP3630_SGXFCLK_COREX2)
+	char parent_clk_name[SYS_SGX_CLOCK_NAME_LEN];
+	struct clk *parent_clk;
+	int i;
+#endif
+
+	if (strict_strtoul(buf, 10, &clock_rate))
+		return -EINVAL;
+
+	SysAcquireData(&psSysData);
+	psSysSpecData = (SYS_SPECIFIC_DATA *) psSysData->pvSysSpecificData;
+
+	mutex_lock(&psSysSpecData->sPowerLock);
+
+#if defined(SUPPORT_OMAP3630_SGXFCLK_COREX2)
+	/*
+	 * Ignore possible values lower than SYS_SGX_CLOCK_SPEED
+	 * obtainable from corex2_fck
+	 */
+	if (clock_rate > SYS_SGX_CLOCK_SPEED + 1000000)
+		strncpy(parent_clk_name, "corex2_fck", 11);
+	else
+		strncpy(parent_clk_name, "core_ck", 8);
+
+	if (strcmp(sgx_parent_clock, parent_clk_name))
+	{
+		parent_clk = clk_get(NULL, parent_clk_name);
+		if (IS_ERR(parent_clk))
+		{
+			PVR_DPF((PVR_DBG_ERROR,"sgx_fck_rate_store: Couldn't get parent clock!"));
+			ret = -ENODEV;
+			goto out;
+		}
+
+		if (atomic_read(&psSysSpecData->sSGXClocksEnabled) == 1)
+		{
+			clk_disable(psSysSpecData->psSGX_ICK);
+			clk_disable(psSysSpecData->psSGX_FCK);
+		}
+
+		i = clk_set_parent(psSysSpecData->psSGX_FCK, parent_clk);
+
+		if (atomic_read(&psSysSpecData->sSGXClocksEnabled) == 1)
+		{
+			ret = clk_enable(psSysSpecData->psSGX_FCK);
+			if (ret)
+			{
+				atomic_set(&psSysSpecData->sSGXClocksEnabled, 0);
+				goto out;
+			}
+			ret = clk_enable(psSysSpecData->psSGX_ICK);
+			if (ret) {
+				clk_disable(psSysSpecData->psSGX_FCK);
+				atomic_set(&psSysSpecData->sSGXClocksEnabled, 0);
+				goto out;
+			}
+		}
+
+		if (i)
+		{
+			PVR_DPF((PVR_DBG_ERROR,"sgx_fck_rate_store: Couldn't set SGX parent clock!"));
+			ret = i;
+			goto out;
+		}
+
+		strncpy(sgx_parent_clock, parent_clk_name, SYS_SGX_CLOCK_NAME_LEN);
+	}
+#endif
+
+	clock_rate = clk_round_rate(psSysSpecData->psSGX_FCK, clock_rate + 1000000);
+
+	if (clock_rate != sgx_clock_speed)
+	{
+		ret = clk_set_rate(psSysSpecData->psSGX_FCK, clock_rate);
+		if (ret)
+		{
+			PVR_DPF((PVR_DBG_ERROR,"sgx_fck_rate_store: Couldn't set clock rate!"));
+			sgx_clock_speed = clk_get_rate(psSysSpecData->psSGX_FCK);
+			goto out;
+		}
+
+		sgx_clock_speed = clock_rate;
+	}
+
+	ret = count;
+
+out:
+	mutex_unlock(&psSysSpecData->sPowerLock);
+	return ret;
+}
+
+static DEVICE_ATTR(sgx_fck_rate, S_IRUGO | S_IWUSR,
+		sgx_fck_rate_show, sgx_fck_rate_store);
+static bool dev_attr_sgx_fck_rate_registered = false;
+
 IMG_UINT32 PVRSRV_BridgeDispatchKM(IMG_UINT32	Ioctl,
 								   IMG_BYTE		*pInBuf,
 								   IMG_UINT32	InBufLen,
@@ -532,6 +644,11 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 	}
 #endif
 
+	i = device_create_file(&gpsPVRLDMDev->dev, &dev_attr_sgx_fck_rate);
+	if (i)
+		PVR_DPF((PVR_DBG_ERROR,"SysInitialise: Failed to initialise device!"));
+	else
+		dev_attr_sgx_fck_rate_registered = true;
 
 	return PVRSRV_OK;
 }
@@ -689,6 +806,12 @@ PVRSRV_ERROR SysDeinitialise (SYS_DATA *psSysData)
 	gpsSysSpecificData->bSGXInitComplete = IMG_FALSE;
 
 	gpsSysData = IMG_NULL;
+
+	if (dev_attr_sgx_fck_rate_registered)
+	{
+		device_remove_file(&gpsPVRLDMDev->dev, &dev_attr_sgx_fck_rate);
+		dev_attr_sgx_fck_rate_registered = false;
+	}
 
 	return PVRSRV_OK;
 }
