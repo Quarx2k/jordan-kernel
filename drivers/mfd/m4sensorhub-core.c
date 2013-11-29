@@ -127,12 +127,14 @@ static void minnow_m4sensorhub_hw_reset(struct m4sensorhub_data *m4sensorhub)
 	gpio_set_value(m4sensorhub->hwconfig.reset_gpio, 1);
 }
 
+
 /* callback from driver to initialize hardware on probe */
 static int minnow_m4sensorhub_hw_init(struct m4sensorhub_data *m4sensorhub,
 		struct device_node *node)
 {
 	int gpio;
 	int err = -EINVAL;
+	const char *fp = NULL;
 
 	if (!m4sensorhub) {
 		printk(KERN_ERR "m4sensorhub_hw_init: invalid pointer\n");
@@ -144,6 +146,14 @@ static int minnow_m4sensorhub_hw_init(struct m4sensorhub_data *m4sensorhub,
 		err = -EINVAL;
 		goto error;
 	}
+
+	of_property_read_string(node, "mot,fw-filename", &fp);
+	if (fp == NULL) {
+		pr_err("Missing M4 sensorhub firmware filename\n");
+		err = -EINVAL;
+		goto error;
+	}
+	m4sensorhub->filename = (char *)fp;
 
 	gpio = of_get_named_gpio_flags(node, "mot,irq-gpio", 0, NULL);
 	err = (gpio < 0) ? -ENODEV : gpio_request(gpio, "m4sensorhub-intr");
@@ -225,6 +235,7 @@ error_reset:
 	gpio_free(m4sensorhub->hwconfig.irq_gpio);
 	m4sensorhub->hwconfig.irq_gpio = -1;
 error:
+	m4sensorhub->filename = NULL;
 	return err;
 }
 
@@ -266,6 +277,8 @@ static void minnow_m4sensorhub_hw_free(struct m4sensorhub_data *m4sensorhub)
 		gpio_free(m4sensorhub->hwconfig.mpu_9150_en_gpio);
 		m4sensorhub->hwconfig.mpu_9150_en_gpio = -1;
 	}
+
+	m4sensorhub->filename = NULL;
 }
 
 /* END BOARD FILE FUNCTIONS */

@@ -106,6 +106,7 @@ struct m4sensorhub_data {
 	enum m4sensorhub_mode mode;
 	struct m4sensorhub_platform_data *pdev;
 	struct m4sensorhub_hwconfig hwconfig;
+	char *filename;
 };
 
 /* Global (kernel) functions */

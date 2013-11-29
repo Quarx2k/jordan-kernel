@@ -27,8 +27,6 @@
 static int m4sensorhub_jump_to_user(struct m4sensorhub_data *m4sensorhub);
 
 /* --------------- Local Declarations -------------- */
-/* Firmware */
-#define FIRMWARE_NAME	"m4sensorhub.bin"
 /* The M4 Flash Memory Map
  * From the Flash Programming Manual:
   Sector  Start Address    Size              comments
@@ -126,11 +124,11 @@ int m4sensorhub_load_firmware(struct m4sensorhub_data *m4sensorhub,
 		goto done;
 	}
 
-	ret = request_firmware(&firmware, FIRMWARE_NAME,
+	ret = request_firmware(&firmware, m4sensorhub->filename,
 		&m4sensorhub->i2c_client->dev);
 	if (ret < 0) {
 		KDEBUG(M4SH_ERROR, "%s: request_firmware failed for %s\n",
-			__func__, FIRMWARE_NAME);
+			__func__,  m4sensorhub->filename);
 		KDEBUG(M4SH_ERROR, "Trying to run firmware already on hw.\n");
 		ret = 0;
 		goto done;

@@ -122,6 +122,7 @@
 		mot,boot0-gpio  = <&gpio1 21 0>; /* gpio-021 */
 		mot,boot1-gpio  = <&gpio1 24 0>; /* gpio-024 */
 		mot,enable-gpio = <&gpio1 28 0>; /* gpio-028 */
+		mot,fw-filename = "m4sensorhub-p0_minnow.bin";
 	};
 };
 
