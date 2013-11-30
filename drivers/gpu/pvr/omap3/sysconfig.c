@@ -490,7 +490,7 @@ PVRSRV_ERROR SysInitialise(IMG_VOID)
 #else
 	psTimingInfo->bEnableActivePM = IMG_FALSE;
 #endif
-	psTimingInfo->ui32ActivePowManLatencyms = SYS_SGX_ACTIVE_POWER_LATENCY_MS;
+	psTimingInfo->ui32ActivePowManLatencyms = sgx_apm_latency;
 	psTimingInfo->ui32uKernelFreq = SYS_SGX_PDS_TIMER_FREQ;
 #endif
 

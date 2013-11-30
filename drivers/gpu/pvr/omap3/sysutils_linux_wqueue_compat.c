@@ -56,6 +56,8 @@
 char sgx_parent_clock[SYS_SGX_CLOCK_NAME_LEN] = SGX_PARENT_CLOCK;
 unsigned long sgx_clock_speed = SYS_SGX_CLOCK_SPEED;
 
+extern uint sgx_apm_latency;
+
 extern struct platform_device *gpsPVRLDMDev;
 #if defined(SGX530) && (SGX_CORE_REV == 125)
 #define OMAP_MEMORY_BUS_CLOCK_MAX 800000
@@ -149,7 +151,7 @@ IMG_VOID SysGetSGXTimingInformation(SGX_TIMING_INFORMATION *psTimingInfo)
 #else
 	psTimingInfo->bEnableActivePM = IMG_FALSE;
 #endif
-	psTimingInfo->ui32ActivePowManLatencyms = SYS_SGX_ACTIVE_POWER_LATENCY_MS;
+	psTimingInfo->ui32ActivePowManLatencyms = sgx_apm_latency;
 }
 
 PVRSRV_ERROR EnableSGXClocks(SYS_DATA *psSysData)
