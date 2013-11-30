@@ -133,12 +133,14 @@ MODULE_PARM_DESC(gPVRDebugLevel, "Sets the level of debug output (default 0x7)")
 #error "sgx ide mode not defined"
 #endif
 
+#if defined(CONFIG_PVR_SGXCORE_540)
 bool sgx_idle_logging = false;
 module_param(sgx_idle_logging, bool, 0644);
 uint sgx_idle_mode = DEFAULT_IDLE_MODE;
 module_param(sgx_idle_mode, uint, 0644);
 uint sgx_idle_timeout = CONFIG_SGX_DVFS_IDLE_TIMEOUT * NSEC_PER_USEC;
 module_param(sgx_idle_timeout, uint, 0644);
+#endif
 
 uint sgx_apm_latency = SYS_SGX_ACTIVE_POWER_LATENCY_MS;
 module_param(sgx_apm_latency, uint, 0644);
