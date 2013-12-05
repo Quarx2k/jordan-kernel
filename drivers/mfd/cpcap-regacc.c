@@ -316,7 +316,8 @@ int cpcap_regacc_read(struct cpcap_device *cpcap, enum cpcap_reg reg,
 {
 	int retval = -EINVAL;
 	struct spi_device *spi = cpcap->spi;
-
+/* Temporarily disable SPI for CPCAP driver for minnow bringup */
+return 0;
 	if (IS_CPCAP(reg) && (value_ptr != 0)) {
 		mutex_lock(&reg_access);
 
@@ -338,7 +339,8 @@ int cpcap_regacc_write(struct cpcap_device *cpcap,
 	unsigned short old_value = 0;
 	struct cpcap_platform_data *data;
 	struct spi_device *spi = cpcap->spi;
-
+/* Temporarily disable SPI for CPCAP driver for minnow bringup */
+return 0;
 	data = (struct cpcap_platform_data *)spi->controller_data;
 
 	if (IS_CPCAP(reg) &&
