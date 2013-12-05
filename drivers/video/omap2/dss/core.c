@@ -517,10 +517,10 @@ static int omap_dss_bus_register(void)
 		return r;
 	}
 
-	core.dss_early_suspend_info.suspend = dss_early_suspend;
-	core.dss_early_suspend_info.resume = dss_late_resume;
-	core.dss_early_suspend_info.level = EARLY_SUSPEND_LEVEL_DISABLE_FB + 1;
-	register_early_suspend(&core.dss_early_suspend_info);
+	//core.dss_early_suspend_info.suspend = dss_early_suspend;
+	//core.dss_early_suspend_info.resume = dss_late_resume;
+	//core.dss_early_suspend_info.level = EARLY_SUSPEND_LEVEL_DISABLE_FB + 1;
+	//register_early_suspend(&core.dss_early_suspend_info);
 	return 0;
 }
 

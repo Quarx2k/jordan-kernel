@@ -29,6 +29,7 @@
 
 /* Powerdomain basic power states */
 #define PWRDM_POWER_OFF		0x0
+#define PWRDM_POWER_RET         0x1
 #define PWRDM_POWER_INACTIVE	0x2
 #define PWRDM_POWER_ON		0x3
 #define PWRDM_POWER_CSWR	0x4

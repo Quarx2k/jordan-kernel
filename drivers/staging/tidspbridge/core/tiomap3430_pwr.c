@@ -46,6 +46,7 @@
 #include "_tiomap_pwr.h"
 #include <mach-omap2/prm-regbits-34xx.h>
 #include <mach-omap2/cm-regbits-34xx.h>
+#include <mach-omap2/powerdomain.h>
 
 #define PWRSTST_TIMEOUT          200
 
@@ -108,7 +109,7 @@ int handle_hibernation_from_dsp(struct bridge_dev_context *dev_context)
 	} else {
 
 		/* Save mailbox settings */
-		omap_mbox_save_ctx(dev_context->mbox);
+		//omap_mbox_save_ctx(dev_context->mbox);
 
 		/* Turn off DSP Peripheral clocks and DSP Load monitor timer */
 		status = dsp_clock_disable_all(dev_context->dsp_per_clks);
@@ -165,7 +166,7 @@ int sleep_dsp(struct bridge_dev_context *dev_context, u32 dw_cmd,
 
 	switch (dev_context->brd_state) {
 	case BRD_RUNNING:
-		omap_mbox_save_ctx(dev_context->mbox);
+		//omap_mbox_save_ctx(dev_context->mbox);
 		if (dsp_test_sleepstate == PWRDM_POWER_OFF) {
 			sm_interrupt_dsp(dev_context, MBX_PM_DSPHIBERNATE);
 			dev_dbg(bridge, "PM: %s - sent hibernate cmd to DSP\n",
@@ -177,7 +178,7 @@ int sleep_dsp(struct bridge_dev_context *dev_context, u32 dw_cmd,
 		}
 		break;
 	case BRD_RETENTION:
-		omap_mbox_save_ctx(dev_context->mbox);
+		//omap_mbox_save_ctx(dev_context->mbox);
 		if (dsp_test_sleepstate == PWRDM_POWER_OFF) {
 			sm_interrupt_dsp(dev_context, MBX_PM_DSPHIBERNATE);
 			target_pwr_state = PWRDM_POWER_OFF;
