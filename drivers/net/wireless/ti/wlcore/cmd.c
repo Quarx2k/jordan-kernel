@@ -60,7 +60,8 @@ static int __wlcore_cmd_send(struct wl1271 *wl, u16 id, void *buf,
 	u16 status;
 	u16 poll_count = 0;
 
-	if (WARN_ON(unlikely(wl->state == WLCORE_STATE_RESTARTING)))
+	if (unlikely(wl->state == WLCORE_STATE_RESTARTING) &&
+		     id != CMD_STOP_FWLOGGER)
 		return -EIO;
 
 	cmd = buf;
@@ -311,8 +312,8 @@ static int wlcore_get_new_session_id(struct wl1271 *wl, u8 hlid)
 int wl12xx_allocate_link(struct wl1271 *wl, struct wl12xx_vif *wlvif, u8 *hlid)
 {
 	unsigned long flags;
-	u8 link = find_first_zero_bit(wl->links_map, WL12XX_MAX_LINKS);
-	if (link >= WL12XX_MAX_LINKS)
+	u8 link = find_first_zero_bit(wl->links_map, wl->num_links);
+	if (link >= wl->num_links)
 		return -EBUSY;
 
 	wl->session_ids[link] = wlcore_get_new_session_id(wl, link);
@@ -325,7 +326,7 @@ int wl12xx_allocate_link(struct wl1271 *wl, struct wl12xx_vif *wlvif, u8 *hlid)
 
 	/* take the last "freed packets" value from the current FW status */
 	wl->links[link].prev_freed_pkts =
-			wl->fw_status_2->counters.tx_lnk_free_pkts[link];
+			wl->fw_status->counters.tx_lnk_free_pkts[link];
 	wl->links[link].wlvif = wlvif;
 
 	/*
@@ -366,9 +367,9 @@ void wl12xx_free_link(struct wl1271 *wl, struct wl12xx_vif *wlvif, u8 *hlid)
 	wl1271_tx_reset_link_queues(wl, *hlid);
 	wl->links[*hlid].wlvif = NULL;
 
-	if (wlvif->bss_type == BSS_TYPE_STA_BSS ||
-	    (wlvif->bss_type == BSS_TYPE_AP_BSS &&
-	     *hlid == wlvif->ap.bcast_hlid)) {
+	if (wlvif->bss_type == BSS_TYPE_AP_BSS &&
+	    *hlid == wlvif->ap.bcast_hlid) {
+		u32 sqn_padding = WL1271_TX_SQN_POST_RECOVERY_PADDING;
 		/*
 		 * save the total freed packets in the wlvif, in case this is
 		 * recovery or suspend
@@ -379,9 +380,11 @@ void wl12xx_free_link(struct wl1271 *wl, struct wl12xx_vif *wlvif, u8 *hlid)
 		 * increment the initial seq number on recovery to account for
 		 * transmitted packets that we haven't yet got in the FW status
 		 */
+		if (wlvif->encryption_type == KEY_GEM)
+			sqn_padding = WL1271_TX_SQN_POST_RECOVERY_PADDING_GEM;
+
 		if (test_bit(WL1271_FLAG_RECOVERY_IN_PROGRESS, &wl->flags))
-			wlvif->total_freed_pkts +=
-					WL1271_TX_SQN_POST_RECOVERY_PADDING;
+			wlvif->total_freed_pkts += sqn_padding;
 	}
 
 	wl->links[*hlid].total_freed_pkts = 0;
@@ -845,7 +848,8 @@ EXPORT_SYMBOL_GPL(wl1271_cmd_test);
  * @buf: buffer for the response, including all headers, must work with dma
  * @len: length of buf
  */
-int wl1271_cmd_interrogate(struct wl1271 *wl, u16 id, void *buf, size_t len)
+int wl1271_cmd_interrogate(struct wl1271 *wl, u16 id, void *buf,
+			   size_t cmd_len, size_t res_len)
 {
 	struct acx_header *acx = buf;
 	int ret;
@@ -854,10 +858,10 @@ int wl1271_cmd_interrogate(struct wl1271 *wl, u16 id, void *buf, size_t len)
 
 	acx->id = cpu_to_le16(id);
 
-	/* payload length, does not include any headers */
-	acx->len = cpu_to_le16(len - sizeof(*acx));
+	/* response payload length, does not include any headers */
+	acx->len = cpu_to_le16(res_len - sizeof(*acx));
 
-	ret = wl1271_cmd_send(wl, CMD_INTERROGATE, acx, sizeof(*acx), len);
+	ret = wl1271_cmd_send(wl, CMD_INTERROGATE, acx, cmd_len, res_len);
 	if (ret < 0)
 		wl1271_error("INTERROGATE command failed");
 
@@ -1126,6 +1130,8 @@ int wl12xx_cmd_build_probe_req(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 	u16 template_id_2_4 = wl->scan_templ_id_2_4;
 	u16 template_id_5 = wl->scan_templ_id_5;
 
+	wl1271_debug(DEBUG_SCAN, "build probe request band %d", band);
+
 	skb = ieee80211_probereq_get(wl->hw, vif, ssid, ssid_len,
 				     ie_len);
 	if (!skb) {
@@ -1134,8 +1140,6 @@ int wl12xx_cmd_build_probe_req(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 	}
 	if (ie_len)
 		memcpy(skb_put(skb, ie_len), ie, ie_len);
-
-	wl1271_dump(DEBUG_SCAN, "PROBE REQ: ", skb->data, skb->len);
 
 	if (sched_scan &&
 	    (wl->quirks & WLCORE_QUIRK_DUAL_PROBE_TMPL)) {
@@ -1172,7 +1176,7 @@ struct sk_buff *wl1271_cmd_build_ap_probe_req(struct wl1271 *wl,
 	if (!skb)
 		goto out;
 
-	wl1271_dump(DEBUG_SCAN, "AP PROBE REQ: ", skb->data, skb->len);
+	wl1271_debug(DEBUG_SCAN, "set ap probe request template");
 
 	rate = wl1271_tx_min_rate_get(wl, wlvif->bitrate_masks[wlvif->band]);
 	if (wlvif->band == IEEE80211_BAND_2GHZ)
@@ -1613,8 +1617,10 @@ static int wlcore_get_reg_conf_ch_idx(enum ieee80211_band band, u16 ch)
 	case IEEE80211_BAND_5GHZ:
 		if (ch >= 8 && ch <= 16)
 			idx = ((ch-8)/4 + 18);
-		else if (ch >= 34 && ch <= 64)
+		else if (ch >= 34 && ch <= 48)
 			idx = ((ch-34)/2 + 3 + 18);
+		else if (ch >= 52 && ch <= 64)
+			idx = ((ch-52)/4 + 11 + 18);
 		else if (ch >= 100 && ch <= 140)
 			idx = ((ch-100)/4 + 15 + 18);
 		else if (ch >= 149 && ch <= 165)
@@ -1967,12 +1973,15 @@ int wl12xx_start_dev(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 		      wlvif->bss_type == BSS_TYPE_IBSS)))
 		return -EINVAL;
 
-	ret = wl12xx_cmd_role_enable(wl,
-				     wl12xx_wlvif_to_vif(wlvif)->addr,
-				     WL1271_ROLE_DEVICE,
-				     &wlvif->dev_role_id);
-	if (ret < 0)
-		goto out;
+	/* the dev role is already started for p2p mgmt interfaces */
+	if (!wl12xx_wlvif_to_vif(wlvif)->dummy_p2p) {
+		ret = wl12xx_cmd_role_enable(wl,
+					     wl12xx_wlvif_to_vif(wlvif)->addr,
+					     WL1271_ROLE_DEVICE,
+					     &wlvif->dev_role_id);
+		if (ret < 0)
+			goto out;
+	}
 
 	ret = wl12xx_cmd_role_start_dev(wl, wlvif, band, channel);
 	if (ret < 0)
@@ -1987,7 +1996,8 @@ int wl12xx_start_dev(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 out_stop:
 	wl12xx_cmd_role_stop_dev(wl, wlvif);
 out_disable:
-	wl12xx_cmd_role_disable(wl, &wlvif->dev_role_id);
+	if (!wl12xx_wlvif_to_vif(wlvif)->dummy_p2p)
+		wl12xx_cmd_role_disable(wl, &wlvif->dev_role_id);
 out:
 	return ret;
 }
@@ -2016,9 +2026,11 @@ int wl12xx_stop_dev(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 	if (ret < 0)
 		goto out;
 
-	ret = wl12xx_cmd_role_disable(wl, &wlvif->dev_role_id);
-	if (ret < 0)
-		goto out;
+	if (!wl12xx_wlvif_to_vif(wlvif)->dummy_p2p) {
+		ret = wl12xx_cmd_role_disable(wl, &wlvif->dev_role_id);
+		if (ret < 0)
+			goto out;
+	}
 
 out:
 	return ret;

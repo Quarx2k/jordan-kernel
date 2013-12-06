@@ -672,6 +672,14 @@ void ieee80211_report_low_ack(struct ieee80211_sta *pubsta, u32 num_packets)
 }
 EXPORT_SYMBOL(ieee80211_report_low_ack);
 
+
+void ieee80211_roaming_status(struct ieee80211_vif *vif, bool enabled)
+{
+	struct ieee80211_sub_if_data *sdata = vif_to_sdata(vif);
+	cfg80211_roaming_status(sdata->dev, enabled, GFP_KERNEL);
+}
+EXPORT_SYMBOL(ieee80211_roaming_status);
+
 void ieee80211_free_txskb(struct ieee80211_hw *hw, struct sk_buff *skb)
 {
 	struct ieee80211_local *local = hw_to_local(hw);

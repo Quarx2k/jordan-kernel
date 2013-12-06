@@ -260,10 +260,8 @@ static void ieee80211_restart_work(struct work_struct *work)
 	flush_workqueue(local->workqueue);
 
 	mutex_lock(&local->mtx);
-	WARN(test_bit(SCAN_HW_SCANNING, &local->scanning) ||
-	     rcu_dereference_protected(local->sched_scan_sdata,
-				       lockdep_is_held(&local->mtx)),
-		"%s called with hardware scan in progress\n", __func__);
+	WARN(test_bit(SCAN_HW_SCANNING, &local->scanning),
+	     "%s called with hardware scan in progress\n", __func__);
 	mutex_unlock(&local->mtx);
 
 	rtnl_lock();
@@ -292,7 +290,7 @@ void ieee80211_restart_hw(struct ieee80211_hw *hw)
 	local->in_reconfig = true;
 	barrier();
 
-	schedule_work(&local->restart_work);
+	queue_work(local->freezable_workqueue, &local->restart_work);
 }
 EXPORT_SYMBOL(ieee80211_restart_hw);
 
@@ -927,6 +925,13 @@ int ieee80211_register_hw(struct ieee80211_hw *hw)
 		goto fail_workqueue;
 	}
 
+	local->freezable_workqueue =
+		create_freezable_workqueue(wiphy_name(local->hw.wiphy));
+	if (!local->freezable_workqueue) {
+		result = -ENOMEM;
+		goto fail_freezable;
+	}
+
 	/*
 	 * The hardware needs headroom for sending the frame,
 	 * and we need some headroom for passing the frame to monitor
@@ -1020,6 +1025,8 @@ int ieee80211_register_hw(struct ieee80211_hw *hw)
 	rtnl_unlock();
 	ieee80211_wep_free(local);
 	sta_info_stop(local);
+	destroy_workqueue(local->freezable_workqueue);
+ fail_freezable:
 	destroy_workqueue(local->workqueue);
  fail_workqueue:
 	wiphy_unregister(local->hw.wiphy);
@@ -1071,6 +1078,7 @@ void ieee80211_unregister_hw(struct ieee80211_hw *hw)
 	skb_queue_purge(&local->skb_queue_unreliable);
 
 	destroy_workqueue(local->workqueue);
+	destroy_workqueue(local->freezable_workqueue);
 	wiphy_unregister(local->hw.wiphy);
 	sta_info_stop(local);
 	ieee80211_wep_free(local);

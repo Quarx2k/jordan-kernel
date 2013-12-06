@@ -265,7 +265,8 @@ void __cfg80211_sched_scan_results(struct work_struct *wk)
 			__cfg80211_bss_expire(rdev, request->scan_start);
 			spin_unlock_bh(&rdev->bss_lock);
 			request->scan_start =
-				jiffies + msecs_to_jiffies(request->interval);
+				jiffies +
+				msecs_to_jiffies(request->long_interval);
 		}
 		nl80211_send_sched_scan_results(rdev, request->dev);
 	}
@@ -295,9 +296,17 @@ void cfg80211_sched_scan_stopped(struct wiphy *wiphy)
 }
 EXPORT_SYMBOL(cfg80211_sched_scan_stopped);
 
+struct cfg80211_sched_scan_request *
+cfg80211_current_sched_scan_request(struct wiphy *wiphy)
+{
+	return wiphy_to_dev(wiphy)->sched_scan_req;
+}
+EXPORT_SYMBOL(cfg80211_current_sched_scan_request);
+
 int __cfg80211_stop_sched_scan(struct cfg80211_registered_device *rdev,
 			       bool driver_initiated)
 {
+	int err = 0;
 	struct net_device *dev;
 
 	lockdep_assert_held(&rdev->sched_scan_mtx);
@@ -308,16 +317,77 @@ int __cfg80211_stop_sched_scan(struct cfg80211_registered_device *rdev,
 	dev = rdev->sched_scan_req->dev;
 
 	if (!driver_initiated) {
-		int err = rdev_sched_scan_stop(rdev, dev);
-		if (err)
-			return err;
+		err = rdev->ops->sched_scan_stop(&rdev->wiphy, dev);
+	} else {
+		nl80211_send_sched_scan(rdev, dev,
+					NL80211_CMD_SCHED_SCAN_STOPPED);
+		kfree(rdev->sched_scan_req);
+		rdev->sched_scan_req = NULL;
 	}
 
-	nl80211_send_sched_scan(rdev, dev, NL80211_CMD_SCHED_SCAN_STOPPED);
+	return err;
+}
 
-	kfree(rdev->sched_scan_req);
-	rdev->sched_scan_req = NULL;
+void __cfg80211_send_intermediate_result(struct net_device *dev,
+					 struct cfg80211_event *ev)
+{
+	struct wireless_dev *wdev;
+	struct cfg80211_registered_device *rdev;
 
+	if (!dev)
+		return;
+
+	wdev = dev->ieee80211_ptr;
+	rdev = wiphy_to_dev(wdev->wiphy);
+
+	if (rdev->scan_req)
+		nl80211_send_intermediate_result(rdev, dev, ev);
+}
+
+void cfg80211_send_intermediate_result(struct net_device *dev,
+				       struct cfg80211_bss *cbss)
+{
+	struct cfg80211_event *ev;
+	unsigned long flags;
+	struct wireless_dev *wdev = dev->ieee80211_ptr;
+	struct cfg80211_registered_device *rdev = wiphy_to_dev(wdev->wiphy);
+
+	if (!rdev->im_scan_result_snd_pid || !rdev->scan_req || !cbss)
+		return;
+
+	if ((rdev->im_scan_result_min_rssi_mbm) &&
+		(rdev->im_scan_result_min_rssi_mbm > cbss->signal))
+		return;
+
+	ev = kzalloc(sizeof(*ev), GFP_ATOMIC);
+	if (!ev)
+		return;
+
+	ev->type = EVENT_IM_SCAN_RESULT;
+	ev->im.signal = cbss->signal;
+	if (cbss->bssid)
+		memcpy(ev->im.bssid, cbss->bssid, ETH_ALEN);
+
+	spin_lock_irqsave(&wdev->event_lock, flags);
+	list_add_tail(&ev->list, &wdev->event_list);
+	spin_unlock_irqrestore(&wdev->event_lock, flags);
+	queue_work(cfg80211_wq, &rdev->event_work);
+}
+EXPORT_SYMBOL(cfg80211_send_intermediate_result);
+
+int cfg80211_scan_cancel(struct cfg80211_registered_device *rdev)
+{
+	struct net_device *dev;
+
+	ASSERT_RDEV_LOCK(rdev);
+
+	if (!rdev->ops->scan_cancel)
+		return -EOPNOTSUPP;
+	if (!rdev->scan_req)
+		return -ENOENT;
+
+	dev = rdev->scan_req->wdev->netdev;
+	rdev->ops->scan_cancel(&rdev->wiphy, dev);
 	return 0;
 }
 

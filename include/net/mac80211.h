@@ -152,11 +152,14 @@ struct ieee80211_low_level_stats {
  * @IEEE80211_CHANCTX_CHANGE_WIDTH: The channel width changed
  * @IEEE80211_CHANCTX_CHANGE_RX_CHAINS: The number of RX chains changed
  * @IEEE80211_CHANCTX_CHANGE_RADAR: radar detection flag changed
+ * @IEEE80211_CHANCTX_CHANGE_CHANNEL: switched to another operating channel,
+ *	this is used only with channel switching with CSA
  */
 enum ieee80211_chanctx_change {
 	IEEE80211_CHANCTX_CHANGE_WIDTH		= BIT(0),
 	IEEE80211_CHANCTX_CHANGE_RX_CHAINS	= BIT(1),
 	IEEE80211_CHANCTX_CHANGE_RADAR		= BIT(2),
+	IEEE80211_CHANCTX_CHANGE_CHANNEL	= BIT(3),
 };
 
 /**
@@ -1065,6 +1068,7 @@ enum ieee80211_vif_flags {
  * @addr: address of this interface
  * @p2p: indicates whether this AP or STA interface is a p2p
  *	interface, i.e. a GO or p2p-sta respectively
+ * @csa_active: marks whether a channel switch is going on
  * @driver_flags: flags/capabilities the driver has for this interface,
  *	these need to be set (or cleared) when the interface is added
  *	or, if supported by the driver, the interface type is changed
@@ -1079,6 +1083,7 @@ enum ieee80211_vif_flags {
  * @debugfs_dir: debugfs dentry, can be used by drivers to create own per
  *      interface debug files. Note that it will be NULL for the virtual
  *	monitor interface (if that is requested.)
+ * @dummy_p2p: dummy p2p interface - not used for data
  * @drv_priv: data area for driver use, will always be aligned to
  *	sizeof(void *).
  */
@@ -1087,6 +1092,7 @@ struct ieee80211_vif {
 	struct ieee80211_bss_conf bss_conf;
 	u8 addr[ETH_ALEN];
 	bool p2p;
+	bool csa_active;
 
 	u8 cab_queue;
 	u8 hw_queue[IEEE80211_NUM_ACS];
@@ -1098,6 +1104,8 @@ struct ieee80211_vif {
 #ifdef CONFIG_MAC80211_DEBUGFS
 	struct dentry *debugfs_dir;
 #endif
+
+	bool dummy_p2p;
 
 	/* must be last */
 	u8 drv_priv[0] __aligned(sizeof(void *));
@@ -1264,6 +1272,9 @@ struct ieee80211_sta_rates {
  * @supp_rates: Bitmap of supported rates (per band)
  * @ht_cap: HT capabilities of this STA; restricted to our own capabilities
  * @vht_cap: VHT capabilities of this STA; restricted to our own capabilities
+ * @max_rx_aggregation_subframes: restriction on rx buff size for this active
+ *	link. Initially set to local->hw.max_rx_aggregation_subframes but can
+ *	be modified by driver.
  * @wme: indicates whether the STA supports WME. Only valid during AP-mode.
  * @drv_priv: data area for driver use, will always be aligned to
  *	sizeof(void *), size is determined in hw information.
@@ -1284,6 +1295,7 @@ struct ieee80211_sta {
 	u16 aid;
 	struct ieee80211_sta_ht_cap ht_cap;
 	struct ieee80211_sta_vht_cap vht_cap;
+	u8 max_rx_aggregation_subframes;
 	bool wme;
 	u8 uapsd_queues;
 	u8 max_sp;
@@ -2618,6 +2630,16 @@ enum ieee80211_roc_type {
  * @ipv6_addr_change: IPv6 address assignment on the given interface changed.
  *	Currently, this is only called for managed or P2P client interfaces.
  *	This callback is optional; it must not sleep.
+ *
+ * @channel_switch_beacon: Starts a channel switch to a new channel.
+ *	Beacons are modified to include CSA or ECSA IEs before calling this
+ *	function. The corresponding count fields in these IEs must be
+ *	decremented, and when they reach zero the driver must call
+ *	ieee80211_csa_finish(). Drivers which use ieee80211_beacon_get()
+ *	get the csa counter decremented by mac80211, but must check if it is
+ *	zero using ieee80211_csa_is_complete() after the beacon has been
+ *	transmitted and then call ieee80211_csa_finish().
+ *
  */
 struct ieee80211_ops {
 	void (*tx)(struct ieee80211_hw *hw,
@@ -2747,7 +2769,8 @@ struct ieee80211_ops {
 				 struct ieee80211_vif *vif,
 				 struct ieee80211_channel *chan,
 				 int duration,
-				 enum ieee80211_roc_type type);
+				 enum ieee80211_roc_type type,
+				 unsigned long cookie);
 	int (*cancel_remain_on_channel)(struct ieee80211_hw *hw);
 	int (*set_ringparam)(struct ieee80211_hw *hw, u32 tx, u32 rx);
 	void (*get_ringparam)(struct ieee80211_hw *hw,
@@ -2805,6 +2828,9 @@ struct ieee80211_ops {
 				 struct ieee80211_vif *vif,
 				 struct inet6_dev *idev);
 #endif
+	void (*channel_switch_beacon)(struct ieee80211_hw *hw,
+				      struct ieee80211_vif *vif,
+				      struct cfg80211_chan_def *chandef);
 };
 
 /**
@@ -3255,6 +3281,17 @@ void ieee80211_tx_status_irqsafe(struct ieee80211_hw *hw,
 void ieee80211_report_low_ack(struct ieee80211_sta *sta, u32 num_packets);
 
 /**
+ * ieee80211_roaming_status - report if roaming support by the driver changed
+ *
+ * Some drivers have limitations on roaming in certain conditions (e.g. multi
+ * role) and need to report this back to userspace.
+ *
+ * @vif: interface
+ * @enabled: is roaming supported
+ */
+void ieee80211_roaming_status(struct ieee80211_vif *vif, bool enabled);
+
+/**
  * ieee80211_beacon_get_tim - beacon generation function
  * @hw: pointer obtained from ieee80211_alloc_hw().
  * @vif: &struct ieee80211_vif pointer from the add_interface callback.
@@ -3298,6 +3335,25 @@ static inline struct sk_buff *ieee80211_beacon_get(struct ieee80211_hw *hw,
 {
 	return ieee80211_beacon_get_tim(hw, vif, NULL, NULL);
 }
+
+/**
+ * ieee80211_csa_finish - notify mac80211 about channel switch
+ * @vif: &struct ieee80211_vif pointer from the add_interface callback.
+ *
+ * After a channel switch announcement was scheduled and the counter in this
+ * announcement hit zero, this function must be called by the driver to
+ * notify mac80211 that the channel can be changed.
+ */
+void ieee80211_csa_finish(struct ieee80211_vif *vif);
+
+/**
+ * ieee80211_csa_is_complete - find out if counters reached zero
+ * @vif: &struct ieee80211_vif pointer from the add_interface callback.
+ *
+ * This function returns whether the channel switch counters reached zero.
+ */
+bool ieee80211_csa_is_complete(struct ieee80211_vif *vif);
+
 
 /**
  * ieee80211_proberesp_get - retrieve a Probe Response template
@@ -4112,7 +4168,7 @@ void ieee80211_ready_on_channel(struct ieee80211_hw *hw);
  * ieee80211_remain_on_channel_expired - remain_on_channel duration expired
  * @hw: pointer as obtained from ieee80211_alloc_hw()
  */
-void ieee80211_remain_on_channel_expired(struct ieee80211_hw *hw);
+void ieee80211_remain_on_channel_expired(struct ieee80211_hw *hw, u64 cookie);
 
 /**
  * ieee80211_stop_rx_ba_session - callback to stop existing BA sessions
@@ -4131,6 +4187,23 @@ void ieee80211_remain_on_channel_expired(struct ieee80211_hw *hw);
 void ieee80211_stop_rx_ba_session(struct ieee80211_vif *vif, u16 ba_rx_bitmap,
 				  const u8 *addr);
 
+/**
+ * ieee80211_change_rx_ba_max_subframes - callback to change
+ *	sta.max_rx_aggregation_subframes and stop existing BA sessions
+ *
+ * This capability is usefull in cases of IOP, i.e. cases where peer sta
+ * or ap doesn't respect the max subframes in a single-frame and uses the
+ * max window size instead. In these cases the driver/chip may recover by
+ * decreasing the max_rx_aggregation_subframes to use the single frame
+ * limitation.
+ *
+ * @vif: &struct ieee80211_vif pointer from the add_interface callback.
+ * @addr: & to bssid mac address
+ * @max_subframes: new max_rx_aggregation_subframes for this sta
+ */
+void ieee80211_change_rx_ba_max_subframes(struct ieee80211_vif *vif,
+					  const u8 *addr,
+					  u8 max_subframes);
 /**
  * ieee80211_send_bar - send a BlockAckReq frame
  *

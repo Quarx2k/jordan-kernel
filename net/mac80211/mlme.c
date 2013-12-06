@@ -958,6 +958,8 @@ static void ieee80211_chswitch_work(struct work_struct *work)
 		container_of(work, struct ieee80211_sub_if_data, u.mgd.chswitch_work);
 	struct ieee80211_local *local = sdata->local;
 	struct ieee80211_if_managed *ifmgd = &sdata->u.mgd;
+	u32 changed = 0;
+	int ret;
 
 	if (!ieee80211_sdata_running(sdata))
 		return;
@@ -966,24 +968,38 @@ static void ieee80211_chswitch_work(struct work_struct *work)
 	if (!ifmgd->associated)
 		goto out;
 
-	local->_oper_chandef = local->csa_chandef;
+	ret = ieee80211_vif_change_channel(sdata, &local->csa_chandef,
+					   &changed);
+	if (ret) {
+		sdata_info(sdata,
+			   "vif channel switch failed, disconnecting\n");
+		ieee80211_queue_work(&sdata->local->hw,
+				     &ifmgd->csa_connection_drop_work);
+		goto out;
+	}
 
-	if (!local->ops->channel_switch) {
-		/* call "hw_config" only if doing sw channel switch */
-		ieee80211_hw_config(local, IEEE80211_CONF_CHANGE_CHANNEL);
-	} else {
-		/* update the device channel directly */
-		local->hw.conf.chandef = local->_oper_chandef;
+	if (!local->use_chanctx) {
+		local->_oper_chandef = local->csa_chandef;
+		/* Call "hw_config" only if doing sw channel switch.
+		 * Otherwise update the channel directly */
+		if (!local->ops->channel_switch)
+			ieee80211_hw_config(local, 0);
+		else
+			local->hw.conf.chandef = local->_oper_chandef;
 	}
 
 	/* XXX: shouldn't really modify cfg80211-owned data! */
-	ifmgd->associated->channel = local->_oper_chandef.chan;
+	ifmgd->associated->channel = local->csa_chandef.chan;
 
 	/* XXX: wait for a beacon first? */
 	ieee80211_wake_queues_by_reason(&local->hw,
 					IEEE80211_MAX_QUEUE_MAP,
 					IEEE80211_QUEUE_STOP_REASON_CSA);
+
+	ieee80211_bss_info_change_notify(sdata, changed);
+
  out:
+	sdata->vif.csa_active = false;
 	ifmgd->flags &= ~IEEE80211_STA_CSA_RECEIVED;
 	mutex_unlock(&ifmgd->mtx);
 }
@@ -1203,17 +1219,27 @@ ieee80211_sta_process_chanswitch(struct ieee80211_sub_if_data *sdata,
 	}
 
 	ifmgd->flags |= IEEE80211_STA_CSA_RECEIVED;
-
-	if (local->use_chanctx) {
-		sdata_info(sdata,
-			   "not handling channel switch with channel contexts\n");
-		ieee80211_queue_work(&local->hw,
-				     &ifmgd->csa_connection_drop_work);
-		return;
-	}
+	sdata->vif.csa_active = true;
 
 	mutex_lock(&local->chanctx_mtx);
+	if (local->use_chanctx) {
+		u32 num_chanctx = 0;
+		list_for_each_entry(chanctx, &local->chanctx_list, list)
+		       num_chanctx++;
+
+		if (num_chanctx > 1) {
+			sdata_info(sdata,
+				   "not handling chan-switch with channel contexts multi-vif\n");
+			ieee80211_queue_work(&local->hw,
+					     &ifmgd->csa_connection_drop_work);
+			mutex_unlock(&local->chanctx_mtx);
+			return;
+		}
+	}
+
 	if (WARN_ON(!rcu_access_pointer(sdata->vif.chanctx_conf))) {
+		ieee80211_queue_work(&local->hw,
+				     &ifmgd->csa_connection_drop_work);
 		mutex_unlock(&local->chanctx_mtx);
 		return;
 	}
@@ -2178,6 +2204,7 @@ static void __ieee80211_disconnect(struct ieee80211_sub_if_data *sdata)
 			       WLAN_REASON_DISASSOC_DUE_TO_INACTIVITY,
 			       true, frame_buf);
 	ifmgd->flags &= ~IEEE80211_STA_CSA_RECEIVED;
+	sdata->vif.csa_active = false;
 	ieee80211_wake_queues_by_reason(&sdata->local->hw,
 					IEEE80211_MAX_QUEUE_MAP,
 					IEEE80211_QUEUE_STOP_REASON_CSA);
@@ -2333,6 +2360,19 @@ ieee80211_rx_mgmt_auth(struct ieee80211_sub_if_data *sdata,
 	if (status_code != WLAN_STATUS_SUCCESS) {
 		sdata_info(sdata, "%pM denied authentication (status %d)\n",
 			   mgmt->sa, status_code);
+
+		if (status_code == WLAN_STATUS_AP_UNABLE_TO_HANDLE_NEW_STA) {
+			/* can't auth right now, try again in 200 ms */
+			u32 ms = 200;
+			printk(KERN_DEBUG "%s: %pM rejected authentication; "
+			       "try again in %u ms\n",
+			       sdata->name, mgmt->sa, ms);
+			ifmgd->auth_data->timeout = jiffies +
+						    msecs_to_jiffies(ms);
+			run_again(ifmgd, ifmgd->auth_data->timeout);
+			return RX_MGMT_NONE;
+		}
+
 		ieee80211_destroy_auth_data(sdata, false);
 		return RX_MGMT_CFG80211_RX_AUTH;
 	}
@@ -2802,6 +2842,17 @@ ieee80211_rx_mgmt_assoc_resp(struct ieee80211_sub_if_data *sdata,
 		assoc_data->timeout_started = true;
 		if (ms > IEEE80211_ASSOC_TIMEOUT)
 			run_again(ifmgd, assoc_data->timeout);
+		return RX_MGMT_NONE;
+	}
+
+	if (status_code == WLAN_STATUS_AP_UNABLE_TO_HANDLE_NEW_STA) {
+		/* can't assoc us right now, try again in 200 ms */
+		u32 ms = 200;
+		printk(KERN_DEBUG "%s: %pM rejected association; "
+		       "try again in %u ms\n",
+		       sdata->name, mgmt->sa, ms);
+		assoc_data->timeout = jiffies + msecs_to_jiffies(ms);
+		run_again(ifmgd, assoc_data->timeout);
 		return RX_MGMT_NONE;
 	}
 

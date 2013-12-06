@@ -1446,6 +1446,7 @@ int ieee80211_reconfig(struct ieee80211_local *local)
 	struct ieee80211_hw *hw = &local->hw;
 	struct ieee80211_sub_if_data *sdata;
 	struct ieee80211_chanctx *ctx;
+	struct cfg80211_sched_scan_request *sched_scan_req;
 	struct sta_info *sta;
 	int res, i;
 	bool reconfig_due_to_wowlan = false;
@@ -1692,6 +1693,22 @@ int ieee80211_reconfig(struct ieee80211_local *local)
 		if (ieee80211_sdata_running(sdata))
 			ieee80211_enable_keys(sdata);
 
+	mutex_lock(&local->mtx);
+	sdata = rtnl_dereference(local->sched_scan_sdata);
+	if (sdata) {
+		if (sdata->sched_scan_stop_pending) {
+			ieee80211_sched_scan_stopped(&local->hw);
+		} else {
+			sched_scan_req = cfg80211_current_sched_scan_request(
+						local->hw.wiphy);
+			/* if sched_scan request is still available */
+			if (sched_scan_req)
+				drv_sched_scan_start(local, sdata,
+						sched_scan_req,
+						&sdata->sched_scan_ies);
+		}
+	}
+	mutex_unlock(&local->mtx);
  wake_up:
 	local->in_reconfig = false;
 	barrier();

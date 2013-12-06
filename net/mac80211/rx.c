@@ -2472,6 +2472,10 @@ ieee80211_rx_h_action(struct ieee80211_rx_data *rx)
 		}
 		break;
 	case WLAN_CATEGORY_BACK:
+		/* reject BA action frames from stations not supporting HT */
+		if (!rx->sta->sta.ht_cap.ht_supported)
+			goto invalid;
+
 		if (sdata->vif.type != NL80211_IFTYPE_STATION &&
 		    sdata->vif.type != NL80211_IFTYPE_MESH_POINT &&
 		    sdata->vif.type != NL80211_IFTYPE_AP_VLAN &&

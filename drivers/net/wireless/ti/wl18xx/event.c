@@ -19,10 +19,12 @@
  *
  */
 
+#include <net/genetlink.h>
 #include "event.h"
 #include "scan.h"
 #include "../wlcore/cmd.h"
 #include "../wlcore/debug.h"
+#include "../wlcore/testmode.h"
 
 int wl18xx_wait_for_event(struct wl1271 *wl, enum wlcore_wait_event event,
 			  bool *timeout)
@@ -44,6 +46,76 @@ int wl18xx_wait_for_event(struct wl1271 *wl, enum wlcore_wait_event event,
 	}
 	return wlcore_cmd_wait_for_event_or_timeout(wl, local_event, timeout);
 }
+
+#ifdef CONFIG_NL80211_TESTMODE
+static int wlcore_smart_config_sync_event(struct wl1271 *wl, u8 sync_channel,
+					  u8 sync_band)
+{
+	struct sk_buff *skb;
+	enum ieee80211_band band;
+	int freq;
+
+	if (sync_band == WLCORE_BAND_5GHZ)
+		band = IEEE80211_BAND_5GHZ;
+	else
+		band = IEEE80211_BAND_2GHZ;
+
+	freq = ieee80211_channel_to_frequency(sync_channel, band);
+
+	wl1271_debug(DEBUG_EVENT,
+		     "SMART_CONFIG_SYNC_EVENT_ID, freq: %d (chan: %d band %d)",
+		     freq, sync_channel, sync_band);
+	skb = cfg80211_testmode_alloc_event_skb(wl->hw->wiphy, 20, GFP_KERNEL);
+
+	if (nla_put_u8(skb, WL1271_TM_ATTR_SMART_CONFIG_EVENT,
+		       WLCORE_TM_SC_EVENT_SYNC) ||
+	    nla_put_u32(skb, WL1271_TM_ATTR_FREQ, freq)) {
+		kfree_skb(skb);
+		return -EMSGSIZE;
+	}
+	cfg80211_testmode_event(skb, GFP_KERNEL);
+	return 0;
+}
+
+static int wlcore_smart_config_decode_event(struct wl1271 *wl,
+					    u8 ssid_len, u8 *ssid,
+					    u8 pwd_len, u8 *pwd)
+{
+	struct sk_buff *skb;
+
+	wl1271_debug(DEBUG_EVENT, "SMART_CONFIG_DECODE_EVENT_ID");
+	wl1271_dump_ascii(DEBUG_EVENT, "SSID:", ssid, ssid_len);
+	wl1271_dump_ascii(DEBUG_EVENT, "PWD:",pwd, pwd_len);
+
+	skb = cfg80211_testmode_alloc_event_skb(wl->hw->wiphy,
+			ssid_len + pwd_len + 20, GFP_KERNEL);
+
+	if (nla_put_u8(skb, WL1271_TM_ATTR_SMART_CONFIG_EVENT,
+		       WLCORE_TM_SC_EVENT_DECODE) ||
+	    nla_put(skb, WL1271_TM_ATTR_SSID, ssid_len, ssid) ||
+	    nla_put(skb, WL1271_TM_ATTR_PSK, pwd_len, pwd)) {
+		kfree_skb(skb);
+		return -EMSGSIZE;
+	}
+	cfg80211_testmode_event(skb, GFP_KERNEL);
+	return 0;
+}
+#else
+static int wlcore_smart_config_sync_event(struct wl1271 *wl, u8 sync_channel,
+					  u8 sync_band)
+{
+	wl1271_error("got SMART_CONFIG event, but CONFIG_NL80211_TESTMODE is not configured!");
+	return -EINVAL;
+}
+
+static int wlcore_smart_config_decode_event(struct wl1271 *wl,
+					    u8 ssid_len, u8 *ssid,
+					    u8 pwd_len, u8 *pwd)
+{
+	wl1271_error("got SMART_CONFIG event, but CONFIG_NL80211_TESTMODE is not configured!");
+	return -EINVAL;
+}
+#endif
 
 int wl18xx_process_mailbox_events(struct wl1271 *wl)
 {
@@ -106,6 +178,78 @@ int wl18xx_process_mailbox_events(struct wl1271 *wl)
 
 	if (vector & REMAIN_ON_CHANNEL_COMPLETE_EVENT_ID)
 		wlcore_event_roc_complete(wl);
+
+	if (vector & RX_BA_WIN_SIZE_CHANGE_EVENT_ID) {
+		struct wl12xx_vif *wlvif;
+		struct ieee80211_vif *vif;
+		u8 role_id = mbox->rx_ba_role_id;
+		u8 link_id = mbox->rx_ba_link_id;
+		u8 win_size = mbox->rx_ba_win_size;
+		int prev_win_size;
+
+		wl1271_debug(DEBUG_EVENT,
+			     "%s. role_id=%u link_id=%u win_size=%u",
+			     "RX_BA_WIN_SIZE_CHANGE_EVENT_ID",
+			     role_id, link_id, win_size);
+
+		wlvif = wl->links[link_id].wlvif;
+		if (unlikely(!wlvif)) {
+			wl1271_error("%s. link_id wlvif is null",
+				     "RX_BA_WIN_SIZE_CHANGE_EVENT_ID");
+
+			goto out_event;
+		}
+
+		if (unlikely(wlvif->role_id != role_id)) {
+			wl1271_error("%s. wlvif has different role_id=%d",
+				     "RX_BA_WIN_SIZE_CHANGE_EVENT_ID",
+				     wlvif->role_id);
+
+			goto out_event;
+		}
+
+		prev_win_size = wlcore_rx_ba_max_subframes(wl, link_id);
+		if (unlikely(prev_win_size < 0)) {
+			wl1271_error("%s. cannot get link rx_ba_max_subframes",
+				     "RX_BA_WIN_SIZE_CHANGE_EVENT_ID");
+
+			goto out_event;
+		}
+
+		if ((u8) prev_win_size <= win_size) {
+			/* This not supposed to happen unless a FW bug */
+			wl1271_error("%s. prev_win_size(%d) <= win_size(%d)",
+				       "RX_BA_WIN_SIZE_CHANGE_EVENT_ID",
+					prev_win_size, win_size);
+
+			goto out_event;
+		}
+
+		/*
+		 * Call MAC routine to update win_size and stop all link active
+		 * BA sessions. This routine returns 0 on failure or previous
+		 * win_size on success
+		 */
+		vif = wl12xx_wlvif_to_vif(wlvif);
+		ieee80211_change_rx_ba_max_subframes(vif,
+			(wlvif->bss_type != BSS_TYPE_AP_BSS ?
+				vif->bss_conf.bssid :
+				wl->links[link_id].addr),
+			win_size);
+	}
+
+	if (vector & SMART_CONFIG_SYNC_EVENT_ID)
+		wlcore_smart_config_sync_event(wl, mbox->sc_sync_channel,
+					       mbox->sc_sync_band);
+
+	if (vector & SMART_CONFIG_DECODE_EVENT_ID)
+		wlcore_smart_config_decode_event(wl,
+						 mbox->sc_ssid_len,
+						 mbox->sc_ssid,
+						 mbox->sc_pwd_len,
+						 mbox->sc_pwd);
+
+out_event:
 
 	return 0;
 }

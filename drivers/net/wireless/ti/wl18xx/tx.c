@@ -32,7 +32,7 @@ static
 void wl18xx_get_last_tx_rate(struct wl1271 *wl, struct ieee80211_vif *vif,
 			     struct ieee80211_tx_rate *rate)
 {
-	u8 fw_rate = wl->fw_status_2->counters.tx_last_rate;
+	u8 fw_rate = wl->fw_status->counters.tx_last_rate;
 
 	if (fw_rate > CONF_HW_RATE_INDEX_MAX) {
 		wl1271_error("last Tx rate invalid: %d", fw_rate);
@@ -139,9 +139,10 @@ static void wl18xx_tx_complete_packet(struct wl1271 *wl, u8 tx_stat_byte)
 void wl18xx_tx_immediate_complete(struct wl1271 *wl)
 {
 	struct wl18xx_fw_status_priv *status_priv =
-		(struct wl18xx_fw_status_priv *)wl->fw_status_2->priv;
+		(struct wl18xx_fw_status_priv *)wl->fw_status->priv;
 	struct wl18xx_priv *priv = wl->priv;
 	u8 i;
+	int orig_cnt = wl->tx_results_count, diff;
 
 	/* nothing to do here */
 	if (priv->last_fw_rls_idx == status_priv->fw_release_idx)
@@ -165,6 +166,13 @@ void wl18xx_tx_immediate_complete(struct wl1271 *wl)
 			status_priv->released_tx_desc[i]);
 
 		wl->tx_results_count++;
+	}
+
+	diff = wl->tx_results_count - orig_cnt;
+	if (diff > 32) {
+		wl1271_error("invalid Tx completed packets %d\n", diff);
+	} else {
+		wl->tx_completions[diff-1]++;
 	}
 
 	priv->last_fw_rls_idx = status_priv->fw_release_idx;

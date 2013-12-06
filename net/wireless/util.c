@@ -768,6 +768,9 @@ void cfg80211_process_wdev_events(struct wireless_dev *wdev)
 		case EVENT_IBSS_JOINED:
 			__cfg80211_ibss_joined(wdev->netdev, ev->ij.bssid);
 			break;
+		case EVENT_IM_SCAN_RESULT:
+			__cfg80211_send_intermediate_result(wdev->netdev, ev);
+			break;
 		}
 		wdev_unlock(wdev);
 

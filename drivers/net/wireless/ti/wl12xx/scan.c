@@ -118,7 +118,11 @@ static int wl1271_scan_send(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 	if (passive)
 		scan_options |= WL1271_SCAN_OPT_PASSIVE;
 
-	cmd->params.role_id = wlvif->role_id;
+	/* scan on the dev role if the regular one is not started */
+	if (wlvif->role_id == WL12XX_INVALID_ROLE_ID)
+		cmd->params.role_id = wlvif->dev_role_id;
+	else
+		cmd->params.role_id = wlvif->role_id;
 
 	if (WARN_ON(cmd->params.role_id == WL12XX_INVALID_ROLE_ID)) {
 		ret = -EINVAL;
@@ -136,7 +140,6 @@ static int wl1271_scan_send(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 	}
 
 	cmd->params.tx_rate = cpu_to_le32(basic_rate);
-	cmd->params.n_probe_reqs = wl->conf.scan.num_probe_reqs;
 	cmd->params.tid_trigger = CONF_TX_AC_ANY_TID;
 	cmd->params.scan_tag = WL1271_SCAN_DEFAULT_TAG;
 
@@ -144,6 +147,11 @@ static int wl1271_scan_send(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 		cmd->params.band = WL1271_SCAN_BAND_2_4_GHZ;
 	else
 		cmd->params.band = WL1271_SCAN_BAND_5_GHZ;
+
+	if (wl->scan.req->num_probe)
+		cmd->params.n_probe_reqs = wl->scan.req->num_probe;
+	else
+		cmd->params.n_probe_reqs = wl->conf.scan.num_probe_reqs;
 
 	if (wl->scan.ssid_len && wl->scan.ssid) {
 		cmd->params.ssid_len = wl->scan.ssid_len;
@@ -344,9 +352,9 @@ int wl1271_scan_sched_scan_config(struct wl1271 *wl,
 	cfg->tag = WL1271_SCAN_DEFAULT_TAG;
 	/* don't filter on BSS type */
 	cfg->bss_type = SCAN_BSS_TYPE_ANY;
-	/* currently NL80211 supports only a single interval */
+	/* TODO: use short intervals as well */
 	for (i = 0; i < SCAN_MAX_CYCLE_INTERVALS; i++)
-		cfg->intervals[i] = cpu_to_le32(req->interval);
+		cfg->intervals[i] = cpu_to_le32(req->long_interval);
 
 	cfg->ssid_len = 0;
 	ret = wlcore_scan_sched_scan_ssid_list(wl, wlvif, req);

@@ -45,7 +45,8 @@ int wl12xx_start_dev(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 		     enum ieee80211_band band, int channel);
 int wl12xx_stop_dev(struct wl1271 *wl, struct wl12xx_vif *wlvif);
 int wl1271_cmd_test(struct wl1271 *wl, void *buf, size_t buf_len, u8 answer);
-int wl1271_cmd_interrogate(struct wl1271 *wl, u16 id, void *buf, size_t len);
+int wl1271_cmd_interrogate(struct wl1271 *wl, u16 id, void *buf,
+			   size_t cmd_len, size_t res_len);
 int wl1271_cmd_configure(struct wl1271 *wl, u16 id, void *buf, size_t len);
 int wlcore_cmd_configure_failsafe(struct wl1271 *wl, u16 id, void *buf,
 				  size_t len, unsigned long valid_rets);
@@ -167,6 +168,9 @@ enum wl1271_commands {
 
 	/* start of 18xx specific commands */
 	CMD_DFS_CHANNEL_CONFIG		= 60,
+	CMD_SMART_CONFIG_START		= 61,
+	CMD_SMART_CONFIG_STOP		= 62,
+	CMD_SMART_CONFIG_SET_GROUP_KEY	= 63,
 
 	MAX_COMMAND_ID = 0xFFFF,
 };

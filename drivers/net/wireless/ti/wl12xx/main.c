@@ -41,6 +41,7 @@
 #include "scan.h"
 #include "event.h"
 #include "debugfs.h"
+#include "version.h"
 
 static char *fref_param;
 static char *tcxo_param;
@@ -333,11 +334,11 @@ static struct wlcore_conf wl12xx_conf = {
 		.always                        = 0,
 	},
 	.fwlog = {
-		.mode                         = WL12XX_FWLOG_ON_DEMAND,
+		.mode                         = WL12XX_FWLOG_CONTINUOUS,
 		.mem_blocks                   = 2,
 		.severity                     = 0,
 		.timestamp                    = WL12XX_FWLOG_TIMESTAMP_DISABLED,
-		.output                       = WL12XX_FWLOG_OUTPUT_HOST,
+		.output                       = WL12XX_FWLOG_OUTPUT_DBG_PINS,
 		.threshold                    = 0,
 	},
 	.rate = {
@@ -716,6 +717,9 @@ static int wl12xx_identify_chip(struct wl1271 *wl)
 		ret = -ENODEV;
 		goto out;
 	}
+
+	wl->fw_mem_block_size = 256;
+	wl->fwlog_end = 0x2000000;
 
 	/* common settings */
 	wl->scan_templ_id_2_4 = CMD_TEMPL_APP_PROBE_REQ_2_4_LEGACY;
@@ -1262,8 +1266,9 @@ static int wl12xx_boot(struct wl1271 *wl)
 		BA_SESSION_RX_CONSTRAINT_EVENT_ID |
 		REMAIN_ON_CHANNEL_COMPLETE_EVENT_ID |
 		INACTIVE_STA_EVENT_ID |
-		MAX_TX_RETRY_EVENT_ID |
 		CHANNEL_SWITCH_COMPLETE_EVENT_ID;
+
+	wl->ap_event_mask = MAX_TX_RETRY_EVENT_ID;
 
 	ret = wlcore_boot_run_firmware(wl);
 	if (ret < 0)
@@ -1374,7 +1379,7 @@ static u32 wl12xx_get_rx_packet_len(struct wl1271 *wl, void *rx_data,
 
 static int wl12xx_tx_delayed_compl(struct wl1271 *wl)
 {
-	if (wl->fw_status_1->tx_results_counter ==
+	if (wl->fw_status->tx_results_counter ==
 	    (wl->tx_results_count & 0xff))
 		return 0;
 
@@ -1432,6 +1437,37 @@ static int wl12xx_hw_init(struct wl1271 *wl)
 	}
 out:
 	return ret;
+}
+
+static void wl12xx_convert_fw_status(struct wl1271 *wl, void *raw_fw_status,
+				     struct wl_fw_status *fw_status)
+{
+	struct wl12xx_fw_status *int_fw_status = raw_fw_status;
+
+	fw_status->intr = le32_to_cpu(int_fw_status->intr);
+	fw_status->fw_rx_counter = int_fw_status->fw_rx_counter;
+	fw_status->drv_rx_counter = int_fw_status->drv_rx_counter;
+	fw_status->tx_results_counter = int_fw_status->tx_results_counter;
+	fw_status->rx_pkt_descs = int_fw_status->rx_pkt_descs;
+
+	fw_status->fw_localtime = le32_to_cpu(int_fw_status->fw_localtime);
+	fw_status->link_ps_bitmap = le32_to_cpu(int_fw_status->link_ps_bitmap);
+	fw_status->link_fast_bitmap =
+			le32_to_cpu(int_fw_status->link_fast_bitmap);
+	fw_status->total_released_blks =
+			le32_to_cpu(int_fw_status->total_released_blks);
+	fw_status->tx_total = le32_to_cpu(int_fw_status->tx_total);
+
+	fw_status->counters.tx_released_pkts =
+			int_fw_status->counters.tx_released_pkts;
+	fw_status->counters.tx_lnk_free_pkts =
+			int_fw_status->counters.tx_lnk_free_pkts;
+	fw_status->counters.tx_voice_released_blks =
+			int_fw_status->counters.tx_voice_released_blks;
+	fw_status->counters.tx_last_rate =
+			int_fw_status->counters.tx_last_rate;
+
+	fw_status->log_start_addr = le32_to_cpu(int_fw_status->log_start_addr);
 }
 
 static u32 wl12xx_sta_get_ap_rate_mask(struct wl1271 *wl,
@@ -1648,6 +1684,11 @@ static bool wl12xx_lnk_low_prio(struct wl1271 *wl, u8 hlid,
 	return true;
 }
 
+static u32 wl12xx_convert_hwaddr(struct wl1271 *wl, u32 hwaddr)
+{
+	return hwaddr << 5;
+}
+
 static int wl12xx_setup(struct wl1271 *wl);
 
 static struct wlcore_ops wl12xx_ops = {
@@ -1668,6 +1709,7 @@ static struct wlcore_ops wl12xx_ops = {
 	.tx_delayed_compl	= wl12xx_tx_delayed_compl,
 	.hw_init		= wl12xx_hw_init,
 	.init_vif		= NULL,
+	.convert_fw_status	= wl12xx_convert_fw_status,
 	.sta_get_ap_rate_mask	= wl12xx_sta_get_ap_rate_mask,
 	.get_pg_ver		= wl12xx_get_pg_ver,
 	.get_mac		= wl12xx_get_mac,
@@ -1684,6 +1726,7 @@ static struct wlcore_ops wl12xx_ops = {
 	.channel_switch		= wl12xx_cmd_channel_switch,
 	.pre_pkt_send		= NULL,
 	.set_peer_cap		= wl12xx_set_peer_cap,
+	.convert_hwaddr = wl12xx_convert_hwaddr,
 	.lnk_high_prio		= wl12xx_lnk_high_prio,
 	.lnk_low_prio		= wl12xx_lnk_low_prio,
 };
@@ -1707,16 +1750,21 @@ static int wl12xx_setup(struct wl1271 *wl)
 	struct wlcore_platdev_data *pdev_data = wl->pdev->dev.platform_data;
 	struct wl12xx_platform_data *pdata = pdev_data->pdata;
 
+	BUILD_BUG_ON(WL12XX_MAX_LINKS > WLCORE_MAX_LINKS);
+
 	wl->rtable = wl12xx_rtable;
 	wl->num_tx_desc = WL12XX_NUM_TX_DESCRIPTORS;
 	wl->num_rx_desc = WL12XX_NUM_RX_DESCRIPTORS;
+	wl->num_links = WL12XX_MAX_LINKS;
 	wl->num_channels = 1;
 	wl->num_mac_addr = WL12XX_NUM_MAC_ADDRESSES;
 	wl->band_rate_to_idx = wl12xx_band_rate_to_idx;
 	wl->hw_tx_rate_tbl_size = WL12XX_CONF_HW_RXTX_RATE_MAX;
 	wl->hw_min_ht_rate = WL12XX_CONF_HW_RXTX_RATE_MCS0;
+	wl->fw_status_len = sizeof(struct wl12xx_fw_status);
 	wl->fw_status_priv_len = 0;
 	wl->stats.fw_stats_len = sizeof(struct wl12xx_acx_statistics);
+	wl->ofdm_only_ap = true;
 	wlcore_set_ht_cap(wl, IEEE80211_BAND_2GHZ, &wl12xx_ht_cap);
 	wlcore_set_ht_cap(wl, IEEE80211_BAND_5GHZ, &wl12xx_ht_cap);
 	wl12xx_conf_init(wl);
@@ -1767,6 +1815,7 @@ static int wl12xx_setup(struct wl1271 *wl)
 	if (!priv->rx_mem_addr)
 		return -ENOMEM;
 
+	wl1271_info("wl12xx driver version: %s", wl12xx_git_head);
 	return 0;
 }
 
@@ -1778,7 +1827,8 @@ static int wl12xx_probe(struct platform_device *pdev)
 
 	hw = wlcore_alloc_hw(sizeof(struct wl12xx_priv),
 			     WL12XX_AGGR_BUFFER_SIZE,
-			     sizeof(struct wl12xx_event_mailbox));
+			     sizeof(struct wl12xx_event_mailbox),
+			     WL12XX_NUM_TX_DESCRIPTORS);
 	if (IS_ERR(hw)) {
 		wl1271_error("can't allocate hw");
 		ret = PTR_ERR(hw);

@@ -138,8 +138,6 @@ WL18XX_DEBUGFS_FWSTATS_FILE(rx_filter, max_arp_queue_dep, "%u");
 
 WL18XX_DEBUGFS_FWSTATS_FILE(rx_rate, rx_frames_per_rates, "%u");
 
-WL18XX_DEBUGFS_FWSTATS_FILE_ARRAY(aggr_size, tx_agg_vs_rate,
-				  AGGR_STATS_TX_AGG*AGGR_STATS_TX_RATE);
 WL18XX_DEBUGFS_FWSTATS_FILE_ARRAY(aggr_size, rx_size,
 				  AGGR_STATS_RX_SIZE_LEN);
 
@@ -168,6 +166,51 @@ WL18XX_DEBUGFS_FWSTATS_FILE(mem, rx_free_mem_blks, "%u");
 WL18XX_DEBUGFS_FWSTATS_FILE(mem, tx_free_mem_blks, "%u");
 WL18XX_DEBUGFS_FWSTATS_FILE(mem, fwlog_free_mem_blks, "%u");
 WL18XX_DEBUGFS_FWSTATS_FILE(mem, fw_gen_free_mem_blks, "%u");
+
+static int aggr_size_tx_agg_vs_rate_print(struct seq_file *s, void *p)
+{
+	struct wl1271 *wl = s->private;
+	struct wl18xx_acx_statistics *stats = wl->stats.fw_stats;
+	int len = ARRAY_SIZE(stats->aggr_size.tx_agg_vs_rate);
+	u32 *tx_agg_vs_rate = stats->aggr_size.tx_agg_vs_rate;
+	int i, rate, agg_size;
+
+
+	wl1271_debugfs_update_stats(wl);
+
+	seq_printf(s, "            ");
+	for (i = 0; i < AGGR_STATS_TX_AGG; i++)
+		seq_printf(s, "%02d      ", i);
+	seq_printf(s, "\n");
+
+	for (i = 0; i < len; i++) {
+		rate = i / AGGR_STATS_TX_RATE;
+		agg_size = i % AGGR_STATS_TX_AGG;
+
+		if (agg_size == 0)
+			seq_printf(s, "MCS%02d  ", rate);
+
+		seq_printf(s, "% 7d ", tx_agg_vs_rate[i]);
+
+		if (agg_size == (AGGR_STATS_TX_AGG - 1))
+			seq_printf(s, "\n");
+	}
+
+	return 0;
+}
+
+static int aggr_size_tx_agg_vs_rate_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, aggr_size_tx_agg_vs_rate_print,
+			inode->i_private);
+}
+
+static const struct file_operations aggr_size_tx_agg_vs_rate_ops = {
+	.open = aggr_size_tx_agg_vs_rate_open,
+	.read = seq_read,
+	.llseek	= seq_lseek,
+	.release = single_release,
+};
 
 static ssize_t conf_read(struct file *file, char __user *user_buf,
 			 size_t count, loff_t *ppos)

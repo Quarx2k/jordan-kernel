@@ -595,6 +595,16 @@ int wiphy_register(struct wiphy *wiphy)
 	}
 #endif
 
+#ifdef CONFIG_ANDROID
+	/* use wowlan by default */
+	if (rdev->wiphy.wowlan.flags & WIPHY_WOWLAN_ANY) {
+		/* TODO: free wowlan in case we fail later*/
+		rdev->wowlan = kzalloc(sizeof(*rdev->wowlan), GFP_KERNEL);
+		if (!rdev->wowlan)
+			return -ENOMEM;
+		rdev->wowlan->any = true;
+	}
+#endif
 	/* check and set up bitrates */
 	ieee80211_set_bitrate_flags(wiphy);
 

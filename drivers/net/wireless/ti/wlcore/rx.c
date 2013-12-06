@@ -200,12 +200,17 @@ static int wl1271_rx_handle_data(struct wl1271 *wl, u8 *data, u32 length,
 	skb_queue_tail(&wl->deferred_rx_queue, skb);
 	queue_work(wl->freezable_wq, &wl->netstack_work);
 
+#ifdef CONFIG_HAS_WAKELOCK
+	/* let the frame some time to propagate to user-space */
+	wake_lock_timeout(&wl->rx_wake, HZ);
+#endif
+
 	return is_data;
 }
 
-int wlcore_rx(struct wl1271 *wl, struct wl_fw_status_1 *status)
+int wlcore_rx(struct wl1271 *wl, struct wl_fw_status *status)
 {
-	unsigned long active_hlids[BITS_TO_LONGS(WL12XX_MAX_LINKS)] = {0};
+	unsigned long active_hlids[BITS_TO_LONGS(WLCORE_MAX_LINKS)] = {0};
 	u32 buf_size;
 	u32 fw_rx_counter = status->fw_rx_counter % wl->num_rx_desc;
 	u32 drv_rx_counter = wl->rx_counter % wl->num_rx_desc;
@@ -215,6 +220,7 @@ int wlcore_rx(struct wl1271 *wl, struct wl_fw_status_1 *status)
 	u8 hlid;
 	enum wl_rx_buf_align rx_align;
 	int ret = 0;
+	int orig_cnt = wl->rx_counter, diff;
 
 	while (drv_rx_counter != fw_rx_counter) {
 		buf_size = 0;
@@ -263,12 +269,12 @@ int wlcore_rx(struct wl1271 *wl, struct wl_fw_status_1 *status)
 						  wl->aggr_buf + pkt_offset,
 						  pkt_len, rx_align,
 						  &hlid) == 1) {
-				if (hlid < WL12XX_MAX_LINKS)
+				if (hlid < wl->num_links)
 					__set_bit(hlid, active_hlids);
 				else
 					WARN(1,
-					     "hlid exceeded WL12XX_MAX_LINKS "
-					     "(%d)\n", hlid);
+					     "hlid (%d) exceeded MAX_LINKS\n",
+					     hlid);
 			}
 
 			wl->rx_counter++;
@@ -290,6 +296,13 @@ int wlcore_rx(struct wl1271 *wl, struct wl_fw_status_1 *status)
 	}
 
 	wl12xx_rearm_rx_streaming(wl, active_hlids);
+
+	diff = wl->rx_counter - orig_cnt;
+	if (diff > 32) {
+		wl1271_error("invalid Rx completed packets %d\n", diff);
+	} else {
+		wl->rx_completions[diff-1]++;
+	}
 
 out:
 	return ret;

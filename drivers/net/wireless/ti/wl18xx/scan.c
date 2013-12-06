@@ -51,7 +51,11 @@ static int wl18xx_scan_send(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 		goto out;
 	}
 
-	cmd->role_id = wlvif->role_id;
+	/* scan on the dev role if the regular one is not started */
+	if (wlvif->role_id == WL12XX_INVALID_ROLE_ID)
+		cmd->role_id = wlvif->dev_role_id;
+	else
+		cmd->role_id = wlvif->role_id;
 
 	if (WARN_ON(cmd->role_id == WL12XX_INVALID_ROLE_ID)) {
 		ret = -EINVAL;
@@ -71,7 +75,10 @@ static int wl18xx_scan_send(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 	cmd->urgency = 0;
 	cmd->protect = 0;
 
-	cmd->n_probe_reqs = wl->conf.scan.num_probe_reqs;
+	if (req->num_probe)
+		cmd->n_probe_reqs = wl->scan.req->num_probe;
+	else
+		cmd->n_probe_reqs = wl->conf.scan.num_probe_reqs;
 	cmd->terminate_after = 0;
 
 	/* configure channels */
@@ -219,9 +226,9 @@ int wl18xx_scan_sched_scan_config(struct wl1271 *wl,
 				    SCAN_TYPE_PERIODIC);
 	wl18xx_adjust_channels(cmd, cmd_channels);
 
-	cmd->short_cycles_sec = 0;
-	cmd->long_cycles_sec = cpu_to_le16(req->interval);
-	cmd->short_cycles_count = 0;
+	cmd->short_cycles_sec = cpu_to_le16(req->short_interval);
+	cmd->long_cycles_sec = cpu_to_le16(req->long_interval);
+	cmd->short_cycles_count = req->n_short_intervals;
 
 	cmd->total_cycles = 0;
 
