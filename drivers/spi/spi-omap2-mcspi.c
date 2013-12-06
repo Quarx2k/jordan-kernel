@@ -1070,6 +1070,9 @@ static int omap2_mcspi_transfer_one_message(struct spi_master *master,
 		const void	*tx_buf = t->tx_buf;
 		void		*rx_buf = t->rx_buf;
 		unsigned	len = t->len;
+		if ((t->speed_hz < (OMAP2_MCSPI_MAX_FREQ >> 15)) ||
+			t->speed_hz > OMAP2_MCSPI_MAX_FREQ)
+			t->speed_hz = 1000000;
 
 		if (t->speed_hz > OMAP2_MCSPI_MAX_FREQ
 				|| (len && !(rx_buf || tx_buf))

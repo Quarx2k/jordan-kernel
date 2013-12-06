@@ -23,6 +23,9 @@
 #include <linux/slab.h>
 #include <linux/gpio.h>
 #include <linux/mfd/tps65912.h>
+#include <linux/of_device.h>
+#include <linux/regulator/of_regulator.h>
+#include <linux/delay.h>
 
 /* DCDC's */
 #define TPS65912_REG_DCDC1	0
@@ -41,15 +44,6 @@
 #define TPS65912_REG_LDO8	11
 #define TPS65912_REG_LDO9	12
 #define TPS65912_REG_LDO10	13
-
-/* Number of step-down converters available */
-#define TPS65912_NUM_DCDC	4
-
-/* Number of LDO voltage regulators  available */
-#define TPS65912_NUM_LDO	10
-
-/* Number of total regulators available */
-#define TPS65912_NUM_REGULATOR		(TPS65912_NUM_DCDC + TPS65912_NUM_LDO)
 
 #define TPS65912_REG_ENABLED	0x80
 #define OP_SELREG_MASK		0x40
@@ -121,7 +115,7 @@ struct tps65912_reg {
 static int tps65912_get_range(struct tps65912_reg *pmic, int id)
 {
 	struct tps65912 *mfd = pmic->mfd;
-	int range;
+	int range = 0;
 
 	switch (id) {
 	case TPS65912_REG_DCDC1:
@@ -459,6 +453,76 @@ static struct regulator_ops tps65912_ops_ldo = {
 	.list_voltage = tps65912_list_voltage,
 };
 
+#ifdef CONFIG_OF
+
+static struct of_regulator_match tps65912_matches[] = {
+	{ .name = "DCDC1" },
+	{ .name = "DCDC2" },
+	{ .name = "DCDC3" },
+	{ .name = "DCDC4" },
+	{ .name = "LDO1" },
+	{ .name = "LDO2" },
+	{ .name = "LDO3" },
+	{ .name = "LDO4" },
+	{ .name = "LDO5" },
+	{ .name = "LDO6" },
+	{ .name = "LDO7" },
+	{ .name = "LDO8" },
+	{ .name = "LDO9" },
+	{ .name = "LDO10" },
+};
+
+static struct tps65912_board *tps65912_parse_dt_reg_data(
+		struct platform_device *pdev)
+{
+	struct tps65912_board *pmic_plat_data;
+	struct device_node *np, *regulators;
+	struct of_regulator_match *matches;
+	int idx = 0, ret, count;
+
+	pmic_plat_data = devm_kzalloc(&pdev->dev, sizeof(*pmic_plat_data),
+					GFP_KERNEL);
+
+	if (!pmic_plat_data) {
+		dev_err(&pdev->dev, "Failure to alloc pdata for regulators.\n");
+		return NULL;
+	}
+
+	np = of_node_get(pdev->dev.parent->of_node);
+	regulators = of_find_node_by_name(np, "regulators");
+	if (!regulators) {
+		dev_err(&pdev->dev, "regulator node not found\n");
+		return NULL;
+	}
+	count = ARRAY_SIZE(tps65912_matches);
+	matches = tps65912_matches;
+
+	ret = of_regulator_match(&pdev->dev, regulators, matches, count);
+	of_node_put(regulators);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "Error parsing regulator init data: %d\n",
+			ret);
+		return NULL;
+	}
+
+	for (idx = 0; idx < count; idx++) {
+		if (!matches[idx].init_data || !matches[idx].of_node)
+			continue;
+
+		pmic_plat_data->tps65912_pmic_init_data[idx] =
+							matches[idx].init_data;
+	}
+
+	return pmic_plat_data;
+}
+#else
+static inline struct tps65912_board *tps65912_parse_dt_reg_data(
+			struct platform_device *pdev)
+{
+	return NULL;
+}
+#endif
+
 static int tps65912_probe(struct platform_device *pdev)
 {
 	struct tps65912 *tps65912 = dev_get_drvdata(pdev->dev.parent);
@@ -469,12 +533,18 @@ static int tps65912_probe(struct platform_device *pdev)
 	struct tps65912_reg *pmic;
 	struct tps65912_board *pmic_plat_data;
 	int i, err;
+	char *ldo_string[] = {"LDO1", "LDO2", "LDO3", "LDO4", "LDO5",
+				"LDO6", "LDO7", "LDO8", "LDO9", "LDO10"};
+	struct regulator *ldo;
 
 	pmic_plat_data = dev_get_platdata(tps65912->dev);
-	if (!pmic_plat_data)
-		return -EINVAL;
+	if (!pmic_plat_data && tps65912->dev->of_node)
+		pmic_plat_data = tps65912_parse_dt_reg_data(pdev);
 
-	reg_data = pmic_plat_data->tps65912_pmic_init_data;
+	if (!pmic_plat_data) {
+		dev_err(&pdev->dev, "Platform data not found\n");
+		return -EINVAL;
+	}
 
 	pmic = devm_kzalloc(&pdev->dev, sizeof(*pmic), GFP_KERNEL);
 	if (!pmic)
@@ -487,8 +557,9 @@ static int tps65912_probe(struct platform_device *pdev)
 	pmic->get_ctrl_reg = &tps65912_get_ctrl_register;
 	info = tps65912_regs;
 
-	for (i = 0; i < TPS65912_NUM_REGULATOR; i++, info++, reg_data++) {
+	for (i = 0; i < TPS65912_NUM_REGULATOR; i++, info++) {
 		int range = 0;
+		reg_data = pmic_plat_data->tps65912_pmic_init_data[i];
 		/* Register the regulators */
 		pmic->info[i] = info;
 
@@ -517,6 +588,29 @@ static int tps65912_probe(struct platform_device *pdev)
 		/* Save regulator for cleanup */
 		pmic->rdev[i] = rdev;
 	}
+
+	for (i = 0; i < TPS65912_NUM_LDO; i++) {
+		ldo =  regulator_get(NULL, ldo_string[i]);
+		if (IS_ERR(ldo)) {
+			pr_info("%s regulator get fails\n", ldo_string[i]);
+		} else {
+			err = regulator_enable(ldo);
+			if (err == 0)
+				pr_info("%s regulator enables success\n",
+					ldo_string[i]);
+			else
+				pr_info("%s regulator enables fails%d\n",
+					ldo_string[i], err);
+		}
+		/* to disable the ldo for vibrator after a while */
+		if (i == 5) {
+			mdelay(200);
+			regulator_disable(ldo);
+			pr_info("%s regulator disabled on purpose\n",
+				ldo_string[i]);
+		}
+	}
+
 	return 0;
 
 err:

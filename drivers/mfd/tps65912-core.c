@@ -20,6 +20,7 @@
 #include <linux/gpio.h>
 #include <linux/mfd/core.h>
 #include <linux/mfd/tps65912.h>
+#include <linux/of_device.h>
 
 static struct mfd_cell tps65912s[] = {
 	{
@@ -121,15 +122,70 @@ int tps65912_reg_write(struct tps65912 *tps65912, u8 reg, u8 val)
 }
 EXPORT_SYMBOL_GPL(tps65912_reg_write);
 
+#ifdef CONFIG_OF
+static struct tps65912_board *tps65912_parse_dt(struct tps65912 *tps65912)
+{
+	struct device_node *np = tps65912->dev->of_node;
+	struct tps65912_board *board_info;
+
+	board_info = kzalloc(sizeof(struct tps65912_board), GFP_KERNEL);
+	if (!board_info) {
+		pr_info("kzalloc failed in tps65912_parse_dt\n");
+		return NULL;
+	}
+
+	if (of_find_property(np, "dcdc1_avs", NULL)) {
+		board_info->is_dcdc1_avs = 1;
+		pr_info("dcdc1_avs is 1\n");
+	}
+
+	if (of_find_property(np, "dcdc2_avs", NULL)) {
+		board_info->is_dcdc2_avs = 1;
+		pr_info("dcdc2_avs is 1\n");
+	}
+
+	if (of_find_property(np, "dcdc3_avs", NULL)) {
+		board_info->is_dcdc3_avs = 1;
+		pr_info("dcdc3_avs is 1\n");
+	}
+
+	if (of_find_property(np, "dcdc4_avs", NULL)) {
+		board_info->is_dcdc4_avs = 1;
+		pr_info("dcdc4_avs is 1\n");
+	}
+
+	board_info->irq = tps65912->irq_num;
+	board_info->irq_base = 0;
+	return board_info;
+}
+#else
+static inline
+struct tps65912_board *tps65912_parse_dt(struct tps65912 *tps65912)
+{
+	return NULL;
+}
+#endif
+
 int tps65912_device_init(struct tps65912 *tps65912)
 {
-	struct tps65912_board *pmic_plat_data = tps65912->dev->platform_data;
+	struct tps65912_board *pmic_plat_data;
 	struct tps65912_platform_data *init_data;
 	int ret, dcdc_avs, value;
 
 	init_data = kzalloc(sizeof(struct tps65912_platform_data), GFP_KERNEL);
 	if (init_data == NULL)
 		return -ENOMEM;
+
+	pmic_plat_data = dev_get_platdata(tps65912->dev);
+
+	if (!pmic_plat_data && tps65912->dev->of_node)
+		pmic_plat_data = tps65912_parse_dt(tps65912);
+
+	if (!pmic_plat_data) {
+		pr_info("Platform data not found\n");
+		kfree(init_data);
+		return -EINVAL;
+	}
 
 	mutex_init(&tps65912->io_mutex);
 	dev_set_drvdata(tps65912->dev, tps65912);
@@ -138,6 +194,7 @@ int tps65912_device_init(struct tps65912 *tps65912)
 			pmic_plat_data->is_dcdc2_avs  << 1 |
 				pmic_plat_data->is_dcdc3_avs << 2 |
 					pmic_plat_data->is_dcdc4_avs << 3);
+
 	if (dcdc_avs) {
 		tps65912->read(tps65912, TPS65912_I2C_SPI_CFG, 1, &value);
 		dcdc_avs |= value;
@@ -165,10 +222,13 @@ int tps65912_device_init(struct tps65912 *tps65912)
 	kfree(init_data);
 	return ret;
 
+#ifdef CONFIG_MFD_TPS65912_DEBUGFS
 err_debugfs:
+#endif
 	tps65912_irq_exit(tps65912);
 err:
 	kfree(init_data);
+	kfree(pmic_plat_data);
 	mfd_remove_devices(tps65912->dev);
 	kfree(tps65912);
 	return ret;

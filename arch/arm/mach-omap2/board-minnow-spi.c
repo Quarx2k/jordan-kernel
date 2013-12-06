@@ -452,7 +452,7 @@ static struct spi_board_info minnow_spi_board_info[] __initdata = {
 	{
 		.modalias = "cpcap",
 		.bus_num = 1,
-		.chip_select = 0,
+		.chip_select = 1,
 		.max_speed_hz = 3000000,
 		.controller_data = &minnow_cpcap_data,
 		.mode = SPI_CS_HIGH,

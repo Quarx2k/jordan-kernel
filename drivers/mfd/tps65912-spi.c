@@ -21,6 +21,7 @@
 #include <linux/spi/spi.h>
 #include <linux/mfd/core.h>
 #include <linux/mfd/tps65912.h>
+#include <linux/of_device.h>
 
 static int tps65912_spi_write(struct tps65912 *tps65912, u8 addr,
 							int bytes, void *src)
@@ -81,6 +82,14 @@ static int tps65912_spi_read(struct tps65912 *tps65912, u8 addr,
 	return ret;
 }
 
+#ifdef CONFIG_OF
+static struct of_device_id tps65912_of_match[] = {
+	{ .compatible = "ti,tps65912" },
+	{ },
+};
+MODULE_DEVICE_TABLE(of, tps65912_of_match);
+#endif
+
 static int tps65912_spi_probe(struct spi_device *spi)
 {
 	struct tps65912 *tps65912;
@@ -111,7 +120,9 @@ static int tps65912_spi_remove(struct spi_device *spi)
 static struct spi_driver tps65912_spi_driver = {
 	.driver = {
 		.name = "tps65912",
+		.bus = &spi_bus_type,
 		.owner = THIS_MODULE,
+		.of_match_table = of_match_ptr(tps65912_of_match),
 	},
 	.probe	= tps65912_spi_probe,
 	.remove = tps65912_spi_remove,
