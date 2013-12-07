@@ -450,8 +450,22 @@ static int omap_cpu_exit(struct cpufreq_policy *policy)
 	return 0;
 }
 
+static ssize_t show_gpu_clock(struct cpufreq_policy *policy, char *buf) {
+        struct clk *clk = clk_get(NULL, "sgx_fck");        
+        return sprintf(buf, "%lu Mhz\n", clk->rate/1000000);
+}
+
+static struct freq_attr gpu_clock = {
+    .attr = {.name = "gpu_clock",
+             .mode=0644,
+    },
+    .show = show_gpu_clock,
+};
+
+
 static struct freq_attr *omap_cpufreq_attr[] = {
 	&cpufreq_freq_attr_scaling_available_freqs,
+	&gpu_clock,
 	NULL,
 };
 
