@@ -31,10 +31,7 @@ struct flash_partitions {
 extern void board_flash_init(struct flash_partitions [],
 				char chip_sel[][GPMC_CS_NUM], int nand_type);
 #else
-static inline void board_flash_init(struct flash_partitions part[],
-				char chip_sel[][GPMC_CS_NUM], int nand_type)
-{
-}
+
 #endif
 
 #if defined(CONFIG_MTD_NAND_OMAP2) || \

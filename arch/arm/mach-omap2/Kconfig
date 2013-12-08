@@ -353,6 +353,12 @@ config MACH_OMAP_3630SDP
 	default y
 	select OMAP_PACKAGE_CBP
 
+config MACH_OMAP_MAPPHONE
+	bool "MAPPHONE board(Motorola)"
+	depends on ARCH_OMAP3
+	default y
+	select OMAP_PACKAGE_CBP
+
 config MACH_TI8168EVM
 	bool "TI8168 Evaluation Module"
 	depends on SOC_OMAPTI81XX
@@ -520,6 +526,13 @@ config OMAP_REBOOT_REASON
 	  Let bootloader to know when their platform do a reboot. The boot
 	  reason is written to SAR memory that is retained across reboots.
 	  Then bootloader cat read it. Bootloader should be updated accordingly.
+
+config EMU_UART_DEBUG
+        bool "Setting MiniUSB port as UART3 to debug kernel"
+        default n
+        help
+          This feature is specific for Motorola phone with CPCAP power IC.
+          If this option is selected, USB functionality is NOT available any more.
 
 endmenu
 

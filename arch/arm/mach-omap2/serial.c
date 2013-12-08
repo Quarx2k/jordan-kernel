@@ -250,6 +250,9 @@ static int __init omap_serial_early_init(void)
 		struct omap_uart_state *uart;
 		char uart_name[MAX_UART_HWMOD_NAME_LEN];
 
+		if(i==2)
+                        continue;
+
 		snprintf(oh_name, MAX_UART_HWMOD_NAME_LEN, "uart%d", i + 1);
 		oh = omap_hwmod_lookup(oh_name);
 		if (!oh)

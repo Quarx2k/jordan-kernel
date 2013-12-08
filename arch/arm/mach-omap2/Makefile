@@ -260,6 +260,11 @@ obj-$(CONFIG_MACH_OMAP_ZOOM3)		+= board-zoom.o \
 obj-$(CONFIG_MACH_OMAP_3630SDP)		+= board-3630sdp.o \
 					   board-zoom-peripherals.o \
 					   board-zoom-display.o
+obj-$(CONFIG_MACH_OMAP_MAPPHONE)	+= board-mapphone.o \
+					   board-flash.o \
+					   hsmmc.o \
+					   omapxx_apps_brd_id.o
+obj-$(CONFIG_EMU_UART_DEBUG)		+= board-mapphone-emu_uart.o
 obj-$(CONFIG_MACH_CM_T35)		+= board-cm-t35.o
 obj-$(CONFIG_MACH_CM_T3517)		+= board-cm-t3517.o
 obj-$(CONFIG_MACH_IGEP0020)		+= board-igep0020.o

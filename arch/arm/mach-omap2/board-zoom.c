@@ -29,8 +29,7 @@
 
 #include "board-flash.h"
 #include "mux.h"
-#include "sdram-micron-mt46h32m32lf-6.h"
-#include "sdram-hynix-h8mbx00u0mer-0em.h"
+#include "sdram-toshiba-hynix-numonyx.h"
 
 #define ZOOM3_EHCI_RESET_GPIO		64
 
@@ -119,33 +118,26 @@ static void __init omap_zoom_init(void)
 	zoom_debugboard_init();
 	zoom_peripherals_init();
 
+/*
 	if (machine_is_omap_zoom2())
 		omap_sdrc_init(mt46h32m32lf6_sdrc_params,
 					  mt46h32m32lf6_sdrc_params);
 	else if (machine_is_omap_zoom3())
 		omap_sdrc_init(h8mbx00u0mer0em_sdrc_params,
 					  h8mbx00u0mer0em_sdrc_params);
+*/
+	omap_sdrc_init(JEDEC_JESD209A_sdrc_params,
+			JEDEC_JESD209A_sdrc_params);
+
 
 	zoom_display_init();
 }
 
-MACHINE_START(OMAP_ZOOM2, "OMAP Zoom2 board")
-	.atag_offset	= 0x100,
+MACHINE_START(MAPPHONE, "mapphone_")
+	.atag_offset	= 0x80C00100,
 	.reserve	= omap_reserve,
 	.map_io		= omap3_map_io,
 	.init_early	= omap3430_init_early,
-	.init_irq	= omap3_init_irq,
-	.handle_irq	= omap3_intc_handle_irq,
-	.init_machine	= omap_zoom_init,
-	.timer		= &omap3_timer,
-	.restart	= omap_prcm_restart,
-MACHINE_END
-
-MACHINE_START(OMAP_ZOOM3, "OMAP Zoom3 board")
-	.atag_offset	= 0x100,
-	.reserve	= omap_reserve,
-	.map_io		= omap3_map_io,
-	.init_early	= omap3630_init_early,
 	.init_irq	= omap3_init_irq,
 	.handle_irq	= omap3_intc_handle_irq,
 	.init_machine	= omap_zoom_init,

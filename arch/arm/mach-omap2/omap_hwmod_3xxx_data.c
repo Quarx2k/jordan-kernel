@@ -3565,7 +3565,7 @@ static __initdata struct omap_hwmod *omap3xxx_hwmods[] = {
 	&omap3xxx_wd_timer2_hwmod,
 	&omap3xxx_uart1_hwmod,
 	&omap3xxx_uart2_hwmod,
-	&omap3xxx_uart3_hwmod,
+	//&omap3xxx_uart3_hwmod,
 
 	/* i2c class */
 	&omap3xxx_i2c1_hwmod,
