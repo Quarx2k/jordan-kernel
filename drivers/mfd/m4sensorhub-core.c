@@ -33,6 +33,7 @@
 #include <linux/of.h>
 #include <linux/of_gpio.h>
 #include <linux/delay.h>
+#include <linux/firmware.h>
 
 
 #define M4SENSORHUB_NUM_GPIOS       6
@@ -49,9 +50,16 @@ static struct miscdevice m4sensorhub_misc_device = {
 	.name = M4SENSORHUB_DRIVER_NAME,
 };
 
+struct init_call {
+	int(*initcb)(struct m4sensorhub_data *);
+	struct init_call *next;
+};
+
 /* --------------- Local Declarations -------------- */
-static struct m4sensorhub_data *m4sensorhub_misc_data;
+static struct m4sensorhub_data m4sensorhub_misc_data;
 static DEFINE_MUTEX(m4sensorhub_driver_lock);
+static struct init_call *inithead;
+static int firmware_download_status = -1;
 
 unsigned short force_upgrade;
 module_param(force_upgrade, short, 0644);
@@ -65,7 +73,7 @@ MODULE_PARM_DESC(debug_level, "Set debug level 1 (CRITICAL) to "
 /* -------------- Global Functions ----------------- */
 struct m4sensorhub_data *m4sensorhub_client_get_drvdata(void)
 {
-	return m4sensorhub_misc_data;
+	return &m4sensorhub_misc_data;
 }
 EXPORT_SYMBOL_GPL(m4sensorhub_client_get_drvdata);
 
@@ -281,7 +289,90 @@ static void minnow_m4sensorhub_hw_free(struct m4sensorhub_data *m4sensorhub)
 	m4sensorhub->filename = NULL;
 }
 
+int m4sensorhub_register_initcall(int(*initfunc)(struct m4sensorhub_data *))
+{
+	struct init_call *inc = NULL;
+
+	inc = kzalloc(sizeof(struct init_call), GFP_KERNEL);
+	if (inc == NULL) {
+		KDEBUG(M4SH_ERROR, "Unable to allocate for init call\n");
+		return -ENOMEM;
+	}
+	inc->initcb = initfunc;
+	/* add it to the list */
+	if (inithead == NULL)
+		inc->next = NULL;
+	else
+		inc->next = inithead;
+	inithead = inc;
+	return 0;
+}
+EXPORT_SYMBOL_GPL(m4sensorhub_register_initcall);
+
+void m4sensorhub_unregister_initcall(int(*initfunc)(struct m4sensorhub_data *))
+{
+	struct init_call *node = inithead;
+	struct init_call *prev;
+
+	for (node = inithead, prev = NULL;
+		node != NULL;
+		prev = node, node = node->next) {
+		if (node->initcb == initfunc) {
+			/* remove this node */
+			if (node == inithead)
+				inithead = node->next;
+			else
+				prev->next = node->next;
+			kfree(node);
+		}
+	}
+}
+EXPORT_SYMBOL_GPL(m4sensorhub_unregister_initcall);
 /* END BOARD FILE FUNCTIONS */
+
+/* Downloads m4 firmware and also initializes all m4 drivers */
+static void m4sensorhub_initialize(const struct firmware *firmware,
+					void *context)
+{
+	int err = 0;
+	struct init_call *inc, *prev;
+
+	if (firmware == NULL) {
+		KDEBUG(M4SH_ERROR, "%s:No firmware data recieved\n", __func__);
+		return;
+	}
+
+	/* initiate m4 firmware download */
+	firmware_download_status = m4sensorhub_load_firmware(
+					&m4sensorhub_misc_data,
+					force_upgrade,
+					firmware);
+
+	if (firmware_download_status < 0) {
+		KDEBUG(M4SH_ERROR, "Failed to load M4 firmware = %d\n", err);
+		/* Since firmware download failed, put m4 back into boot mode*/
+		minnow_m4sensorhub_hw_reset(&m4sensorhub_misc_data);
+		return;
+	}
+
+	err = m4sensorhub_irq_init(&m4sensorhub_misc_data);
+	if (err < 0) {
+		KDEBUG(M4SH_ERROR, "M4sensorhub irq init failed\n");
+		return;
+	}
+
+	/* Initialize all the m4 drivers */
+	inc = inithead;
+	prev = NULL;
+	while (inc) {
+		err = inc->initcb(&m4sensorhub_misc_data);
+		if (err < 0)
+			dump_stack();
+		prev = inc;
+		inc = inc->next;
+		kfree(prev);
+	}
+}
 
 static ssize_t m4sensorhub_set_dbg(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t count)
@@ -307,7 +398,7 @@ static ssize_t m4sensorhub_get_loglevel(struct device *dev,
 {
 	unsigned long long loglevel;
 
-	m4sensorhub_reg_read(m4sensorhub_misc_data,
+	m4sensorhub_reg_read(&m4sensorhub_misc_data,
 		M4SH_REG_LOG_LOGENABLE, (char *)&loglevel);
 	KDEBUG(M4SH_INFO, "M4 loglevel = %llx", loglevel);
 	return sprintf(buf, "%llu\n", loglevel);
@@ -354,7 +445,7 @@ static ssize_t m4sensorhub_set_loglevel(struct device *dev,
 	char *tag, *level;
 	char **logbuf = (char **) &buf;
 
-	m4sensorhub_reg_read(m4sensorhub_misc_data,
+	m4sensorhub_reg_read(&m4sensorhub_misc_data,
 		M4SH_REG_LOG_LOGENABLE, (char *)&currentLogLevels);
 	while (1) {
 		tag = strsep(logbuf, "=,\n ");
@@ -366,7 +457,7 @@ static ssize_t m4sensorhub_set_loglevel(struct device *dev,
 		ParseAndUpdateLogLevels(tag, level, &currentLogLevels);
 	}
 
-	return m4sensorhub_reg_write(m4sensorhub_misc_data,
+	return m4sensorhub_reg_write(&m4sensorhub_misc_data,
 		M4SH_REG_LOG_LOGENABLE, (char *)&currentLogLevels,
 		m4sh_no_mask);
 }
@@ -377,7 +468,7 @@ static DEVICE_ATTR(log_level, S_IRUGO|S_IWUGO, m4sensorhub_get_loglevel,
 static int m4sensorhub_probe(struct i2c_client *client,
 			     const struct i2c_device_id *id)
 {
-	struct m4sensorhub_data *m4sensorhub;
+	struct m4sensorhub_data *m4sensorhub = &m4sensorhub_misc_data;
 	struct device_node *node = client->dev.of_node;
 	int err = -EINVAL;
 
@@ -395,23 +486,14 @@ static int m4sensorhub_probe(struct i2c_client *client,
 		m4sensorhub_debug = M4SH_ERROR;
 #endif
 	}
-	KDEBUG(M4SH_ERROR, "Initializing M4 Sensor Hub: force_upgrade=%d "
-			    "debug=%d\n", force_upgrade, m4sensorhub_debug);
+	KDEBUG(M4SH_ERROR, "Initializing M4 Sensor Hub debug=%d\n",
+			m4sensorhub_debug);
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		KDEBUG(M4SH_ERROR, "client not i2c capable\n");
 		err = -ENODEV;
 		goto err_unload;
 	}
-	m4sensorhub = kzalloc(sizeof(*m4sensorhub), GFP_KERNEL);
-	if (m4sensorhub == NULL) {
-		err = -ENOMEM;
-		KDEBUG(M4SH_ERROR,
-			"failed to allocate memory for module data: %d\n", err);
-		goto err_unload;
-	}
-	m4sensorhub_misc_data = m4sensorhub;
-
 	err = minnow_m4sensorhub_hw_init(m4sensorhub, node);
 	if (err)
 		printk(KERN_ERR "%s: hw_init Failed!", __func__);
@@ -440,33 +522,27 @@ static int m4sensorhub_probe(struct i2c_client *client,
 		goto err_del_debug_file;
 	}
 
-	err = m4sensorhub_load_firmware(m4sensorhub, force_upgrade);
-	if (err < 0) {
-		dev_err(&client->dev, "load firmware file failed: %d\n", err);
-		goto err_del_log_file;
-	}
-
-	err = m4sensorhub_reg_init(m4sensorhub);
-	if (err < 0)
-		goto err_set_bootmode;
-
 	if (m4sensorhub->hwconfig.irq_gpio >= 0)
 		client->irq = gpio_to_irq(m4sensorhub->hwconfig.irq_gpio);
 	else {
 		KDEBUG(M4SH_ERROR, "Error: No IRQ configured\n");
 		err = -ENODEV;
-		goto err_reg_shutdown;
+		goto err_del_log_file;
 	}
 
 	err = m4sensorhub_panic_init(m4sensorhub);
 	if (err < 0)
 		goto err_reg_shutdown;
 
-	err = m4sensorhub_irq_init(m4sensorhub);
-	if (err < 0)
+	err = request_firmware_nowait(THIS_MODULE,
+			FW_ACTION_HOTPLUG, m4sensorhub->filename,
+			&(m4sensorhub->i2c_client->dev),
+			GFP_KERNEL, m4sensorhub,
+			m4sensorhub_initialize);
+	if (err < 0) {
+		KDEBUG(M4SH_ERROR, "request_firmware_nowait failed: %d\n", err);
 		goto err_panic_shutdown;
-
-
+	}
 	KDEBUG(M4SH_NOTICE, "Registered M4 Sensor Hub\n");
 
 	goto done;
@@ -475,8 +551,6 @@ err_panic_shutdown:
 	m4sensorhub_panic_shutdown(m4sensorhub);
 err_reg_shutdown:
 	m4sensorhub_reg_shutdown(m4sensorhub);
-err_set_bootmode:
-	minnow_m4sensorhub_hw_reset(m4sensorhub);
 err_del_log_file:
 	device_remove_file(&client->dev, &dev_attr_log_level);
 err_del_debug_file:
@@ -487,9 +561,7 @@ err_hw_free:
 	m4sensorhub->i2c_client = NULL;
 	i2c_set_clientdata(client, NULL);
 	minnow_m4sensorhub_hw_free(m4sensorhub);
-	kfree(m4sensorhub);
 	m4sensorhub = NULL;
-	m4sensorhub_misc_data = NULL;
 err_unload:
 done:
 	return err;
@@ -510,9 +582,7 @@ static int __exit m4sensorhub_remove(struct i2c_client *client)
 	m4sensorhub->i2c_client = NULL;
 	i2c_set_clientdata(client, NULL);
 	minnow_m4sensorhub_hw_free(m4sensorhub);
-	kfree(m4sensorhub);
 	m4sensorhub = NULL;
-	m4sensorhub_misc_data = NULL;
 
 	return 0;
 }

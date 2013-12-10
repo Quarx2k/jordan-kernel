@@ -307,6 +307,11 @@ int m4sensorhub_irq_register(struct m4sensorhub_data *m4sensorhub,
 
 	irqdata = m4sensorhub->irqdata;
 
+	if (irqdata == NULL) {
+		KDEBUG(M4SH_ERROR, "irqdata null for caller = %d\n", irq);
+		return -EINVAL;
+	}
+
 	mutex_lock(&irqdata->lock);
 
 	if (irqdata->event_handler[irq].func == NULL) {
@@ -342,7 +347,8 @@ int m4sensorhub_irq_unregister(struct m4sensorhub_data *m4sensorhub,
 	struct m4sensorhub_irqdata *data = m4sensorhub->irqdata;
 	int retval;
 
-	if (irq >= M4SH_IRQ__NUM)
+	if ((irq >= M4SH_IRQ__NUM) || (m4sensorhub == NULL) ||
+			(m4sensorhub->irqdata == NULL))
 		return -EINVAL;
 
 	retval = m4sensorhub_irq_disable(m4sensorhub, irq);

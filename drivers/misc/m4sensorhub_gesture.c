@@ -245,6 +245,30 @@ static struct miscdevice gesture_client_miscdrv = {
 	.fops = &gesture_client_fops,
 };
 
+static int gesture_driver_init(struct m4sensorhub_data *m4sensorhub)
+{
+	int ret = 0;
+	ret = m4sensorhub_irq_register(m4sensorhub, M4SH_IRQ_GESTURE_DETECTED,
+					m4_handle_gesture_irq,
+					misc_gesture_data);
+	if (ret < 0) {
+		KDEBUG(M4SH_ERROR, "Error registering int %d (%d)\n",
+			M4SH_IRQ_GESTURE_DETECTED, ret);
+		return ret;
+	}
+	ret = m4sensorhub_irq_enable(m4sensorhub, M4SH_IRQ_GESTURE_DETECTED);
+	if (ret < 0) {
+		KDEBUG(M4SH_ERROR, "Error enabling int %d (%d)\n",
+			M4SH_IRQ_GESTURE_DETECTED, ret);
+		goto exit;
+	}
+	return ret;
+
+exit:
+	m4sensorhub_irq_unregister(m4sensorhub, M4SH_IRQ_GESTURE_DETECTED);
+	return ret;
+}
+
 static int gesture_client_probe(struct platform_device *pdev)
 {
 	int ret = -1;
@@ -256,8 +280,11 @@ static int gesture_client_probe(struct platform_device *pdev)
 
 	gesture_client_data = kzalloc(sizeof(*gesture_client_data),
 						GFP_KERNEL);
-	if (!gesture_client_data)
+	if (!gesture_client_data) {
+		KDEBUG(M4SH_ERROR, "%s failed: unable to allocate"
+				"for client_data\n", __func__);
 		return -ENOMEM;
+	}
 
 	gesture_client_data->m4sensorhub = m4sensorhub;
 	platform_set_drvdata(pdev, gesture_client_data);
@@ -298,32 +325,22 @@ static int gesture_client_probe(struct platform_device *pdev)
 		goto unregister_input_device;
 	}
 	misc_gesture_data = gesture_client_data;
-	ret = m4sensorhub_irq_register(m4sensorhub, M4SH_IRQ_GESTURE_DETECTED,
-				       m4_handle_gesture_irq,
-				       gesture_client_data);
+	ret = m4sensorhub_register_initcall(gesture_driver_init);
 	if (ret < 0) {
-		KDEBUG(M4SH_ERROR, "Error registering int %d (%d)\n",
-		M4SH_IRQ_GESTURE_DETECTED, ret);
+		KDEBUG(M4SH_ERROR, "Unable to register init function"
+			"for gesture client = %d\n", ret);
 		goto unregister_misc_device;
-	}
-	ret = m4sensorhub_irq_enable(m4sensorhub, M4SH_IRQ_GESTURE_DETECTED);
-	if (ret < 0) {
-		KDEBUG(M4SH_ERROR, "Error enabling int %d (%d)\n",
-		M4SH_IRQ_GESTURE_DETECTED, ret);
-		goto unregister_display_gesture_irq;
 	}
 	if (device_create_file(&pdev->dev, &dev_attr_gesture_status)) {
 		KDEBUG(M4SH_ERROR, "Error creating %s sys entry\n", __func__);
 		ret = -1;
-		goto disable_display_gesture_irq;
+		goto unregister_initcall;
 	}
 	KDEBUG(M4SH_INFO, "Initialized %s driver\n", __func__);
 	return 0;
 
-disable_display_gesture_irq:
-	m4sensorhub_irq_disable(m4sensorhub, M4SH_IRQ_GESTURE_DETECTED);
-unregister_display_gesture_irq:
-	m4sensorhub_irq_unregister(m4sensorhub, M4SH_IRQ_GESTURE_DETECTED);
+unregister_initcall:
+	m4sensorhub_unregister_initcall(gesture_driver_init);
 unregister_misc_device:
 	misc_gesture_data = NULL;
 	misc_deregister(&gesture_client_miscdrv);
@@ -347,6 +364,7 @@ static int __exit gesture_client_remove(struct platform_device *pdev)
 				M4SH_IRQ_GESTURE_DETECTED);
 	m4sensorhub_irq_unregister(gesture_client_data->m4sensorhub,
 				M4SH_IRQ_GESTURE_DETECTED);
+	m4sensorhub_unregister_initcall(gesture_driver_init);
 	misc_gesture_data = NULL;
 	misc_deregister(&gesture_client_miscdrv);
 	input_unregister_device(gesture_client_data->input_dev);

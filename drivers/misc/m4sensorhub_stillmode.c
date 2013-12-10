@@ -224,6 +224,57 @@ static DEVICE_ATTR(state, 0664, m4_stillmode_getstate,
 static DEVICE_ATTR(timeout, 0664, m4_stillmode_get_timeout,
 		   m4_stillmode_set_timeout);
 
+static int stillmode_driver_init(struct m4sensorhub_data *m4sensorhub)
+{
+	int ret;
+
+	ret = m4sensorhub_irq_register(m4sensorhub, M4SH_IRQ_STILL_DETECTED,
+					m4_handle_stillmode_irq,
+					g_stillmode_data);
+
+	if (ret < 0) {
+		KDEBUG(M4SH_ERROR, "Error registering still mode IRQ: %d\n",
+		ret);
+		return ret;
+	}
+
+	ret = m4sensorhub_irq_enable(m4sensorhub, M4SH_IRQ_STILL_DETECTED);
+	if (ret < 0) {
+		KDEBUG(M4SH_ERROR, "Error enabling still mode int: %d\n",
+			ret);
+		goto unregister_still_irq;
+	}
+
+	ret = m4sensorhub_irq_register(m4sensorhub, M4SH_IRQ_MOTION_DETECTED,
+					m4_handle_stillmode_irq,
+					g_stillmode_data);
+
+	if (ret < 0) {
+		KDEBUG(M4SH_ERROR, "Error registering moving mode IRQ: %d\n",
+			ret);
+		goto disable_still_irq;
+	}
+
+	ret = m4sensorhub_irq_enable(m4sensorhub, M4SH_IRQ_MOTION_DETECTED);
+	if (ret < 0) {
+		KDEBUG(M4SH_ERROR, "Error enabling moving mode int: %d\n",
+			ret);
+		goto unregister_moving_irq;
+	}
+
+	/* initialize timer on M4 */
+	m4sensorhub_stillmode_exit();
+	return ret;
+
+unregister_moving_irq:
+	m4sensorhub_irq_unregister(m4sensorhub, M4SH_IRQ_MOTION_DETECTED);
+disable_still_irq:
+	m4sensorhub_irq_disable(m4sensorhub, M4SH_IRQ_STILL_DETECTED);
+unregister_still_irq:
+	m4sensorhub_irq_unregister(m4sensorhub, M4SH_IRQ_STILL_DETECTED);
+	return ret;
+}
+
 static int stillmode_client_probe(struct platform_device *pdev)
 {
 	int ret = -1;
@@ -267,42 +318,19 @@ static int stillmode_client_probe(struct platform_device *pdev)
 		       STILLMODE_CLIENT_DRIVER_NAME);
 
 	INIT_WORK(&stillmode_client_data->queued_work,
-		  m4sensorhub_stillmode_work);
+		m4sensorhub_stillmode_work);
 
-	ret = m4sensorhub_irq_register(m4sensorhub, M4SH_IRQ_STILL_DETECTED,
-						m4_handle_stillmode_irq,
-						stillmode_client_data);
+	ret = m4sensorhub_register_initcall(stillmode_driver_init);
 	if (ret < 0) {
-		KDEBUG(M4SH_ERROR, "Error registering still mode IRQ: "
-			"%d\n", ret);
+		KDEBUG(M4SH_ERROR, "Unable to register init function "
+			"for stillmode client = %d\n", ret);
 		goto destroy_wakelock;
-	}
-	ret = m4sensorhub_irq_enable(m4sensorhub, M4SH_IRQ_STILL_DETECTED);
-	if (ret < 0) {
-		KDEBUG(M4SH_ERROR, "Error enabling still mode int: "
-			"%d\n", ret);
-		goto unregister_still_irq;
-	}
-
-	ret = m4sensorhub_irq_register(m4sensorhub, M4SH_IRQ_MOTION_DETECTED,
-						m4_handle_stillmode_irq,
-						stillmode_client_data);
-	if (ret < 0) {
-		KDEBUG(M4SH_ERROR, "Error registering moving mode IRQ: "
-			"%d\n", ret);
-		goto disable_still_irq;
-	}
-	ret = m4sensorhub_irq_enable(m4sensorhub, M4SH_IRQ_MOTION_DETECTED);
-	if (ret < 0) {
-		KDEBUG(M4SH_ERROR, "Error enabling moving mode int: "
-			"%d\n", ret);
-		goto unregister_moving_irq;
 	}
 
 	if (device_create_file(&pdev->dev, &dev_attr_state)) {
 		KDEBUG(M4SH_ERROR, "Error creating stillmode sys entry\n");
 		ret = -1;
-		goto disable_moving_irq;
+		goto unregister_initcall;
 	}
 
 	if (device_create_file(&pdev->dev, &dev_attr_timeout)) {
@@ -311,9 +339,6 @@ static int stillmode_client_probe(struct platform_device *pdev)
 		goto remove_stillmode_sysfs;
 	}
 
-	/* initialize timer on M4 */
-	m4sensorhub_stillmode_exit();
-
 	KDEBUG(M4SH_INFO, "Initialized %s driver\n",
 		STILLMODE_CLIENT_DRIVER_NAME);
 
@@ -321,14 +346,8 @@ static int stillmode_client_probe(struct platform_device *pdev)
 
 remove_stillmode_sysfs:
 	device_remove_file(&pdev->dev, &dev_attr_state);
-disable_moving_irq:
-	m4sensorhub_irq_disable(m4sensorhub, M4SH_IRQ_MOTION_DETECTED);
-unregister_moving_irq:
-	m4sensorhub_irq_unregister(m4sensorhub, M4SH_IRQ_MOTION_DETECTED);
-disable_still_irq:
-	m4sensorhub_irq_disable(m4sensorhub, M4SH_IRQ_STILL_DETECTED);
-unregister_still_irq:
-	m4sensorhub_irq_unregister(m4sensorhub, M4SH_IRQ_STILL_DETECTED);
+unregister_initcall:
+	m4sensorhub_unregister_initcall(stillmode_driver_init);
 destroy_wakelock:
 	wake_lock_destroy(&stillmode_client_data->wakelock);
 	input_unregister_device(stillmode_client_data->input_dev);
@@ -355,6 +374,7 @@ static int __exit stillmode_client_remove(struct platform_device *pdev)
 	m4sensorhub_irq_unregister(m4sensorhub, M4SH_IRQ_MOTION_DETECTED);
 	m4sensorhub_irq_disable(m4sensorhub, M4SH_IRQ_STILL_DETECTED);
 	m4sensorhub_irq_unregister(m4sensorhub, M4SH_IRQ_STILL_DETECTED);
+	m4sensorhub_unregister_initcall(stillmode_driver_init);
 	wake_lock_destroy(&stillmode_client_data->wakelock);
 	input_unregister_device(stillmode_client_data->input_dev);
 	platform_set_drvdata(pdev, NULL);

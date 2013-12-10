@@ -63,42 +63,7 @@ struct audio_client {
 	int active;	/* Indicates if audio transfer is active */
 };
 
-struct audio_client *audio_data;
-
-static ssize_t audio_get_loglevel(struct device *dev,
-			struct device_attribute *attr, char *buf)
-{
-	unsigned long long loglevel;
-	struct spi_device *spi = to_spi_device(dev);
-	struct audio_client *audio_client_data = spi_get_drvdata(spi);
-
-	m4sensorhub_reg_read(audio_client_data->m4sensorhub,
-		M4SH_REG_LOG_LOGENABLE, (char *)&loglevel);
-	loglevel = get_log_level(loglevel, AUDIO_MASK_BIT_1);
-	return sprintf(buf, "%llu\n", loglevel);
-}
-static ssize_t audio_set_loglevel(struct device *dev,
-			struct device_attribute *attr,
-			const char *buf, size_t size)
-{
-	unsigned long level;
-	unsigned long long mask = 0, newlevel;
-	struct spi_device *spi = to_spi_device(dev);
-	struct audio_client *audio_client_data = spi_get_drvdata(spi);
-
-	if (strict_strtoul(buf, 10, &level) < 0)
-		return -1;
-	if (level > M4_MAX_LOG_LEVEL) {
-		KDEBUG(M4SH_ERROR, " Invalid log level - %d\n", (int)level);
-		return -1;
-	}
-	mask = (1ULL << AUDIO_MASK_BIT_1) | (1ULL << AUDIO_MASK_BIT_2);
-	newlevel = (unsigned long long)level << AUDIO_MASK_BIT_1;
-	return m4sensorhub_reg_write(audio_client_data->m4sensorhub,
-		M4SH_REG_LOG_LOGENABLE, (char *)&newlevel,
-		(unsigned char *)&mask);
-}
-static DEVICE_ATTR(LogLevel, 0664, audio_get_loglevel, audio_set_loglevel);
+static struct audio_client *audio_data;
 
 static void audio_client_spidma_read(struct audio_client *audio_client_data,
 	int len)
@@ -384,6 +349,19 @@ static const struct file_operations audio_client_fops = {
 	.read = audio_client_read,
 };
 
+static int audio_driver_init(struct m4sensorhub_data *m4sensorhub)
+{
+	int ret;
+
+	ret = m4sensorhub_irq_register(m4sensorhub, M4SH_IRQ_MIC_DATA_READY,
+		m4_handle_audio_irq, audio_data);
+	if (ret < 0) {
+		KDEBUG(M4SH_ERROR, "Error registering int %d (%d)\n",
+			M4SH_IRQ_MIC_DATA_READY, ret);
+	}
+	return ret;
+}
+
 static int audio_client_probe(struct spi_device *spi)
 {
 	int ret = -1;
@@ -409,27 +387,16 @@ static int audio_client_probe(struct spi_device *spi)
 	}
 	audio_client_data->dev_dsp = ret;
 	audio_client_data->dev_dsp_open_count = 0;
-
-	ret = m4sensorhub_irq_register(m4sensorhub, M4SH_IRQ_MIC_DATA_READY,
-		m4_handle_audio_irq, audio_client_data);
+	ret = m4sensorhub_register_initcall(audio_driver_init);
 	if (ret < 0) {
-		KDEBUG(M4SH_ERROR, "Error registering int %d (%d)\n",
-			M4SH_IRQ_MIC_DATA_READY, ret);
+		KDEBUG(M4SH_ERROR, "Unable to register init function "
+			"for audio client = %d\n", ret);
 		goto unregister_sound_device;
-	}
-
-	ret = device_create_file(&spi->dev, &dev_attr_LogLevel);
-	if (ret) {
-		KDEBUG(M4SH_ERROR, "Error creating %s sys entry\n",
-			AUDIO_CLIENT_DRIVER_NAME);
-		goto unregister_irq;
 	}
 
 	KDEBUG(M4SH_ERROR, "Initialized %s driver\n", AUDIO_CLIENT_DRIVER_NAME);
 	return 0;
 
-unregister_irq:
-	m4sensorhub_irq_unregister(m4sensorhub, M4SH_IRQ_MIC_DATA_READY);
 unregister_sound_device:
 	unregister_sound_dsp(audio_client_data->dev_dsp);
 free_client_data:
@@ -442,11 +409,11 @@ static int __exit audio_client_remove(struct spi_device *spi)
 {
 	struct audio_client *audio_client_data = spi_get_drvdata(spi);
 
-	device_remove_file(&spi->dev, &dev_attr_LogLevel);
 	m4sensorhub_irq_disable(audio_client_data->m4sensorhub,
 		M4SH_IRQ_MIC_DATA_READY);
 	m4sensorhub_irq_unregister(audio_client_data->m4sensorhub,
 		M4SH_IRQ_MIC_DATA_READY);
+	m4sensorhub_unregister_initcall(audio_driver_init);
 	unregister_sound_dsp(audio_client_data->dev_dsp);
 	spi_set_drvdata(spi, NULL);
 	kfree(audio_client_data);

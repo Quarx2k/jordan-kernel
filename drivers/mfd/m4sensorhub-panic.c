@@ -225,7 +225,7 @@ void m4sensorhub_panic_process(struct m4sensorhub_data *m4sensorhub)
 	KDEBUG(M4SH_ERROR, "m4sensorhub_panic: Detected M4 panic, reset M4!\n");
 	m4sensorhub->pdev->hw_reset(m4sensorhub);
 	msleep(100);
-	ret = m4sensorhub_load_firmware(m4sensorhub, 0);
+	ret = m4sensorhub_load_firmware(m4sensorhub, 0, NULL);
 	if (ret < 0) {
 		KDEBUG(M4SH_ERROR, "m4sensorhub_panic: "\
 			"Failed to restart M4, ret = %d\n", ret);

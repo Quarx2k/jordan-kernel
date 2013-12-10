@@ -321,7 +321,7 @@ static ssize_t m4_pedometer_floorsclimbed(struct device *dev,
 	m4_read_pedometer_data(pedo_client_data);
 	KDEBUG(M4SH_DEBUG, "%s  : floorsclimbed = %d\n",
 			__func__, pedo_client_data->curr_data.floorsclimbed);
-	return sprintf(buf, "%d \n", pedo_client_data->curr_data.floorsclimbed);
+	return sprintf(buf, "%d\n", pedo_client_data->curr_data.floorsclimbed);
 }
 
 static ssize_t m4_pedometer_metsactivity(struct device *dev,
@@ -332,76 +332,7 @@ static ssize_t m4_pedometer_metsactivity(struct device *dev,
 
 	KDEBUG(M4SH_DEBUG, "%s  : metsactivity = %d\n",
 			__func__, pedo_client_data->curr_data.metsactivity);
-	return sprintf(buf, "%d \n", pedo_client_data->curr_data.metsactivity);
-}
-
-static ssize_t pedo_get_loglevel(struct device *dev,
-				struct device_attribute *attr, char *buf)
-{
-
-	int loglevel;
-	struct platform_device *pdev = to_platform_device(dev);
-	struct pedometer_client *pedo_client_data = platform_get_drvdata(pdev);
-
-	m4sensorhub_reg_read(pedo_client_data->m4sensorhub,
-		M4SH_REG_LOG_LOGENABLE, (char *)&loglevel);
-	loglevel = get_log_level(loglevel, PEDO_MASK_BIT_1);
-	return sprintf(buf, "%d\n", loglevel);
-}
-
-static ssize_t pedo_set_loglevel(struct device *dev,
-				struct device_attribute *attr,
-				const char *buf, size_t size)
-{
-	unsigned long level;
-	unsigned int mask = 0;
-	struct platform_device *pdev = to_platform_device(dev);
-	struct pedometer_client *pedo_client_data = platform_get_drvdata(pdev);
-
-	if ((strict_strtoul(buf, 10, &level)) < 0)
-		return -1;
-	if (level > M4_MAX_LOG_LEVEL) {
-		KDEBUG(M4SH_ERROR, " Invalid log level - %d\n", (int)level);
-		return -1;
-	}
-	mask = (1 << PEDO_MASK_BIT_1) | (1 << PEDO_MASK_BIT_2);
-	level = (level << PEDO_MASK_BIT_1);
-	return m4sensorhub_reg_write(pedo_client_data->m4sensorhub,
-		M4SH_REG_LOG_LOGENABLE, (char *)&level, (unsigned char *)&mask);
-}
-
-static ssize_t mets_get_loglevel(struct device *dev,
-				struct device_attribute *attr, char *buf)
-{
-	int loglevel;
-	struct platform_device *pdev = to_platform_device(dev);
-	struct pedometer_client *pedo_client_data = platform_get_drvdata(pdev);
-
-	m4sensorhub_reg_read(pedo_client_data->m4sensorhub,
-		M4SH_REG_LOG_LOGENABLE, (char *)&loglevel);
-	loglevel = get_log_level(loglevel, METS_MASK_BIT_1);
-	return sprintf(buf, "%d\n", loglevel);
-}
-
-static ssize_t mets_set_loglevel(struct device *dev,
-			struct device_attribute *attr,
-			const char *buf, size_t size)
-{
-	unsigned long level;
-	unsigned int mask = 0;
-	struct platform_device *pdev = to_platform_device(dev);
-	struct pedometer_client *pedo_client_data = platform_get_drvdata(pdev);
-
-	if ((strict_strtoul(buf, 10, &level)) < 0)
-		return -1;
-	if (level > M4_MAX_LOG_LEVEL) {
-		KDEBUG(M4SH_ERROR, " Invalid log level - %d\n", (int)level);
-		return -1;
-	}
-	mask = (1 << METS_MASK_BIT_1) | (1 << METS_MASK_BIT_2);
-	level = (level << METS_MASK_BIT_1);
-	return m4sensorhub_reg_write(pedo_client_data->m4sensorhub,
-		M4SH_REG_LOG_LOGENABLE, (char *)&level, (unsigned char *)&mask);
+	return sprintf(buf, "%d\n", pedo_client_data->curr_data.metsactivity);
 }
 
 static DEVICE_ATTR(activity, 0444, m4_pedometer_activity, NULL);
@@ -412,8 +343,6 @@ static DEVICE_ATTR(mets, 0444, m4_pedometer_mets, NULL);
 static DEVICE_ATTR(calories, 0444, m4_pedometer_calories, NULL);
 static DEVICE_ATTR(floorsclimbed, 0444, m4_pedometer_floorsclimbed, NULL);
 static DEVICE_ATTR(metsactivity, 0444, m4_pedometer_metsactivity, NULL);
-static DEVICE_ATTR(pedoLogLevel, 0664, pedo_get_loglevel, pedo_set_loglevel);
-static DEVICE_ATTR(metsLogLevel, 0644, mets_get_loglevel, mets_set_loglevel);
 
 static const struct file_operations pedometer_client_fops = {
 	.owner = THIS_MODULE,
@@ -427,6 +356,43 @@ static struct miscdevice pedometer_client_miscdrv = {
 	.name  = PEDOMETER_CLIENT_DRIVER_NAME,
 	.fops = &pedometer_client_fops,
 };
+
+static int pedometer_driver_init(struct m4sensorhub_data *m4sensorhub)
+{
+	int ret;
+
+	ret = m4sensorhub_irq_register(m4sensorhub,
+					M4SH_IRQ_PEDOMETER_DATA_READY,
+					m4_handle_pedometer_irq,
+					misc_pedometer_data);
+	if (ret < 0) {
+		KDEBUG(M4SH_ERROR, "Error registering m4 int %d (%d)\n",
+			M4SH_IRQ_PEDOMETER_DATA_READY, ret);
+		return ret;
+	}
+	ret = m4sensorhub_irq_register(m4sensorhub,
+					M4SH_IRQ_ACTIVITY_CHANGE,
+					m4_handle_pedometer_irq,
+					misc_pedometer_data);
+	if (ret < 0) {
+		KDEBUG(M4SH_ERROR, "Error registering m4 int %d (%d)\n",
+			M4SH_IRQ_ACTIVITY_CHANGE, ret);
+		goto exit1;
+	}
+	ret = m4sensorhub_irq_enable(m4sensorhub, M4SH_IRQ_ACTIVITY_CHANGE);
+	if (ret < 0) {
+		KDEBUG(M4SH_ERROR, "Error enabling m4 int %d (%d)\n",
+			M4SH_IRQ_ACTIVITY_CHANGE, ret);
+		goto exit;
+	}
+
+	return ret;
+exit:
+	m4sensorhub_irq_unregister(m4sensorhub, M4SH_IRQ_ACTIVITY_CHANGE);
+exit1:
+	m4sensorhub_irq_unregister(m4sensorhub, M4SH_IRQ_PEDOMETER_DATA_READY);
+	return ret;
+}
 
 static int pedometer_client_probe(struct platform_device *pdev)
 {
@@ -483,34 +449,16 @@ static int pedometer_client_probe(struct platform_device *pdev)
 		goto unregister_input_device;
 	}
 	misc_pedometer_data = pedometer_client_data;
-	ret = m4sensorhub_irq_register(m4sensorhub,
-			M4SH_IRQ_PEDOMETER_DATA_READY, m4_handle_pedometer_irq,
-			pedometer_client_data);
+	ret = m4sensorhub_register_initcall(pedometer_driver_init);
 	if (ret < 0) {
-		KDEBUG(M4SH_ERROR, "Error registering int %d (%d)\n",
-					M4SH_IRQ_PEDOMETER_DATA_READY, ret);
+		KDEBUG(M4SH_ERROR, "Unable to register init function "
+			"for pedometer client = %d\n", ret);
 		goto unregister_misc_device;
 	}
-	ret = m4sensorhub_irq_register(m4sensorhub, M4SH_IRQ_ACTIVITY_CHANGE,
-						m4_handle_pedometer_irq,
-						pedometer_client_data);
-	if (ret < 0) {
-		KDEBUG(M4SH_ERROR, "Error registering int %d (%d)\n",
-				M4SH_IRQ_ACTIVITY_CHANGE, ret);
-		goto unregister_pedometer_irq;
-	}
-
-	ret = m4sensorhub_irq_enable(m4sensorhub, M4SH_IRQ_ACTIVITY_CHANGE);
-	if (ret < 0) {
-		KDEBUG(M4SH_ERROR, "Error enabling int %d (%d)\n",
-			M4SH_IRQ_ACTIVITY_CHANGE, ret);
-		goto unregister_activity_irq;
-	}
-
 	if (device_create_file(&pdev->dev, &dev_attr_activity)) {
 		KDEBUG(M4SH_ERROR, "Error creating %s sys entry\n", __func__);
 		ret = -1;
-		goto disable_activity_irq;
+		goto unregister_initcall;
 	}
 	if (device_create_file(&pdev->dev, &dev_attr_distance)) {
 		KDEBUG(M4SH_ERROR, "Error creating %s sys entry\n", __func__);
@@ -532,20 +480,10 @@ static int pedometer_client_probe(struct platform_device *pdev)
 		ret = -1;
 		goto remove_stepcount_device_file;
 	}
-	if (device_create_file(&pdev->dev, &dev_attr_pedoLogLevel)) {
-		KDEBUG(M4SH_ERROR, "Error creating %s sys entry\n", __func__);
-		ret = -1;
-		goto remove_mets_device_file;
-	}
-	if (device_create_file(&pdev->dev, &dev_attr_metsLogLevel)) {
-		KDEBUG(M4SH_ERROR, "Error creating %s sys entry\n", __func__);
-		ret = -1;
-		goto remove_pedoLogLevel_device_file;
-	}
 	if (device_create_file(&pdev->dev, &dev_attr_calories)) {
 		KDEBUG(M4SH_ERROR, "Error creating %s sys entry\n", __func__);
 		ret = -1;
-		goto remove_metsLogLevel_device_file;
+		goto remove_mets_device_file;
 	}
 	if (device_create_file(&pdev->dev, &dev_attr_floorsclimbed)) {
 		KDEBUG(M4SH_ERROR, "Error creating %s sys entry\n", __func__);
@@ -564,10 +502,6 @@ remove_floorsclimbed_device_file:
 	device_remove_file(&pdev->dev, &dev_attr_floorsclimbed);
 remove_cals_device_file:
 	device_remove_file(&pdev->dev, &dev_attr_calories);
-remove_metsLogLevel_device_file:
-	device_remove_file(&pdev->dev, &dev_attr_metsLogLevel);
-remove_pedoLogLevel_device_file:
-	device_remove_file(&pdev->dev, &dev_attr_pedoLogLevel);
 remove_mets_device_file:
 	device_remove_file(&pdev->dev, &dev_attr_mets);
 remove_stepcount_device_file:
@@ -578,12 +512,8 @@ remove_distance_device_file:
 	device_remove_file(&pdev->dev, &dev_attr_distance);
 remove_activity_device_file:
 	device_remove_file(&pdev->dev, &dev_attr_activity);
-disable_activity_irq:
-	m4sensorhub_irq_disable(m4sensorhub, M4SH_IRQ_ACTIVITY_CHANGE);
-unregister_activity_irq:
-	m4sensorhub_irq_unregister(m4sensorhub, M4SH_IRQ_ACTIVITY_CHANGE);
-unregister_pedometer_irq:
-	m4sensorhub_irq_unregister(m4sensorhub, M4SH_IRQ_PEDOMETER_DATA_READY);
+unregister_initcall:
+	m4sensorhub_unregister_initcall(pedometer_driver_init);
 unregister_misc_device:
 	misc_pedometer_data = NULL;
 	misc_deregister(&pedometer_client_miscdrv);
@@ -602,8 +532,6 @@ static int __exit pedometer_client_remove(struct platform_device *pdev)
 	struct pedometer_client *pedometer_client_data =
 						platform_get_drvdata(pdev);
 
-	device_remove_file(&pdev->dev, &dev_attr_metsLogLevel);
-	device_remove_file(&pdev->dev, &dev_attr_pedoLogLevel);
 	device_remove_file(&pdev->dev, &dev_attr_mets);
 	device_remove_file(&pdev->dev, &dev_attr_calories);
 	device_remove_file(&pdev->dev, &dev_attr_stepcount);
@@ -619,6 +547,7 @@ static int __exit pedometer_client_remove(struct platform_device *pdev)
 				M4SH_IRQ_ACTIVITY_CHANGE);
 	m4sensorhub_irq_unregister(pedometer_client_data->m4sensorhub,
 				M4SH_IRQ_ACTIVITY_CHANGE);
+	m4sensorhub_unregister_initcall(pedometer_driver_init);
 	misc_pedometer_data = NULL;
 	misc_deregister(&pedometer_client_miscdrv);
 	input_unregister_device(pedometer_client_data->input_dev);

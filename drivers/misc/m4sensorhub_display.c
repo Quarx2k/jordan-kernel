@@ -353,45 +353,6 @@ int m4sensorhub_set_display_control(int m4_ctrl, int gpio_mipi_mux)
 }
 EXPORT_SYMBOL_GPL(m4sensorhub_set_display_control);
 
-static ssize_t display_get_loglevel(struct device *dev,
-	struct device_attribute *attr, char *buf)
-{
-	uint64_t loglevel;
-	struct platform_device *pdev = to_platform_device(dev);
-	struct display_client *display_data =
-		platform_get_drvdata(pdev);
-
-	m4sensorhub_reg_read(display_data->m4sensorhub,
-		M4SH_REG_LOG_LOGENABLE, (char *)&loglevel);
-	loglevel = get_log_level(loglevel, DISPLAY_MASK_BIT_1);
-	return sprintf(buf, "%d\n", (int)loglevel);
-}
-
-static ssize_t display_set_loglevel(struct device *dev,
-	struct device_attribute *attr,
-	const char *buf, size_t size)
-{
-	uint64_t level = 0;
-	uint64_t mask = 0x3;
-	struct platform_device *pdev = to_platform_device(dev);
-	struct display_client *display_data =
-		platform_get_drvdata(pdev);
-
-	if ((strict_strtoul(buf, 10, (unsigned long *)&level)) < 0)
-		return -EINVAL;
-	if (level > M4_MAX_LOG_LEVEL) {
-		KDEBUG(M4SH_ERROR, " Invalid log level - %d\n", (int)level);
-		return -EINVAL;
-	}
-	mask <<= DISPLAY_MASK_BIT_1;
-	level <<= DISPLAY_MASK_BIT_1;
-	return m4sensorhub_reg_write(display_data->m4sensorhub,
-		M4SH_REG_LOG_LOGENABLE, (char *)&level, (unsigned char *)&mask);
-}
-
-static DEVICE_ATTR(LogLevel, 0664, \
-		display_get_loglevel, display_set_loglevel);
-
 static const struct file_operations display_client_fops = {
 	.owner = THIS_MODULE,
 	.unlocked_ioctl = display_client_ioctl,
@@ -428,6 +389,18 @@ static void display_panic_restore(\
 			/* TODO retry ? */
 		}
 	}
+}
+
+static int display_driver_init(struct m4sensorhub_data *m4sensorhub)
+{
+	int err;
+
+	err = m4sensorhub_panic_register(m4sensorhub, PANICHDL_DISPLAY_RESTORE,
+		display_panic_restore, global_display_data);
+	if (err < 0)
+		KDEBUG(M4SH_ERROR, "Display driver init failed\n");
+
+	return err;
 }
 
 static int display_client_probe(struct platform_device *pdev)
@@ -468,13 +441,6 @@ static int display_client_probe(struct platform_device *pdev)
 		goto disable_regulator;
 	}
 
-	if (device_create_file(&pdev->dev, &dev_attr_LogLevel)) {
-		KDEBUG(M4SH_ERROR, "Error creating %s sys entry\n",
-				DISPLAY_CLIENT_DRIVER_NAME);
-		ret = -EFAULT;
-		goto unregister_misc_device;
-	}
-
 	/* default to host control */
 	display_data->m4_control = 0;
 	display_data->m4_enable = 0;
@@ -482,9 +448,12 @@ static int display_client_probe(struct platform_device *pdev)
 	mutex_init(&(display_data->m4_mutex));
 
 	global_display_data = display_data;
-
-	m4sensorhub_panic_register(m4sensorhub, PANICHDL_DISPLAY_RESTORE,\
-					display_panic_restore, display_data);
+	ret = m4sensorhub_register_initcall(display_driver_init);
+	if (ret < 0) {
+		KDEBUG(M4SH_ERROR, "Unable to register init function "
+			"for display client = %d\n", ret);
+		goto unregister_misc_device;
+	}
 
 	KDEBUG(M4SH_INFO, "Initialized %s driver\n", __func__);
 	return 0;
@@ -506,7 +475,7 @@ static int __exit display_client_remove(struct platform_device *pdev)
 						platform_get_drvdata(pdev);
 
 	display_data->m4sensorhub->pdev->set_display_control = NULL;
-	device_remove_file(&pdev->dev, &dev_attr_LogLevel);
+	m4sensorhub_unregister_initcall(display_driver_init);
 	misc_deregister(&display_client_miscdrv);
 	global_display_data = NULL;
 	regulator_put(display_data->regulator);

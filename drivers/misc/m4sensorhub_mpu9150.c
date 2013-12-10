@@ -467,7 +467,7 @@ static ssize_t m4_mpu9150_local_x(struct device *dev,
 
 	KDEBUG(M4SH_DEBUG, "%s  : x_local = %d\n",
 			__func__, mpu9150_client_data->accel_local_data.lx);
-	return sprintf(buf, "%d \n", mpu9150_client_data->accel_local_data.lx);
+	return sprintf(buf, "%d\n", mpu9150_client_data->accel_local_data.lx);
 }
 
 static ssize_t m4_mpu9150_local_y(struct device *dev,
@@ -478,7 +478,7 @@ static ssize_t m4_mpu9150_local_y(struct device *dev,
 
 	KDEBUG(M4SH_DEBUG, "%s  : y_local = %d\n",
 			__func__, mpu9150_client_data->accel_local_data.ly);
-	return sprintf(buf, "%d \n", mpu9150_client_data->accel_local_data.ly);
+	return sprintf(buf, "%d\n", mpu9150_client_data->accel_local_data.ly);
 }
 
 static ssize_t m4_mpu9150_local_z(struct device *dev,
@@ -489,7 +489,7 @@ static ssize_t m4_mpu9150_local_z(struct device *dev,
 
 	KDEBUG(M4SH_DEBUG, "%s  : z_local = %d\n",
 			__func__, mpu9150_client_data->accel_local_data.lz);
-	return sprintf(buf, "%d \n", mpu9150_client_data->accel_local_data.lz);
+	return sprintf(buf, "%d\n", mpu9150_client_data->accel_local_data.lz);
 }
 static ssize_t m4_mpu9150_world_x(struct device *dev,
 				struct device_attribute *attr, char *buf)
@@ -499,7 +499,7 @@ static ssize_t m4_mpu9150_world_x(struct device *dev,
 
 	KDEBUG(M4SH_DEBUG, "%s  : x_world = %d\n",
 			__func__, mpu9150_client_data->accel_world_data.wx);
-	return sprintf(buf, "%d \n", mpu9150_client_data->accel_world_data.wx);
+	return sprintf(buf, "%d\n", mpu9150_client_data->accel_world_data.wx);
 }
 
 static ssize_t m4_mpu9150_world_y(struct device *dev,
@@ -510,7 +510,7 @@ static ssize_t m4_mpu9150_world_y(struct device *dev,
 
 	KDEBUG(M4SH_DEBUG, "%s  : y_world = %d\n",
 			__func__, mpu9150_client_data->accel_world_data.wy);
-	return sprintf(buf, "%d \n", mpu9150_client_data->accel_world_data.wy);
+	return sprintf(buf, "%d\n", mpu9150_client_data->accel_world_data.wy);
 }
 
 static ssize_t m4_mpu9150_world_z(struct device *dev,
@@ -521,7 +521,7 @@ static ssize_t m4_mpu9150_world_z(struct device *dev,
 
 	KDEBUG(M4SH_DEBUG, "%s  : z_world = %d\n",
 			__func__, mpu9150_client_data->accel_world_data.wz);
-	return sprintf(buf, "%d \n", mpu9150_client_data->accel_world_data.wz);
+	return sprintf(buf, "%d\n", mpu9150_client_data->accel_world_data.wz);
 }
 static ssize_t m4_mpu9150_pitch(struct device *dev,
 				struct device_attribute *attr, char *buf)
@@ -531,7 +531,7 @@ static ssize_t m4_mpu9150_pitch(struct device *dev,
 
 	KDEBUG(M4SH_DEBUG, "%s  : pitch = %d\n",
 			__func__, mpu9150_client_data->euler_data.pitch);
-	return sprintf(buf, "%d \n", mpu9150_client_data->euler_data.pitch);
+	return sprintf(buf, "%d\n", mpu9150_client_data->euler_data.pitch);
 }
 
 static ssize_t m4_mpu9150_roll(struct device *dev,
@@ -542,7 +542,7 @@ static ssize_t m4_mpu9150_roll(struct device *dev,
 
 	KDEBUG(M4SH_DEBUG, "%s  : roll = %d\n",
 			__func__, mpu9150_client_data->euler_data.roll);
-	return sprintf(buf, "%d \n", mpu9150_client_data->euler_data.roll);
+	return sprintf(buf, "%d\n", mpu9150_client_data->euler_data.roll);
 }
 
 static ssize_t m4_mpu9150_yaw(struct device *dev,
@@ -553,7 +553,7 @@ static ssize_t m4_mpu9150_yaw(struct device *dev,
 
 	KDEBUG(M4SH_DEBUG, "%s  : yaw = %d\n",
 			__func__, mpu9150_client_data->euler_data.yaw);
-	return sprintf(buf, "%d \n", mpu9150_client_data->euler_data.yaw);
+	return sprintf(buf, "%d\n", mpu9150_client_data->euler_data.yaw);
 }
 
 static ssize_t m4_mpu9150_heading(struct device *dev,
@@ -564,7 +564,7 @@ static ssize_t m4_mpu9150_heading(struct device *dev,
 
 	KDEBUG(M4SH_DEBUG, "%s  : heading = %d\n",
 			__func__, mpu9150_client_data->heading_data.heading);
-	return sprintf(buf, "%d \n", mpu9150_client_data->heading_data.heading);
+	return sprintf(buf, "%d\n", mpu9150_client_data->heading_data.heading);
 }
 
 static ssize_t m4_mpu9150_heading_acc(struct device *dev,
@@ -586,7 +586,7 @@ static ssize_t m4_mpu9150_x(struct device *dev,
 
 	KDEBUG(M4SH_DEBUG, "%s  : raw x = %d\n",
 			__func__, mpu9150_client_data->accel_data.x);
-	return sprintf(buf, "%d \n", mpu9150_client_data->accel_data.x);
+	return sprintf(buf, "%d\n", mpu9150_client_data->accel_data.x);
 }
 
 static ssize_t m4_mpu9150_y(struct device *dev,
@@ -597,7 +597,7 @@ static ssize_t m4_mpu9150_y(struct device *dev,
 
 	KDEBUG(M4SH_DEBUG, "%s  : raw y = %d\n",
 			__func__, mpu9150_client_data->accel_data.y);
-	return sprintf(buf, "%d \n", mpu9150_client_data->accel_data.y);
+	return sprintf(buf, "%d\n", mpu9150_client_data->accel_data.y);
 }
 
 static ssize_t m4_mpu9150_z(struct device *dev,
@@ -608,7 +608,7 @@ static ssize_t m4_mpu9150_z(struct device *dev,
 
 	KDEBUG(M4SH_DEBUG, "%s  : raw z = %d\n",
 			__func__, mpu9150_client_data->accel_data.z);
-	return sprintf(buf, "%d \n", mpu9150_client_data->accel_data.z);
+	return sprintf(buf, "%d\n", mpu9150_client_data->accel_data.z);
 }
 
 static ssize_t m4_mpu9150_cx(struct device *dev,
@@ -619,7 +619,7 @@ static ssize_t m4_mpu9150_cx(struct device *dev,
 
 	KDEBUG(M4SH_DEBUG, "%s  : compass cx = %d\n",
 			__func__, mpu9150_client_data->compass_data.cx);
-	return sprintf(buf, "%d \n", mpu9150_client_data->compass_data.cx);
+	return sprintf(buf, "%d\n", mpu9150_client_data->compass_data.cx);
 }
 
 static ssize_t m4_mpu9150_cy(struct device *dev,
@@ -630,7 +630,7 @@ static ssize_t m4_mpu9150_cy(struct device *dev,
 
 	KDEBUG(M4SH_DEBUG, "%s  : compass cy = %d\n",
 			__func__, mpu9150_client_data->compass_data.cy);
-	return sprintf(buf, "%d \n", mpu9150_client_data->compass_data.cy);
+	return sprintf(buf, "%d\n", mpu9150_client_data->compass_data.cy);
 }
 
 static ssize_t m4_mpu9150_cz(struct device *dev,
@@ -641,7 +641,7 @@ static ssize_t m4_mpu9150_cz(struct device *dev,
 
 	KDEBUG(M4SH_DEBUG, "%s  : compass cz = %d\n",
 			__func__, mpu9150_client_data->compass_data.cz);
-	return sprintf(buf, "%d \n", mpu9150_client_data->compass_data.cz);
+	return sprintf(buf, "%d\n", mpu9150_client_data->compass_data.cz);
 }
 
 static ssize_t m4_mpu9150_ca(struct device *dev,
@@ -652,7 +652,7 @@ static ssize_t m4_mpu9150_ca(struct device *dev,
 
 	KDEBUG(M4SH_DEBUG, "%s  : compass ca = %d\n",
 			__func__, mpu9150_client_data->compass_data.ca);
-	return sprintf(buf, "%d \n", mpu9150_client_data->compass_data.ca);
+	return sprintf(buf, "%d\n", mpu9150_client_data->compass_data.ca);
 }
 
 static ssize_t m4_mpu9150_rx(struct device *dev,
@@ -663,7 +663,7 @@ static ssize_t m4_mpu9150_rx(struct device *dev,
 
 	KDEBUG(M4SH_DEBUG, "%s  : rx = %d\n",
 			__func__, mpu9150_client_data->gyro_data.rx);
-	return sprintf(buf, "%d \n", mpu9150_client_data->gyro_data.rx);
+	return sprintf(buf, "%d\n", mpu9150_client_data->gyro_data.rx);
 }
 static ssize_t m4_mpu9150_ry(struct device *dev,
 				struct device_attribute *attr, char *buf)
@@ -673,7 +673,7 @@ static ssize_t m4_mpu9150_ry(struct device *dev,
 
 	KDEBUG(M4SH_DEBUG, "%s  : ry = %d\n",
 			__func__, mpu9150_client_data->gyro_data.ry);
-	return sprintf(buf, "%d \n", mpu9150_client_data->gyro_data.ry);
+	return sprintf(buf, "%d\n", mpu9150_client_data->gyro_data.ry);
 }
 
 static ssize_t m4_mpu9150_rz(struct device *dev,
@@ -684,143 +684,9 @@ static ssize_t m4_mpu9150_rz(struct device *dev,
 
 	KDEBUG(M4SH_DEBUG, "%s  : rz = %d\n",
 			__func__, mpu9150_client_data->gyro_data.rz);
-	return sprintf(buf, "%d \n", mpu9150_client_data->gyro_data.rz);
+	return sprintf(buf, "%d\n", mpu9150_client_data->gyro_data.rz);
 }
 
-static int mpu9150_set_loglevel(struct mpu9150_client *mpu9150_client_data,
-	unsigned long long level, enum mpu9150_sensor type)
-{
-	unsigned long long mask;
-	if (level > M4_MAX_LOG_LEVEL) {
-		KDEBUG(M4SH_ERROR, " Invalid log level - %llu !!!\n", level);
-		return -1;
-	}
-	switch (type) {
-	case TYPE_GYRO:
-	mask = (1ULL << GYRO_MASK_BIT_1) | (1ULL << GYRO_MASK_BIT_2);
-	level = (level << GYRO_MASK_BIT_1);
-	break;
-	case TYPE_ACCEL:
-	mask = (1ULL << ACCEL_MASK_BIT_1) | (1ULL << ACCEL_MASK_BIT_2);
-	level = (level << ACCEL_MASK_BIT_1);
-	break;
-	case TYPE_COMPASS:
-	mask = (1ULL << COMPASS_MASK_BIT_1) | (1ULL << COMPASS_MASK_BIT_2);
-	level = (level << COMPASS_MASK_BIT_1);
-	break;
-	case TYPE_FUSION:
-	mask = (1ULL << FUSION_MASK_BIT_1) | (1ULL << FUSION_MASK_BIT_2);
-	level = (level << FUSION_MASK_BIT_1);
-	break;
-	default:
-		return -1;
-	}
-	return m4sensorhub_reg_write(mpu9150_client_data->m4sensorhub,
-		M4SH_REG_LOG_LOGENABLE, (char *)&level, (unsigned char *)&mask);
-}
-
-static ssize_t gyro_set_loglevel(struct device *dev,
-				struct device_attribute *attr,
-				const char *buf, size_t size)
-{
-	unsigned long level;
-	struct platform_device *pdev = to_platform_device(dev);
-	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
-
-	if ((strict_strtoul(buf, 10, &level)) < 0)
-		return -1;
-	return mpu9150_set_loglevel(mpu9150_client_data, level, TYPE_GYRO);
-}
-
-static ssize_t gyro_get_loglevel(struct device *dev,
-				struct device_attribute *attr, char *buf)
-{
-	unsigned long long loglevel;
-	struct platform_device *pdev = to_platform_device(dev);
-	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
-
-	m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
-		M4SH_REG_LOG_LOGENABLE, (char *)&loglevel);
-	loglevel = get_log_level(loglevel, GYRO_MASK_BIT_1);
-	return sprintf(buf, "%llu\n", loglevel);
-}
-
-static ssize_t accel_set_loglevel(struct device *dev,
-				struct device_attribute *attr,
-				const char *buf, size_t size)
-{
-	unsigned long level;
-	struct platform_device *pdev = to_platform_device(dev);
-	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
-
-	if ((strict_strtoul(buf, 10, &level)) < 0)
-		return -1;
-	return mpu9150_set_loglevel(mpu9150_client_data, level, TYPE_ACCEL);
-}
-
-static ssize_t accel_get_loglevel(struct device *dev,
-				struct device_attribute *attr, char *buf)
-{
-	int loglevel;
-	struct platform_device *pdev = to_platform_device(dev);
-	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
-
-	m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
-		M4SH_REG_LOG_LOGENABLE, (char *)&loglevel);
-	loglevel = get_log_level(loglevel, ACCEL_MASK_BIT_1);
-	return sprintf(buf, "%d\n", loglevel);
-}
-
-static ssize_t compass_set_loglevel(struct device *dev,
-				struct device_attribute *attr,
-				const char *buf, size_t size)
-{
-	unsigned long level;
-	struct platform_device *pdev = to_platform_device(dev);
-	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
-
-	if ((strict_strtoul(buf, 10, &level)) < 0)
-		return -1;
-	return mpu9150_set_loglevel(mpu9150_client_data, level, TYPE_COMPASS);
-}
-
-static ssize_t compass_get_loglevel(struct device *dev,
-				struct device_attribute *attr, char *buf)
-{
-	int loglevel;
-	struct platform_device *pdev = to_platform_device(dev);
-	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
-
-	m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
-		M4SH_REG_LOG_LOGENABLE, (char *)&loglevel);
-	loglevel = get_log_level(loglevel, COMPASS_MASK_BIT_1);
-	return sprintf(buf, "%d\n", loglevel);
-}
-
-static ssize_t fusion_set_loglevel(struct device *dev,
-				struct device_attribute *attr,
-				const char *buf, size_t size)
-{
-	unsigned long level;
-	struct platform_device *pdev = to_platform_device(dev);
-	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
-
-	if ((strict_strtoul(buf, 10, &level)) < 0)
-		return -1;
-	return mpu9150_set_loglevel(mpu9150_client_data, level, TYPE_FUSION);
-}
-static ssize_t fusion_get_loglevel(struct device *dev,
-				struct device_attribute *attr, char *buf)
-{
-	int loglevel;
-	struct platform_device *pdev = to_platform_device(dev);
-	struct mpu9150_client *mpu9150_client_data = platform_get_drvdata(pdev);
-
-	m4sensorhub_reg_read(mpu9150_client_data->m4sensorhub,
-		M4SH_REG_LOG_LOGENABLE, (char *)&loglevel);
-	loglevel = get_log_level(loglevel, FUSION_MASK_BIT_1);
-	return sprintf(buf, "%d\n", loglevel);
-}
 
 static DEVICE_ATTR(x_local, 0444, m4_mpu9150_local_x, NULL);
 static DEVICE_ATTR(y_local, 0444, m4_mpu9150_local_y, NULL);
@@ -843,14 +709,6 @@ static DEVICE_ATTR(compass_ca, 0444, m4_mpu9150_ca, NULL);
 static DEVICE_ATTR(rx, 0444, m4_mpu9150_rx, NULL);
 static DEVICE_ATTR(ry, 0444, m4_mpu9150_ry, NULL);
 static DEVICE_ATTR(rz, 0444, m4_mpu9150_rz, NULL);
-static DEVICE_ATTR(gyroLogLevel, 0644, gyro_get_loglevel,
-				gyro_set_loglevel);
-static DEVICE_ATTR(accelLogLevel, 0644, accel_get_loglevel,
-				accel_set_loglevel);
-static DEVICE_ATTR(compassLogLevel, 0644, compass_get_loglevel,
-				compass_set_loglevel);
-static DEVICE_ATTR(fusionLogLevel, 0644, fusion_get_loglevel,
-				fusion_set_loglevel);
 
 static struct attribute *mpu9150_attributes[] = {
 	&dev_attr_x_local.attr,
@@ -874,10 +732,6 @@ static struct attribute *mpu9150_attributes[] = {
 	&dev_attr_rx.attr,
 	&dev_attr_ry.attr,
 	&dev_attr_rz.attr,
-	&dev_attr_gyroLogLevel.attr,
-	&dev_attr_accelLogLevel.attr,
-	&dev_attr_compassLogLevel.attr,
-	&dev_attr_fusionLogLevel.attr,
 	NULL
 };
 
@@ -1051,6 +905,16 @@ static int mpu9150_irq_enable_disable(struct mpu9150_client *mpu9150_client_data
 	return ret;
 }
 
+static int mpu9150_driver_init(struct m4sensorhub_data *m4sensorhub)
+{
+	int ret;
+	ret = mpu9150_irq_init(misc_mpu9150_data);
+
+	if (ret < 0)
+		KDEBUG(M4SH_ERROR, "mpu9150 irq init failed\n");
+	return ret;
+}
+
 static int mpu9150_client_probe(struct platform_device *pdev)
 {
 	int ret = -1;
@@ -1122,21 +986,24 @@ static int mpu9150_client_probe(struct platform_device *pdev)
 		goto unregister_input_device;
 	}
 	misc_mpu9150_data = mpu9150_client_data;
-	ret = mpu9150_irq_init(mpu9150_client_data);
-	if (ret < 0)
+	ret = m4sensorhub_register_initcall(mpu9150_driver_init);
+	if (ret < 0) {
+		KDEBUG(M4SH_ERROR, "Unable to register init function"
+			"for mpu9150 client = %d\n", ret);
 		goto unregister_misc_device;
+	}
 
 #ifdef MPU9150_DEBUG
 	ret = sysfs_create_group(&pdev->dev.kobj, &mpu9150_group);
 	if (ret)
-		goto unregister_irq;
+		goto unregister_initcall;
 #endif
 	KDEBUG(M4SH_INFO, "Initialized %s driver\n", __func__);
 	return 0;
 
 #ifdef MPU9150_DEBUG
-unregister_irq:
-	mpu9150_irq_deinit(mpu9150_client_data);
+unregister_initcall:
+	m4sensorhub_unregister_initcall(mpu9150_driver_init);
 #endif
 unregister_misc_device:
 	misc_mpu9150_data = NULL;
@@ -1159,6 +1026,7 @@ static int __exit mpu9150_client_remove(struct platform_device *pdev)
 	sysfs_remove_group(&pdev->dev.kobj, &mpu9150_group);
 #endif
 	mpu9150_irq_deinit(mpu9150_client_data);
+	m4sensorhub_unregister_initcall(mpu9150_driver_init);
 	misc_mpu9150_data = NULL;
 	misc_deregister(&mpu9150_client_miscdrv);
 	input_unregister_device(mpu9150_client_data->input_dev);

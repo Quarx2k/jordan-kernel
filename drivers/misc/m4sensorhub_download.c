@@ -56,7 +56,7 @@ struct download_client {
 	struct m4sensorhub_data *m4sensorhub;
 };
 
-struct download_client *misc_download_data;
+static struct download_client *misc_download_data;
 static wait_queue_head_t download_wq;
 static atomic_t m4_dlcmd_resp_ready;
 static atomic_t download_client_entry;
@@ -298,45 +298,6 @@ static long download_client_ioctl(
 	return ret;
 }
 
-static ssize_t download_get_loglevel(struct device *dev,
-	struct device_attribute *attr, char *buf)
-{
-	int loglevel;
-	struct platform_device *pdev = to_platform_device(dev);
-	struct download_client *download_client_data =
-		platform_get_drvdata(pdev);
-
-	m4sensorhub_reg_read(download_client_data->m4sensorhub,
-		M4SH_REG_LOG_LOGENABLE, (char *)&loglevel);
-	loglevel = get_log_level(loglevel, DOWNLOAD_MASK_BIT_1);
-	return sprintf(buf, "%d\n", loglevel);
-}
-
-static ssize_t download_set_loglevel(struct device *dev,
-	struct device_attribute *attr,
-	const char *buf, size_t size)
-{
-	unsigned long level;
-	unsigned int mask = 0;
-	struct platform_device *pdev = to_platform_device(dev);
-	struct download_client *download_client_data =
-		platform_get_drvdata(pdev);
-
-	if ((strict_strtoul(buf, 10, &level)) < 0)
-		return -EINVAL;
-	if (level > M4_MAX_LOG_LEVEL) {
-		KDEBUG(M4SH_ERROR, " Invalid log level - %d\n", (int)level);
-		return -EINVAL;
-	}
-	mask = (1 << DOWNLOAD_MASK_BIT_1) | (1 << DOWNLOAD_MASK_BIT_2);
-	level = (level << DOWNLOAD_MASK_BIT_1);
-	return m4sensorhub_reg_write(download_client_data->m4sensorhub,
-		M4SH_REG_LOG_LOGENABLE, (char *)&level, (unsigned char *)&mask);
-}
-
-static DEVICE_ATTR(LogLevel, 0664, \
-		download_get_loglevel, download_set_loglevel);
-
 static const struct file_operations download_client_fops = {
 	.owner = THIS_MODULE,
 	.unlocked_ioctl = download_client_ioctl,
@@ -349,6 +310,29 @@ static struct miscdevice download_client_miscdrv = {
 	.name  = DOWNLOAD_CLIENT_DRIVER_NAME,
 	.fops = &download_client_fops,
 };
+
+static int download_driver_init(struct m4sensorhub_data *m4sensorhub)
+{
+	int ret;
+	ret = m4sensorhub_irq_register(m4sensorhub, M4SH_IRQ_DLCMD_RESP_READY,
+					m4_handle_download_irq,
+					misc_download_data);
+	if (ret < 0) {
+		KDEBUG(M4SH_ERROR, "Error registering int %d (%d)\n",
+			M4SH_IRQ_DLCMD_RESP_READY, ret);
+		return ret;
+	}
+	ret = m4sensorhub_irq_enable(m4sensorhub, M4SH_IRQ_DLCMD_RESP_READY);
+	if (ret < 0) {
+		KDEBUG(M4SH_ERROR, "Error enable irq %d (%d)\n",
+			M4SH_IRQ_DLCMD_RESP_READY, ret);
+		goto exit;
+	}
+	return ret;
+exit:
+	m4sensorhub_irq_unregister(m4sensorhub, M4SH_IRQ_DLCMD_RESP_READY);
+	return ret;
+}
 
 static int download_client_probe(struct platform_device *pdev)
 {
@@ -376,29 +360,12 @@ static int download_client_probe(struct platform_device *pdev)
 		goto free_memory;
 	}
 	misc_download_data = download_client_data;
-	ret = m4sensorhub_irq_register(m4sensorhub, M4SH_IRQ_DLCMD_RESP_READY,
-					m4_handle_download_irq,
-					download_client_data);
+	ret = m4sensorhub_register_initcall(download_driver_init);
 	if (ret < 0) {
-		KDEBUG(M4SH_ERROR, "Error registering int %d (%d)\n",
-				M4SH_IRQ_DLCMD_RESP_READY, ret);
+		KDEBUG(M4SH_ERROR, "Unable to register init function "
+			"for download client = %d\n", ret);
 		goto unregister_misc_device;
 	}
-
-	ret = m4sensorhub_irq_enable(m4sensorhub, M4SH_IRQ_DLCMD_RESP_READY);
-	if (ret < 0) {
-		KDEBUG(M4SH_ERROR, "Error enable irq %d (%d)\n",
-				M4SH_IRQ_DLCMD_RESP_READY, ret);
-		goto unregister_irq;
-	}
-
-	if (device_create_file(&pdev->dev, &dev_attr_LogLevel)) {
-		KDEBUG(M4SH_ERROR, "Error creating %s sys entry\n",
-				DOWNLOAD_CLIENT_DRIVER_NAME);
-		ret = -1;
-		goto disable_irq;
-	}
-
 	init_waitqueue_head(&download_wq);
 	atomic_set(&m4_dlcmd_resp_ready, false);
 	atomic_set(&download_client_entry, 0);
@@ -407,10 +374,6 @@ static int download_client_probe(struct platform_device *pdev)
 		DOWNLOAD_CLIENT_DRIVER_NAME);
 	return 0;
 
-disable_irq:
-	m4sensorhub_irq_disable(m4sensorhub, M4SH_IRQ_DLCMD_RESP_READY);
-unregister_irq:
-	m4sensorhub_irq_unregister(m4sensorhub, M4SH_IRQ_DLCMD_RESP_READY);
 unregister_misc_device:
 	misc_download_data = NULL;
 	misc_deregister(&download_client_miscdrv);
@@ -427,11 +390,11 @@ static int __exit download_client_remove(struct platform_device *pdev)
 	struct download_client *download_client_data =
 		platform_get_drvdata(pdev);
 
-	device_remove_file(&pdev->dev, &dev_attr_LogLevel);
 	m4sensorhub_irq_disable(download_client_data->m4sensorhub,
 				M4SH_IRQ_DLCMD_RESP_READY);
 	m4sensorhub_irq_unregister(download_client_data->m4sensorhub,
 				M4SH_IRQ_DLCMD_RESP_READY);
+	m4sensorhub_unregister_initcall(download_driver_init);
 	misc_download_data = NULL;
 	misc_deregister(&download_client_miscdrv);
 	platform_set_drvdata(pdev, NULL);

@@ -168,6 +168,32 @@ static struct miscdevice passive_client_miscdrv = {
 	.fops = &passive_client_fops,
 };
 
+static int passive_driver_init(struct m4sensorhub_data *m4sensorhub)
+{
+	int ret;
+	ret = m4sensorhub_irq_register(m4sensorhub,
+					M4SH_IRQ_PASSIVE_BUFFER_FULL,
+					m4_handle_passive_irq,
+					misc_passive_data);
+	if (ret < 0) {
+		KDEBUG(M4SH_ERROR, "Error registering int %d (%d)\n",
+		M4SH_IRQ_PASSIVE_BUFFER_FULL, ret);
+		return ret;
+	}
+	ret = m4sensorhub_irq_enable(m4sensorhub,
+					M4SH_IRQ_PASSIVE_BUFFER_FULL);
+	if (ret < 0) {
+		KDEBUG(M4SH_ERROR, "Error enabling int %d (%d)\n",
+			M4SH_IRQ_PASSIVE_BUFFER_FULL, ret);
+		goto exit;
+	}
+
+	return ret;
+exit:
+	m4sensorhub_irq_unregister(m4sensorhub, M4SH_IRQ_PASSIVE_BUFFER_FULL);
+	return ret;
+}
+
 static int passive_client_probe(struct platform_device *pdev)
 {
 	int ret = -1;
@@ -213,27 +239,15 @@ static int passive_client_probe(struct platform_device *pdev)
 		goto unregister_input_device;
 	}
 	misc_passive_data = passive_client_data;
-
-	ret = m4sensorhub_irq_register(m4sensorhub,
-				M4SH_IRQ_PASSIVE_BUFFER_FULL,
-				m4_handle_passive_irq,
-				passive_client_data);
+	ret = m4sensorhub_register_initcall(passive_driver_init);
 	if (ret < 0) {
-		KDEBUG(M4SH_ERROR, "Error registering int %d (%d)\n",
-					M4SH_IRQ_PASSIVE_BUFFER_FULL, ret);
+		KDEBUG(M4SH_ERROR, "Unable to register init function"
+			"for passive client = %d\n", ret);
 		goto unregister_misc_device;
-	}
-	ret = m4sensorhub_irq_enable(m4sensorhub, M4SH_IRQ_PASSIVE_BUFFER_FULL);
-	if (ret < 0) {
-		KDEBUG(M4SH_ERROR, "Error enabling int %d (%d)\n",
-					M4SH_IRQ_PASSIVE_BUFFER_FULL, ret);
-		goto unregister_irq;
 	}
 	KDEBUG(M4SH_INFO, "Initialized %s driver\n", __func__);
 	return 0;
 
-unregister_irq:
-	m4sensorhub_irq_unregister(m4sensorhub, M4SH_IRQ_PASSIVE_BUFFER_FULL);
 unregister_misc_device:
 	misc_passive_data = NULL;
 	misc_deregister(&passive_client_miscdrv);
@@ -256,6 +270,7 @@ static int __exit passive_client_remove(struct platform_device *pdev)
 				M4SH_IRQ_PASSIVE_BUFFER_FULL);
 	m4sensorhub_irq_unregister(passive_client_data->m4sensorhub,
 				M4SH_IRQ_PASSIVE_BUFFER_FULL);
+	m4sensorhub_unregister_initcall(passive_driver_init);
 
 	misc_passive_data = NULL;
 	misc_deregister(&passive_client_miscdrv);

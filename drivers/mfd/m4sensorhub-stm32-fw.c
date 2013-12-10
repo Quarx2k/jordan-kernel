@@ -106,9 +106,10 @@ int flash_delay[NUM_FLASH_TO_ERASE] = {
 */
 
 int m4sensorhub_load_firmware(struct m4sensorhub_data *m4sensorhub,
-	unsigned short force_upgrade)
+	unsigned short force_upgrade,
+	const struct firmware *fm)
 {
-	const struct firmware *firmware;
+	const struct firmware *firmware = fm;
 	int i = MAX_RETRIES;
 	int ret = 0;
 	int bytes_left, bytes_to_write;
@@ -123,9 +124,12 @@ int m4sensorhub_load_firmware(struct m4sensorhub_data *m4sensorhub,
 		ret = -ENOMEM;
 		goto done;
 	}
+	if (firmware == NULL) {
+		ret = request_firmware(&firmware, m4sensorhub->filename,
+			&m4sensorhub->i2c_client->dev);
+	}
+	KDEBUG(M4SH_INFO, "Firmware = %s\n", m4sensorhub->filename);
 
-	ret = request_firmware(&firmware, m4sensorhub->filename,
-		&m4sensorhub->i2c_client->dev);
 	if (ret < 0) {
 		KDEBUG(M4SH_ERROR, "%s: request_firmware failed for %s\n",
 			__func__,  m4sensorhub->filename);
@@ -224,10 +228,12 @@ int m4sensorhub_load_firmware(struct m4sensorhub_data *m4sensorhub,
 				"Version of firmware on file is 0x%04x\n",
 				fw_version_file);
 			KDEBUG(M4SH_ERROR,
-				"Firmware on device different from file, updating...\n");
+				"Firmware on device different from file,"
+				"updating...\n");
 		}
 	} else {
-		KDEBUG(M4SH_NOTICE, "Version of firmware on file is 0x%04x\n",
+		KDEBUG(M4SH_NOTICE, "Version of firmware on file is 0x%04x, "
+			"updating...\n",
 			fw_version_file);
 	}
 

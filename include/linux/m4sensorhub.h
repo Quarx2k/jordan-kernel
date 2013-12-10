@@ -22,6 +22,7 @@
 #include <linux/platform_device.h>
 #include <linux/m4sensorhub/m4sensorhub_registers.h>
 #include <linux/m4sensorhub/m4sensorhub_irqs.h>
+#include <linux/firmware.h>
 
 #ifdef __KERNEL__
 
@@ -166,7 +167,8 @@ int m4sensorhub_i2c_write_read(struct m4sensorhub_data *m4sensorhub,
 				      u8 *buf, int writelen, int readlen);
 
 int m4sensorhub_load_firmware(struct m4sensorhub_data *m4sensorhub,
-	unsigned short force_upgrade);
+	unsigned short force_upgrade,
+	const struct firmware *firmware);
 
 /* Interrupt handler */
 int m4sensorhub_irq_init(struct m4sensorhub_data *m4sensorhub);
@@ -195,6 +197,10 @@ int m4sensorhub_panic_register(struct m4sensorhub_data *m4sensorhub,
 int m4sensorhub_panic_unregister(struct m4sensorhub_data *m4sensorhub,
 				enum m4sensorhub_panichdl_index index);
 void m4sensorhub_panic_process(struct m4sensorhub_data *m4sensorhub);
+int m4sensorhub_register_initcall(int(*initfunc)(struct m4sensorhub_data *));
+void m4sensorhub_unregister_initcall(
+		int(*initfunc)(struct m4sensorhub_data *));
+
 
 #endif /* __KERNEL__ */
 #endif  /* __M4SENSORHUB_H__ */

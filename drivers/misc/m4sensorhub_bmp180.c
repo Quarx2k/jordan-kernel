@@ -223,44 +223,8 @@ static ssize_t altitude_show(struct device *dev,
 	return sprintf(buf, "%d\n", pressure_client_data->altitude);
 }
 
-static ssize_t bmp_get_loglevel(struct device *dev,
-			struct device_attribute *attr, char *buf)
-{
-	unsigned long long loglevel;
-	struct platform_device *pdev = to_platform_device(dev);
-	struct pressure_client *pressure_client_data
-				= platform_get_drvdata(pdev);
-
-	m4sensorhub_reg_read(pressure_client_data->m4sensorhub,
-		M4SH_REG_LOG_LOGENABLE, (char *)&loglevel);
-	loglevel = get_log_level(loglevel, BMP_MASK_BIT_1);
-	return sprintf(buf, "%llu\n", loglevel);
-}
-static ssize_t bmp_set_loglevel(struct device *dev,
-			struct device_attribute *attr,
-			const char *buf, size_t size)
-{
-	unsigned long level;
-	unsigned long long mask = 0, newlevel;
-	struct platform_device *pdev = to_platform_device(dev);
-	struct pressure_client *pressure_client_data
-				 = platform_get_drvdata(pdev);
-
-	if ((strict_strtoul(buf, 10, &level)) < 0)
-		return -1;
-	if (level > M4_MAX_LOG_LEVEL) {
-		KDEBUG(M4SH_ERROR, " Invalid log level - %d\n", (int)level);
-		return -1;
-	}
-	mask = (1ULL << BMP_MASK_BIT_1) | (1ULL << BMP_MASK_BIT_2);
-	newlevel = ((unsigned long long)level << BMP_MASK_BIT_1);
-	return m4sensorhub_reg_write(pressure_client_data->m4sensorhub,
-	M4SH_REG_LOG_LOGENABLE, (char *)&newlevel, (unsigned char *)&mask);
-}
-
 static DEVICE_ATTR(pressure, 0444, pressure_show, NULL);
 static DEVICE_ATTR(altitude, 0444, altitude_show, NULL);
-static DEVICE_ATTR(LogLevel, 0664, bmp_get_loglevel, bmp_set_loglevel);
 
 static const struct file_operations pressure_client_fops = {
 	.owner = THIS_MODULE,
@@ -274,6 +238,20 @@ static struct miscdevice pressure_client_miscdrv = {
 	.name  = PRESSURE_CLIENT_DRIVER_NAME,
 	.fops = &pressure_client_fops,
 };
+
+
+static int pressure_driver_init(struct m4sensorhub_data *m4sensorhub)
+{
+	int ret;
+	ret = m4sensorhub_irq_register(m4sensorhub,
+					M4SH_IRQ_PRESSURE_DATA_READY,
+					m4_handle_pressure_irq,
+					misc_pressure_data);
+	if (ret < 0)
+		KDEBUG(M4SH_ERROR, "Error registering int %d (%d)\n",
+			M4SH_IRQ_PRESSURE_DATA_READY, ret);
+	return ret;
+}
 
 static int pressure_client_probe(struct platform_device *pdev)
 {
@@ -321,19 +299,17 @@ static int pressure_client_probe(struct platform_device *pdev)
 		goto unregister_input_device;
 	}
 	misc_pressure_data = pressure_client_data;
-	ret = m4sensorhub_irq_register(m4sensorhub,
-			M4SH_IRQ_PRESSURE_DATA_READY, m4_handle_pressure_irq,
-			pressure_client_data);
+	ret = m4sensorhub_register_initcall(pressure_driver_init);
 	if (ret < 0) {
-		KDEBUG(M4SH_ERROR, "Error registering int %d (%d)\n",
-				M4SH_IRQ_PRESSURE_DATA_READY, ret);
+		KDEBUG(M4SH_ERROR, "Unable to register init function "
+			"for pressure client = %d\n", ret);
 		goto unregister_misc_device;
 	}
 	if (device_create_file(&pdev->dev, &dev_attr_pressure)) {
 		KDEBUG(M4SH_ERROR, "Error creating %s sys entry\n",
 				PRESSURE_CLIENT_DRIVER_NAME);
 		ret = -1;
-		goto unregister_irq;
+		goto unregister_initcall;
 	}
 
 	if (device_create_file(&pdev->dev, &dev_attr_altitude)) {
@@ -342,21 +318,13 @@ static int pressure_client_probe(struct platform_device *pdev)
 		ret = -1;
 		goto remove_device_file;
 	}
-	if (device_create_file(&pdev->dev, &dev_attr_LogLevel)) {
-		KDEBUG(M4SH_ERROR, "Error creating %s sys entry\n",
-				PRESSURE_CLIENT_DRIVER_NAME);
-		ret = -1;
-		goto remove_alt_device_file;
-	}
 	KDEBUG(M4SH_ERROR, "Initialized %s driver\n", __func__);
 	return 0;
 
-remove_alt_device_file:
-	device_remove_file(&pdev->dev, &dev_attr_altitude);
 remove_device_file:
 	device_remove_file(&pdev->dev, &dev_attr_pressure);
-unregister_irq:
-	m4sensorhub_irq_unregister(m4sensorhub, M4SH_IRQ_PRESSURE_DATA_READY);
+unregister_initcall:
+	m4sensorhub_unregister_initcall(pressure_driver_init);
 unregister_misc_device:
 	misc_pressure_data = NULL;
 	misc_deregister(&pressure_client_miscdrv);
@@ -375,13 +343,13 @@ static int __exit pressure_client_remove(struct platform_device *pdev)
 	struct pressure_client *pressure_client_data =
 					platform_get_drvdata(pdev);
 
-	device_remove_file(&pdev->dev, &dev_attr_LogLevel);
 	device_remove_file(&pdev->dev, &dev_attr_pressure);
 	device_remove_file(&pdev->dev, &dev_attr_altitude);
 	m4sensorhub_irq_disable(pressure_client_data->m4sensorhub,
 					M4SH_IRQ_PRESSURE_DATA_READY);
 	m4sensorhub_irq_unregister(pressure_client_data->m4sensorhub,
 					M4SH_IRQ_PRESSURE_DATA_READY);
+	m4sensorhub_unregister_initcall(pressure_driver_init);
 	misc_pressure_data = NULL;
 	misc_deregister(&pressure_client_miscdrv);
 	input_unregister_device(pressure_client_data->input_dev);
