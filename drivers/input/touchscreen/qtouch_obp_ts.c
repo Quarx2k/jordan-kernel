@@ -33,6 +33,10 @@
 #include <linux/timer.h>
 #include <linux/bitops.h>
 
+#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE
+#include <linux/input/sweep2wake.h>
+#endif
+
 #ifdef CONFIG_TOUCHSCREEN_DEBUG
 #include <linux/time.h>
 #endif
@@ -1930,6 +1934,7 @@ static void qtouch_ts_work_func(struct work_struct *work)
 		container_of(work, struct qtouch_ts_data, work);
 	struct qtm_obj_message *msg;
 	struct qtm_object *obj;
+	struct irq_desc *desc;
 	int ret;
 
 #ifdef CONFIG_TOUCHSCREEN_DEBUG
@@ -1969,7 +1974,11 @@ done:
 	}
 	else
 	{
-		enable_irq(ts->client->irq);
+		/* Fix kernel warning, if we have unbalanced IRQ */
+		desc = irq_to_desc(ts->client->irq);
+		if (desc && desc->depth > 0)
+			enable_irq(ts->client->irq);
+
 	}
 }
 
@@ -2436,7 +2445,19 @@ static int qtouch_ts_suspend(struct i2c_client *client, pm_message_t mesg)
 	if (ts->mode == 1)
 		return -EBUSY;
 
+#ifdef CONFIG_TOUCHSCREEN_SWEEP2WAKE	
+	if (s2w_switch > 0)
+		return 0;
+	else
+		goto do_resume;
+#else
+	goto do_resume;
+#endif
+
+
+do_resume: 
 	disable_irq(ts->client->irq);
+
 	ret = cancel_work_sync(&ts->work);
 	if (ret) { /* if work was pending disable-count is now 2 */
 		pr_info("%s: Pending work item\n", __func__);
@@ -2453,6 +2474,7 @@ static int qtouch_ts_suspend(struct i2c_client *client, pm_message_t mesg)
 static int qtouch_ts_resume(struct i2c_client *client)
 {
 	struct qtouch_ts_data *ts = i2c_get_clientdata(client);
+	struct irq_desc *desc;
 	int i;
 
 	if (qtouch_tsdebug & 4)
@@ -2483,7 +2505,15 @@ static int qtouch_ts_resume(struct i2c_client *client)
 	   instead, which makes sure everything gets re-intialized. */
 	qtouch_force_reset(ts, 0);
 
-	enable_irq(ts->client->irq);
+	/* 
+	 * Check if this interrupt request should really be enabled
+	 * because it could be already enabled.
+	 */
+
+	desc = irq_to_desc(ts->client->irq);
+	if (desc && desc->depth > 0)
+		enable_irq(ts->client->irq);
+
 	return 0;
 }
 
@@ -2491,17 +2521,25 @@ static int qtouch_ts_resume(struct i2c_client *client)
 static void qtouch_ts_early_suspend(struct early_suspend *handler)
 {
 	struct qtouch_ts_data *ts;
+	int ret;
 
 	ts = container_of(handler, struct qtouch_ts_data, early_suspend);
-	qtouch_ts_suspend(ts->client, PMSG_SUSPEND);
+	ret = qtouch_ts_suspend(ts->client, PMSG_SUSPEND);
+
+	if(ret)
+		printk("%s an Error occurred while suspending: %u \n", __func__, ret);
 }
 
 static void qtouch_ts_late_resume(struct early_suspend *handler)
 {
 	struct qtouch_ts_data *ts;
+	int ret;
 
 	ts = container_of(handler, struct qtouch_ts_data, early_suspend);
-	qtouch_ts_resume(ts->client);
+	ret = qtouch_ts_resume(ts->client);
+
+	if(ret)
+		printk("%s An Error occurred while resuming: %u \n", __func__, ret);
 }
 #endif
 

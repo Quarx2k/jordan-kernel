@@ -52,8 +52,8 @@ MODULE_LICENSE("GPLv2");
 
 /* Tuneables */
 #define S2W_DEBUG		0
-#define S2W_DEFAULT		1
-#define S2W_S2SONLY_DEFAULT	1
+#define S2W_DEFAULT		0
+#define S2W_S2SONLY_DEFAULT	0
 #define S2W_PWRKEY_DUR          60
 
 /* defaults */
@@ -320,6 +320,9 @@ static void s2w_early_suspend(struct early_suspend *h) {
 
 static void s2w_late_resume(struct early_suspend *h) {
 	scr_suspended = false;
+	
+	/* The execution stopped, it should be save to reset the hole thing */
+	sweep2wake_reset();
 }
 
 static struct early_suspend s2w_early_suspend_handler = {
