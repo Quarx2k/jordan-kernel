@@ -166,6 +166,16 @@ static int reg_write(void *data, u64 val)
 
 DEFINE_SIMPLE_ATTRIBUTE(reg_fops, reg_read, reg_write, "0x%02llx\n");
 
+void tps65912_dump_registers(struct tps65912 *tps65912)
+{
+	int i, reg_data;
+	for (i = 0; i < ARRAY_SIZE(debugfs_regs); i++) {
+		reg_data = tps65912_reg_read(tps65912, debugfs_regs[i].reg);
+		pr_info("dump register %s addr %02x with value %02x\n",
+			debugfs_regs[i].name, debugfs_regs[i].reg, reg_data);
+	}
+}
+
 int tps65912_debugfs_create(struct tps65912 *tps65912)
 {
 	int i;

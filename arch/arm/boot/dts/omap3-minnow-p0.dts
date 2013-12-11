@@ -52,8 +52,8 @@
 			reg = <2>;
 			regulator-compatible = "DCDC3";
 			regulator-name = "DCDC3";
-			regulator-min-microvolt = <1800000>;
-			regulator-max-microvolt = <1800000>;
+			regulator-min-microvolt = <1875000>;
+			regulator-max-microvolt = <1875000>;
 			regulator-boot-on;
 			regulator-always-on;
 		};

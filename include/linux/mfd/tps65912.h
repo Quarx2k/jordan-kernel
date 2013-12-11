@@ -337,5 +337,6 @@ int tps65912_irq_init(struct tps65912 *tps65912, int irq,
 int tps65912_irq_exit(struct tps65912 *tps65912);
 int tps65912_debugfs_create(struct tps65912 *tps65912);
 void tps65912_debugfs_remove(struct tps65912 *tps65912);
+void tps65912_dump_registers(struct tps65912 *tps65912);
 
 #endif /*  __LINUX_MFD_TPS65912_H */
