@@ -102,7 +102,7 @@ static ssize_t reset_wl18xx_chip(struct device *dev,
 
 }
 
-static DEVICE_ATTR(reset_vio, 0644, NULL, reset_wl18xx_chip);
+static DEVICE_ATTR(reset_vio, 0200, NULL, reset_wl18xx_chip);
 
 
 static int wl127x_rfkill_probe(struct platform_device *pdev)
