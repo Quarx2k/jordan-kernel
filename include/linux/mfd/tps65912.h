@@ -317,12 +317,24 @@ struct tps65912 {
 	int irq_num;
 	u32 irq_mask;
 	void *debugfs_data;
+	void *keydata;
+	u32 powerkey_state;
 };
 
 struct tps65912_platform_data {
 	int irq;
 	int irq_base;
 };
+
+static inline void tps65912_set_keydata(struct tps65912 *tps65912, void *data)
+{
+	tps65912->keydata = data;
+}
+
+static inline void *tps65912_get_keydata(struct tps65912 *tps65912)
+{
+	return tps65912->keydata;
+}
 
 unsigned int tps_chip(void);
 
@@ -338,5 +350,7 @@ int tps65912_irq_exit(struct tps65912 *tps65912);
 int tps65912_debugfs_create(struct tps65912 *tps65912);
 void tps65912_debugfs_remove(struct tps65912 *tps65912);
 void tps65912_dump_registers(struct tps65912 *tps65912);
+void tps65912_broadcast_key_event(struct tps65912 *tps65912,
+			       unsigned int code, int value);
 
 #endif /*  __LINUX_MFD_TPS65912_H */

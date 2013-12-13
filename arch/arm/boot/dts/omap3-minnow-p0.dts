@@ -27,6 +27,8 @@
 	dcdc1_avs;
 	dcdc4_avs;
 
+	tps_irq_gpio = <0>;
+
 	regulators {
 		#address-cells = <1>;
 		#size-cells = <0>;

@@ -21,11 +21,18 @@
 #include <linux/mfd/core.h>
 #include <linux/mfd/tps65912.h>
 #include <linux/of_device.h>
+#include <linux/irq.h>
 
 static struct mfd_cell tps65912s[] = {
 	{
 		.name = "tps65912-pmic",
 	},
+};
+
+static struct platform_device tps65912_key_device = {
+	.name = "tps65912_key",
+	.id = -1,
+	.dev.platform_data = NULL,
 };
 
 int tps65912_set_bits(struct tps65912 *tps65912, u8 reg, u8 mask)
@@ -127,6 +134,7 @@ static struct tps65912_board *tps65912_parse_dt(struct tps65912 *tps65912)
 {
 	struct device_node *np = tps65912->dev->of_node;
 	struct tps65912_board *board_info;
+	int tps_irq_gpio, ret;
 
 	board_info = kzalloc(sizeof(struct tps65912_board), GFP_KERNEL);
 	if (!board_info) {
@@ -154,9 +162,25 @@ static struct tps65912_board *tps65912_parse_dt(struct tps65912 *tps65912)
 		pr_info("dcdc4_avs is 1\n");
 	}
 
-	board_info->irq = tps65912->irq_num;
-	board_info->irq_base = 0;
+	if (!of_property_read_u32(np,"tps_irq_gpio",&tps_irq_gpio)) {
+		ret = gpio_request(tps_irq_gpio, "tps65912-irq");
+		if (ret)
+			goto err;
+		ret = gpio_direction_input(tps_irq_gpio);
+		if (ret) {
+			gpio_free(tps_irq_gpio);
+			goto err;
+		}
+
+		board_info->irq = __gpio_to_irq(tps_irq_gpio);
+		pr_info("tps_irq_gpio:%d irq:%d\n", tps_irq_gpio, board_info->irq);
+	}
+	board_info->irq_base = irq_alloc_descs(-1, 0, TPS65912_NUM_IRQ, 0);
+	pr_info("irq_base:%d\n", board_info->irq_base);
 	return board_info;
+err:
+	kfree(board_info);
+	return NULL;
 }
 #else
 static inline
@@ -207,11 +231,16 @@ int tps65912_device_init(struct tps65912 *tps65912)
 	if (ret < 0)
 		goto err;
 
+	tps65912_key_device.dev.platform_data = tps65912;
+	ret = platform_device_register(&tps65912_key_device);
+	if (ret < 0)
+		goto err;
+
 	init_data->irq = pmic_plat_data->irq;
 	init_data->irq_base = pmic_plat_data->irq_base;
 	ret = tps65912_irq_init(tps65912, init_data->irq, init_data);
 	if (ret < 0)
-		goto err;
+		goto err_irq;
 
 #ifdef CONFIG_MFD_TPS65912_DEBUGFS
 	ret = tps65912_debugfs_create(tps65912);
@@ -226,6 +255,8 @@ int tps65912_device_init(struct tps65912 *tps65912)
 err_debugfs:
 #endif
 	tps65912_irq_exit(tps65912);
+err_irq:
+	platform_device_unregister(&tps65912_key_device);
 err:
 	kfree(init_data);
 	kfree(pmic_plat_data);

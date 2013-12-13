@@ -22,6 +22,13 @@
 #include <linux/irq.h>
 #include <linux/gpio.h>
 #include <linux/mfd/tps65912.h>
+#include <linux/input.h>
+
+enum pwrkey_states {
+	PWRKEY_RELEASE,	/* Power key released state. */
+	PWRKEY_PRESS,	/* Power key pressed state. */
+	PWRKEY_UNKNOWN,	/* Unknown power key state. */
+};
 
 static inline int irq_to_tps65912_irq(struct tps65912 *tps65912,
 							int irq)
@@ -29,6 +36,30 @@ static inline int irq_to_tps65912_irq(struct tps65912 *tps65912,
 	return irq - tps65912->irq_base;
 }
 
+/* this powerkey_handler runs in process contextt, not in interrupt context*/
+static irqreturn_t powerkey_handler(int irq, void *irq_data)
+{
+	struct tps65912 *tps65912 = irq_data;
+	u32 new_state;
+
+	if (irq - tps65912->irq_base == TPS65912_IRQ_GPIO3_R) {
+		new_state = PWRKEY_RELEASE;
+	} else if (irq - tps65912->irq_base == TPS65912_IRQ_GPIO3_F) {
+		new_state = PWRKEY_PRESS;
+	} else {
+		pr_info("incorrect interrupt %d for power key\n",
+			irq - tps65912->irq_base);
+		return IRQ_HANDLED;
+	}
+
+	mutex_lock(&tps65912->irq_lock);
+	if (new_state != tps65912->powerkey_state) {
+		tps65912_broadcast_key_event(tps65912, KEY_END, new_state);
+		tps65912->powerkey_state = new_state;
+	}
+	mutex_unlock(&tps65912->irq_lock);
+	return IRQ_HANDLED;
+}
 /*
  * This is a threaded IRQ handler so can access I2C/SPI.  Since the
  * IRQ handler explicitly clears the IRQ it handles the IRQ line
@@ -158,7 +189,7 @@ int tps65912_irq_init(struct tps65912 *tps65912, int irq,
 			    struct tps65912_platform_data *pdata)
 {
 	int ret, cur_irq;
-	int flags = IRQF_ONESHOT;
+	int flags = IRQF_ONESHOT|IRQF_TRIGGER_RISING;
 	u8 reg;
 
 	if (!irq) {
@@ -170,6 +201,8 @@ int tps65912_irq_init(struct tps65912 *tps65912, int irq,
 		dev_warn(tps65912->dev, "No interrupt support, no IRQ base\n");
 		return 0;
 	}
+
+	tps65912->powerkey_state = PWRKEY_RELEASE;
 
 	/* Clear unattended interrupts */
 	tps65912->read(tps65912, TPS65912_INT_STS, 1, &reg);
@@ -207,10 +240,22 @@ int tps65912_irq_init(struct tps65912 *tps65912, int irq,
 #endif
 	}
 
+	ret = request_threaded_irq(tps65912->irq_base + TPS65912_IRQ_GPIO3_R,
+		NULL, powerkey_handler, flags, "tps65912_key_rel", tps65912);
+
+	if (ret != 0)
+		dev_err(tps65912->dev,
+		"Failed to request sub-IRQ for power key rel: %d\n", ret);
+
+	ret = request_threaded_irq(tps65912->irq_base + TPS65912_IRQ_GPIO3_F,
+		NULL, powerkey_handler, flags, "tps65912_key_press", tps65912);
+
+	if (ret != 0)
+		dev_err(tps65912->dev,
+		"Failed to request sub-IRQ for power key press: %d\n", ret);
+
 	ret = request_threaded_irq(irq, NULL, tps65912_irq, flags,
 				   "tps65912", tps65912);
-
-	irq_set_irq_type(irq, IRQ_TYPE_LEVEL_LOW);
 	if (ret != 0)
 		dev_err(tps65912->dev, "Failed to request IRQ: %d\n", ret);
 

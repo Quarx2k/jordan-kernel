@@ -114,7 +114,7 @@ unsigned short cpcap_regulator_off_mode_values[CPCAP_NUM_REGULATORS] = {
 	[CPCAP_VAUDIO]   = 0x0000,
 };
 
-#define CPCAP_GPIO 0
+#define CPCAP_GPIO 1
 
 struct regulator_consumer_supply cpcap_sw4_consumers[] = {
 	REGULATOR_SUPPLY("sw4", NULL /* DSP */),
