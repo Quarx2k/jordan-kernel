@@ -4,8 +4,7 @@ ifneq ($(BUILD_KERNEL),)
 KERNEL_SRCDIR := kernel/omap-moto-cw
 KERNEL_OUT := $(ANDROID_PRODUCT_OUT)/obj/KERNEL_OBJ
 KERNEL_CONFIG := $(KERNEL_OUT)/.config
-TARGET_PREBUILT_INT_KERNEL := $(KERNEL_OUT)/arch/arm/boot/zImage
-TARGET_PREBUILT_INT_DTB := $(KERNEL_OUT)/arch/arm/boot/dts/omap3-casper-p1.dtb
+TARGET_PREBUILT_INT_KERNEL := $(KERNEL_OUT)/arch/arm/boot/zImage-dtb
 KERNEL_HEADERS_INSTALL := $(KERNEL_OUT)/usr
 KERNEL_MODULES_INSTALL := system
 KERNEL_MODULES_OUT := $(TARGET_OUT)/lib/modules
@@ -15,12 +14,10 @@ KERNEL_SOURCE_RELATIVE_PATH := ../../../../../../$(KERNEL_SRCDIR)
 PRODUCT_PREBUILT_KERNEL := $(TARGET_PREBUILT_KERNEL)
 
 ifeq ($(TARGET_USES_UNCOMPRESSED_KERNEL),true)
-$(info Using uncompressed kernel)
-TARGET_PREBUILT_KERNEL := $(KERNEL_OUT)/piggy
+$(error TARGET_USES_UNCOMPRESSED_KERNEL is not supported)
 else
 TARGET_PREBUILT_KERNEL := $(TARGET_PREBUILT_INT_KERNEL)
 endif
-TARGET_PREBUILT_DTB := $(TARGET_PREBUILT_INT_DTB)
 
 define mv-modules
 mdpath=`find $(KERNEL_MODULES_OUT) -type f -name modules.order`;\
@@ -42,13 +39,7 @@ define update-prebuilts
 if [ -f $(TARGET_PREBUILT_INT_KERNEL) -a\
      -f $(PRODUCT_PREBUILT_KERNEL) ]; then\
   cp -f $(TARGET_PREBUILT_INT_KERNEL) $(PRODUCT_PREBUILT_KERNEL);\
-fi;\
-pdir=$(PRODUCT_PREBUILT_KERNEL);\
-pdir=$${pdir%$$(basename $$pdir)};\
-if [ -f $(TARGET_PREBUILT_INT_DTB) -a\
-     -d $$pdir ]; then\
-  cp -f $(TARGET_PREBUILT_INT_DTB) $$pdir;\
-fi
+fi;
 endef
 
 include $(KERNEL_SRCDIR)/defconfig.mk
@@ -73,12 +64,6 @@ $(KERNEL_OUT):
 
 $(KERNEL_CONFIG): $(KERNEL_OUT) $(TARGET_DEFCONFIG) inst_hook
 	$(call do-kernel-config,$(KERNEL_OUT),$@,$(TARGET_DEFCONFIG),$(KERNEL_SRCDIR),arm,arm-eabi-,$(MAKE))
-
-$(KERNEL_OUT)/piggy : $(TARGET_PREBUILT_INT_KERNEL)
-	$(hide) gunzip -c $(KERNEL_OUT)/arch/arm/boot/compressed/piggy.gzip > $(KERNEL_OUT)/piggy
-
-$(TARGET_PREBUILT_INT_DTB): $(KERNEL_OUT) $(KERNEL_CONFIG) $(KERNEL_HEADERS_INSTALL)
-	$(MAKE) -C $(KERNEL_SRCDIR) KBUILD_RELSRC=$(KERNEL_SOURCE_RELATIVE_PATH) O=$(KERNEL_OUT) ARCH=arm CROSS_COMPILE=arm-eabi- dtbs
 
 $(TARGET_PREBUILT_INT_KERNEL): $(KERNEL_OUT) $(KERNEL_CONFIG) $(KERNEL_HEADERS_INSTALL) $(TARGET_PREBUILT_INT_DTB)
 	$(MAKE) -C $(KERNEL_SRCDIR) KBUILD_RELSRC=$(KERNEL_SOURCE_RELATIVE_PATH) O=$(KERNEL_OUT) ARCH=arm CROSS_COMPILE=arm-eabi-
