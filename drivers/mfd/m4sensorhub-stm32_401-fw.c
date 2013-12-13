@@ -505,8 +505,8 @@ static int m4sensorhub_bl_wm(struct m4sensorhub_data *m4sensorhub,
 		goto done;
 	}
 
-	buf[num_bytes++] = OPC_WM;
-	buf[num_bytes++] = ~(OPC_WM);
+	buf[num_bytes++] = OPC_NO_STRETCH_WM;
+	buf[num_bytes++] = ~(OPC_NO_STRETCH_WM);
 
 	if (m4sensorhub_i2c_write_read(m4sensorhub, buf, num_bytes, 0) < 0) {
 		KDEBUG(M4SH_ERROR, "%s : %d : I2C transfer error\n",
@@ -570,8 +570,6 @@ static int m4sensorhub_bl_wm(struct m4sensorhub_data *m4sensorhub,
 		goto done;
 	}
 
-	usleep_range(10000, 12000);
-
 	if (!m4sensorhub_bl_ack(m4sensorhub)) {
 		KDEBUG(M4SH_ERROR, "%s : %d : NACK received, data invalid\n",
 			__func__, __LINE__);
@@ -601,8 +599,8 @@ static int m4sensorhub_bl_erase_fw(struct m4sensorhub_data *m4sensorhub)
 	int i;
 	int num_bytes = 0;
 
-	buf[num_bytes++] = OPC_ER;
-	buf[num_bytes++] = ~(OPC_ER);
+	buf[num_bytes++] = OPC_NO_STRETCH_ER;
+	buf[num_bytes++] = ~(OPC_NO_STRETCH_ER);
 
 	if (m4sensorhub_i2c_write_read(m4sensorhub, buf, num_bytes, 0) < 0) {
 		KDEBUG(M4SH_ERROR, "%s : %d : I2C transfer error\n",
@@ -649,9 +647,6 @@ static int m4sensorhub_bl_erase_fw(struct m4sensorhub_data *m4sensorhub)
 			__func__, __LINE__);
 		return -1;
 	}
-
-	/* TODO : this sleep isn't needed with v1.1 protocol*/
-	msleep(2000);
 
 	if (!m4sensorhub_bl_ack(m4sensorhub)) {
 		KDEBUG(M4SH_ERROR, "%s : %d : NACK received, command invalid\n",
