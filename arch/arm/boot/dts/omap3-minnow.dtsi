@@ -112,9 +112,10 @@
 };
 
 &i2c2 {
-	m4sensorhub@18 {
+	m4sensorhub@39 {
 		compatible = "mot,m4sensorhub";
-		reg = <0x18>;
+		status = "ok";
+		reg = <0x39>;
 
 		mot,irq-gpio    = <&gpio2 27 1>; /* gpio-059 */
 		mot,reset-gpio  = <&gpio5  1 2>; /* gpio-129 */
@@ -206,6 +207,7 @@
 	wkup_pins: pinmux_board_pins {
 		pinctrl-single,pins = <
 			0x01a 0x10c     /* SYS_CLKOUT1, MODE4 | INPUT_PULLDOWN */
+			0x05a 0x004     /* GPIO_129, MODE4 | OUTPUT */
 		>;
 	};
 };

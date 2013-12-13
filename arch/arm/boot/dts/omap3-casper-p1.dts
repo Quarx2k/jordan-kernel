@@ -13,3 +13,25 @@
 	mmi,revision = "p1";
 	mmi,hwrev = <0xFE>;
 };
+
+&i2c2 {
+    m4sensorhub@39 {
+		status = "disabled";
+    };
+};
+
+&i2c2 {
+    m4sensorhub@18 {
+        compatible = "mot,m4sensorhub";
+        reg = <0x18>;
+
+        mot,irq-gpio    = <&gpio2 27 1>; /* gpio-059 */
+        mot,reset-gpio  = <&gpio5  1 2>; /* gpio-129 */
+        mot,wake-gpio   = <&gpio4 30 0>; /* gpio-126 */
+        mot,boot0-gpio  = <&gpio1 21 0>; /* gpio-021 */
+        mot,boot1-gpio  = <&gpio1 24 0>; /* gpio-024 */
+        mot,enable-gpio = <&gpio1 28 0>; /* gpio-028 */
+	mot,fw-filename = "m4sensorhub-p1_casper.bin";
+    };
+};
+

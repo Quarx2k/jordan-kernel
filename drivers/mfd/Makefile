@@ -170,7 +170,8 @@ m4sensorhub-objs                := m4sensorhub-core.o \
                                    m4sensorhub-reg.o \
                                    m4sensorhub-irq.o \
                                    m4sensorhub-panic.o \
-                                   m4sensorhub-stm32-fw.o
+                                   m4sensorhub-stm32-fw.o \
+                                   m4sensorhub-stm32_401-fw.o
 
 obj-$(CONFIG_MFD_M4SENSORHUB)   += m4sensorhub.o
 

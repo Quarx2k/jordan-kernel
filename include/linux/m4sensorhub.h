@@ -170,6 +170,12 @@ int m4sensorhub_load_firmware(struct m4sensorhub_data *m4sensorhub,
 	unsigned short force_upgrade,
 	const struct firmware *firmware);
 
+int m4sensorhub_401_load_firmware(struct m4sensorhub_data *m4sensorhub,
+	unsigned short force_upgrade,
+	const struct firmware *fm);
+
+void m4sensorhub_hw_reset(struct m4sensorhub_data *m4sensorhub);
+
 /* Interrupt handler */
 int m4sensorhub_irq_init(struct m4sensorhub_data *m4sensorhub);
 void m4sensorhub_irq_shutdown(struct m4sensorhub_data *m4sensorhub);

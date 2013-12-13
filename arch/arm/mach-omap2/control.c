@@ -235,6 +235,22 @@ void omap3_ctrl_write_boot_mode(u8 bootmode)
 	__raw_writel(l, OMAP2_L4_IO_ADDRESS(OMAP343X_SCRATCHPAD + 4));
 }
 
+/**
+ * omap3_enable_usim_IO - enable USIM block input/output buffers
+ *
+ * Enable USIM block input/output buffers.  By default the buffers are
+ * not enabled.  Once vdds is stable, they can be enabled.  They must
+ * be enabled before using any GPIOs from this block.
+ */
+void omap3_enable_usim_buffer(void)
+{
+	u32 reg;
+
+	reg = omap_ctrl_readl(OMAP343X_CONTROL_WKUP_CTRL);
+	reg |= OMAP343X_USIM_IO_PWRDNZ;
+	omap_ctrl_writel(reg, OMAP343X_CONTROL_WKUP_CTRL);
+}
+
 #endif
 
 /**

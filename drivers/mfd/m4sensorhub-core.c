@@ -119,25 +119,37 @@ int m4sensorhub_set_bootmode(struct m4sensorhub_data *m4sensorhub,
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(m4sensorhub_set_bootmode);
 
-static void minnow_m4sensorhub_hw_reset(struct m4sensorhub_data *m4sensorhub)
+void m4sensorhub_hw_reset(struct m4sensorhub_data *m4sensorhub)
 {
 	if (!m4sensorhub) {
 		printk(KERN_ERR "m4sensorhub_hw_reset: invalid pointer\n");
 		return;
 	}
 
-	m4sensorhub_set_bootmode(m4sensorhub, BOOTMODE00);
-	gpio_set_value(m4sensorhub->hwconfig.reset_gpio, 1);
-	msleep(5);
-	gpio_set_value(m4sensorhub->hwconfig.reset_gpio, 0);
-	msleep(5);
-	gpio_set_value(m4sensorhub->hwconfig.reset_gpio, 1);
+
+	if (m4sensorhub->i2c_client->addr == 0x39) {
+		m4sensorhub_set_bootmode(m4sensorhub, BOOTMODE01);
+		usleep_range(5000, 10000);
+		gpio_set_value(m4sensorhub->hwconfig.reset_gpio, 0);
+		usleep_range(10000, 12000);
+		gpio_set_value(m4sensorhub->hwconfig.reset_gpio, 1);
+		msleep(400);
+	} else {
+		m4sensorhub_set_bootmode(m4sensorhub, BOOTMODE00);
+		gpio_set_value(m4sensorhub->hwconfig.reset_gpio, 1);
+		usleep_range(5000, 10000);
+		gpio_set_value(m4sensorhub->hwconfig.reset_gpio, 0);
+		usleep_range(5000, 10000);
+		gpio_set_value(m4sensorhub->hwconfig.reset_gpio, 1);
+	}
 }
+EXPORT_SYMBOL_GPL(m4sensorhub_hw_reset);
 
 
 /* callback from driver to initialize hardware on probe */
-static int minnow_m4sensorhub_hw_init(struct m4sensorhub_data *m4sensorhub,
+static int m4sensorhub_hw_init(struct m4sensorhub_data *m4sensorhub,
 		struct device_node *node)
 {
 	int gpio;
@@ -223,7 +235,7 @@ static int minnow_m4sensorhub_hw_init(struct m4sensorhub_data *m4sensorhub,
 	gpio_direction_output(gpio, 0);
 	m4sensorhub->hwconfig.mpu_9150_en_gpio = gpio;
 
-	minnow_m4sensorhub_hw_reset(m4sensorhub);
+	m4sensorhub_hw_reset(m4sensorhub);
 
 	return 0;
 
@@ -248,7 +260,7 @@ error:
 }
 
 /* callback from driver to free hardware on shutdown */
-static void minnow_m4sensorhub_hw_free(struct m4sensorhub_data *m4sensorhub)
+static void m4sensorhub_hw_free(struct m4sensorhub_data *m4sensorhub)
 {
 
 	if (!m4sensorhub) {
@@ -343,15 +355,22 @@ static void m4sensorhub_initialize(const struct firmware *firmware,
 	}
 
 	/* initiate m4 firmware download */
-	firmware_download_status = m4sensorhub_load_firmware(
-					&m4sensorhub_misc_data,
-					force_upgrade,
-					firmware);
-
+	KDEBUG(M4SH_CRITICAL, "Starting firmware download with force_upgrade "
+		"= %d\n", force_upgrade);
+	if (m4sensorhub_misc_data.i2c_client->addr == 0x39)
+		firmware_download_status = m4sensorhub_401_load_firmware(
+						&m4sensorhub_misc_data,
+						force_upgrade,
+						firmware);
+	else
+		firmware_download_status = m4sensorhub_load_firmware(
+						&m4sensorhub_misc_data,
+						force_upgrade,
+						firmware);
 	if (firmware_download_status < 0) {
 		KDEBUG(M4SH_ERROR, "Failed to load M4 firmware = %d\n", err);
 		/* Since firmware download failed, put m4 back into boot mode*/
-		minnow_m4sensorhub_hw_reset(&m4sensorhub_misc_data);
+		m4sensorhub_hw_reset(&m4sensorhub_misc_data);
 		return;
 	}
 
@@ -494,15 +513,19 @@ static int m4sensorhub_probe(struct i2c_client *client,
 		err = -ENODEV;
 		goto err_unload;
 	}
-	err = minnow_m4sensorhub_hw_init(m4sensorhub, node);
-	if (err)
+
+	/* link m4sensorhub to i2c_client, hw_init uses i2c_client */
+	m4sensorhub->i2c_client = client;
+
+	err = m4sensorhub_hw_init(m4sensorhub, node);
+	if (err) {
 		printk(KERN_ERR "%s: hw_init Failed!", __func__);
+		goto done;
+	}
 
 	/* link i2c_client to m4sensorhub */
 	i2c_set_clientdata(client, m4sensorhub);
 
-	/* link m4sensorhub to i2c_client */
-	m4sensorhub->i2c_client = client;
 
 	err = misc_register(&m4sensorhub_misc_device);
 	if (err < 0) {
@@ -560,7 +583,7 @@ err_deregister:
 err_hw_free:
 	m4sensorhub->i2c_client = NULL;
 	i2c_set_clientdata(client, NULL);
-	minnow_m4sensorhub_hw_free(m4sensorhub);
+	m4sensorhub_hw_free(m4sensorhub);
 	m4sensorhub = NULL;
 err_unload:
 done:
@@ -577,11 +600,11 @@ static int __exit m4sensorhub_remove(struct i2c_client *client)
 	m4sensorhub_reg_shutdown(m4sensorhub);
 	device_remove_file(&client->dev, &dev_attr_log_level);
 	device_remove_file(&client->dev, &dev_attr_debug_level);
-	minnow_m4sensorhub_hw_reset(m4sensorhub);
+	m4sensorhub_hw_reset(m4sensorhub);
 	misc_deregister(&m4sensorhub_misc_device);
 	m4sensorhub->i2c_client = NULL;
 	i2c_set_clientdata(client, NULL);
-	minnow_m4sensorhub_hw_free(m4sensorhub);
+	m4sensorhub_hw_free(m4sensorhub);
 	m4sensorhub = NULL;
 
 	return 0;

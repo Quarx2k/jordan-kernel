@@ -243,6 +243,9 @@
 #define OMAP343X_CONTROL_WKUP_DEBOBS3 (OMAP343X_CONTROL_GENERAL_WKUP + 0x014)
 #define OMAP343X_CONTROL_WKUP_DEBOBS4 (OMAP343X_CONTROL_GENERAL_WKUP + 0x018)
 
+/* 34xx USIM register offsets */
+#define OMAP343X_CONTROL_WKUP_CTRL    (OMAP2_CONTROL_INTERFACE + 0x0A5C)
+
 /* 36xx-only RTA - Retention till Access control registers and bits */
 #define OMAP36XX_CONTROL_MEM_RTA_CTRL	0x40C
 #define OMAP36XX_RTA_DISABLE		0x0
@@ -323,6 +326,9 @@
 #define OMAP343X_SCRATCHPAD_REGADDR(reg)	OMAP2_L4_IO_ADDRESS(\
 						OMAP343X_SCRATCHPAD + reg)
 
+/* CONTROL_WKUP bits */
+#define OMAP343X_USIM_IO_PWRDNZ         (1 << 6)
+
 /* AM35XX_CONTROL_IPSS_CLK_CTRL bits */
 #define AM35XX_USBOTG_VBUSP_CLK_SHIFT	0
 #define AM35XX_CPGMAC_VBUSP_CLK_SHIFT	1
@@ -390,6 +396,7 @@
 #define		FEAT_NEON_NONE		1
 
 
+
 #ifndef __ASSEMBLY__
 #ifdef CONFIG_ARCH_OMAP2PLUS
 extern void __iomem *omap_ctrl_base_get(void);
@@ -417,6 +424,8 @@ extern void omap3630_ctrl_disable_rta(void);
 extern int omap3_ctrl_save_padconf(void);
 extern void omap2_set_globals_control(void __iomem *ctrl,
 				      void __iomem *ctrl_pad);
+/* called from board-minnow.c to enable USIM GPIOs */
+extern void omap3_enable_usim_buffer(void);
 #else
 #define omap_ctrl_base_get()		0
 #define omap_ctrl_readb(x)		0
@@ -429,6 +438,5 @@ extern void omap2_set_globals_control(void __iomem *ctrl,
 #define omap4_ctrl_pad_writel(x, y)	WARN_ON(1)
 #endif
 #endif	/* __ASSEMBLY__ */
-
 #endif /* __ARCH_ARM_MACH_OMAP2_CONTROL_H */
 

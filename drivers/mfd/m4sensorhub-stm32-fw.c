@@ -128,8 +128,6 @@ int m4sensorhub_load_firmware(struct m4sensorhub_data *m4sensorhub,
 		ret = request_firmware(&firmware, m4sensorhub->filename,
 			&m4sensorhub->i2c_client->dev);
 	}
-	KDEBUG(M4SH_INFO, "Firmware = %s\n", m4sensorhub->filename);
-
 	if (ret < 0) {
 		KDEBUG(M4SH_ERROR, "%s: request_firmware failed for %s\n",
 			__func__,  m4sensorhub->filename);
@@ -137,6 +135,7 @@ int m4sensorhub_load_firmware(struct m4sensorhub_data *m4sensorhub,
 		ret = 0;
 		goto done;
 	}
+	KDEBUG(M4SH_INFO, "%s:Firmware = %s\n", m4sensorhub->filename, __func__);
 
 	if (firmware->size > MAX_FILE_SIZE) {
 		KDEBUG(M4SH_ERROR, "%s: firmware file size is too big.\n",

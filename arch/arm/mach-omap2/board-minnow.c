@@ -17,11 +17,11 @@
 #include <linux/usb/musb.h>
 #include <linux/usb/phy.h>
 #include <linux/usb/nop-usb-xceiv.h>
-#include "board-minnow.h"
 #include "mux.h"
 #include "common.h"
 #include "dss-common.h"
 #include "board-minnow.h"
+#include "control.h"
 
 #include "sdram-toshiba-hynix-numonyx.h"
 
@@ -46,6 +46,7 @@ static void __init minnow_init(void)
 	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
 
 	omap_sdrc_init(JEDEC_JESD209A_sdrc_params, JEDEC_JESD209A_sdrc_params);
+	omap3_enable_usim_buffer(); /* Needed for GPIOs in USIM block */
 	omap_minnow_display_init();
 	minnow_spi_init();
 	minnow_bt_init();
