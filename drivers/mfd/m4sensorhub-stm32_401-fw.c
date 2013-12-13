@@ -69,18 +69,16 @@ static int m4sensorhub_jump_to_user(struct m4sensorhub_data *m4sensorhub);
 /* opcode_no_stretch_readout_unprotect */
 #define OPC_NO_STRETCH_RU	((uint8_t) (0x93))
 
-/* We flash code in sector 4 and sector 5 */
-#define USER_FLASH_FIRST_PAGE_ADDRESS	0x08010000
-/* TO CHECK : Is it a valid assumption that the version number is
-0x200 bytes into the file*/
+/* We flash code in sector 6 and sector 7 */
+#define USER_FLASH_FIRST_PAGE_ADDRESS	0x08040000
 #define VERSION_OFFSET  0x200
 #define VERSION_ADDRESS (USER_FLASH_FIRST_PAGE_ADDRESS + VERSION_OFFSET)
 
-/* Sector 5 ends at 0x0803FFFF, and we put 4 byte barker */
-/* at the end of Sector 5, giving BARKER_ADDRESS as (0x0803FFFF - 0x4 + 0x1) */
-#define BARKER_ADDRESS	0x0803FFFC
+/* Sector 7 ends at 0x0807FFFF, and we put 4 byte barker */
+/* at the end of Sector 7, giving BARKER_ADDRESS as (0x0807FFFF - 0x4 + 0x1) */
+#define BARKER_ADDRESS	0x0807FFFC
 #define BARKER_NUMBER	0xACEC0DE
-/* The MAX_FILE_SIZE is the size of sectors 4 and 5  where the firmware code
+/* The MAX_FILE_SIZE is the size of sectors 6 and 7  where the firmware code
  * will reside (minus the barker size).
 
  * From the Flash Programming Manual:
@@ -92,10 +90,12 @@ static int m4sensorhub_jump_to_user(struct m4sensorhub_data *m4sensorhub);
   3       0x0800 C000   0x0800 FFFF 16 Kbytes
   4       0x0801 0000   0x0801 FFFF 64 Kbytes
   5       0x0802 0000   0x0803 FFFF 128 Kbytes
+  6       0x0804 0000   0x0805 FFFF 128 Kbytes
+  7       0x0806 0000   0x0807 FFFF 128 Kbytes
 
  */
-/* Max file size is 64Kb + 128 Kb - 4 bytes for barker */
-#define MAX_FILE_SIZE	(64*1024+128*1024-4) /* bytes */
+/* Max file size is 128Kb + 128 Kb - 4 bytes for barker */
+#define MAX_FILE_SIZE	(128*1024+128*1024-4) /* bytes */
 /* Transfer is done in 256 bytes, or if data is less than 256 bytes, then
 data is 16 bit aligned and sent out */
 #define MAX_TRANSFER_SIZE	256 /* bytes */
@@ -105,8 +105,8 @@ window of about 4 seconds. */
 #define MAX_ATTEMPTS 40
 /* We are flashing/erasing 2 sectors */
 #define NUM_FLASH_TO_ERASE 2
-#define SECTOR_TO_ERASE_1 4
-#define SECTOR_TO_ERASE_2 5
+#define SECTOR_TO_ERASE_1 6
+#define SECTOR_TO_ERASE_2 7
 int page_to_erase[2] = {SECTOR_TO_ERASE_1, SECTOR_TO_ERASE_2};
 /* -------------- Local Data Structures ------------- */
 
