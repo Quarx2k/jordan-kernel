@@ -13,6 +13,11 @@
 	mmi,revision = "p0";
 	mmi,hwrev = <0x00>;
 
+
+	vib-gpio {
+		compatible = "mot,vib-gpio";
+		vib-gpio-supply = <&ldo6_reg>;
+	};
 };
 
 &mcspi1 {

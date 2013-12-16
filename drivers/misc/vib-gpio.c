@@ -1,6 +1,6 @@
 /* drivers/misc/vib-gpio.c
  *
- * Copyright (C) 2009 Motorola, Inc.
+ * Copyright (C) 2013 Motorola, Inc.
  * Copyright (C) 2008 Google, Inc.
  * Author: Mike Lockwood <lockwood@android.com>
  *
@@ -20,9 +20,10 @@
 #include <linux/hrtimer.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
-#include <linux/vib-gpio.h>
 #include <linux/workqueue.h>
 #include <linux/slab.h>
+#include <linux/regulator/consumer.h>
+#include <linux/of.h>
 
 /* TODO: replace with correct header */
 #include "../staging/android/timed_output.h"
@@ -33,59 +34,77 @@ struct vib_gpio_data {
 	struct hrtimer timer;
 	spinlock_t lock;
 
-	struct vib_gpio_platform_data *pdata;
+	struct regulator *reg;
+	int gpio;
+	int max_timeout;
+	bool active_low;
+	int initial_vibrate;
 
 	int vib_power_state;
 	int vib_state;
 };
 
-struct vib_gpio_data *misc_data;
+static int power_on(struct vib_gpio_data *vib_data)
+{
+	if (vib_data->reg)
+		return regulator_enable(vib_data->reg);
+	return 0;
+}
 
-static void vib_gpio_set(int on)
+static int power_off(struct vib_gpio_data *vib_data)
+{
+	if (vib_data->reg)
+		return regulator_disable(vib_data->reg);
+	return 0;
+}
+
+static void vib_gpio_set(struct vib_gpio_data *vib_data, int on)
 {
 	if (on) {
-		if (misc_data->pdata->power_on && !misc_data->vib_power_state) {
-			misc_data->pdata->power_on();
-			misc_data->vib_power_state = 1;
+		if (!vib_data->vib_power_state) {
+			power_on(vib_data);
+			vib_data->vib_power_state = 1;
 		}
-		if (misc_data->pdata->gpio >= 0)
-			gpio_direction_output(misc_data->pdata->gpio,
-					      misc_data->pdata->active_low ?
-						 0 : 1);
+		if (vib_data->gpio >= 0)
+			gpio_direction_output(vib_data->gpio,
+					      vib_data->active_low ?  0 : 1);
 	} else {
-		if (misc_data->pdata->gpio >= 0)
-			gpio_direction_output(misc_data->pdata->gpio,
-					      misc_data->pdata->active_low ?
-						 1 : 0);
+		if (vib_data->gpio >= 0)
+			gpio_direction_output(vib_data->gpio,
+					      vib_data->active_low ?  1 : 0);
 
-		if (misc_data->pdata->power_off && misc_data->vib_power_state) {
-			misc_data->pdata->power_off();
-			misc_data->vib_power_state = 0;
+		if (vib_data->vib_power_state) {
+			power_off(vib_data);
+			vib_data->vib_power_state = 0;
 		}
 	}
 }
 
 static void vib_gpio_update(struct work_struct *work)
 {
-	vib_gpio_set(misc_data->vib_state);
+	struct vib_gpio_data *vib_data;
+
+	vib_data = container_of(work, struct vib_gpio_data, vib_work);
+	if (vib_data)
+		vib_gpio_set(vib_data, vib_data->vib_state);
 }
 
 static enum hrtimer_restart gpio_timer_func(struct hrtimer *timer)
 {
-	struct vib_gpio_data *data =
+	struct vib_gpio_data *vib_data =
 	    container_of(timer, struct vib_gpio_data, timer);
-	data->vib_state = 0;
-	schedule_work(&data->vib_work);
+	vib_data->vib_state = 0;
+	schedule_work(&vib_data->vib_work);
 	return HRTIMER_NORESTART;
 }
 
 static int vib_gpio_get_time(struct timed_output_dev *dev)
 {
-	struct vib_gpio_data *data =
+	struct vib_gpio_data *vib_data =
 	    container_of(dev, struct vib_gpio_data, dev);
 
-	if (hrtimer_active(&data->timer)) {
-		ktime_t r = hrtimer_get_remaining(&data->timer);
+	if (hrtimer_active(&vib_data->timer)) {
+		ktime_t r = hrtimer_get_remaining(&vib_data->timer);
 		struct timeval t = ktime_to_timeval(r);
 		return t.tv_sec * 1000 + t.tv_usec / 1000;
 	} else
@@ -94,115 +113,133 @@ static int vib_gpio_get_time(struct timed_output_dev *dev)
 
 static void vib_gpio_enable(struct timed_output_dev *dev, int value)
 {
-	struct vib_gpio_data *data =
+	struct vib_gpio_data *vib_data =
 	    container_of(dev, struct vib_gpio_data, dev);
 	unsigned long flags;
 
-	spin_lock_irqsave(&data->lock, flags);
-	hrtimer_cancel(&data->timer);
+	spin_lock_irqsave(&vib_data->lock, flags);
+	hrtimer_cancel(&vib_data->timer);
 
 	if (value == 0)
-		data->vib_state = 0;
+		vib_data->vib_state = 0;
 	else {
-		value = (value > data->pdata->max_timeout ?
-				 data->pdata->max_timeout : value);
-		data->vib_state = 1;
-		hrtimer_start(&data->timer,
+		value = (value > vib_data->max_timeout ?
+				 vib_data->max_timeout : value);
+		vib_data->vib_state = 1;
+		hrtimer_start(&vib_data->timer,
 			      ktime_set(value / 1000, (value % 1000) * 1000000),
 			      HRTIMER_MODE_REL);
 	}
 
-	spin_unlock_irqrestore(&data->lock, flags);
+	spin_unlock_irqrestore(&vib_data->lock, flags);
 
-	schedule_work(&data->vib_work);
-}
-
-/* This is a temporary solution until a more global haptics soltion is
- * available for haptics that need to occur in any application */
-void vibrator_haptic_fire(int value)
-{
-	vib_gpio_enable(&misc_data->dev, value);
+	schedule_work(&vib_data->vib_work);
 }
 
 static int vib_gpio_probe(struct platform_device *pdev)
 {
-	struct vib_gpio_platform_data *pdata = pdev->dev.platform_data;
-	struct vib_gpio_data *gpio_data;
+	struct vib_gpio_data *vib_data;
+	struct device_node *np;
+	unsigned int prop;
 	int ret = 0;
 
-	if (!pdata) {
-		ret = -EBUSY;
-		goto err0;
-	}
-	gpio_data = kzalloc(sizeof(struct vib_gpio_data), GFP_KERNEL);
-	if (!gpio_data) {
+	vib_data = kzalloc(sizeof(struct vib_gpio_data), GFP_KERNEL);
+	if (!vib_data) {
 		ret = -ENOMEM;
-		goto err0;
+		goto err;
 	}
 
-	gpio_data->pdata = pdata;
+	platform_set_drvdata(pdev, vib_data);
 
-	INIT_WORK(&gpio_data->vib_work, vib_gpio_update);
+	vib_data->gpio = -1;
+	vib_data->active_low = 0;
+	vib_data->initial_vibrate = 0;
+	vib_data->max_timeout = 1500;
+	vib_data->reg = NULL;
+#ifdef CONFIG_OF
+	np = pdev->dev.of_node;
+	if (!np) {
+		dev_err(&pdev->dev, "required device_tree entry not found\n");
+		goto free_mem;
+	}
 
-	hrtimer_init(&gpio_data->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+	if (!of_property_read_u32(np, "gpio", &prop))
+		vib_data->gpio = prop;
 
-	gpio_data->timer.function = gpio_timer_func;
-	spin_lock_init(&gpio_data->lock);
+	if (!of_property_read_u32(np, "max-timeout", &prop))
+		vib_data->max_timeout = prop;
 
-	gpio_data->dev.name = "vibrator";
-	gpio_data->dev.get_time = vib_gpio_get_time;
-	gpio_data->dev.enable = vib_gpio_enable;
-	ret = timed_output_dev_register(&gpio_data->dev);
+	if (!of_property_read_u32(np, "active-low", &prop))
+		vib_data->active_low = prop;
+
+	if (!of_property_read_u32(np, "initial-vibrate", &prop))
+		vib_data->initial_vibrate = prop;
+
+#endif
+	vib_data->reg = regulator_get(&pdev->dev, "vib-gpio");
+	if (IS_ERR(vib_data->reg)) {
+		ret = PTR_ERR(vib_data->reg);
+		goto free_mem;
+	}
+
+	INIT_WORK(&vib_data->vib_work, vib_gpio_update);
+
+	hrtimer_init(&vib_data->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+
+	vib_data->timer.function = gpio_timer_func;
+	spin_lock_init(&vib_data->lock);
+
+	vib_data->dev.name = "vibrator";
+	vib_data->dev.get_time = vib_gpio_get_time;
+	vib_data->dev.enable = vib_gpio_enable;
+	ret = timed_output_dev_register(&vib_data->dev);
 	if (ret < 0)
-		goto err1;
+		goto reg_put;
 
-	if (gpio_data->pdata->init)
-		ret = gpio_data->pdata->init();
-	if (ret < 0)
-		goto err2;
+	if (vib_data->gpio >= 0)
+		gpio_direction_output(vib_data->gpio,
+				      vib_data->active_low);
 
-	misc_data = gpio_data;
-	if (misc_data->pdata->gpio >= 0)
-		gpio_direction_output(gpio_data->pdata->gpio,
-				      gpio_data->pdata->active_low);
-
-	platform_set_drvdata(pdev, gpio_data);
-
-	vib_gpio_enable(&gpio_data->dev, gpio_data->pdata->initial_vibrate);
+	vib_gpio_enable(&vib_data->dev, vib_data->initial_vibrate);
 
 	pr_info("vib gpio probe done");
 	return 0;
 
-err2:
-	timed_output_dev_unregister(&gpio_data->dev);
-err1:
-	kfree(gpio_data->pdata);
-	kfree(gpio_data);
-err0:
+reg_put:
+	regulator_put(vib_data->reg);
+free_mem:
+	kfree(vib_data);
+err:
 	return ret;
 }
 
 static int vib_gpio_remove(struct platform_device *pdev)
 {
-	struct vib_gpio_data *gpio_data = platform_get_drvdata(pdev);
+	struct vib_gpio_data *vib_data = platform_get_drvdata(pdev);
 
-	if (gpio_data->pdata->exit)
-		gpio_data->pdata->exit();
-
-	timed_output_dev_unregister(&gpio_data->dev);
-
-	kfree(gpio_data->pdata);
-	kfree(gpio_data);
+	timed_output_dev_unregister(&vib_data->dev);
+	regulator_put(vib_data->reg);
+	kfree(vib_data);
 
 	return 0;
 }
+
+#ifdef CONFIG_OF
+static struct of_device_id vib_gpio_of_match[] = {
+	{ .compatible = "mot,vib-gpio" },
+	{ }, };
+MODULE_DEVICE_TABLE(of, vib_gpio_of_match);
+#endif
 
 static struct platform_driver vib_gpio_driver = {
 	.probe = vib_gpio_probe,
 	.remove = vib_gpio_remove,
 	.driver = {
-		   .name = VIB_GPIO_NAME,
+		   .name = "vib-gpio",
 		   .owner = THIS_MODULE,
+#ifdef CONFIG_OF
+		   .of_match_table = of_match_ptr(vib_gpio_of_match),
+#endif
 		   },
 };
 

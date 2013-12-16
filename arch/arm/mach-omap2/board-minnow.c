@@ -49,7 +49,6 @@ static void __init minnow_init(void)
 	omap3_enable_usim_buffer(); /* Needed for GPIOs in USIM block */
 	omap_minnow_display_init();
 	minnow_bt_init();
-	minnow_sensors_init();
 	minnow_cpcap_client_init();
 	minnow_musb_init();
 }

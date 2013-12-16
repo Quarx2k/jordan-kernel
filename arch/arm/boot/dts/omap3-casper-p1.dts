@@ -12,6 +12,10 @@
 / {
 	mmi,revision = "p1";
 	mmi,hwrev = <0xFE>;
+
+	vib-gpio {
+		compatible = "mot,vib-gpio";
+	};
 };
 
 &i2c2 {
