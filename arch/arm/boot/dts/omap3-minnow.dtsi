@@ -150,7 +150,10 @@
 
 &omap3_pmx_core {
 	pinctrl-names = "default";
-	pinctrl-0 = <&board_pins>;
+	pinctrl-0 = <
+		&board_pins
+		&usb_phy_pins
+	>;
 
 	board_pins: pinmux_board_pins {
 		pinctrl-single,pins = <
@@ -196,7 +199,9 @@
 			0x5c0 0x004	/* ETK_D10, MODE4 | OUTPUT */
 			0x5c8 0x004	/* ETK_D14, MODE4 | OUTPUT */
 		>;
+	};
 
+	usb_phy_pins: pinmux_board_pins {
 	};
 };
 

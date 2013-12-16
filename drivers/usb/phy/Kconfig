@@ -217,6 +217,17 @@ config USB_ULPI_VIEWPORT
 	help
 	  Provides read/write operations to the ULPI phy register set for
 	  controllers with a viewport register (e.g. Chipidea/ARC controllers).
+config USB_TUSB
+	bool "TI TUSB-1211 Transceiver Driver"
+	depends on USB || USB_GADGET
+	help
+	  Say Y here to add support for TI TUSB-1211 USB phy tranceiver and
+          dynamic enable/disable based on the presence of VBUS.
+
+          To compile this driver as a module, choose M here.
+
+	  If you're not sure if this applies to you, it probably doesn't;
+	  say N here.
 config CPCAP_USB
 	bool "CPCAP USB Transceiver Driver"
 	help

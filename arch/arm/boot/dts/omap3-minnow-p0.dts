@@ -18,6 +18,32 @@
 		compatible = "mot,vib-gpio";
 		vib-gpio-supply = <&ldo6_reg>;
 	};
+
+	tusb_phy: tusb-usb@0 {
+		compatible = "ti,tusb-usb";
+		irq-gpio = <142>;
+		resetn-gpio = <15>;
+		cs-gpio = <16>;
+		csn-gpio = <27>;
+		reg = <0 0>;
+	};
+};
+
+&usb_phy_pins {
+	pinctrl-single,pins = <
+		0x140 0x104     /* MCBSP3_CLKX, MODE4 (GPIO-142) | INPUT */
+		0x5ae 0x004     /* ETK_D1, MODE4 (GPIO_15) | OUTPUT */
+		0x5b0 0x004     /* ETK_D2, MODE4 (GPIO_16) | OUTPUT */
+		0x5c6 0x004     /* EDK_D13, MODE4 (GPIO_27) | OUTPUT */
+	>;
+};
+
+&usb_otg_hs {
+	interface-type = <0>;
+	usb-phy = <&tusb_phy>;
+	mode = <3>;
+	power = <50>;
+
 };
 
 &mcspi1 {

@@ -37,6 +37,7 @@ static const char *omap3_gp_boards_compat[] __initdata = {
 };
 static void __init minnow_musb_init(void)
 {
+	usb_bind_phy("musb-hdrc.0.auto", 0, "tps-usb");
 	usb_bind_phy("musb-hdrc.1.auto", 0, "cpcap_usb");
 	usb_musb_init(NULL);
 }
