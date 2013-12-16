@@ -20,6 +20,8 @@
 #include <linux/miscdevice.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/gpio.h>
+#include <linux/irq.h>
 #include <linux/regulator/machine.h>
 #include <linux/spi/spi.h>
 #include <linux/spi/cpcap.h>
@@ -351,10 +353,10 @@ int cpcap_device_register(struct platform_device *pdev)
 
 static int cpcap_probe(struct spi_device *spi)
 {
-	int retval = -EINVAL;
+	int i, retval = -EINVAL;
 	struct cpcap_device *cpcap;
 	struct cpcap_platform_data *data;
-	int i;
+	unsigned int irq;
 	struct cpcap_driver_info *info;
 
 	cpcap = kzalloc(sizeof(*cpcap), GFP_KERNEL);
@@ -362,12 +364,32 @@ static int cpcap_probe(struct spi_device *spi)
 		return -ENOMEM;
 
 	cpcap->spi = spi;
-	data = spi->controller_data;
+	data = cpcap_get_plat_data(cpcap);
+	if (data == NULL) {
+		dev_info(&(spi->dev), "No platform data found for CPCAP\n");
+		goto free_mem;
+	}
+
+	/* fixup struct spi_device for backward compatibility */
+	spi->controller_data = data;
 	spi_set_drvdata(spi, cpcap);
+
+	/* setup IRQ GPIO (previously done in board file) */
+	retval = gpio_request(data->irq_gpio, "cpcap-irq");
+	if (retval)
+		goto free_mem;
+
+	retval = gpio_direction_input(data->irq_gpio);
+	if (retval)
+		goto free_gpio;
+
+	irq = gpio_to_irq(data->irq_gpio);
+	irq_set_irq_type(irq, IRQ_TYPE_EDGE_RISING);
+	spi->irq = irq;
 
 	retval = cpcap_regacc_init(cpcap);
 	if (retval < 0)
-		goto free_mem;
+		goto free_gpio;
 	retval = cpcap_irq_init(cpcap);
 	if (retval < 0)
 		goto free_cpcap_irq;
@@ -430,6 +452,8 @@ static int cpcap_probe(struct spi_device *spi)
 
 free_cpcap_irq:
 	cpcap_irq_shutdown(cpcap);
+free_gpio:
+	gpio_free(data->irq_gpio);
 free_mem:
 	kfree(cpcap);
 	return retval;

@@ -8,9 +8,15 @@
  * published by the Free Software Foundation.
  */
 
+/* This is converted from the boardfile.  Instead of migrating the
+   driver to the new device_tree format, this code is left in place
+   to hardcode device settings.  This is driver is for obsolete hardware
+   and will be removed in the future
+ */
+
 #include <linux/kernel.h>
 #include <linux/device.h>
-#include <linux/gpio.h>
+#include <linux/of.h>
 #include <linux/irq.h>
 #include <linux/platform_device.h>
 #include <linux/power_supply.h>
@@ -19,8 +25,6 @@
 #include <linux/regulator/machine.h>
 #include <linux/spi/cpcap.h>
 #include <linux/spi/spi.h>
-
-#include "mux.h"
 
 struct cpcap_spi_init_data minnow_cpcap_spi_init[CPCAP_REG_SIZE + 1] = {
 	{CPCAP_REG_ASSIGN1,   0x0101},
@@ -113,8 +117,6 @@ unsigned short cpcap_regulator_off_mode_values[CPCAP_NUM_REGULATORS] = {
 	[CPCAP_VUSB]     = 0x0000,
 	[CPCAP_VAUDIO]   = 0x0000,
 };
-
-#define CPCAP_GPIO 1
 
 struct regulator_consumer_supply cpcap_sw4_consumers[] = {
 	REGULATOR_SUPPLY("sw4", NULL /* DSP */),
@@ -444,25 +446,14 @@ static struct cpcap_platform_data minnow_cpcap_data = {
 	.usb_changed = NULL,
 	.is_umts = 0,
 	.hwcfg = {CPCAP_HWCFG0_NONE, CPCAP_HWCFG1_STBY_GPIO},
-	.irq_gpio = CPCAP_GPIO,
+	.irq_gpio = 0,
 };
 
-static struct spi_board_info minnow_spi_board_info[] __initdata = {
-	/* CPCAP must be 1st object beacuse it is modified in spi_init() */
-	{
-		.modalias = "cpcap",
-		.bus_num = 1,
-		.chip_select = 1,
-		.max_speed_hz = 3000000,
-		.controller_data = &minnow_cpcap_data,
-		.mode = SPI_CS_HIGH,
-	},
-};
-
-void __init minnow_spi_init(void)
+#ifdef CONFIG_OF
+struct cpcap_platform_data *cpcap_get_plat_data(struct cpcap_device *cpcap)
 {
-	int irq;
-	int ret;
+	struct device_node *np = cpcap->spi->dev.of_node;
+	unsigned int prop;
 	int i;
 
 	for (i = 0; i < CPCAP_REG_SIZE; i++) {
@@ -471,21 +462,16 @@ void __init minnow_spi_init(void)
 	}
 	minnow_cpcap_data.init_len = i;
 
-	ret = gpio_request(CPCAP_GPIO, "cpcap-irq");
-	if (ret)
-		return;
-	ret = gpio_direction_input(CPCAP_GPIO);
-	if (ret) {
-		gpio_free(CPCAP_GPIO);
-		return;
-	}
+	if (!of_property_read_u32(np, "irq-gpio", &prop))
+		minnow_cpcap_data.irq_gpio = prop;
 
-	irq = gpio_to_irq(CPCAP_GPIO);
-	irq_set_irq_type(irq, IRQ_TYPE_EDGE_RISING);
-	minnow_spi_board_info[0].irq = irq;
-
-	spi_register_board_info(minnow_spi_board_info,
-				ARRAY_SIZE(minnow_spi_board_info));
-
-	/* regulator_has_full_constraints(); */
+	return &minnow_cpcap_data;
 }
+#else
+static inline
+struct cpcap_platform_data *cpcap_get_plat_data(struct cpcap_device *cpcap)
+{
+	return NULL;
+}
+#endif
+

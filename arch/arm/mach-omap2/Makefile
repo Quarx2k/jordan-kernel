@@ -254,7 +254,6 @@ obj-$(CONFIG_MACH_TOUCHBOOK)		+= board-omap3touchbook.o
 obj-$(CONFIG_MACH_OMAP_4430SDP)		+= board-4430sdp.o
 obj-$(CONFIG_MACH_OMAP4_PANDA)		+= board-omap4panda.o
 obj-$(CONFIG_MACH_MINNOW)		+= board-minnow.o \
-                                           board-minnow-spi.o \
                                            board-minnow-wireless.o \
                                            board-minnow-sensors.o \
                                            board-minnow-cpcap-client.o

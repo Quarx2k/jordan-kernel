@@ -841,6 +841,7 @@ unsigned char cpcap_uc_status(struct cpcap_device *cpcap,
 			      enum cpcap_macro macro);
 
 int cpcap_disable_offmode_wakeups(bool disable);
+struct cpcap_platform_data *cpcap_get_plat_data(struct cpcap_device *cpcap);
 
 #ifdef CONFIG_PM_DBG_DRV
 void cpcap_irq_pm_dbg_suspend(void);

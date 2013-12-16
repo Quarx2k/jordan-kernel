@@ -35,3 +35,14 @@
     };
 };
 
+&mcspi1 {
+	clock-frequency = <3000000>;
+	cpcap {
+		compatible = "mot,cpcap";
+		reg = <0>; /* CS 0 */
+		spi-max-frequency = <3000000>;
+		spi-cs-high;
+
+		irq-gpio = <0>;
+	};
+};
