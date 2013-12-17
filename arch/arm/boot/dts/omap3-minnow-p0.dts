@@ -28,6 +28,9 @@
 	dcdc4_avs;
 
 	regulators {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
 		sw1_iva_reg: regulator@0 {
 			reg = <0>;
 			regulator-compatible = "DCDC1";
