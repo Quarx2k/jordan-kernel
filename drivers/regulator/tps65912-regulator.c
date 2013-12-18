@@ -511,6 +511,9 @@ static struct tps65912_board *tps65912_parse_dt_reg_data(
 
 		pmic_plat_data->tps65912_pmic_init_data[idx] =
 							matches[idx].init_data;
+		/* store the of_node */
+		pmic_plat_data->tps65912_pmic_init_data[idx]->driver_data =
+						(void *)matches[idx].of_node;
 	}
 
 	return pmic_plat_data;
@@ -575,6 +578,7 @@ static int tps65912_probe(struct platform_device *pdev)
 		config.dev = tps65912->dev;
 		config.init_data = reg_data;
 		config.driver_data = pmic;
+		config.of_node = (struct device_node *)reg_data->driver_data;
 
 		rdev = regulator_register(&pmic->desc[i], &config);
 		if (IS_ERR(rdev)) {
