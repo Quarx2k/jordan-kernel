@@ -19,6 +19,12 @@ else
 TARGET_PREBUILT_KERNEL := $(TARGET_PREBUILT_INT_KERNEL)
 endif
 
+# use eng_ defconfig for engineering Android variants
+ifeq ($(TARGET_BUILD_VARIANT), eng)
+KERNEL_DEFCONFIG := eng_${KERNEL_DEFCONFIG}
+endif
+SOURCE_DEFCONFIG  := $(KERNEL_SRCDIR)/arch/arm/configs/$(KERNEL_DEFCONFIG)
+
 define mv-modules
 mdpath=`find $(KERNEL_MODULES_OUT) -type f -name modules.order`;\
 if [ "$$mdpath" != "" ];then\
@@ -42,8 +48,6 @@ if [ -f $(TARGET_PREBUILT_INT_KERNEL) -a\
 fi;
 endef
 
-include $(KERNEL_SRCDIR)/defconfig.mk
-
 define do-kernel-config
 	( cp $(3) $(2) && $(7) -C $(4) O=$(1) ARCH=$(5) CROSS_COMPILE=$(6) oldconfig ) || ( rm -f $(2) && false )
 endef
@@ -62,8 +66,8 @@ $(GIT_HOOKS_DIR)/checkpatch.pl:  $(KERNEL_SRCDIR)/scripts/checkpatch.pl
 $(KERNEL_OUT):
 	mkdir -p $(KERNEL_OUT)
 
-$(KERNEL_CONFIG): $(KERNEL_OUT) $(TARGET_DEFCONFIG) inst_hook
-	$(call do-kernel-config,$(KERNEL_OUT),$@,$(TARGET_DEFCONFIG),$(KERNEL_SRCDIR),arm,arm-eabi-,$(MAKE))
+$(KERNEL_CONFIG): $(KERNEL_OUT) $(SOURCE_DEFCONFIG) inst_hook
+	$(call do-kernel-config,$(KERNEL_OUT),$@,$(SOURCE_DEFCONFIG),$(KERNEL_SRCDIR),arm,arm-eabi-,$(MAKE))
 
 $(TARGET_PREBUILT_INT_KERNEL): $(KERNEL_OUT) $(KERNEL_CONFIG) $(KERNEL_HEADERS_INSTALL) $(TARGET_PREBUILT_INT_DTB)
 	$(MAKE) -C $(KERNEL_SRCDIR) KBUILD_RELSRC=$(KERNEL_SOURCE_RELATIVE_PATH) O=$(KERNEL_OUT) ARCH=arm CROSS_COMPILE=arm-eabi-
@@ -82,8 +86,6 @@ kerneltags: $(KERNEL_OUT) $(KERNEL_CONFIG)
 kernelconfig: $(KERNEL_OUT) $(KERNEL_CONFIG)
 	env KCONFIG_NOTIMESTAMP=true \
 	     $(MAKE) -C $(KERNEL_SRCDIR) O=$(KERNEL_OUT) ARCH=arm CROSS_COMPILE=arm-eabi- menuconfig
-	env KCONFIG_NOTIMESTAMP=true \
-	     $(MAKE) -C $(KERNEL_SRCDIR) O=$(KERNEL_OUT) ARCH=arm CROSS_COMPILE=arm-eabi- savedefconfig
-	cp $(KERNEL_OUT)/defconfig kernel/arch/arm/configs/$(KERNEL_DEFCONFIG)
+	cp $(KERNEL_OUT)/.config $(SOURCE_DEFCONFIG)
 
 endif
