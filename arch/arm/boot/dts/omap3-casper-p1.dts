@@ -16,6 +16,42 @@
 	vib-gpio {
 		compatible = "mot,vib-gpio";
 	};
+
+        m4sensor {
+                compatible = "simple-bus";
+                wrist {
+                        compatible = "mot,m4wrist";
+                        mot,wrist_xres = <&gpio6 15 0>; /* xres gpio-175 */
+                        mot,wrist_clk =  <&gpio1 29 0>; /* clk  gpio-029 */
+                        mot,wrist_data = <&gpio1 15 0>; /* data gpio-015 */
+                };
+
+                pressure {
+                        compatible = "mot,m4pressure";
+                };
+                mpu9150 {
+                        compatible = "mot,m4mpu9150";
+                };
+                pedometer {
+                        compatible = "mot,m4pedometer";
+                };
+                passive {
+                        compatible = "mot,m4passive";
+                };
+                gesture {
+                        compatible = "mot,m4gesture";
+                };
+                display {
+                        compatible = "mot,m4display";
+                };
+                download {
+                        compatible = "mot,m4download";
+                };
+                stillmode {
+                        compatible = "mot,m4stillmode";
+                };
+        };
+
 };
 
 &i2c2 {

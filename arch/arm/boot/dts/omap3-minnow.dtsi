@@ -62,12 +62,6 @@
 
 	m4sensor {
 		compatible = "simple-bus";
-		wrist {
-			compatible = "mot,m4wrist";
-			mot,wrist_xres = <&gpio6 15 0>; /* xres gpio-175 */
-			mot,wrist_clk =  <&gpio1 29 0>; /* clk  gpio-029 */
-			mot,wrist_data = <&gpio1 15 0>; /* data gpio-015 */
-		};
 
 		pressure {
 			compatible = "mot,m4pressure";
