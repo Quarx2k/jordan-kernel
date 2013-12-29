@@ -1919,6 +1919,7 @@ out:
 }
 
 #ifdef CONFIG_COMPACTION
+#define COMPACTION_RETRY_TIMES 2
 /* Try memory compaction for high-order allocations before reclaim */
 static struct page *
 __alloc_pages_direct_compact(gfp_t gfp_mask, unsigned int order,
@@ -1928,6 +1929,7 @@ __alloc_pages_direct_compact(gfp_t gfp_mask, unsigned int order,
 	bool *deferred_compaction,
 	unsigned long *did_some_progress)
 {
+	int retry_times = 0, order_adj = order;
 	struct page *page;
 
 	if (!order)
@@ -1938,8 +1940,9 @@ __alloc_pages_direct_compact(gfp_t gfp_mask, unsigned int order,
 		return NULL;
 	}
 
+retry_compact:
 	current->flags |= PF_MEMALLOC;
-	*did_some_progress = try_to_compact_pages(zonelist, order, gfp_mask,
+	*did_some_progress = try_to_compact_pages(zonelist, order_adj, gfp_mask,
 						nodemask, sync_migration);
 	current->flags &= ~PF_MEMALLOC;
 	if (*did_some_progress != COMPACT_SKIPPED) {
@@ -1956,7 +1959,20 @@ __alloc_pages_direct_compact(gfp_t gfp_mask, unsigned int order,
 			preferred_zone->compact_considered = 0;
 			preferred_zone->compact_defer_shift = 0;
 			count_vm_event(COMPACTSUCCESS);
+
+			if (retry_times)
+				count_vm_event(COMPACTSUCCESS_RETRY);
+
 			return page;
+		}
+
+		if (retry_times++ < COMPACTION_RETRY_TIMES) {
+
+			order_adj++;
+			if (order_adj >= MAX_ORDER)
+				order_adj = -1;
+
+			goto retry_compact;
 		}
 
 		/*
