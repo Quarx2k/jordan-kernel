@@ -1575,10 +1575,10 @@ void cpcap_musb_notifier_call(unsigned char event)
 		musb_writeb(musb->mregs, MUSB_POWER, power);
 
 		musb->xceiv->state = OTG_STATE_B_IDLE;
-		musb->is_host = false;				
+		musb->is_host = false;	
+		musb_pullup2(musb, 0);
+		musb_stop(musb);			
 		musb_g_reset(musb);
-		musb_stop(musb);
-
 		cpcap_otg = false;
 		return;
 
@@ -1598,9 +1598,9 @@ void cpcap_musb_notifier_call(unsigned char event)
 
 		musb->xceiv->state = OTG_STATE_A_IDLE;
 		musb->is_host = true;
-		musb_start(musb);
  		musb_g_reset(musb);
-
+		musb_pullup2(musb, 1);
+		musb_start(musb);
 		cpcap_otg = true;
 		return;
 
@@ -1662,7 +1662,7 @@ static const struct usb_gadget_ops musb_gadget_operations = {
 	.set_selfpowered	= musb_gadget_set_self_powered,
 	/* .vbus_session		= musb_gadget_vbus_session, */
 	.vbus_draw		= musb_gadget_vbus_draw,
-	.pullup			= musb_gadget_pullup,
+	//.pullup			= musb_gadget_pullup,
 };
 
 /* ----------------------------------------------------------------------- */
