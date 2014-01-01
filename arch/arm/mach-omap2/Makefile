@@ -264,7 +264,6 @@ obj-$(CONFIG_MACH_OMAP_MAPPHONE)	+= board-mapphone.o \
 					   board-flash.o \
 					   hsmmc.o \
 					   omapxx_apps_brd_id.o
-obj-$(CONFIG_EMU_UART_DEBUG)		+= board-mapphone-emu_uart.o
 obj-$(CONFIG_MACH_CM_T35)		+= board-cm-t35.o
 obj-$(CONFIG_MACH_CM_T3517)		+= board-cm-t3517.o
 obj-$(CONFIG_MACH_IGEP0020)		+= board-igep0020.o
@@ -356,7 +355,7 @@ obj-$(CONFIG_ARCH_OMAP4)		+= board-omap-identity.o
 obj-$(CONFIG_ARCH_OMAP5)		+= board-omap-identity.o
 obj-$(CONFIG_OMAP_HSI_DEVICE)           += omap_hsi.o
 
-
+ifneq ($(CONFIG_ARCH_OMAP3), y)
 ifneq ($(CONFIG_ARCH_OMAP5_ES1),)
 obj-y					+=omap_hwmod_54xx_es1_data.o
 obj-y				        += $(clock-common) clock54xx_es1_data.o \
@@ -379,6 +378,7 @@ obj-y                                   += clockdomain.o \
 obj-y                                   += $(powerdomain-common) \
                                         powerdomain4xxx_5xxx.o \
                                         powerdomains54xx_data.o
+endif
 endif
 
 ifneq ($(CONFIG_OMAP_REMOTEPROC),)

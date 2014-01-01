@@ -662,20 +662,20 @@ next:
 #ifdef CONFIG_SUSPEND
 	suspend_set_ops(&omap_pm_ops);
 #endif
-
+#ifdef CONFIG_ARCH_OMAP4
 	/* Initialize Core PM */
 	omap4_pm_init();
-
+#endif
 	set_device_opp();
 
 	omap_pm_is_ready_status = true;
 	/* let the other CPU know as well */
 	smp_wmb();
-
+#ifdef CONFIG_ARCH_OMAP4
 	omap4_set_processor_device_opp();
 
 	omap4_init_cpuidle();
-
+#endif
 	core_pd = pwrdm_lookup("core_pwrdm");
 	if (!core_pd) {
 		pr_err("Failed to lookup CORE power domain\n");
