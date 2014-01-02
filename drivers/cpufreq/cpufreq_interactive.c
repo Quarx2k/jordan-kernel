@@ -1462,10 +1462,10 @@ static int __init cpufreq_interactive_init(void)
 		init_rwsem(&pcpu->enable_sem);
 	}
 
-	input_wq = alloc_workqueue("input_wq", WQ_HIGHPRI, 0);
+	input_wq = create_singlethread_workqueue("input_wq");
 
 	if (!input_wq)
-		return -EINVAL;
+		return -ENOMEM;
 
 	INIT_WORK(&input_work, cpufreq_interactive_boost);
 

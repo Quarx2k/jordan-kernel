@@ -210,11 +210,6 @@ static void s2w_input_event(struct input_handle *handle, unsigned int type,
 		(code==ABS_MT_TRACKING_ID) ? "ID" :
 		"undef"), code, value);
 #endif
-	if (code == ABS_MT_SLOT) {
-		sweep2wake_reset();
-		return;
-	}
-
 	if (code == ABS_MT_TRACKING_ID && value == -1) {
 		sweep2wake_reset();
 		return;
@@ -448,20 +443,20 @@ static int __init sweep2wake_init(void)
 #ifndef ANDROID_TOUCH_DECLARED
 	android_touch_kobj = kobject_create_and_add("android_touch", NULL) ;
 	if (android_touch_kobj == NULL) {
-		pr_warn("%s: android_touch_kobj create_and_add failed\n", __func__);
+		printk("%s: android_touch_kobj create_and_add failed\n", __func__);
 	}
 #endif
 	rc = sysfs_create_file(android_touch_kobj, &dev_attr_sweep2wake.attr);
 	if (rc) {
-		pr_warn("%s: sysfs_create_file failed for sweep2wake\n", __func__);
+		printk("%s: sysfs_create_file failed for sweep2wake\n", __func__);
 	}
 	rc = sysfs_create_file(android_touch_kobj, &dev_attr_s2w_s2sonly.attr);
 	if (rc) {
-		pr_warn("%s: sysfs_create_file failed for s2w_s2sonly\n", __func__);
+		printk("%s: sysfs_create_file failed for s2w_s2sonly\n", __func__);
 	}
 	rc = sysfs_create_file(android_touch_kobj, &dev_attr_sweep2wake_version.attr);
 	if (rc) {
-		pr_warn("%s: sysfs_create_file failed for sweep2wake_version\n", __func__);
+		printk("%s: sysfs_create_file failed for sweep2wake_version\n", __func__);
 	}
 
 err_input_dev:
