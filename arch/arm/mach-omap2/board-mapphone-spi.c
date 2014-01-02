@@ -544,21 +544,8 @@ static void __init cpcap_of_init(void)
 	int size, unit_size, i, count;
 	struct device_node *node;
 	const void *prop;
-	struct device_node *bp_node;
-	const void *bp_prop;
-	char *cpcap_bp_model = "CDMA";
 
-	bp_node = of_find_node_by_path(DT_PATH_CHOSEN);
-	if (bp_node) {
-		bp_prop = of_get_property(bp_node, DT_PROP_CHOSEN_BP, NULL);
-		if (bp_prop)
-			cpcap_bp_model = (char *)bp_prop;
-
-		of_node_put(bp_node);
-	}
-
-	if (strcmp(cpcap_bp_model, "UMTS") >= 0)
-		mapphone_cpcap_data.is_umts = 1;
+	mapphone_cpcap_data.is_umts = 1;
 
 	node = of_find_node_by_path(DT_PATH_CPCAP);
 	if (node == NULL) {

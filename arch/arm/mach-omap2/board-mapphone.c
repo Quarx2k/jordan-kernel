@@ -240,31 +240,6 @@ static void mapphone_wifi_init(void)
 	printk("Wifi init done\n");
 }
 
-static void __init mapphone_bp_model_init(void)
-{
-#ifdef CONFIG_OMAP_RESET_CLOCKS
-	struct clk *clkp;
-#endif
-	struct device_node *bp_node;
-	const void *bp_prop;
-
-	if ((bp_node = of_find_node_by_path(DT_PATH_CHOSEN))) {
-		if ((bp_prop = of_get_property(bp_node, \
-			DT_PROP_CHOSEN_BP, NULL)))
-			bp_model = (char *)bp_prop;
-		printk("BP MODEL:%s\n",bp_model);
-		of_node_put(bp_node);
-	}
-#ifdef CONFIG_OMAP_RESET_CLOCKS
-	/* Enable sad2d iclk */
-	clkp = clk_get(NULL, "sad2d_ick");
-	if (clkp) {
-             clk_enable(clkp);
-             printk("sad2d_ick enabled\n");
-	}
-#endif
-}
-
 static void mapphone_pm_power_off(void)
 {
 	printk(KERN_INFO "mapphone_pm_power_off start...\n");
@@ -368,7 +343,6 @@ static void __init omap_mapphone_init_early(void)
 	omap2_init_common_infrastructure();
 	omap2_init_common_devices(JEDEC_JESD209A_sdrc_params,
 				   JEDEC_JESD209A_sdrc_params);
-	omap2_gp_clockevent_set_gptimer(1);
 
 	if (fdt_start_address) {
 		void *mem;
@@ -383,6 +357,9 @@ static void __init omap_mapphone_init_early(void)
 
 static void __init omap_mapphone_init(void)
 {
+#ifdef CONFIG_OMAP_RESET_CLOCKS
+	struct clk *clkp;
+#endif
 	/*
 	 * This will allow unused regulator to be shutdown. This flag
 	 * should be set in the board file. Before regulators are registered.
@@ -390,7 +367,6 @@ static void __init omap_mapphone_init(void)
 	regulator_has_full_constraints();
 	omap3_pm_init_cpuidle(mapphone_cpuidle_params_table);
 	omap_serial_init();
-	mapphone_bp_model_init();
 	mapphone_voltage_init();
 	mapphone_gpio_mapping_init();
 	mapphone_i2c_init();
@@ -416,6 +392,16 @@ static void __init omap_mapphone_init(void)
 	/* emu-uart function will override devtree iomux setting */
 	activate_emu_uart();
 #endif
+
+#ifdef CONFIG_OMAP_RESET_CLOCKS
+	/* Enable sad2d iclk */
+	clkp = clk_get(NULL, "sad2d_ick");
+	if (clkp) {
+             clk_enable(clkp);
+             printk("sad2d_ick enabled\n");
+	}
+#endif
+
 }
 
 static void __init mapphone_reserve(void)
