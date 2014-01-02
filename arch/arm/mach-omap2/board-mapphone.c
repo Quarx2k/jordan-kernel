@@ -26,6 +26,7 @@
 #include <plat/hdq.h>
 #include <plat/omap-serial.h>
 #include "omap_ram_console.h"
+#include "omap2plus-cpufreq.h"
 
 #include <mach/board-mapphone.h>
 
@@ -116,6 +117,9 @@ static struct cpuidle_params mapphone_cpuidle_params_table[] = {
         {4300 + 8794, 159000, 1},
 };
 
+static struct omap_cpufreq_platform_data cpufreq_pdata = {
+        .max_nominal_freq = 1000000,
+};
 
 static struct omap_musb_board_data musb_board_data = {
 	.interface_type         = MUSB_INTERFACE_ULPI,
@@ -334,6 +338,7 @@ static void __init omap_mapphone_init(void)
 	 */
 	regulator_has_full_constraints();
 	omap3_pm_init_cpuidle(mapphone_cpuidle_params_table);
+	omap_cpufreq_set_platform_data(&cpufreq_pdata);
 	omap_serial_init();
 	mapphone_voltage_init();
 	mapphone_gpio_mapping_init();
