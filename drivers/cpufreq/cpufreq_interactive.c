@@ -97,7 +97,7 @@ static unsigned long go_hispeed_load = DEFAULT_GO_HISPEED_LOAD;
 static unsigned int sampling_down_factor = DEFAULT_SAMPLING_DOWN_FACTOR;
 
 /* Target load.  Lower values result in higher CPU speeds. */
-#define DEFAULT_TARGET_LOAD 85
+#define DEFAULT_TARGET_LOAD 95
 static unsigned int default_target_loads[] = {DEFAULT_TARGET_LOAD};
 static spinlock_t target_loads_lock;
 static unsigned int *target_loads = default_target_loads;
@@ -112,7 +112,7 @@ static unsigned long min_sample_time = DEFAULT_MIN_SAMPLE_TIME;
 /*
  * The sample rate of the timer used to increase frequency
  */
-#define DEFAULT_TIMER_RATE (30 * USEC_PER_MSEC)
+#define DEFAULT_TIMER_RATE (20 * USEC_PER_MSEC)
 static unsigned long timer_rate = DEFAULT_TIMER_RATE;
 
 /*
@@ -654,17 +654,6 @@ static int cpufreq_interactive_speedchange_task(void *data)
 							max_freq,
 							CPUFREQ_RELATION_H);
 
-			/* 
-			 * If suspended and over this loadlevel,
-			 * we might want to scale up
-			 */
-			if (cpu_load >= 85 && suspend_state) {
-				new_freq = 2 * suspend_freq;
-				__cpufreq_driver_target(pcpu->policy,
-							new_freq,
-							CPUFREQ_RELATION_L);
-			}
-
 			trace_cpufreq_interactive_setspeed(cpu,
 						     pcpu->target_freq,
 						     pcpu->policy->cur);
@@ -689,7 +678,7 @@ static void interactive_suspend(int suspend)
         if (!suspend) { 
                 suspend_state = 0;
                 __cpufreq_driver_target(pcpu->policy, pcpu->policy->max, CPUFREQ_RELATION_L);
-                printk("[interactive] awake at %d\n", pcpu->policy->max);
+                printk("[interactive] awake at %d\n", pcpu->policy->cur);
         } else {
 		/* Going in suspend, take saved suspend_freq */
                 suspend_state = 1;
@@ -744,6 +733,10 @@ static void cpufreq_interactive_boost(struct work_struct *work)
 
 		pcpu->floor_freq = input_boost_freq;
 		pcpu->floor_validate_time = ktime_to_us(ktime_get());
+
+		if (i)
+			break;
+
 	}
 }
 
@@ -1227,7 +1220,7 @@ static ssize_t store_boostpulse(struct kobject *kobj, struct attribute *attr,
 
 	boostpulse_endtime = ktime_to_us(ktime_get()) + boostpulse_duration_val;
 	trace_cpufreq_interactive_boost("pulse");
-	queue_work(input_wq, &input_work);
+	queue_work_on(0, input_wq, &input_work);
 	return count;
 }
 
