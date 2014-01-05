@@ -29,6 +29,13 @@
 #include <linux/err.h>
 #include <linux/cpufreq.h>
 
+#ifdef CONFIG_OMAP3_OVERCLOCK
+#include <linux/proc_fs.h>
+#include <asm/uaccess.h>
+#include <linux/vmalloc.h>
+#include <linux/cpufreq.h>
+#endif
+
 #include <plat/cpu.h>
 #include <plat/clock.h>
 #include <plat/sram.h>
@@ -361,6 +368,7 @@ static struct omap_clk omap34xx_clks[] = {
 
 unsigned long long cpu_hz;
 EXPORT_SYMBOL(cpu_hz);
+EXPORT_SYMBOL(mpu_opps);
 
 /**
  * omap3430es2_clk_ssi_find_idlest - return CM_IDLEST info for SSI
@@ -1108,6 +1116,118 @@ static unsigned long omap3_clkoutx2_recalc(struct clk *clk)
 #ifdef CONFIG_CPU_FREQ
 static struct cpufreq_frequency_table freq_table[VDD1_OPP6+1];
 
+#ifdef CONFIG_OMAP3_OVERCLOCK
+
+static int proc_freq_table_read(char *buffer, char **buffer_location,
+																off_t offset, int count, int *eof, void *data)
+{
+	int i, ret = 0;
+
+	if (offset > 0)
+		ret = 0;
+	else
+		for(i = 0; freq_table[i].frequency != CPUFREQ_TABLE_END; i++)
+		{
+			if(ret >= count)
+				break;
+
+			ret += scnprintf(buffer+ret, count-ret, "freq_table[%d] index=%u frequency=%u\n", i, freq_table[i].index, freq_table[i].frequency);
+		}
+
+		return ret;
+}
+
+static int proc_mpu_opps_read(char *buffer, char **buffer_location,
+															off_t offset, int count, int *eof, void *data)
+{
+	int i, ret = 0;
+
+	if (offset > 0)
+		ret = 0;
+	else
+		for(i = MAX_VDD1_OPP; mpu_opps[i].rate; i--)
+		{
+			if(ret >= count)
+				break;
+
+			ret += scnprintf(buffer+ret, count-ret, "mpu_opps[%d] rate=%lu opp_id=%u vsel=%u sr_adjust_vsel=%u\n", i,
+											 mpu_opps[i].rate, mpu_opps[i].opp_id, mpu_opps[i].vsel, mpu_opps[i].sr_adjust_vsel);
+		}
+
+		return ret;
+}
+
+#ifdef CONFIG_CPU_FREQ_STAT
+extern void cpufreq_stats_freqtable_update(unsigned int cpu, unsigned int index, unsigned int freq);
+#endif
+
+static int proc_mpu_opps_write(struct file *filp, const char __user *buffer,
+															 unsigned long len, void *data)
+{
+	uint index, rate, vsel;
+	struct cpufreq_policy *policy;
+
+	if (!mpu_opps)
+		return -EFAULT;
+
+	if(!len)
+		return -ENOSPC;
+
+	if(sscanf(buffer, "%d %d %d", &index, &rate, &vsel) == 3)
+	{
+		if (index < 1 || index > MAX_VDD1_OPP)
+		{
+			printk(KERN_INFO "overclock: invalid index\n");
+			return -EFAULT;
+		}
+
+		//update mpu_opps
+		mpu_opps[index].rate = rate;
+		mpu_opps[index].vsel = vsel;
+		mpu_opps[index].sr_adjust_vsel = 0;
+
+		//update frequency table (MAX_VDD1_OPP - index)
+		freq_table[MAX_VDD1_OPP - index].frequency = rate / 1000;
+#ifdef CONFIG_CPU_FREQ_STAT
+		cpufreq_stats_freqtable_update(0, MAX_VDD1_OPP - index, rate / 1000);
+#endif
+
+		//in case of MAX_VDD1_OPP update max policy
+		//and in case of one update min policy
+		if (index == MAX_VDD1_OPP)
+		{
+			policy = cpufreq_cpu_get(0);
+			policy->max = policy->cpuinfo.max_freq =
+			policy->user_policy.max = rate / 1000;
+		}
+		else if (index == 1)
+		{
+			policy = cpufreq_cpu_get(0);
+			policy->min = policy->cpuinfo.min_freq =
+			policy->user_policy.min = rate / 1000;
+		}
+	}
+	else
+		printk(KERN_INFO "overclock: insufficient parameters for mpu_opps\n");
+
+	return len;
+}
+
+static int overclock_init(void)
+{
+	struct proc_dir_entry *proc_entry;
+
+	printk(KERN_INFO "%s: Loading OMAP3 overclock\n", __func__);
+
+	proc_mkdir("overclock", NULL);
+	proc_entry = create_proc_read_entry("overclock/freq_table", 0444, NULL, proc_freq_table_read, NULL);
+	proc_entry = create_proc_read_entry("overclock/mpu_opps", 0644, NULL, proc_mpu_opps_read, NULL);
+	proc_entry->write_proc = proc_mpu_opps_write;
+
+	return 0;
+}
+#endif
+
 void omap2_clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
 {
 	struct omap_opp *prcm;
@@ -1136,6 +1256,9 @@ void omap2_clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
 	freq_table[i].frequency = CPUFREQ_TABLE_END;
 
 	*table = &freq_table[0];
+#ifdef CONFIG_OMAP3_OVERCLOCK
+	overclock_init();
+#endif
 }
 #endif
 

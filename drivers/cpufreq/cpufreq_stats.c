@@ -50,6 +50,16 @@ struct cpufreq_stats_attribute {
 	ssize_t(*show) (struct cpufreq_stats *, char *);
 };
 
+void cpufreq_stats_freqtable_update(unsigned int cpu, unsigned int index, unsigned int freq)
+{
+	struct cpufreq_stats *stat;
+	spin_lock(&cpufreq_stats_lock);
+	stat = per_cpu(cpufreq_stats_table, cpu);
+	stat->freq_table[index] = freq;
+	stat->time_in_state[index] = 0;
+	spin_unlock(&cpufreq_stats_lock);
+}
+
 static int cpufreq_stats_update(unsigned int cpu)
 {
 	struct cpufreq_stats *stat;

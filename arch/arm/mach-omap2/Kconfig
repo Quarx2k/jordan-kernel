@@ -202,3 +202,9 @@ config PM_DEEPSLEEP
 	  if enabling this feature, when PM state is set to DEEPSLEEP, the kerne
 	  ignore all key press except long press power key.
 
+config OMAP3_OVERCLOCK
+	bool "OMAP3 overclock"
+	depends on ARCH_OMAP3 && ARCH_OMAP34XX
+	default n
+	help
+	  Say Y to allow setting clock and voltage for MPU using procfs.
