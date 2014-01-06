@@ -180,7 +180,7 @@ int pinctrl_dt_to_map(struct pinctrl *p)
 	struct property *prop;
 	const char *statename;
 	const __be32 *list;
-	int size, config;
+	int size, config, valid_configs;
 	phandle phandle;
 	struct device_node *np_config;
 
@@ -195,6 +195,7 @@ int pinctrl_dt_to_map(struct pinctrl *p)
 
 	/* For each defined state ID */
 	for (state = 0; ; state++) {
+		valid_configs = 0;
 		/* Retrieve the pinctrl-* property */
 		propname = kasprintf(GFP_KERNEL, "pinctrl-%d", state);
 		prop = of_find_property(np, propname, &size);
@@ -234,9 +235,14 @@ int pinctrl_dt_to_map(struct pinctrl *p)
 			/* Parse the node */
 			ret = dt_to_map_one_config(p, statename, np_config);
 			of_node_put(np_config);
-			if (ret < 0)
-				goto err;
+			if (ret >= 0)
+				valid_configs++;
 		}
+
+		dev_dbg(p->dev, "%d/%d valid pinctrl configs found\n",
+			valid_configs, size);
+		if (!valid_configs)
+			goto err;
 
 		/* No entries in DT? Generate a dummy state table entry */
 		if (!size) {
