@@ -11,7 +11,10 @@
 
 / {
 	mmi,revision = "p0";
-	mmi,hwrev = <0x00>;
+	mmi,hwrev = <
+		0x00   /* Minnow P0 wingboard */
+		0x01   /* Minnow P0 portable */
+	>;
 
 
 	vib-gpio {
