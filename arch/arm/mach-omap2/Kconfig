@@ -136,8 +136,8 @@ config MACH_OMAP_ZOOM3
 	bool "OMAP3630 Zoom3 board"
 
 config MACH_MAPPHONE
-        bool "Motorola Android Platform phone"
-        depends on ARCH_OMAP3 && ARCH_OMAP34XX
+	bool "Motorola Android Platform phone"
+	depends on ARCH_OMAP3 && ARCH_OMAP34XX
 
 config MAPPHONE_2NDBOOT
 	bool "Motorola Android Platform phone 2nd-boot kernel modifications"
@@ -176,6 +176,19 @@ config EMU_UART_DEBUG
 	help
 	  This feature is specific for Motorola phone with CPCAP power IC.
 	  If this option is selected, USB functionality is NOT available any more.
+
+config DTC
+	bool "Device tree support"
+	default n
+	help
+	  Adds support for device tree alongside ATAG
+
+config MAPPHONE_DTC
+	bool "Motorola Android Platform device tree"
+	depends on DTC && MACH_MAPPHONE
+	default n
+	help
+	  Specific version of the device tree for Motorola Android Platform phone
 
 config OMAP3_EXPORT_DIE_ID
        bool "Export DIE ID code under /proc/socinfo"

@@ -329,8 +329,10 @@ static void check_name_properties(struct check *c, struct node *root,
 
 	if ((prop->val.len != node->basenamelen+1)
 	    || (memcmp(prop->val.val, node->name, node->basenamelen) != 0)) {
+#ifndef MAPPHONE_DTC
 		FAIL(c, "\"name\" property in %s is incorrect (\"%s\" instead"
 		     " of base node name)", node->fullpath, prop->val.val);
+#endif
 	} else {
 		/* The name property is correct, and therefore redundant.
 		 * Delete it */

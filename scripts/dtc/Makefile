@@ -11,6 +11,10 @@ dtc-objs	+= dtc-lexer.lex.o dtc-parser.tab.o
 
 HOSTCFLAGS_DTC := -I$(src) -I$(src)/libfdt
 
+ifeq ($(CONFIG_MAPPHONE_DTC),y)
+	HOSTCFLAGS_DTC += -DMAPPHONE_DTC
+endif
+
 HOSTCFLAGS_checks.o := $(HOSTCFLAGS_DTC)
 HOSTCFLAGS_data.o := $(HOSTCFLAGS_DTC)
 HOSTCFLAGS_dtc.o := $(HOSTCFLAGS_DTC)
