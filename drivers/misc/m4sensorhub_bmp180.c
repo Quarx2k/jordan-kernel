@@ -280,8 +280,8 @@ static int pressure_client_probe(struct platform_device *pdev)
 
 	pressure_client_data->input_dev->name = PRESSURE_CLIENT_DRIVER_NAME;
 	set_bit(EV_ABS, pressure_client_data->input_dev->evbit);
-	set_bit(ABS_PRESSURE, pressure_client_data->input_dev->absbit);
-	set_bit(ABS_ALTITUDE, pressure_client_data->input_dev->absbit);
+	input_set_abs_params(pressure_client_data->input_dev, ABS_ALTITUDE,
+		-2147483647, 2147483647, 0, 0);
 	input_set_abs_params(pressure_client_data->input_dev, ABS_PRESSURE,
 					PRESSURE_MIN, PRESSURE_MAX, 0, 0);
 

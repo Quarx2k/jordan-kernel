@@ -310,7 +310,8 @@ static int gesture_client_probe(struct platform_device *pdev)
 	set_bit(MSC_GESTURE_VALUE3, gesture_client_data->input_dev->mscbit);
 
 	set_bit(EV_ABS, gesture_client_data->input_dev->evbit);
-	set_bit(ABS_TILTSCROLL, gesture_client_data->input_dev->absbit);
+	input_set_abs_params(gesture_client_data->input_dev, ABS_TILTSCROLL,
+		-128, 127, 0, 0);
 
 	if (input_register_device(gesture_client_data->input_dev)) {
 		KDEBUG(M4SH_ERROR, "%s: input device register failed\n",

@@ -907,14 +907,20 @@ static int mpu9150_client_probe(struct platform_device *pdev)
 	mpu9150_client_data->input_dev->name = MPU9150_CLIENT_DRIVER_NAME;
 	set_bit(EV_ABS, mpu9150_client_data->input_dev->evbit);
 	set_bit(EV_REL, mpu9150_client_data->input_dev->evbit);
-
-	set_bit(ABS_COMPASS_X, mpu9150_client_data->input_dev->absbit);
-	set_bit(ABS_COMPASS_Y, mpu9150_client_data->input_dev->absbit);
-	set_bit(ABS_COMPASS_Z, mpu9150_client_data->input_dev->absbit);
-	set_bit(ABS_COMPASS_ACCURACY, mpu9150_client_data->input_dev->absbit);
-	set_bit(ABS_X, mpu9150_client_data->input_dev->absbit);
-	set_bit(ABS_Y, mpu9150_client_data->input_dev->absbit);
-	set_bit(ABS_Z, mpu9150_client_data->input_dev->absbit);
+	input_set_abs_params(mpu9150_client_data->input_dev,
+		ABS_COMPASS_X, -2147483647, 2147483647, 0, 0);
+	input_set_abs_params(mpu9150_client_data->input_dev,
+		ABS_COMPASS_Y, -2147483647, 2147483647, 0, 0);
+	input_set_abs_params(mpu9150_client_data->input_dev,
+		ABS_COMPASS_Z, -2147483647, 2147483647, 0, 0);
+	input_set_abs_params(mpu9150_client_data->input_dev,
+		ABS_COMPASS_ACCURACY, -128, 127, 0, 0);
+	input_set_abs_params(mpu9150_client_data->input_dev,
+		ABS_X, -2147483647, 2147483647, 0, 0);
+	input_set_abs_params(mpu9150_client_data->input_dev,
+		ABS_Y, -2147483647, 2147483647, 0, 0);
+	input_set_abs_params(mpu9150_client_data->input_dev,
+		ABS_Z, -2147483647, 2147483647, 0, 0);
 
 	set_bit(REL_X, mpu9150_client_data->input_dev->relbit);
 	set_bit(REL_Y, mpu9150_client_data->input_dev->relbit);
