@@ -28,7 +28,6 @@
 #include <linux/proc_fs.h>
 #include <linux/input.h>
 #include <linux/m4sensorhub.h>
-#include <linux/m4sensorhub_client_ioctl.h>
 #include <linux/m4sensorhub/MemMapGyroSensor.h>
 #include <linux/m4sensorhub/MemMapAccelSensor.h>
 #include <linux/m4sensorhub/MemMapCompassSensor.h>
@@ -397,67 +396,33 @@ static void m4_handle_mpu9150_fusion_irq(enum m4sensorhub_irqs int_event,
 	m4_report_mpu9150_inputevent(mpu9150_client_data, TYPE_FUSION);
 }
 
-/*
- * Handle commands from user-space.
- */
-static long mpu9150_client_ioctl(struct file *filp,
-				 unsigned int cmd, unsigned long arg)
+static ssize_t m4_mpu9150_write_accel_setdelay(struct device *dev,
+			struct device_attribute *attr,
+			const char *buf, size_t count)
 {
-	int ret = 0;
-	int delay;
-	static int status;
-	void __user *argp = (void __user *)arg;
-	struct mpu9150_client *mpu9150_client_data = filp->private_data;
+	int scanresult;
 
-	switch (cmd) {
-	case M4_SENSOR_IOCTL_APP_GET_FLAG:
-		if (copy_to_user(argp, &status, sizeof(status)))
-			return -EFAULT;
-		break;
-	case M4_SENSOR_IOCTL_APP_SET_FLAG:
-		if (copy_from_user(&status, argp, sizeof(status)))
-			return -EFAULT;
-		break;
-	case M4_SENSOR_IOCTL_GYRO_SET_DELAY:
-		if (copy_from_user(&delay, argp, sizeof(delay)))
-			return -EFAULT;
-		m4_set_mpu9150_delay(mpu9150_client_data, delay, TYPE_GYRO);
-		mpu9150_irq_enable_disable(mpu9150_client_data, TYPE_GYRO,
-						SENSOR_IRQ_ENABLE);
-		break;
-	case M4_SENSOR_IOCTL_COMPASS_SET_DELAY:
-		if (copy_from_user(&delay, argp, sizeof(delay)))
-			return -EFAULT;
-		m4_set_mpu9150_delay(mpu9150_client_data, delay, TYPE_COMPASS);
-		mpu9150_irq_enable_disable(mpu9150_client_data, TYPE_COMPASS,
-						SENSOR_IRQ_ENABLE);
-		break;
-	case M4_SENSOR_IOCTL_ACCEL_SET_DELAY:
-		if (copy_from_user(&delay, argp, sizeof(delay)))
-			return -EFAULT;
-		m4_set_mpu9150_delay(mpu9150_client_data, delay, TYPE_ACCEL);
-		mpu9150_irq_enable_disable(mpu9150_client_data, TYPE_ACCEL,
-						SENSOR_IRQ_ENABLE);
-		break;
-	case M4_SENSOR_IOCTL_FUSION_SET_DELAY:
-		if (copy_from_user(&delay, argp, sizeof(delay)))
-			return -EFAULT;
-		if (delay >=  0)
-			m4_set_mpu9150_delay(mpu9150_client_data, delay, TYPE_FUSION);
-		if (delay)
-			mpu9150_irq_enable_disable(mpu9150_client_data, TYPE_FUSION,
-						SENSOR_IRQ_ENABLE);
-		else
-			mpu9150_irq_enable_disable(mpu9150_client_data, TYPE_FUSION,
-						SENSOR_IRQ_DISABLE);
-		break;
-	default:
-		KDEBUG(M4SH_ERROR, "Invalid IOCTL Command in %s\n", __func__);
-		 ret = -EINVAL;
-	}
-	return ret;
+	sscanf(buf, "%d", &scanresult);
+
+	m4_set_mpu9150_delay(misc_mpu9150_data, scanresult, TYPE_ACCEL);
+	mpu9150_irq_enable_disable(misc_mpu9150_data, TYPE_ACCEL,
+							SENSOR_IRQ_ENABLE);
+
+	return count;
+
 }
 
+static DEVICE_ATTR(accel_setdelay, 0222, NULL, m4_mpu9150_write_accel_setdelay);
+
+static struct attribute *mpu9150_control_attributes[] = {
+	&dev_attr_accel_setdelay.attr,
+	NULL
+};
+
+
+static const struct attribute_group mpu9150_control_group = {
+	.attrs = mpu9150_control_attributes,
+};
 #ifdef MPU9150_DEBUG
 static ssize_t m4_mpu9150_local_x(struct device *dev,
 			      struct device_attribute *attr, char *buf)
@@ -742,7 +707,6 @@ static const struct attribute_group mpu9150_group = {
 
 static const struct file_operations mpu9150_client_fops = {
 	.owner = THIS_MODULE,
-	.unlocked_ioctl = mpu9150_client_ioctl,
 	.open  = mpu9150_client_open,
 	.release = mpu9150_client_close,
 };
@@ -993,18 +957,23 @@ static int mpu9150_client_probe(struct platform_device *pdev)
 		goto unregister_misc_device;
 	}
 
+	ret = sysfs_create_group(&pdev->dev.kobj, &mpu9150_control_group);
+	if (ret)
+		goto unregister_initcall;
 #ifdef MPU9150_DEBUG
 	ret = sysfs_create_group(&pdev->dev.kobj, &mpu9150_group);
 	if (ret)
-		goto unregister_initcall;
+		goto unregister_control_group;
 #endif
 	KDEBUG(M4SH_INFO, "Initialized %s driver\n", __func__);
 	return 0;
 
 #ifdef MPU9150_DEBUG
+unregister_control_group:
+	sysfs_remove_group(&pdev->dev.kobj, &mpu9150_control_group);
+#endif
 unregister_initcall:
 	m4sensorhub_unregister_initcall(mpu9150_driver_init);
-#endif
 unregister_misc_device:
 	misc_mpu9150_data = NULL;
 	misc_deregister(&mpu9150_client_miscdrv);
@@ -1022,6 +991,7 @@ static int __exit mpu9150_client_remove(struct platform_device *pdev)
 {
 	struct mpu9150_client *mpu9150_client_data =
 						platform_get_drvdata(pdev);
+	sysfs_remove_group(&pdev->dev.kobj, &mpu9150_control_group);
 #ifdef MPU9150_DEBUG
 	sysfs_remove_group(&pdev->dev.kobj, &mpu9150_group);
 #endif
