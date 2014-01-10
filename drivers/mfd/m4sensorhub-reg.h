@@ -161,6 +161,13 @@ static const struct {
 	[M4SH_REG_PASSIVE_STEPS]             = {M4SH_TYPE_PASSIVE, 0x30, 48},
 	[M4SH_REG_PASSIVE_METS]              = {M4SH_TYPE_PASSIVE, 0x60, 48},
 	[M4SH_REG_PASSIVE_FLOORSCLIMBED]     = {M4SH_TYPE_PASSIVE, 0x90, 48},
+	[M4SH_REG_EMG_SIGNALCOUNT]           = {M4SH_TYPE_EMG, 0x0, 1},
+	[M4SH_REG_EMG_DUMMY]                 = {M4SH_TYPE_EMG, 0x1, 1},
+	[M4SH_REG_EMG_SAMPLERATE]            = {M4SH_TYPE_EMG, 0x2, 2},
+	[M4SH_REG_EMG_SIGNALS]               = {M4SH_TYPE_EMG, 0x4, 326},
+	[M4SH_REG_HEARTRATE_HEARTRATE]       = {M4SH_TYPE_HEARTRATE, 0x0, 2},
+	[M4SH_REG_HEARTRATESENSOR_RAWHRVALUE] = {M4SH_TYPE_HEARTRATESENSOR, 0x0, 24},
+	[M4SH_REG_HEARTRATESENSOR_SAMPLERATE] = {M4SH_TYPE_HEARTRATESENSOR, 0x18, 2},
 };
 
 static const unsigned int bank_size_tbl[M4SH_TYPE__NUM] = {
@@ -184,5 +191,8 @@ static const unsigned int bank_size_tbl[M4SH_TYPE__NUM] = {
 	[M4SH_TYPE_WRIST]                    = 8,
 	[M4SH_TYPE_GESTURE]                  = 10,
 	[M4SH_TYPE_PASSIVE]                  = 192,
+	[M4SH_TYPE_EMG]                      = 330,
+	[M4SH_TYPE_HEARTRATE]                = 2,
+	[M4SH_TYPE_HEARTRATESENSOR]          = 26,
 };
 #endif /*__M4SENSORHUB_MEM_INTERNAL_H__ */
