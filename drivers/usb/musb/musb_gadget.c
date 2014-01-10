@@ -1662,9 +1662,8 @@ static const struct usb_gadget_ops musb_gadget_operations = {
 	.set_selfpowered	= musb_gadget_set_self_powered,
 	/* .vbus_session		= musb_gadget_vbus_session, */
 	.vbus_draw		= musb_gadget_vbus_draw,
-	//.pullup			= musb_gadget_pullup,
+	.pullup			= musb_gadget_pullup,
 };
-
 /* ----------------------------------------------------------------------- */
 
 /* Registration */
