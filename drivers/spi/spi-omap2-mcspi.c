@@ -1387,5 +1387,16 @@ static struct platform_driver omap2_mcspi_driver = {
 	.remove =	omap2_mcspi_remove,
 };
 
-module_platform_driver(omap2_mcspi_driver);
+static int __init omap2_mcspi_init(void)
+{
+	return platform_driver_register(&omap2_mcspi_driver);
+}
+subsys_initcall_sync(omap2_mcspi_init);
+
+static void __exit omap2_mcspi_exit(void)
+{
+	platform_driver_unregister(&omap2_mcspi_driver);
+}
+module_exit(omap2_mcspi_exit);
+
 MODULE_LICENSE("GPL");
