@@ -1733,7 +1733,6 @@ static void __init mapphone_init(void)
 	mapphone_als_init();
 	mapphone_panel_init();
 	mapphone_sensors_init();
-	mapphone_camera_init();
 	mapphone_touch_init();
 	usb_musb_init();
 	mapphone_ehci_init();
