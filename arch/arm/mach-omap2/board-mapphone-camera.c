@@ -81,13 +81,10 @@ static int  mapphone_camera_reg_power(bool);
 /* devtree regulator support */
 static char regulator_list[CAM_MAX_REGS][CAM_MAX_REG_NAME_LEN];
 /* devtree flash */
-static enum v4l2_power previous_power = V4L2_POWER_OFF;
 static int avdd_en_gpio     = -1;
 static int cam_reset_gpio   = -1;
 static int cam_standby_gpio = -1;
 static int sensor_power_config = SENSOR_POWER_STANDBY;
-static u8 cam_flags;
-static unsigned int is_smart_cam;
 
 static void mapphone_lock_cpufreq(int lock)
 {
@@ -327,8 +324,8 @@ struct camise_capture_size {
 	unsigned long width;
 	unsigned long height;
 };
-#ifndef CONFIG_KOBE_BOARD
-const static struct camise_capture_size camise_sizes_1[] = {
+
+const static struct camise_capture_size defy_camise_sizes_1[] = {
 	{  176, 144 }, /* QCIF for Video Recording */
 	{  320, 240 }, /* QVGA for Preview and Video Recording */
 	{  352, 288 }, /* CIF for Video Recording */
@@ -339,8 +336,8 @@ const static struct camise_capture_size camise_sizes_1[] = {
 	{  640, 2048}, /* JPEG Catpure Resolution */
 	{  848, 480 }, /* Support for WVGA preview */
 };
-#else
-const static struct camise_capture_size camise_sizes_1[] = {
+
+const static struct camise_capture_size kobe_camise_sizes_1[] = {
 /*	{  160, 120 }, */
 	{  176, 144 }, /* QCIF for Video Recording */
 	{  320, 240 }, /* QVGA for Preview and Video Recording */
@@ -352,7 +349,7 @@ const static struct camise_capture_size camise_sizes_1[] = {
 	{ 768, 1024},	 /* JPEG Catpure Resolution */
 /*	{ 2048, 1536},	/ * 3 MP */
 };
-#endif
+
 const static struct camise_capture_size camise_sizes_2[] = {
 	{  176, 144 }, /* QCIF for Video Recording */
 	{  320, 240 }, /* QVGA for Preview and Video Recording */
@@ -394,16 +391,38 @@ static int camise_get_capture_size(int index,
 				unsigned long *w,
 				unsigned long *h)
 {
-	int max_size = is_smart_cam ? ARRAY_SIZE(camise_sizes_2) :
-			ARRAY_SIZE(camise_sizes_1);
+	struct device_node *node;
+	const void *prop;
+	int max_size = 0;
 
-	if (is_smart_cam && index < max_size) {
-		*h = camise_sizes_2[index].height;
-		*w = camise_sizes_2[index].width;
-	} else if (index < max_size) {
-		*h = camise_sizes_1[index].height;
-		*w = camise_sizes_1[index].width;
+	node = of_find_node_by_path(DT_PATH_CHOSEN);
+	if (node == NULL) {
+		pr_err("Unable to read node %s from device tree!\n",
+			DT_PATH_CHOSEN);
+		return max_size;
 	}
+
+	prop = of_get_property(node, DT_PROP_CHOSEN_USB_PROD_NAME, NULL);
+	if (prop) {
+		if (!strcmp(prop, "MB526")) {
+			max_size =  ARRAY_SIZE(defy_camise_sizes_1);
+			if (index < max_size) {
+				*h = defy_camise_sizes_1[index].height;
+				*w = defy_camise_sizes_1[index].width;
+			}
+		} else if (!strcmp(prop, "MB520")) {
+			max_size =  ARRAY_SIZE(kobe_camise_sizes_1);
+			if (index < max_size) {
+				*h = kobe_camise_sizes_1[index].height;
+				*w = kobe_camise_sizes_1[index].width;
+			}
+		}
+	} else {
+		pr_err("Read property %s error!\n",
+		       DT_PROP_CHOSEN_USB_PROD_NAME);
+	}
+
+	of_node_put(node);
 
 	return max_size;
 }
