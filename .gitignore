@@ -30,6 +30,7 @@
 *.patch
 *.gcno
 *.builtin
+*.dtb
 
 #
 # Top-level generic files
