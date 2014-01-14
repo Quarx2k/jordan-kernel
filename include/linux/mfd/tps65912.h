@@ -264,6 +264,11 @@
 #define DCDC_LIMIT_MAX_SEL_MASK		0x3F
 #define DCDC_LIMIT_MAX_SEL_SHIFT	0
 
+/* Register LOADSWITCH */
+#define LOADSWITCH_MASK		0x03
+#define LOADSWITCH_DISABLE		0
+#define LOADSWITCH_ENABLE		1
+
 /* Number of step-down converters available */
 #define TPS65912_NUM_DCDC	4
 

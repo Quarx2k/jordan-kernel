@@ -16,6 +16,14 @@
 		0x01   /* Minnow P0 portable */
 	>;
 
+	c55-ctrl@0 {
+		compatible = "ti,c55-ctrl";
+		reg = <0 0>;
+		gpios = <&gpio3 12 1>, /* IRQ   gpio_ap_int gpio-076 */
+			<&gpio3 16 0>, /*  gpio_reset gpio-80*/
+			<&gpio3 17 2>; /* gpio_c55_int gpio-81*/
+		c55-ctrl-supply = <&ldo9_reg>;
+	};
 
 	vib-gpio {
 		compatible = "mot,vib-gpio";

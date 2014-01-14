@@ -17,6 +17,7 @@
 #include <linux/irq.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/regulator/consumer.h>
 #include <linux/slab.h>
 #include <linux/wakelock.h>
 #include <linux/of.h>
@@ -26,6 +27,7 @@
 struct c55_ctrl_data {
 	int int_gpio;
 	struct wake_lock wake_lock;
+	struct regulator *reg;
 };
 
 #define NUM_GPIOS 3
@@ -138,6 +140,17 @@ static int  c55_ctrl_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	cdata->reg = regulator_get(&pdev->dev, "c55-ctrl");
+	if (IS_ERR(cdata->reg)) {
+		return PTR_ERR(cdata->reg);
+	}
+	ret = regulator_enable(cdata->reg);
+	if (ret) {
+		dev_err(&pdev->dev, "%s: c55_ctrl regulator_enable failed.\n", __func__);
+		regulator_put(cdata->reg);
+		return ret;
+	}
+
 	wake_lock_init(&cdata->wake_lock, WAKE_LOCK_SUSPEND, "c55_ctrl");
 
 	platform_set_drvdata(pdev, cdata);
@@ -146,6 +159,9 @@ static int  c55_ctrl_probe(struct platform_device *pdev)
 
 static int  c55_ctrl_remove(struct platform_device *pdev)
 {
+	struct c55_ctrl_data *cdata = platform_get_drvdata(pdev);
+
+	regulator_put(cdata->reg);
 	return 0;
 }
 

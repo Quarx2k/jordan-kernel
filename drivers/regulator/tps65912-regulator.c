@@ -274,7 +274,7 @@ static int tps65912_reg_enable(struct regulator_dev *dev)
 	struct tps65912_reg *pmic = rdev_get_drvdata(dev);
 	struct tps65912 *mfd = pmic->mfd;
 	int id = rdev_get_id(dev);
-	int reg;
+	int reg, lsw;
 
 	if (id < TPS65912_REG_DCDC1 || id > TPS65912_REG_LDO10)
 		return -EINVAL;
@@ -283,6 +283,13 @@ static int tps65912_reg_enable(struct regulator_dev *dev)
 	if (reg < 0)
 		return reg;
 
+	if (id == TPS65912_REG_LDO9) {
+		lsw = tps65912_reg_read(mfd, TPS65912_LOADSWITCH);
+		lsw &= ~LOADSWITCH_MASK;
+		lsw |= LOADSWITCH_ENABLE;
+		tps65912_reg_write(mfd, TPS65912_LOADSWITCH, lsw);
+	}
+
 	return tps65912_set_bits(mfd, reg, TPS65912_REG_ENABLED);
 }
 
@@ -290,12 +297,18 @@ static int tps65912_reg_disable(struct regulator_dev *dev)
 {
 	struct tps65912_reg *pmic = rdev_get_drvdata(dev);
 	struct tps65912 *mfd = pmic->mfd;
-	int id = rdev_get_id(dev), reg;
+	int id = rdev_get_id(dev), reg, lsw;
 
 	reg = pmic->get_ctrl_reg(id);
 	if (reg < 0)
 		return reg;
 
+	if (id == TPS65912_REG_LDO9) {
+		lsw = tps65912_reg_read(mfd, TPS65912_LOADSWITCH);
+		lsw &= ~LOADSWITCH_MASK;
+		lsw |= LOADSWITCH_DISABLE;
+		tps65912_reg_write(mfd, TPS65912_LOADSWITCH, lsw);
+	}
 	return tps65912_clear_bits(mfd, reg, TPS65912_REG_ENABLED);
 }
 
