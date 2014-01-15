@@ -17,4 +17,4 @@ else
 	# NEEDSWORK: we should produce a diff with an empty tree here
 	# if we want to do the same verification for the initial import.
 	:
-fi | scripts/checkpatch.pl --no-signoff --strict --ignore SPLIT_STRING -
+fi | scripts/checkpatch.pl --no-signoff --strict --ignore SPLIT_STRING,MSLEEP -
