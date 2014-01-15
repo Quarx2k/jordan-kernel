@@ -116,4 +116,8 @@ config OMAP2_DSS_SLEEP_AFTER_VENC_RESET
 	  This option enables the sleep, and is enabled by default. You can
 	  disable the sleep if it doesn't cause problems on your platform.
 
+config OMAP2_DSS_RESET
+	bool "Reset OMAP Display Subsystem"
+	default n
+
 endif

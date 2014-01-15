@@ -320,6 +320,10 @@ static enum omapdss_version __init omap_display_get_version(void)
 		return OMAPDSS_VER_UNKNOWN;
 }
 
+#ifdef	CONFIG_OMAP2_DSS_RESET
+static int reset_omap_dss(void);
+#endif
+
 int __init omap_display_init(struct omap_dss_board_info *board_data)
 {
 	int r = 0;
@@ -415,7 +419,9 @@ int __init omap_display_init(struct omap_dss_board_info *board_data)
 			return PTR_ERR(pdev);
 		}
 	}
-
+#ifdef	CONFIG_OMAP2_DSS_RESET
+	reset_omap_dss();
+#endif
 	return 0;
 }
 
@@ -564,3 +570,60 @@ int omap_dss_reset(struct omap_hwmod *oh)
 
 	return r;
 }
+
+#ifdef	CONFIG_OMAP2_DSS_RESET
+#define	DSS_CLKS	4
+static int reset_omap_dss(void)
+{
+	static const char * const clkstr[DSS_CLKS] = {
+		"dss_ick",
+		"dss1_alwon_fck",
+		"dss2_alwon_fck",
+		"dss_tv_fck"
+	};
+	struct clk *clk[DSS_CLKS];
+	int i, r = 0, c = 0;
+	struct omap_hwmod *oh_dss = omap_hwmod_lookup("dss_core");
+	struct omap_hwmod *oh_dispc = omap_hwmod_lookup("dss_dispc");
+	struct omap_hwmod *oh_dsi = omap_hwmod_lookup("dss_dsi1");
+
+	WARN((!oh_dss || !oh_dispc || !oh_dsi), "Reset lost!");
+
+	for (i = 0; i < DSS_CLKS; i++) {
+		clk[i] = clk_get(NULL, clkstr[i]);
+		if (!IS_ERR(clk[i])) {
+			r = clk_prepare_enable(clk[i]);
+			if (!r)
+				continue;
+			clk_put(clk[i]);
+		}
+		pr_warn("dss_core: failed enable %s\n", clkstr[i]);
+		clk[i] = ERR_PTR(-ENOENT);
+	}
+
+	/*
+	 * clear DSS_CONTROL register to switch DSS clock sources to
+	 * PRCM clock, if any
+	 */
+	omap_hwmod_write(0x0, oh_dss, DSS_CONTROL);
+	dispc_disable_outputs();
+	omap_hwmod_write(0x0, oh_dss, DSS_SDI_CONTROL);
+	omap_hwmod_write(0x0, oh_dss, DSS_PLL_CONTROL);
+
+	omap_hwmod_write(0x02, oh_dss, DSS_SYSCONFIG);
+	omap_test_timeout((omap_hwmod_read(oh_dss, DSS_SYSSTATUS)
+				& SYSS_RESETDONE_MASK),
+			MAX_MODULE_SOFTRESET_WAIT, c);
+	r = (c == MAX_MODULE_SOFTRESET_WAIT) ? -ETIMEDOUT : 0;
+	pr_warn("dss_core: reset DSS %s\n", r ? "failed" : "done");
+
+	for (i = 0; i < DSS_CLKS; i++) {
+		if (!IS_ERR(clk[i])) {
+			clk_disable_unprepare(clk[i]);
+			clk_put(clk[i]);
+		}
+	}
+
+	return r;
+}
+#endif

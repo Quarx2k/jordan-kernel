@@ -36,6 +36,9 @@
 #include <video/omap-panel-data.h>
 #include <video/mipi_display.h>
 
+#include "../dss/dss.h"
+
+
 /* DSI Virtual channel. Hardcoded for now. */
 #define TCH 0
 
@@ -48,101 +51,245 @@
 #define DCS_GET_ID2		0xdb
 #define DCS_GET_ID3		0xdc
 
+enum minnow_reset_gpios {
+	MINNOW_RESET_PANEL,
+	MINNOW_RESET_BRIDGE,
+	MINNOW_RESET_MAX
+};
+
 enum minnow_panel_id {
 	MINNOW_PANEL_CM_220X176,
 	MINNOW_PANEL_CM_220X220,
+	MINNOW_PANEL_CM_BRIDGE_320X320,
 	MINNOW_PANEL_MAX
 };
+
+enum minnow_cmd_type {
+	DCS_WRITE_SYNC,
+	GENERIC_WRITE_SYNC,
+	DCS_WRITE,
+	GENERIC_WRITE,
+	BTA_SYNC,
+	WAIT_MS,
+	CMD_TYPE_MAX
+};
+
 
 /* Panel Initialize DSI DCS command buffer description:
  * it uses compact DCS command buffer to store all DCS commands, the first
  * byte of each command is the command length in byte
  */
 static u8 panel_init_220x176[] = {
-/*n, data_0, data_1 ... data_n-1*/
- 3, 0xF0, 0x5A, 0x5A,
- 3, 0xF1, 0x5A, 0x5A,
-18, 0xF2, 0x16, 0xDC, 0x03, 0x28, 0x28, 0x10, 0x00, 0x60, 0xF8, 0x00, 0x07, 0x02, 0x00, 0x00, 0xDC, 0x28, 0x28,
-15, 0xF4, 0x0A, 0x00, 0x00, 0x00, 0x77, 0x7F, 0x07, 0x22, 0x2A, 0x43, 0x07, 0x2A, 0x43, 0x07,
-11, 0xF5, 0x00, 0x50, 0x28, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x00,
-10, 0xF6, 0x07, 0x00, 0x07, 0x00, 0x0B, 0x04, 0x04, 0x04, 0x07,
- 5, 0xF7, 0x00, 0x00, 0x00, 0x00,
- 3, 0xF8, 0x44, 0x08,
- 2, 0xF9, 0x04,
-17, 0xFA, 0x0F, 0x0F, 0x1E, 0x23, 0x26, 0x2D, 0x21, 0x2B, 0x33, 0x32, 0x2E, 0x00, 0x00, 0x00, 0x00, 0x00,
-17, 0xFB, 0x0F, 0x0F, 0x1E, 0x23, 0x26, 0x2D, 0x21, 0x2B, 0x33, 0x32, 0x2E, 0x00, 0x00, 0x00, 0x00, 0x00,
- 2, 0xF9, 0x02,
-17, 0xFA, 0x00, 0x00, 0x0A, 0x16, 0x1D, 0x27, 0x1C, 0x30, 0x38, 0x37, 0x32, 0x00, 0x00, 0x00, 0x00, 0x00,
-17, 0xFB, 0x00, 0x00, 0x0A, 0x16, 0x1D, 0x27, 0x1C, 0x30, 0x38, 0x37, 0x32, 0x00, 0x00, 0x00, 0x00, 0x00,
- 2, 0xF9, 0x01,
-17, 0xFA, 0x00, 0x00, 0x13, 0x14, 0x19, 0x24, 0x1A, 0x31, 0x39, 0x38, 0x33, 0x00, 0x00, 0x00, 0x00, 0x00,
-17, 0xFB, 0x00, 0x00, 0x13, 0x14, 0x19, 0x24, 0x1A, 0x31, 0x39, 0x38, 0x33, 0x00, 0x00, 0x00, 0x00, 0x00,
- 3, 0xF0, 0x00, 0x00,
- 3, 0xF1, 0x00, 0x00,
- 2, 0x36, 0xD0,
- 2, 0x3A, 0x06
+/*n, type, data_0, data_1 ... data_n-1*/
+1,  DCS_WRITE_SYNC, MIPI_DCS_EXIT_SLEEP_MODE,
+1,  WAIT_MS, 5,
+3,  DCS_WRITE_SYNC, 0xF0, 0x5A, 0x5A,
+3,  DCS_WRITE_SYNC, 0xF1, 0x5A, 0x5A,
+18, DCS_WRITE_SYNC, 0xF2, 0x16, 0xDC, 0x03, 0x28, 0x28, 0x10, 0x00, 0x60, 0xF8,
+		    0x00, 0x07, 0x02, 0x00, 0x00, 0xDC, 0x28, 0x28,
+15, DCS_WRITE_SYNC, 0xF4, 0x0A, 0x00, 0x00, 0x00, 0x77, 0x7F, 0x07, 0x22, 0x2A,
+		    0x43, 0x07, 0x2A, 0x43, 0x07,
+11, DCS_WRITE_SYNC, 0xF5, 0x00, 0x50, 0x28, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00,
+		    0x00,
+10, DCS_WRITE_SYNC, 0xF6, 0x07, 0x00, 0x07, 0x00, 0x0B, 0x04, 0x04, 0x04, 0x07,
+5,  DCS_WRITE_SYNC, 0xF7, 0x00, 0x00, 0x00, 0x00,
+3,  DCS_WRITE_SYNC, 0xF8, 0x44, 0x08,
+2,  DCS_WRITE_SYNC, 0xF9, 0x04,
+17, DCS_WRITE_SYNC, 0xFA, 0x0F, 0x0F, 0x1E, 0x23, 0x26, 0x2D, 0x21, 0x2B, 0x33,
+		    0x32, 0x2E, 0x00, 0x00, 0x00, 0x00, 0x00,
+17, DCS_WRITE_SYNC, 0xFB, 0x0F, 0x0F, 0x1E, 0x23, 0x26, 0x2D, 0x21, 0x2B, 0x33,
+		    0x32, 0x2E, 0x00, 0x00, 0x00, 0x00, 0x00,
+2,  DCS_WRITE_SYNC, 0xF9, 0x02,
+17, DCS_WRITE_SYNC, 0xFA, 0x00, 0x00, 0x0A, 0x16, 0x1D, 0x27, 0x1C, 0x30, 0x38,
+		    0x37, 0x32, 0x00, 0x00, 0x00, 0x00, 0x00,
+17, DCS_WRITE_SYNC, 0xFB, 0x00, 0x00, 0x0A, 0x16, 0x1D, 0x27, 0x1C, 0x30, 0x38,
+		    0x37, 0x32, 0x00, 0x00, 0x00, 0x00, 0x00,
+2,  DCS_WRITE_SYNC, 0xF9, 0x01,
+17, DCS_WRITE_SYNC, 0xFA, 0x00, 0x00, 0x13, 0x14, 0x19, 0x24, 0x1A, 0x31, 0x39,
+		    0x38, 0x33, 0x00, 0x00, 0x00, 0x00, 0x00,
+17, DCS_WRITE_SYNC, 0xFB, 0x00, 0x00, 0x13, 0x14, 0x19, 0x24, 0x1A, 0x31, 0x39,
+		    0x38, 0x33, 0x00, 0x00, 0x00, 0x00, 0x00,
+3,  DCS_WRITE_SYNC, 0xF0, 0x00, 0x00,
+3,  DCS_WRITE_SYNC, 0xF1, 0x00, 0x00,
+2,  DCS_WRITE_SYNC, 0x36, 0xD8,
+2,  DCS_WRITE_SYNC, 0x3A, 0x06,
+0
 };
 
 static u8 panel_init_220x220[] = {
-/*n, data_0, data_1 ... data_n-1*/
- 3, 0xF0, 0x5A, 0x5A,
- 3, 0xF1, 0x5A, 0x5A,
-18, 0xF2, 0x1C, 0xDC, 0x03, 0x28, 0x28, 0x10, 0x00, 0x60, 0xF8, 0x00, 0x07, 0x02, 0x00, 0x00, 0xDC, 0x28, 0x28,
-15, 0xF4, 0x0A, 0x00, 0x00, 0x00, 0x77, 0x7F, 0x07, 0x22, 0x2A, 0x43, 0x07, 0x2A, 0x43, 0x07,
-11, 0xF5, 0x00, 0x50, 0x28, 0x00, 0x00, 0x09, 0x00, 0x00, 0x01, 0x01,
-10, 0xF6, 0x07, 0x00, 0x07, 0x00, 0x0B, 0x04, 0x04, 0x04, 0x07,
- 5, 0xF7, 0x00, 0x00, 0x00, 0x00,
- 3, 0xF8, 0x44, 0x02,
- 2, 0xF9, 0x04,
-17, 0xFA, 0x1E, 0x1E, 0x0D, 0x1D, 0x21, 0x2C, 0x23, 0x28, 0x2C, 0x28, 0x28, 0x00, 0x00, 0x00, 0x00, 0x00,
-17, 0xFB, 0x1E, 0x1E, 0x0D, 0x1D, 0x21, 0x2C, 0x23, 0x28, 0x2C, 0x28, 0x28, 0x00, 0x00, 0x00, 0x00, 0x00,
- 2, 0xF9, 0x02,
-17, 0xFA, 0x19, 0x18, 0x08, 0x0F, 0x18, 0x26, 0x1E, 0x2C, 0x30, 0x2C, 0x2C, 0x00, 0x00, 0x00, 0x00, 0x00,
-17, 0xFB, 0x19, 0x18, 0x08, 0x0F, 0x18, 0x26, 0x1E, 0x2C, 0x30, 0x2C, 0x2C, 0x00, 0x00, 0x00, 0x00, 0x00,
- 2, 0xF9, 0x01,
-17, 0xFA, 0x19, 0x19, 0x09, 0x0D, 0x12, 0x21, 0x1B, 0x2E, 0x31, 0x2E, 0x2E, 0x00, 0x00, 0x00, 0x00, 0x00,
-17, 0xFB, 0x19, 0x19, 0x09, 0x0D, 0x12, 0x21, 0x1B, 0x2E, 0x31, 0x2E, 0x2E, 0x00, 0x00, 0x00, 0x00, 0x00,
- 3, 0xF0, 0x00, 0x00,
- 3, 0xF1, 0x00, 0x00,
- 2, 0x36, 0xD0,
- 2, 0x3A, 0x06
+/*n, type, data_0, data_1 ... data_n-1*/
+1,  DCS_WRITE_SYNC, MIPI_DCS_EXIT_SLEEP_MODE,
+1,  WAIT_MS, 5,
+3,  DCS_WRITE_SYNC, 0xF0, 0x5A, 0x5A,
+3,  DCS_WRITE_SYNC, 0xF1, 0x5A, 0x5A,
+18, DCS_WRITE_SYNC, 0xF2, 0x1C, 0xDC, 0x03, 0x28, 0x28, 0x10, 0x00, 0x60, 0xF8,
+		    0x00, 0x07, 0x02, 0x00, 0x00, 0xDC, 0x28, 0x28,
+15, DCS_WRITE_SYNC, 0xF4, 0x0A, 0x00, 0x00, 0x00, 0x77, 0x7F, 0x07, 0x22, 0x2A,
+		    0x43, 0x07, 0x2A, 0x43, 0x07,
+11, DCS_WRITE_SYNC, 0xF5, 0x00, 0x50, 0x28, 0x00, 0x00, 0x09, 0x00, 0x00, 0x01,
+		    0x01,
+10, DCS_WRITE_SYNC, 0xF6, 0x07, 0x00, 0x07, 0x00, 0x0B, 0x04, 0x04, 0x04, 0x07,
+5,  DCS_WRITE_SYNC, 0xF7, 0x00, 0x00, 0x00, 0x00,
+3,  DCS_WRITE_SYNC, 0xF8, 0x44, 0x02,
+2,  DCS_WRITE_SYNC, 0xF9, 0x04,
+17, DCS_WRITE_SYNC, 0xFA, 0x1E, 0x1E, 0x0D, 0x1D, 0x21, 0x2C, 0x23, 0x28, 0x2C,
+		    0x28, 0x28, 0x00, 0x00, 0x00, 0x00, 0x00,
+17, DCS_WRITE_SYNC, 0xFB, 0x1E, 0x1E, 0x0D, 0x1D, 0x21, 0x2C, 0x23, 0x28, 0x2C,
+		    0x28, 0x28, 0x00, 0x00, 0x00, 0x00, 0x00,
+2,  DCS_WRITE_SYNC, 0xF9, 0x02,
+17, DCS_WRITE_SYNC, 0xFA, 0x19, 0x18, 0x08, 0x0F, 0x18, 0x26, 0x1E, 0x2C, 0x30,
+		    0x2C, 0x2C, 0x00, 0x00, 0x00, 0x00, 0x00,
+17, DCS_WRITE_SYNC, 0xFB, 0x19, 0x18, 0x08, 0x0F, 0x18, 0x26, 0x1E, 0x2C, 0x30,
+		    0x2C, 0x2C, 0x00, 0x00, 0x00, 0x00, 0x00,
+2,  DCS_WRITE_SYNC, 0xF9, 0x01,
+17, DCS_WRITE_SYNC, 0xFA, 0x19, 0x19, 0x09, 0x0D, 0x12, 0x21, 0x1B, 0x2E, 0x31,
+		    0x2E, 0x2E, 0x00, 0x00, 0x00, 0x00, 0x00,
+17, DCS_WRITE_SYNC, 0xFB, 0x19, 0x19, 0x09, 0x0D, 0x12, 0x21, 0x1B, 0x2E, 0x31,
+		    0x2E, 0x2E, 0x00, 0x00, 0x00, 0x00, 0x00,
+3,  DCS_WRITE_SYNC, 0xF0, 0x00, 0x00,
+3,  DCS_WRITE_SYNC, 0xF1, 0x00, 0x00,
+2,  DCS_WRITE_SYNC, 0x36, 0xD8,
+2,  DCS_WRITE_SYNC, 0x3A, 0x06,
+0
+};
+
+static u8 panel_init_ssd2848_320x320[] = {
+/*n, type, data_0, data_1 ... data_n-1*/
+2, GENERIC_WRITE_SYNC, 0xFF, 0x00,
+6, GENERIC_WRITE_SYNC, 0x00, 0x08, 0x01, 0xF4, 0x04, 0x29,
+6, GENERIC_WRITE_SYNC, 0x00, 0x0C, 0x00, 0x00, 0x00, 0x0B,
+6, GENERIC_WRITE_SYNC, 0x00, 0x14, 0x0C, 0x01, 0x80, 0x0F,
+1, DCS_WRITE_SYNC, MIPI_DCS_EXIT_SLEEP_MODE,
+1, WAIT_MS, 1,
+6, GENERIC_WRITE_SYNC, 0x10, 0x08, 0x01, 0x20, 0x01, 0x45,
+6, GENERIC_WRITE_SYNC, 0x20, 0x0C, 0x00, 0x00, 0x00, 0x02,
+6, GENERIC_WRITE_SYNC, 0x20, 0x10, 0x00, 0x1B, 0x00, 0x0C,
+6, GENERIC_WRITE_SYNC, 0x20, 0x14, 0x01, 0x88, 0x00, 0x28,
+6, GENERIC_WRITE_SYNC, 0x20, 0x18, 0x01, 0x4E, 0x00, 0x0A,
+6, GENERIC_WRITE_SYNC, 0x20, 0x20, 0x01, 0x40, 0x01, 0x40,
+6, GENERIC_WRITE_SYNC, 0x20, 0x24, 0x01, 0x40, 0x01, 0x40,
+6, GENERIC_WRITE_SYNC, 0x20, 0x30, 0x00, 0x00, 0x00, 0x15,
+6, GENERIC_WRITE_SYNC, 0x20, 0x34, 0x00, 0x00, 0x00, 0x00,
+6, GENERIC_WRITE_SYNC, 0x20, 0x38, 0x01, 0x3F, 0x01, 0x3F,
+6, GENERIC_WRITE_SYNC, 0x20, 0x3C, 0x01, 0x40, 0x01, 0x40,
+6, GENERIC_WRITE_SYNC, 0x20, 0xA0, 0x00, 0x00, 0x05, 0x00,
+5, DCS_WRITE_SYNC, 0x2A, 0x00, 0x00, 0x01, 0x3F,
+5, DCS_WRITE_SYNC, 0x2B, 0x00, 0x00, 0x01, 0x3F,
+6, GENERIC_WRITE_SYNC, 0x60, 0x08, 0x00, 0x02, 0x00, 0x0A,
+6, GENERIC_WRITE_SYNC, 0x60, 0x0C, 0x0A, 0x2A, 0x02, 0x0A,
+6, GENERIC_WRITE_SYNC, 0x60, 0x10, 0x01, 0x40, 0x02, 0x14,
+6, GENERIC_WRITE_SYNC, 0x60, 0x14, 0x01, 0x00, 0x01, 0x00,
+6, GENERIC_WRITE_SYNC, 0x60, 0x40, 0x3F, 0x0B, 0x23, 0x0A,
+6, GENERIC_WRITE_SYNC, 0x60, 0x44, 0x1F, 0x1F, 0x07, 0x29,
+6, GENERIC_WRITE_SYNC, 0x60, 0x84, 0x00, 0x00, 0x01, 0x40,
+2, GENERIC_WRITE_SYNC, 0xFF, 0x01,
+2, DCS_WRITE_SYNC, 0x36, 0x10,
+3, DCS_WRITE_SYNC, 0xF0, 0x54, 0x47,
+2, DCS_WRITE_SYNC, 0xA0, 0x00,
+4, DCS_WRITE_SYNC, 0xBD, 0x00, 0x11, 0x31,
+2, DCS_WRITE_SYNC, 0xE9, 0x46,
+5, DCS_WRITE_SYNC, 0xBA, 0x07, 0x15, 0x3E, 0x01,
+6, DCS_WRITE_SYNC, 0xB3, 0x02, 0x0A, 0x14, 0x2A, 0x2A,
+5, DCS_WRITE_SYNC, 0xB5, 0x78, 0x78, 0x76, 0xF6,
+18, DCS_WRITE_SYNC, 0xC0, 0x00, 0x03, 0x11, 0x12, 0x17, 0x25, 0x0D, 0x0C, 0x0A,
+		    0x0E, 0x0C, 0x2F, 0x09, 0x0E, 0x3D, 0x3E, 0x3F,
+18, DCS_WRITE_SYNC, 0xC1, 0x00, 0x03, 0x11, 0x12, 0x17, 0x25, 0x0D, 0x0C, 0x0A,
+		    0x0E, 0x0C, 0x2F, 0x09, 0x0E, 0x3D, 0x3E, 0x3F,
+18, DCS_WRITE_SYNC, 0xC2, 0x00, 0x03, 0x11, 0x12, 0x17, 0x25, 0x0D, 0x0C, 0x0A,
+		    0x0E, 0x0C, 0x2F, 0x09, 0x0E, 0x3D, 0x3E, 0x3F,
+18, DCS_WRITE_SYNC, 0xC3, 0x00, 0x03, 0x11, 0x12, 0x17, 0x25, 0x0D, 0x0C, 0x0A,
+		    0x0E, 0x0C, 0x2F, 0x09, 0x0E, 0x3D, 0x3E, 0x3F,
+18, DCS_WRITE_SYNC, 0xC4, 0x00, 0x03, 0x11, 0x12, 0x17, 0x25, 0x0D, 0x0C, 0x0A,
+		    0x0E, 0x0C, 0x2F, 0x09, 0x0E, 0x3D, 0x3E, 0x3F,
+18, DCS_WRITE_SYNC, 0xC5, 0x00, 0x03, 0x11, 0x12, 0x17, 0x25, 0x0D, 0x0C, 0x0A,
+		    0x0E, 0x0C, 0x2F, 0x09, 0x0E, 0x3D, 0x3E, 0x3F,
+1, DCS_WRITE_SYNC, MIPI_DCS_EXIT_SLEEP_MODE,
+1, WAIT_MS, 120,
+1, DCS_WRITE_SYNC, MIPI_DCS_SET_DISPLAY_ON,
+2, GENERIC_WRITE_SYNC, 0xFF, 0x00,
+0
+};
+
+struct minnow_panel_clk_range {
+	int	min;
+	int	max;
+};
+
+struct minnow_panel_hw_reset {
+	int	active;
+	int	reset_ms;
+	int	wait_ms;
 };
 
 struct minnow_panel_attr {
+	int	mode;
 	int	xres;
 	int	yres;
-	int 	rate;
+	int	pixel_clock;
+	int	pixel_format;
 	int	xoffset;
 	int	yoffset;
 	int	init_cmd_count;
 	u8	*init_cmd;
+	struct minnow_panel_clk_range hs;
+	struct minnow_panel_clk_range lp;
+	struct minnow_panel_hw_reset panel_reset;
+	struct minnow_panel_hw_reset bridge_reset;
 };
 
 #define	INIT_CMD(buf) 	.init_cmd_count = sizeof(buf), .init_cmd = (buf)
 static struct minnow_panel_attr panel_attr_table[MINNOW_PANEL_MAX] = {
 	[MINNOW_PANEL_CM_220X176] = {
+		.mode = OMAP_DSS_DSI_CMD_MODE,
 		.xres = 220,
 		.yres = 176,
-		.rate = 60,
+		.pixel_clock = 4608,
+		.pixel_format = OMAP_DSS_DSI_FMT_RGB666,
 		.xoffset = 0x32,
 		.yoffset = 0,
-		INIT_CMD(panel_init_220x176)
+		INIT_CMD(panel_init_220x176),
+		.hs = { 100000000, 150000000 },
+		.lp = { 7000000, 9000000 },
+		.panel_reset = { 0, 1, 5 },
+		.bridge_reset = { 0, 0, 0 },
 	},
 	[MINNOW_PANEL_CM_220X220] = {
+		.mode = OMAP_DSS_DSI_CMD_MODE,
 		.xres = 220,
 		.yres = 220,
-		.rate = 60,
+		.pixel_clock = 4608,
+		.pixel_format = OMAP_DSS_DSI_FMT_RGB666,
 		.xoffset = 0x32,
 		.yoffset = 0x4,
-		INIT_CMD(panel_init_220x220)
+		INIT_CMD(panel_init_220x220),
+		.hs = { 100000000, 150000000 },
+		.lp = { 7000000, 9000000 },
+		.panel_reset = { 0, 1, 5 },
+		.bridge_reset = { 0, 0, 0 },
+	},
+	[MINNOW_PANEL_CM_BRIDGE_320X320] = {
+		.mode = OMAP_DSS_DSI_CMD_MODE,
+		.xres = 320,
+		.yres = 290, /* actual display height is 290 */
+		.pixel_clock = DIV_ROUND_UP(320 * 290 * 60, 1000),
+		.pixel_format = OMAP_DSS_DSI_FMT_RGB888,
+		.xoffset = 0,
+		.yoffset = 0,
+		INIT_CMD(panel_init_ssd2848_320x320),
+		.hs = { 100000000, 150000000 },
+		.lp = { 7000000, 9000000 },
+		.panel_reset = { 0, 5, 10 },
+		.bridge_reset = { 0, 20, 10 }
 	},
 };
+
 
 static irqreturn_t minnow_panel_te_isr(int irq, void *data);
 static void minnow_panel_te_timeout_work_callback(struct work_struct *work);
 static int _minnow_panel_enable_te(struct omap_dss_device *dssdev, bool enable);
 
 static int minnow_panel_reset(struct omap_dss_device *dssdev);
+
 
 struct minnow_panel_data {
 	struct mutex lock; /* mutex */
@@ -157,8 +304,11 @@ struct minnow_panel_data {
 	struct omap_dss_device *dssdev;
 
 	/* panel HW configuration from DT or platform data */
-	int reset_gpio;
+	int reset_gpio[MINNOW_RESET_MAX];
 	int ext_te_gpio;
+	int clk_en_gpio;
+	struct minnow_panel_hw_reset hw_reset[MINNOW_RESET_MAX];
+	struct minnow_panel_hw_reset bridge_reset;
 
 	bool use_dsi_backlight;
 
@@ -167,6 +317,7 @@ struct minnow_panel_data {
 
 	u8 *init_cmd_data;
 	int init_cmd_count;
+	int id_panel;
 	int x_offset;
 	int y_offset;
 
@@ -193,6 +344,66 @@ struct minnow_panel_data {
 	unsigned ulps_timeout;
 	struct delayed_work ulps_work;
 };
+
+#ifdef	CONFIG_OMAP2_DSS_DEBUGFS
+static void minnow_panel_dump_regs(struct seq_file *s)
+{
+	static struct {char name[8]; int addr; int endreg; } regs[] = {
+		{"SCM",		0x0000, 0x30},
+		{"MIPIRX",	0x1000, 0x30},
+		{"VTCM",	0x2000, 0xB4},
+		{"VCU",		0x4000, 0x20},
+		{"GPIO",	0x5000, 0x04},
+		{"MIPITX",	0x6000, 0x54},
+		{"TX-DSI0",	0x6080, 0x14},
+	};
+	struct omap_dss_output *out = omap_dss_get_output(OMAP_DSS_OUTPUT_DSI1);
+	struct platform_device *dsidev = out->pdev;
+	struct omap_dss_device *dssdev = out->device;
+	struct minnow_panel_data *mpd = dev_get_drvdata(&dssdev->dev);
+	int i, j, r;
+
+	dsi_bus_lock(dssdev);
+
+	if (dsi_runtime_get(dsidev)) {
+		seq_puts(s, "dsi_runtime_get failed!");
+		goto exit1;
+	}
+
+	if (mpd->dssdev != dssdev) {
+		seq_puts(s, "dssdev mis-matched!");
+		goto exit;
+	}
+
+	if (dsi_vc_set_max_rx_packet_size(dssdev, mpd->channel, 4)) {
+		seq_puts(s, "failed set max rx_packet_size 4");
+		goto exit;
+	}
+
+	for (i = 0; i < sizeof(regs)/sizeof(regs[0]); i++) {
+		seq_printf(s, "%s Registers:\n", regs[i].name);
+		for (j = 0; j <= regs[i].endreg; j += 4) {
+			u8 reg[4];
+			u16 addr = j + regs[i].addr;
+			seq_printf(s, "  %04X: ", addr);
+			r = dsi_vc_generic_read_2(dssdev, mpd->channel,
+						addr>>8, addr&0xFF, reg, 4);
+			if (r)
+				seq_printf(s, "read failed ret = %d\n", r);
+			else
+				seq_printf(s, "%02X%02X%02X%02X\n",
+					   reg[0], reg[1], reg[2], reg[3]);
+		}
+	}
+
+	dsi_vc_set_max_rx_packet_size(dssdev, mpd->channel, 1);
+
+exit:
+	dsi_runtime_put(dsidev);
+exit1:
+	dsi_bus_unlock(dssdev);
+}
+#endif
 
 static void minnow_panel_esd_work(struct work_struct *work);
 static void minnow_panel_ulps_work(struct work_struct *work);
@@ -278,9 +489,33 @@ static int minnow_panel_sleep_out(struct minnow_panel_data *mpd)
 	return 0;
 }
 
-static int minnow_panel_get_id(struct minnow_panel_data *mpd, u8 *id1, u8 *id2, u8 *id3)
+static int minnow_panel_get_bridge_rev(struct minnow_panel_data *mpd,
+					u8 *id1, u8 *id2, u8 *id3)
+{
+	int r = dsi_vc_set_max_rx_packet_size(mpd->dssdev, mpd->channel, 4);
+
+	if (!r) {
+		u8 reg[4];
+		r = dsi_vc_generic_read_2(mpd->dssdev,
+						mpd->channel, 0, 0, reg, 4);
+		if (!r) {
+			*id1 = reg[0];
+			*id2 = reg[1];
+			*id3 = reg[3];
+		}
+	}
+	dsi_vc_set_max_rx_packet_size(mpd->dssdev, mpd->channel, 1);
+
+	return r;
+}
+
+static int minnow_panel_get_id(struct minnow_panel_data *mpd,
+					u8 *id1, u8 *id2, u8 *id3)
 {
 	int r;
+
+	if (mpd->id_panel == MINNOW_PANEL_CM_BRIDGE_320X320)
+		return minnow_panel_get_bridge_rev(mpd, id1, id2, id3);
 
 	r = minnow_panel_dcs_read_1(mpd, DCS_GET_ID1, id1);
 	if (r)
@@ -292,24 +527,67 @@ static int minnow_panel_get_id(struct minnow_panel_data *mpd, u8 *id1, u8 *id2, 
 	if (r)
 		return r;
 
+
 	return 0;
 }
 
 static int _minnow_panel_init(struct minnow_panel_data *mpd)
 {
+	u8 *data;
 	int i, r;
-	for (i = 0; i < mpd->init_cmd_count; ) {
-		u8 *data = mpd->init_cmd_data + i;
-		r = *data++;
-		i += r + 1;
-		if (i > mpd->init_cmd_count) {
-			dev_err(&mpd->dssdev->dev, "Invalid init command data selected!\n");
-			return -EINVAL;
-		}
-		r = dsi_vc_dcs_write(mpd->dssdev, mpd->channel, data, r);
-		if (r)
+
+	for (i = 0, data = mpd->init_cmd_data; *data; ) {
+		i += ((u32)*data + 2);
+		if (i >= mpd->init_cmd_count)
 			break;
+		if (data[1] >= CMD_TYPE_MAX)
+			break;
+		data += (*data + 2);
 	}
+
+	/* Init command data shall end with 0 */
+	if (*data) {
+		dev_err(&mpd->dssdev->dev, "Invalid panel initialize data\n");
+		return -EINVAL;
+	}
+
+	for (i = 0, data = mpd->init_cmd_data; *data; i++) {
+		int len = (u32)*data;
+		u8 cmd = data[1];
+		data += 2;
+		switch (cmd) {
+		case DCS_WRITE_SYNC:
+			r = dsi_vc_dcs_write(mpd->dssdev,
+					mpd->channel, data, len);
+			break;
+		case GENERIC_WRITE_SYNC:
+			r = dsi_vc_generic_write(mpd->dssdev,
+					mpd->channel, data, len);
+			break;
+		case DCS_WRITE:
+			r = dsi_vc_dcs_write_nosync(mpd->dssdev,
+					mpd->channel, data, len);
+			break;
+		case GENERIC_WRITE:
+			r = dsi_vc_generic_write_nosync(mpd->dssdev,
+					mpd->channel, data, len);
+			break;
+		case BTA_SYNC:
+			r = dsi_vc_send_bta_sync(mpd->dssdev, mpd->channel);
+			break;
+		case WAIT_MS:
+			msleep((len == 1 ? (u32)(*data) : *(u16 *)data));
+			break;
+		}
+		if (r) {
+			dev_err(&mpd->dssdev->dev, "Failed process initialize"
+				"command[%d] len=%d type=%d ret=%d\n",
+				i, len, cmd, r);
+			break;
+		}
+		data += len;
+	}
+
 	return r;
 }
 
@@ -839,20 +1117,40 @@ static struct attribute_group minnow_panel_attr_group = {
 static void minnow_panel_hw_reset(struct omap_dss_device *dssdev)
 {
 	struct minnow_panel_data *mpd = dev_get_drvdata(&dssdev->dev);
+	int i, ms_rst = -1, ms_rel = -1;
 
-	if (!gpio_is_valid(mpd->reset_gpio))
+	for (i = 0; i < MINNOW_RESET_MAX; i++) {
+		if (!gpio_is_valid(mpd->reset_gpio[i]))
+			continue;
+		gpio_set_value(mpd->reset_gpio[i],
+			       mpd->hw_reset[i].active ? 0 : 1);
+		if (ms_rst < mpd->hw_reset[i].reset_ms)
+			ms_rst = mpd->hw_reset[i].reset_ms;
+		if (ms_rel < mpd->hw_reset[i].wait_ms)
+			ms_rel = mpd->hw_reset[i].wait_ms;
+	}
+	if (ms_rst == -1)
 		return;
-
-	gpio_set_value(mpd->reset_gpio, 1);
-	udelay(10);
-	/* reset the panel */
-	gpio_set_value(mpd->reset_gpio, 0);
-	/* assert reset */
-	udelay(10);
-	gpio_set_value(mpd->reset_gpio, 1);
-
-	/* wait after releasing reset */
 	msleep(5);
+
+	/* reset the device */
+	for (i = 0; i < MINNOW_RESET_MAX; i++) {
+		if (!gpio_is_valid(mpd->reset_gpio[i]))
+			continue;
+		gpio_set_value(mpd->reset_gpio[i],
+			       mpd->hw_reset[i].active ? 1 : 0);
+	}
+	/* wait device reset */
+	msleep(ms_rst);
+	/* assert reset */
+	for (i = 0; i < MINNOW_RESET_MAX; i++) {
+		if (!gpio_is_valid(mpd->reset_gpio[i]))
+			continue;
+		gpio_set_value(mpd->reset_gpio[i],
+			       mpd->hw_reset[i].active ? 0 : 1);
+	}
+	/* wait after releasing reset */
+	msleep(ms_rel);
 }
 
 #define	DEBUG_DT
@@ -900,30 +1198,40 @@ static int minnow_panel_dt_init(struct minnow_panel_data *mpd)
 			"Invalid id_panel = %u!\n", value);
 		return -EINVAL;
 	}
-	DTINFO("id_panel = %d\n", value);
-	panel_attr = &panel_attr_table[value];
+	mpd->id_panel = value;
+	DTINFO("id_panel = %d\n", mpd->id_panel);
+
+	panel_attr = &panel_attr_table[mpd->id_panel];
 	mpd->init_cmd_data = panel_attr->init_cmd;
 	mpd->init_cmd_count = panel_attr->init_cmd_count;
-	mpd->x_offset = panel_attr->xoffset;
-	mpd->y_offset = panel_attr->yoffset;
-	mpd->dssdev->panel.timings.x_res = panel_attr->xres;
-	mpd->dssdev->panel.timings.y_res = panel_attr->yres;
-	mpd->dssdev->panel.timings.pixel_clock = DIV_ROUND_UP(panel_attr->xres\
-				* panel_attr->yres * panel_attr->rate, 1000);
-	mpd->dssdev->panel.dsi_pix_fmt = OMAP_DSS_DSI_FMT_RGB888;
 	mpd->dssdev->caps = OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE |
 		OMAP_DSS_DISPLAY_CAP_TEAR_ELIM;
-	mpd->dsi_config.mode = OMAP_DSS_DSI_CMD_MODE;
-	mpd->dsi_config.pixel_format = OMAP_DSS_DSI_FMT_RGB888;
-	mpd->dsi_config.hs_clk_min = 90000000;
-	mpd->dsi_config.hs_clk_max = 150000000;
-	mpd->dsi_config.lp_clk_min = 7000000;
-	mpd->dsi_config.lp_clk_max = 9000000;
+	mpd->dssdev->panel.timings.x_res = panel_attr->xres;
+	mpd->dssdev->panel.timings.y_res = panel_attr->yres;
+	mpd->dssdev->panel.timings.pixel_clock = panel_attr->pixel_clock;
+	mpd->dssdev->panel.dsi_pix_fmt = panel_attr->pixel_format;
+	mpd->dsi_config.mode = panel_attr->mode;
+	mpd->dsi_config.pixel_format = panel_attr->pixel_format;
+	mpd->dsi_config.hs_clk_min = panel_attr->hs.min;
+	mpd->dsi_config.hs_clk_max = panel_attr->hs.max;
+	mpd->dsi_config.lp_clk_min = panel_attr->lp.min;
+	mpd->dsi_config.lp_clk_max = panel_attr->lp.max;
+	mpd->x_offset = panel_attr->xoffset;
+	mpd->y_offset = panel_attr->yoffset;
 
-	mpd->reset_gpio = of_get_named_gpio(dt_node, "gpio_reset", 0);
-	DTINFO("gpio_reset = %d\n", mpd->reset_gpio);
+	mpd->hw_reset[MINNOW_RESET_PANEL] = panel_attr->panel_reset;
+	mpd->hw_reset[MINNOW_RESET_BRIDGE] = panel_attr->bridge_reset;
+	mpd->reset_gpio[MINNOW_RESET_PANEL] =
+		of_get_named_gpio(dt_node, "gpio_panel_reset", 0);
+	DTINFO("gpio_panel_reset = %d\n", mpd->reset_gpio[MINNOW_RESET_PANEL]);
+	mpd->reset_gpio[MINNOW_RESET_BRIDGE] =
+		of_get_named_gpio(dt_node, "gpio_bridge_reset", 0);
+	DTINFO("gpio_bridge_reset = %d\n",
+	       mpd->reset_gpio[MINNOW_RESET_BRIDGE]);
 	mpd->ext_te_gpio = of_get_named_gpio(dt_node, "gpio_te", 0);
-	DTINFO("ext_te: gpio_te = %d\n", mpd->ext_te_gpio);
+	DTINFO("gpio_te = %d\n", mpd->ext_te_gpio);
+	mpd->clk_en_gpio = of_get_named_gpio(dt_node, "gpio_clk_en", 0);
+	DTINFO("gpio_clk_en = %d\n", mpd->clk_en_gpio);
 
 	mpd->esd_interval = 0;
 	if (!of_property_read_u32(dt_node, "esd_interval", &value)) {
@@ -1021,7 +1329,7 @@ static int minnow_panel_probe(struct omap_dss_device *dssdev)
 	struct backlight_properties props;
 	struct minnow_panel_data *mpd;
 	struct backlight_device *bldev = NULL;
-	int r;
+	int i, r;
 
 	dev_dbg(&dssdev->dev, "probe\n");
 
@@ -1040,11 +1348,28 @@ static int minnow_panel_probe(struct omap_dss_device *dssdev)
 
 	atomic_set(&mpd->do_update, 0);
 
-	if (gpio_is_valid(mpd->reset_gpio)) {
-		r = devm_gpio_request_one(&dssdev->dev, mpd->reset_gpio,
-				GPIOF_OUT_INIT_HIGH, "minnow-panel reset");
+	if (gpio_is_valid(mpd->clk_en_gpio)) {
+		r = devm_gpio_request_one(&dssdev->dev, mpd->clk_en_gpio,
+				GPIOF_OUT_INIT_HIGH, "minnow-panel clk_en");
 		if (r) {
-			dev_err(&dssdev->dev, "failed to request reset gpio\n");
+			dev_err(&dssdev->dev, "failed to request panel clk_en gpio\n");
+			return r;
+		}
+	}
+
+	for (i = 0; i < MINNOW_RESET_MAX; i++) {
+		static const char * const name[MINNOW_RESET_MAX] = {
+			"minnow-panel reset",
+			"minnow-bridge reset"
+		};
+		if (!gpio_is_valid(mpd->reset_gpio[i]))
+			continue;
+		r = devm_gpio_request_one(&dssdev->dev, mpd->reset_gpio[i],
+			mpd->hw_reset[i].active ? GPIOF_OUT_INIT_LOW
+			: GPIOF_OUT_INIT_HIGH, name[i]);
+		if (r) {
+			dev_err(&dssdev->dev,
+				"failed to request %s gpio\n", name[i]);
 			return r;
 		}
 	}
@@ -1053,11 +1378,13 @@ static int minnow_panel_probe(struct omap_dss_device *dssdev)
 		r = devm_gpio_request_one(&dssdev->dev, mpd->ext_te_gpio,
 				GPIOF_IN, "minnow-panel irq");
 		if (r) {
-			dev_err(&dssdev->dev, "failed to request ext_te gpio\n");
+			dev_err(&dssdev->dev,
+				"failed to request ext_te gpio\n");
 			return r;
 		}
 
-		r = devm_request_irq(&dssdev->dev, gpio_to_irq(mpd->ext_te_gpio),
+		r = devm_request_irq(&dssdev->dev,
+				gpio_to_irq(mpd->ext_te_gpio),
 				minnow_panel_te_isr,
 				IRQF_TRIGGER_RISING,
 				"minnow-panel vsync", dssdev);
@@ -1119,6 +1446,11 @@ static int minnow_panel_probe(struct omap_dss_device *dssdev)
 		dev_err(&dssdev->dev, "failed to create sysfs files\n");
 		goto err_vc_id;
 	}
+
+#ifdef	CONFIG_OMAP2_DSS_DEBUGFS
+	if (mpd->id_panel == MINNOW_PANEL_CM_BRIDGE_320X320)
+		dss_debugfs_create_file("panel_regs", minnow_panel_dump_regs);
+#endif
 
 	return 0;
 
@@ -1182,18 +1514,25 @@ static int minnow_panel_power_on(struct omap_dss_device *dssdev)
 		goto err0;
 	}
 
+#ifdef	CONFIG_OMAP2_DSS_RESET
+	minnow_panel_hw_reset(dssdev);
+#else
+	/* Need reset display at first time as it's already enable on boot */
 	if (mpd->intro_printed)
 		minnow_panel_hw_reset(dssdev);
+#endif
 
 	omapdss_dsi_vc_enable_hs(dssdev, mpd->channel, false);
 
-	r = minnow_panel_sleep_out(mpd);
+	r = _minnow_panel_init(mpd);
 	if (r)
 		goto err;
 
-	_minnow_panel_init(mpd);
-
 	r = minnow_panel_get_id(mpd, &id1, &id2, &id3);
+	if (r)
+		goto err;
+
+	r = _minnow_panel_enable_te(dssdev, mpd->te_enabled);
 	if (r)
 		goto err;
 
@@ -1201,9 +1540,7 @@ static int minnow_panel_power_on(struct omap_dss_device *dssdev)
 	if (r)
 		goto err;
 
-	r = _minnow_panel_enable_te(dssdev, mpd->te_enabled);
-	if (r)
-		goto err;
+	omapdss_dsi_vc_enable_hs(dssdev, mpd->channel, true);
 
 	r = dsi_enable_video_output(dssdev, mpd->channel);
 	if (r)
@@ -1216,8 +1553,6 @@ static int minnow_panel_power_on(struct omap_dss_device *dssdev)
 			id1, id2, id3);
 		mpd->intro_printed = true;
 	}
-
-	omapdss_dsi_vc_enable_hs(dssdev, mpd->channel, true);
 
 	return 0;
 err:
@@ -1343,7 +1678,6 @@ static irqreturn_t minnow_panel_te_isr(int irq, void *data)
 
 	if (old) {
 		cancel_delayed_work(&mpd->te_timeout_work);
-
 		r = omap_dsi_update(dssdev, mpd->channel, minnow_panel_framedone_cb,
 				dssdev);
 		if (r)
@@ -1374,6 +1708,10 @@ static int minnow_panel_update(struct omap_dss_device *dssdev,
 {
 	struct minnow_panel_data *mpd = dev_get_drvdata(&dssdev->dev);
 	int r;
+
+	/* for video mode, do not need manual update */
+	if (mpd->dsi_config.mode == OMAP_DSS_DSI_VIDEO_MODE)
+		return 0;
 
 	dev_dbg(&dssdev->dev, "update %d, %d, %d x %d\n", x, y, w, h);
 
@@ -1444,9 +1782,6 @@ static int _minnow_panel_enable_te(struct omap_dss_device *dssdev, bool enable)
 
 	if (!gpio_is_valid(mpd->ext_te_gpio))
 		omapdss_dsi_enable_te(dssdev, enable);
-
-	/* possible panel bug */
-	msleep(100);
 
 	return r;
 }
@@ -1543,12 +1878,14 @@ static int minnow_panel_memory_read(struct omap_dss_device *dssdev,
 		u16 x, u16 y, u16 w, u16 h)
 {
 	int r;
-	int first = 1;
 	int plen;
-	unsigned buf_used = 0;
+	u32 buf_used = 0;
 	struct minnow_panel_data *mpd = dev_get_drvdata(&dssdev->dev);
+	u8 dcs_cmd = MIPI_DCS_READ_MEMORY_START;
 
-	if (size < w * h * 3)
+	plen = dsi_get_pixel_size(mpd->dssdev->panel.dsi_pix_fmt);
+	plen = DIV_ROUND_UP(plen, 8);
+	if (size < w * h * plen)
 		return -ENOMEM;
 
 	mutex_lock(&mpd->lock);
@@ -1558,9 +1895,9 @@ static int minnow_panel_memory_read(struct omap_dss_device *dssdev,
 		goto err1;
 	}
 
-	size = min(w * h * 3,
+	size = min(w * h * plen,
 			dssdev->panel.timings.x_res *
-			dssdev->panel.timings.y_res * 3);
+			dssdev->panel.timings.y_res * plen);
 
 	dsi_bus_lock(dssdev);
 
@@ -1568,39 +1905,24 @@ static int minnow_panel_memory_read(struct omap_dss_device *dssdev,
 	if (r)
 		goto err2;
 
-	/* plen 1 or 2 goes into short packet. until checksum error is fixed,
-	 * use short packets. plen 32 works, but bigger packets seem to cause
-	 * an error. */
-	if (size % 2)
-		plen = 1;
-	else
-		plen = 2;
-
 	minnow_panel_set_update_window(mpd, x, y, w, h);
 
+	/* each read 8 pixel as SSD2848 has minimum read pixels */
+	plen *= 8;
 	r = dsi_vc_set_max_rx_packet_size(dssdev, mpd->channel, plen);
 	if (r)
 		goto err2;
 
-	while (buf_used < size) {
-		u8 dcs_cmd = first ? 0x2e : 0x3e;
-		first = 0;
-
+	size = size / plen * plen;
+	for (; buf_used < size; dcs_cmd = MIPI_DCS_READ_MEMORY_CONTINUE) {
 		r = dsi_vc_dcs_read(dssdev, mpd->channel, dcs_cmd,
-				buf + buf_used, size - buf_used);
-
-		if (r < 0) {
-			dev_err(&dssdev->dev, "read error\n");
+				buf + buf_used, plen);
+		if (r) {
+			dev_err(&dssdev->dev,
+				"read failed at %u err=%d\n", buf_used, r);
 			goto err3;
 		}
-
-		buf_used += r;
-
-		if (r < plen) {
-			dev_err(&dssdev->dev, "short read\n");
-			break;
-		}
-
+		buf_used += plen;
 		if (signal_pending(current)) {
 			dev_err(&dssdev->dev, "signal pending, "
 					"aborting memory read\n");
@@ -1608,7 +1930,6 @@ static int minnow_panel_memory_read(struct omap_dss_device *dssdev,
 			goto err3;
 		}
 	}
-
 	r = buf_used;
 
 err3:

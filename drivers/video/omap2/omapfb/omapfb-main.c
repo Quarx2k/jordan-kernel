@@ -29,6 +29,7 @@
 #include <linux/device.h>
 #include <linux/platform_device.h>
 #include <linux/omapfb.h>
+#include <linux/uaccess.h>
 
 #include <video/omapdss.h>
 #include <video/omapvrfb.h>
@@ -906,6 +907,8 @@ int omapfb_setup_overlay(struct fb_info *fbi, struct omap_overlay *ovl,
 		mirror = ofbi->mirror;
 
 	info.paddr = data_start_p;
+	info.p_uv_addr = (u32)omapfb_get_region_vaddr(ofbi) +
+			 (data_start_p - (u32)omapfb_get_region_paddr(ofbi));
 	info.screen_width = screen_width;
 	info.width = xres;
 	info.height = yres;
@@ -1048,6 +1051,7 @@ static int omapfb_set_par(struct fb_info *fbi)
 static int omapfb_pan_display(struct fb_var_screeninfo *var,
 		struct fb_info *fbi)
 {
+	struct omap_dss_device *display = fb2display(fbi);
 	struct omapfb_info *ofbi = FB2OFB(fbi);
 	struct fb_var_screeninfo new_var;
 	int r;
@@ -1069,6 +1073,12 @@ static int omapfb_pan_display(struct fb_var_screeninfo *var,
 	r = omapfb_apply_changes(fbi, 0);
 
 	omapfb_put_mem_region(ofbi->region);
+
+	if (display && display->driver->update && display->driver->sync) {
+		DBG("sync_update(%d, %d)\n", var->xres, var->yres);
+		display->driver->sync(display);
+		display->driver->update(display, 0, 0, var->xres, var->yres);
+	}
 
 	return r;
 }
@@ -1290,6 +1300,97 @@ ssize_t omapfb_write(struct fb_info *info, const char __user *buf,
 }
 #endif
 
+ssize_t omapfb_write(struct fb_info *info, const char __user *buf,
+		size_t count, loff_t *ppos)
+{
+	struct omapfb_info *ofbi = FB2OFB(info);
+	struct omapfb2_device *fbdev = ofbi->fbdev;
+	struct omap_dss_device *display = fb2display(info);
+	struct omapfb_display_data *d;
+	struct fb_var_screeninfo *var = &info->var;
+	unsigned long p = *ppos;
+	u8 *buffer, *src;
+	u8 __iomem *dst;
+	int c, cnt, err = 0;
+	unsigned long total_size;
+
+	DBG("omapfb_write %d, %lu\n", count, (unsigned long)*ppos);
+
+	total_size = var->xres * var->yres * (var->bits_per_pixel>>3);
+	if (p > total_size)
+		return -EFBIG;
+	if (count > total_size) {
+		err = -EFBIG;
+		count = total_size;
+	}
+	if (count + p > total_size) {
+		if (!err)
+			err = -ENOSPC;
+
+		count = total_size - p;
+	}
+
+	DBG("omapfb_write %d, %lu, %lu\n", count, p, total_size);
+
+	buffer = kmalloc((count > PAGE_SIZE) ? PAGE_SIZE : count,
+			 GFP_KERNEL);
+	if (!buffer)
+		return -ENOMEM;
+
+	dst = (u8 __iomem *)(info->screen_base + p);
+	c = var->bits_per_pixel >> 3;
+	cnt = var->xres_virtual * c;
+	dst += var->yoffset*cnt + var->xoffset*c;
+	DBG("omapfb_write offset = %d, scr_size = %lu\n",
+	    (int)(dst) - (int)(info->screen_base + p), info->screen_size);
+
+	if (info->fbops->fb_sync)
+		info->fbops->fb_sync(info);
+
+	for (cnt = 0; count; ) {
+		c = (count > PAGE_SIZE) ? PAGE_SIZE : count;
+		src = buffer;
+
+		if (copy_from_user(src, buf, c)) {
+			err = -EFAULT;
+			break;
+		}
+
+		fb_memcpy_tofb(dst, src, c);
+		dst += c;
+		src += c;
+		*ppos += c;
+		buf += c;
+		cnt += c;
+		count -= c;
+	}
+
+	kfree(buffer);
+
+	if (total_size <= *ppos && display &&
+	    display->driver->update && display->driver->sync) {
+		DBG("fb_var_screen info:\n");
+		DBG("\txres = %u\n", var->xres);
+		DBG("\tyres = %u\n", var->yres);
+		DBG("\txres_virtual = %u\n", var->xres_virtual);
+		DBG("\tyres_virtual = %u\n", var->yres_virtual);
+		DBG("\txoffset = %u\n", var->xoffset);
+		DBG("\tyoffset = %u\n", var->yoffset);
+		DBG("\tbits_per_pixel = %u\n", var->bits_per_pixel);
+		omapfb_lock(fbdev);
+		d = get_display_data(fbdev, display);
+		if (d->update_mode == OMAPFB_MANUAL_UPDATE) {
+			DBG("sync_update(%d, %d)\n", var->xres, var->yres);
+			display->driver->sync(display);
+			display->driver->update(display,
+				0, 0, var->xres, var->yres);
+		}
+		omapfb_unlock(fbdev);
+	}
+
+	return (cnt) ? cnt : err;
+}
+
 static struct fb_ops omapfb_ops = {
 	.owner          = THIS_MODULE,
 	.fb_open        = omapfb_open,
@@ -1305,7 +1406,7 @@ static struct fb_ops omapfb_ops = {
 	.fb_mmap	= omapfb_mmap,
 	.fb_setcolreg	= omapfb_setcolreg,
 	.fb_setcmap	= omapfb_setcmap,
-	/*.fb_write	= omapfb_write,*/
+	.fb_write	= omapfb_write,
 };
 
 static void omapfb_free_fbmem(struct fb_info *fbi)
