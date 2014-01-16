@@ -35,8 +35,14 @@
 #define pr_fmt(fmt) fmt
 #endif
 
+#ifdef DEBUG
+extern bool dss_debug;
 #define DSSDBG(format, ...) \
-	pr_debug(format, ## __VA_ARGS__)
+	if (dss_debug) \
+		pr_debug(format, ## __VA_ARGS__)
+#else
+#define DSSDBG(format, ...)
+#endif
 
 #ifdef DSS_SUBSYS_NAME
 #define DSSERR(format, ...) \
