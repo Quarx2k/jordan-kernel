@@ -142,6 +142,11 @@
 		compatible = "ti,lm3535";
 		reg = <0x38>;
 	};
+
+	max17050@36 {
+		compatible = "maxim,max17050";
+		reg = <0x36>;
+	};
 };
 
 
