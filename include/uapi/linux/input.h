@@ -867,7 +867,8 @@ struct input_keymap_entry {
 
 #define ABS_TILTSCROLL          0x55
 
-#define ABS_MAX			0x7f
+/* TODO TEMP !!! CHeck IKXCLOCK-100 */
+#define ABS_MAX			0x3f
 #define ABS_CNT			(ABS_MAX+1)
 
 /*
