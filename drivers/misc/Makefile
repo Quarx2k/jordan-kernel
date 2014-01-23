@@ -65,3 +65,4 @@ obj-$(CONFIG_MFD_M4SENSORHUB)   += m4sensorhub_audio.o
 obj-$(CONFIG_MFD_M4SENSORHUB)   += m4sensorhub_passive.o
 obj-$(CONFIG_VIB_GPIO)          += vib-gpio.o
 obj-$(CONFIG_C55_CTRL) += c55_ctrl.o
+obj-$(CONFIG_MMI_FACTORY) += mmi-factory.o
