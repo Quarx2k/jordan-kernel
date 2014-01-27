@@ -549,9 +549,6 @@ static int tps65912_probe(struct platform_device *pdev)
 	struct tps65912_reg *pmic;
 	struct tps65912_board *pmic_plat_data;
 	int i, err;
-	char *ldo_string[] = {"LDO1", "LDO2", "LDO3", "LDO4", "LDO5",
-				"LDO6", "LDO7", "LDO8", "LDO9", "LDO10"};
-	struct regulator *ldo;
 
 	pmic_plat_data = dev_get_platdata(tps65912->dev);
 	if (!pmic_plat_data && tps65912->dev->of_node)
@@ -604,28 +601,6 @@ static int tps65912_probe(struct platform_device *pdev)
 
 		/* Save regulator for cleanup */
 		pmic->rdev[i] = rdev;
-	}
-
-	for (i = 0; i < TPS65912_NUM_LDO; i++) {
-		ldo =  regulator_get(NULL, ldo_string[i]);
-		if (IS_ERR(ldo)) {
-			pr_info("%s regulator get fails\n", ldo_string[i]);
-		} else {
-			err = regulator_enable(ldo);
-			if (err == 0)
-				pr_info("%s regulator enables success\n",
-					ldo_string[i]);
-			else
-				pr_info("%s regulator enables fails%d\n",
-					ldo_string[i], err);
-		}
-		/* to disable the ldo for vibrator after a while */
-		if (i == 5) {
-			mdelay(200);
-			regulator_disable(ldo);
-			pr_info("%s regulator disabled on purpose\n",
-				ldo_string[i]);
-		}
 	}
 
 	return 0;
