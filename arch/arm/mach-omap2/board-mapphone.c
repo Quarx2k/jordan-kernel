@@ -75,6 +75,7 @@
 #include "cm.h"
 #include "clock.h"
 #include "omap_ion.h"
+#include "omap_ram_console.h"
 
 #ifdef CONFIG_VIDEO_OMAP3
 #include <media/v4l2-int-device.h>
@@ -123,6 +124,12 @@
 #define I2C_BUS_MAX_DEVICES 5
 #define I2C_MAX_DEV_NAME_LEN 16
 #define I2C_BUS_PROP_NAME_LEN 12
+
+#ifdef CONFIG_OMAP_RAM_CONSOLE
+#define MAPPHONE_RAM_CONSOLE_START  PHYS_OFFSET + 0xE000000
+/* XXX: size is ridiculously large, but system won't boot with smaller */
+#define MAPPHONE_RAM_CONSOLE_SIZE    SZ_1M
+#endif
 
 char *bp_model = "UMTS";
 
@@ -1751,6 +1758,10 @@ static void __init mapphone_init(void)
 
 static void __init mapphone_reserve(void)
 {
+#ifdef CONFIG_OMAP_RAM_CONSOLE
+        omap_ram_console_init(MAPPHONE_RAM_CONSOLE_START,
+                        MAPPHONE_RAM_CONSOLE_SIZE);
+#endif
 	omap_reserve();
 #ifdef CONFIG_ION_OMAP
 	omap_ion_init();

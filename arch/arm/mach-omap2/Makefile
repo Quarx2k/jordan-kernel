@@ -139,3 +139,5 @@ obj-y					+= $(onenand-m) $(onenand-y)
 
 smc91x-$(CONFIG_SMC91X)			:= gpmc-smc91x.o
 obj-y					+= $(smc91x-m) $(smc91x-y)
+
+obj-$(CONFIG_OMAP_RAM_CONSOLE)		+= omap_ram_console.o
