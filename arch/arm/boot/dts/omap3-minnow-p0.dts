@@ -51,6 +51,14 @@
 		gpios = <&gpio6 22 0x0>; /*gpio-182 GPIOF_DIR_OUT|GPIOF_INIT_LOW */
 		gpio-names = "factory_kill_disable";
 	};
+
+	pmic-wdi@0 {
+		compatible = "mot,pmic-wdi";
+		gpios  = <&gpio5  15 0x0>; /* gpio-143 GPIOF_DIR_OUT|GPIOF_INIT_LOW */
+		pinctrl-names = "output", "tristate";
+		pinctrl-0 = <&wdi_phy_gpio_mode>;
+		pinctrl-1 = <&wdi_phy_safe_mode>;
+	};
 };
 
 &usb_phy_pins {

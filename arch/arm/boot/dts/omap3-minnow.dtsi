@@ -219,6 +219,18 @@
 
 	usb_phy_pins: pinmux_usb_phy_pins {
 	};
+
+	wdi_phy_gpio_mode: pinmux_wdi_phy_gpio_mode {
+		pinctrl-single,pins = <
+			0x142 0x004 /* MCBSP_FSX | OUTPUT */
+		>;
+	};
+
+	wdi_phy_safe_mode: pinmux_wdi_phy_safe_mode {
+		pinctrl-single,pins = <
+			0x142 0x10F /* MCBSP_FSX | INPUT | PULLDOWN */
+		>;
+	};
 };
 
 &omap3_pmx_wkup{

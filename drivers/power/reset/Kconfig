@@ -37,3 +37,9 @@ config POWER_RESET_VEXPRESS
 	help
 	  Power off and reset support for the ARM Ltd. Versatile
 	  Express boards.
+
+config POWER_RESET_MINNOW
+	bool "GPIO power off driver for Minnow"
+	depends on POWER_RESET
+	help
+	  Power off and reset support for Minnow boards
