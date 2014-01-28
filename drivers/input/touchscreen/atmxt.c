@@ -389,7 +389,7 @@ atmxt_suspend_fail:
 	mutex_unlock(dd->mutex);
 
 atmxt_suspend_no_dd_fail:
-	return err;
+	return (err < 0) ? err : 0;
 }
 
 static int atmxt_resume(struct i2c_client *client)
@@ -497,7 +497,7 @@ atmxt_resume_fail:
 	mutex_unlock(dd->mutex);
 
 atmxt_resume_no_dd_fail:
-	return err;
+	return (err < 0) ? err : 0;
 }
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
