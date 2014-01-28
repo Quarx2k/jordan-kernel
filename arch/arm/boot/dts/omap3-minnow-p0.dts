@@ -92,6 +92,10 @@
 
 	tps_irq_gpio = <0>;
 
+	powerkey_up_irq = <10>;		/* TPS65912_IRQ_GPIO3_R the key down */
+	powerkey_down_irq = <11>;	/* TPS65912_IRQ_GPIO3_F the key up */
+	powerkey_code = <116>;		/* power key code for android*/
+
 	regulators {
 		#address-cells = <1>;
 		#size-cells = <0>;
