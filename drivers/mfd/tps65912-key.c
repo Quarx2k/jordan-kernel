@@ -98,6 +98,7 @@ void tps65912_broadcast_key_event(struct tps65912 *tps65912,
 	struct tps65912_key_data *key = tps65912_get_keydata(tps65912);
 
 	if (key && key->input_dev) {
+		pr_info("tps65912: code %d val %d\n", code, value);
 		input_report_key(key->input_dev, code, value);
 		/*sync with input subsystem to solve the key cached problem*/
 		input_sync(key->input_dev);

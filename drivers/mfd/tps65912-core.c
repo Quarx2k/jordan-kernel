@@ -22,6 +22,7 @@
 #include <linux/mfd/tps65912.h>
 #include <linux/of_device.h>
 #include <linux/irq.h>
+#include <linux/input.h>
 
 static struct mfd_cell tps65912s[] = {
 	{
@@ -162,7 +163,34 @@ static struct tps65912_board *tps65912_parse_dt(struct tps65912 *tps65912)
 		pr_info("dcdc4_avs is 1\n");
 	}
 
-	if (!of_property_read_u32(np,"tps_irq_gpio",&tps_irq_gpio)) {
+	if (!of_property_read_u32(np, "powerkey_up_irq",
+				  &tps65912->powerkey_up_irq)) {
+		pr_info("powerkey_up_irq:%d\n", tps65912->powerkey_up_irq);
+	} else {
+		tps65912->powerkey_up_irq = TPS65912_IRQ_PWRHOLD_R;
+		pr_info("powerkey_up_irq:defaulting to %d\n",
+			tps65912->powerkey_up_irq);
+	}
+
+	if (!of_property_read_u32(np, "powerkey_down_irq",
+				  &tps65912->powerkey_down_irq)) {
+		pr_info("powerkey_down_irq:%d\n", tps65912->powerkey_down_irq);
+	} else {
+		tps65912->powerkey_up_irq = TPS65912_IRQ_PWRHOLD_F;
+		pr_info("powerkey_up_irq:defaulting to %d\n",
+			tps65912->powerkey_up_irq);
+	}
+
+	if (!of_property_read_u32(np, "powerkey_code",
+				  &tps65912->powerkey_code)) {
+		pr_info("powerkey_code:%d\n", tps65912->powerkey_code);
+	} else {
+		tps65912->powerkey_code = KEY_POWER;
+		pr_info("powerkey_code:defaulting to %d\n",
+			tps65912->powerkey_code);
+	}
+
+	if (!of_property_read_u32(np, "tps_irq_gpio", &tps_irq_gpio)) {
 		ret = gpio_request(tps_irq_gpio, "tps65912-irq");
 		if (ret)
 			goto err;

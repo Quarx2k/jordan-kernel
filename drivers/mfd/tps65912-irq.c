@@ -42,9 +42,9 @@ static irqreturn_t powerkey_handler(int irq, void *irq_data)
 	struct tps65912 *tps65912 = irq_data;
 	u32 new_state;
 
-	if (irq - tps65912->irq_base == TPS65912_IRQ_GPIO3_R) {
+	if (irq - tps65912->irq_base == tps65912->powerkey_up_irq) {
 		new_state = PWRKEY_RELEASE;
-	} else if (irq - tps65912->irq_base == TPS65912_IRQ_GPIO3_F) {
+	} else if (irq - tps65912->irq_base == tps65912->powerkey_down_irq) {
 		new_state = PWRKEY_PRESS;
 	} else {
 		pr_info("incorrect interrupt %d for power key\n",
@@ -54,7 +54,9 @@ static irqreturn_t powerkey_handler(int irq, void *irq_data)
 
 	mutex_lock(&tps65912->irq_lock);
 	if (new_state != tps65912->powerkey_state) {
-		tps65912_broadcast_key_event(tps65912, KEY_END, new_state);
+		tps65912_broadcast_key_event(tps65912,
+					     tps65912->powerkey_code,
+					     new_state);
 		tps65912->powerkey_state = new_state;
 	}
 	mutex_unlock(&tps65912->irq_lock);
@@ -240,15 +242,24 @@ int tps65912_irq_init(struct tps65912 *tps65912, int irq,
 #endif
 	}
 
-	ret = request_threaded_irq(tps65912->irq_base + TPS65912_IRQ_GPIO3_R,
-		NULL, powerkey_handler, flags, "tps65912_key_rel", tps65912);
+	ret = request_threaded_irq(tps65912->irq_base +
+		tps65912->powerkey_up_irq, NULL, powerkey_handler,
+		flags, "tps65912_key_rel", tps65912);
+
+	/* enable the interrupt for this irq */
+	tps65912->irq_mask &= ~(1 << tps65912->powerkey_up_irq);
 
 	if (ret != 0)
 		dev_err(tps65912->dev,
 		"Failed to request sub-IRQ for power key rel: %d\n", ret);
 
-	ret = request_threaded_irq(tps65912->irq_base + TPS65912_IRQ_GPIO3_F,
-		NULL, powerkey_handler, flags, "tps65912_key_press", tps65912);
+	ret = request_threaded_irq(tps65912->irq_base +
+		tps65912->powerkey_down_irq,
+		NULL, powerkey_handler, flags,
+		"tps65912_key_press", tps65912);
+
+	/* enable the interrupt for this irq */
+	tps65912->irq_mask &= ~(1 << tps65912->powerkey_down_irq);
 
 	if (ret != 0)
 		dev_err(tps65912->dev,

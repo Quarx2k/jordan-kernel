@@ -324,6 +324,9 @@ struct tps65912 {
 	void *debugfs_data;
 	void *keydata;
 	u32 powerkey_state;
+	u32 powerkey_code;
+	u32 powerkey_up_irq;
+	u32 powerkey_down_irq;
 };
 
 struct tps65912_platform_data {
