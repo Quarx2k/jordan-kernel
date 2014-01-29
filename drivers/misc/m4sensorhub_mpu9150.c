@@ -364,7 +364,6 @@ static void m4_handle_mpu9150_gyro_irq(enum m4sensorhub_irqs int_event,
 					 void *mpu9150_data)
 {
 	struct mpu9150_client *mpu9150_client_data = mpu9150_data;
-
 	m4_read_mpu9150_data(mpu9150_client_data, TYPE_GYRO);
 	m4_report_mpu9150_inputevent(mpu9150_client_data, TYPE_GYRO);
 }
@@ -414,8 +413,26 @@ static ssize_t m4_mpu9150_write_accel_setdelay(struct device *dev,
 
 static DEVICE_ATTR(accel_setdelay, 0222, NULL, m4_mpu9150_write_accel_setdelay);
 
+static ssize_t m4_mpu9150_write_gyro_setdelay(struct device *dev,
+			struct device_attribute *attr,
+			const char *buf, size_t count)
+{
+	int scanresult;
+
+	sscanf(buf, "%d", &scanresult);
+
+	m4_set_mpu9150_delay(misc_mpu9150_data, scanresult, TYPE_GYRO);
+	mpu9150_irq_enable_disable(misc_mpu9150_data, TYPE_GYRO,
+				SENSOR_IRQ_ENABLE);
+
+	return count;
+}
+
+static DEVICE_ATTR(gyro_setdelay, 0222, NULL, m4_mpu9150_write_gyro_setdelay);
+
 static struct attribute *mpu9150_control_attributes[] = {
 	&dev_attr_accel_setdelay.attr,
+	&dev_attr_gyro_setdelay.attr,
 	NULL
 };
 
