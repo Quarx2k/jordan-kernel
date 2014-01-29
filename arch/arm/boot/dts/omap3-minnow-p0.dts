@@ -14,6 +14,8 @@
 	mmi,hwrev = <
 		0x00   /* Minnow P0 wingboard */
 		0x01   /* Minnow P0 portable */
+		0x03   /* Minnow P1A portable */
+		0x02   /* Minnow P1B portable */
 	>;
 
 	c55-ctrl@0 {
