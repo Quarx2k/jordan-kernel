@@ -61,6 +61,10 @@
 		pinctrl-0 = <&wdi_phy_gpio_mode>;
 		pinctrl-1 = <&wdi_phy_safe_mode>;
 	};
+
+	rtc_sensorhub@0 {
+		compatible = "mot,rtc_from_sensorhub";
+	};
 };
 
 &usb_phy_pins {
