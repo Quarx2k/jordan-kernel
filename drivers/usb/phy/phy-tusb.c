@@ -32,6 +32,7 @@
 #include <linux/workqueue.h>
 #include <linux/wakelock.h>
 #include <linux/of.h>
+#include <linux/of_gpio.h>
 #include <linux/module.h>
 
 struct tusb_usb {
@@ -40,11 +41,9 @@ struct tusb_usb {
 	struct work_struct work;
 	struct workqueue_struct *workqueue;
 	struct wake_lock wake_lock;
-	int			irq;
-	int			irq_gpio;
-	int			resetn_gpio;
-	int			cs_gpio;
-	int			csn_gpio;
+	int irq_gpio;
+	int num_gpios;
+	struct gpio *gpio_list;
 };
 
 static int tusb_set_suspend(struct usb_phy *x, int suspend)
@@ -89,22 +88,20 @@ static void tusb_usb_work_func(struct work_struct *work)
 {
 	struct tusb_usb *tusb =
 		container_of(work, struct tusb_usb, work);
-	int vbus_stat = gpio_get_value(tusb->irq_gpio);
+	bool vbus_state = gpio_get_value(tusb->irq_gpio);
+	int i;
 
-	if (vbus_stat) {
-		if (tusb->resetn_gpio >= 0)
-			gpio_set_value(tusb->resetn_gpio, 1);
-		if (tusb->cs_gpio >= 0)
-			gpio_set_value(tusb->cs_gpio, 1);
-		if (tusb->csn_gpio >= 0)
-			gpio_set_value(tusb->csn_gpio, 0);
-	} else {
-		if (tusb->resetn_gpio >= 0)
-			gpio_set_value(tusb->resetn_gpio, 0);
-		if (tusb->cs_gpio >= 0)
-			gpio_set_value(tusb->cs_gpio, 0);
-		if (tusb->csn_gpio >= 0)
-			gpio_set_value(tusb->csn_gpio, 1);
+	/* For all the GPIOs configured as output:
+	     Set the level to the default state if VBUS is low
+	     Set the level to the opposite of default state if VBUS is high
+	 */
+	for (i = 0; i < tusb->num_gpios; i++) {
+		if (!(tusb->gpio_list[i].flags & GPIOF_DIR_IN)) {
+			bool default_level =
+				!!(tusb->gpio_list[i].flags & GPIOF_INIT_HIGH);
+			gpio_set_value(tusb->gpio_list[i].gpio,
+				       vbus_state ^ default_level);
+		}
 	}
 
 	if (wake_lock_active(&tusb->wake_lock))
@@ -121,12 +118,58 @@ static irqreturn_t tusb_usb_isr(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
+static int tusb_parse_of(struct platform_device *pdev, struct tusb_usb *tusb)
+{
+	int gpio_count;
+	int i;
+	struct device_node *np = pdev->dev.of_node;
+	enum of_gpio_flags flags;
+
+	if (!tusb)
+		return -EINVAL;
+
+	gpio_count = of_gpio_count(np);
+
+	if (!gpio_count) {
+		dev_err(&pdev->dev, "No GPIOS defined in device tree\n");
+		return -EINVAL;
+	}
+
+	/* Make sure number of GPIOs defined matches the supplied number of
+	 * GPIO name strings.
+	 */
+	if (gpio_count != of_property_count_strings(np, "gpio-names")) {
+		dev_err(&pdev->dev, "GPIO info and name mismatch\n");
+		return -EINVAL;
+	}
+
+	tusb->gpio_list = devm_kzalloc(&pdev->dev,
+				sizeof(struct gpio) * gpio_count,
+				GFP_KERNEL);
+	if (!tusb->gpio_list)
+		return -ENOMEM;
+
+	tusb->num_gpios = gpio_count;
+	for (i = 0; i < gpio_count; i++) {
+		tusb->gpio_list[i].gpio = of_get_gpio_flags(np, i, &flags);
+		tusb->gpio_list[i].flags = flags;
+		of_property_read_string_index(np, "gpio-names", i,
+					      &tusb->gpio_list[i].label);
+
+		dev_dbg(&pdev->dev, "%s: gpio-%d  flags: 0x%lx\n",
+			tusb->gpio_list[i].label, tusb->gpio_list[i].gpio,
+			tusb->gpio_list[i].flags);
+	}
+
+	return 0;
+}
+
 static int  tusb_usb_probe(struct platform_device *pdev)
 {
 	struct tusb_usb	*tusb;
 	struct usb_otg	*otg;
 	struct device_node *np;
-	int gpio;
+	int i, ret, irqnum = -1;
 
 	np = pdev->dev.of_node;
 	if (!np) {
@@ -138,16 +181,41 @@ static int  tusb_usb_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "unable to allocate memory for tusb PHY\n");
 		return -ENOMEM;
 	}
-	tusb->irq = -1;
-	tusb->irq_gpio = -1;
-	tusb->resetn_gpio = -1;
-	tusb->cs_gpio = -1;
-	tusb->csn_gpio = -1;
+
+	ret = tusb_parse_of(pdev, tusb);
+	if (ret) {
+		dev_err(&pdev->dev, "Error parsing device tree\n");
+		return ret;
+	}
+
+	ret = gpio_request_array(tusb->gpio_list, tusb->num_gpios);
+	if (ret) {
+		dev_err(&pdev->dev, "failed to request GPIOs\n");
+		return ret;
+	}
+
+	for (i = 0; i < tusb->num_gpios; i++) {
+		if (!strcmp(tusb->gpio_list[i].label, "tusb-irq")) {
+			tusb->irq_gpio = tusb->gpio_list[i].gpio;
+			irqnum = gpio_to_irq(tusb->irq_gpio);
+			ret = request_irq(irqnum,
+					tusb_usb_isr,
+					IRQF_DISABLED |
+					IRQF_TRIGGER_RISING |
+					IRQF_TRIGGER_FALLING,
+					"tsub-irq", tusb);
+			if (ret) {
+				dev_err(&pdev->dev, "failed to get irq\n");
+				goto free_gpios;
+			}
+		}
+	}
 
 	otg = devm_kzalloc(&pdev->dev, sizeof(*otg), GFP_KERNEL);
 	if (!otg) {
 		dev_err(&pdev->dev, "unable to allocate memory for tusb OTG\n");
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto free_irq;
 	}
 
 	wake_lock_init(&tusb->wake_lock, WAKE_LOCK_SUSPEND, "tusb");
@@ -155,58 +223,17 @@ static int  tusb_usb_probe(struct platform_device *pdev)
 	tusb->workqueue = create_workqueue("tusb");
 	INIT_WORK(&tusb->work, tusb_usb_work_func);
 
-	if (!of_property_read_u32(np, "resetn-gpio", &gpio)) {
-		if (!gpio_request(gpio, "tusb-resetn")) {
-			if (!gpio_direction_output(gpio, 1))
-				tusb->resetn_gpio = gpio;
-			else
-				gpio_free(gpio);
+	if (irqnum >= 0) {
+		ret = enable_irq_wake(irqnum);
+		if (ret) {
+			dev_err(&pdev->dev, "unable to enable irq wake\n");
+			ret = -EINVAL;
+			goto cancel_work;
 		}
+	} else {
+		dev_err(&pdev->dev, "no IRQ configured\n");
+		goto cancel_work;
 	}
-
-	if (!of_property_read_u32(np, "cs-gpio", &gpio)) {
-		if (!gpio_request(gpio, "tusb-cs")) {
-			if (!gpio_direction_output(gpio, 1))
-				tusb->cs_gpio = gpio;
-			else
-				gpio_free(gpio);
-		}
-	}
-
-	if (!of_property_read_u32(np, "csn-gpio", &gpio)) {
-		if (!gpio_request(gpio, "tusb-csn")) {
-			if (!gpio_direction_output(gpio, 0))
-				tusb->csn_gpio = gpio;
-			else
-				gpio_free(gpio);
-		}
-	}
-
-	if (!of_property_read_u32(np, "irq-gpio", &gpio)) {
-		tusb->irq_gpio = gpio;
-		if (!gpio_request(tusb->irq_gpio, "tusb-irq")) {
-			if (!gpio_direction_input(tusb->irq_gpio)) {
-				tusb->irq = gpio_to_irq(tusb->irq_gpio);
-				irq_set_irq_type(tusb->irq,
-						 IRQ_TYPE_EDGE_RISING |
-						 IRQ_TYPE_EDGE_FALLING);
-
-				if (request_irq(tusb->irq, tusb_usb_isr,
-						IRQF_DISABLED |
-						IRQF_TRIGGER_RISING,
-						"tsub-irq", tusb)) {
-					gpio_free(tusb->irq_gpio);
-					tusb->irq = -1;
-					tusb->irq_gpio = -1;
-				}
-			} else {
-				gpio_free(tusb->irq_gpio);
-			}
-		}
-	}
-	if (tusb->irq == -1)
-		dev_info(&pdev->dev, "Unable to get enable irq;"
-				     " no interrupt support\n");
 
 	tusb->dev		= &pdev->dev;
 	tusb->phy.dev		= tusb->dev;
@@ -227,32 +254,34 @@ static int  tusb_usb_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, tusb);
 
 	return 0;
+
+cancel_work:
+	cancel_work_sync(&tusb->work);
+	destroy_workqueue(tusb->workqueue);
+	wake_lock_destroy(&tusb->wake_lock);
+free_irq:
+	free_irq(irqnum, tusb);
+free_gpios:
+	gpio_free_array(tusb->gpio_list, tusb->num_gpios);
+
+	return ret;
 }
 
 static int tusb_usb_remove(struct platform_device *pdev)
 {
 	struct tusb_usb	*tusb = platform_get_drvdata(pdev);
+	int irqnum = gpio_to_irq(tusb->irq_gpio);
 
 
-	if (tusb->irq >= 0) {
-		disable_irq_wake(tusb->irq);
-		free_irq(tusb->irq, tusb);
-		gpio_free(tusb->irq_gpio);
-	}
-
-	if (tusb->csn_gpio >= 0)
-		gpio_free(tusb->csn_gpio);
-	if (tusb->cs_gpio >= 0)
-		gpio_free(tusb->csn_gpio);
-	if (tusb->resetn_gpio >= 0)
-		gpio_free(tusb->csn_gpio);
-
+	disable_irq_wake(irqnum);
 	cancel_work_sync(&tusb->work);
 	destroy_workqueue(tusb->workqueue);
 
 	if (wake_lock_active(&tusb->wake_lock))
 		wake_unlock(&tusb->wake_lock);
 	wake_lock_destroy(&tusb->wake_lock);
+	free_irq(irqnum, tusb);
+	gpio_free_array(tusb->gpio_list, tusb->num_gpios);
 
 	return 0;
 }
