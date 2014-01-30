@@ -47,12 +47,3 @@ config RFKILL_GPIO
 	  If you say yes here you get support of a generic gpio RFKILL
 	  driver. The platform should fill in the appropriate fields in the
 	  rfkill_gpio_platform_data structure and pass that to the driver.
-
-config RFKILL_WL127X
-    tristate "Bluetooth power control driver for TI wl127x"
-    depends on RFKILL
-    default n
-    ---help---
-     Creates an rfkill entry in sysfs for power control of Bluetooth
-     TI wl127x chips.
-
