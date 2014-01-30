@@ -9,7 +9,6 @@
  */
 #include <linux/i2c.h>
 
-extern void __init minnow_bt_init(void);
 extern void __init minnow_spi_init(void);
 extern void __init minnow_sensors_init(void);
 extern void __init minnow_touch_init(struct i2c_board_info *i2c_info);
