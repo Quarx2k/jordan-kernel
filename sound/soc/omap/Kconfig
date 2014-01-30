@@ -3,6 +3,17 @@ config SND_OMAP_SOC
 	depends on ARCH_OMAP && DMA_OMAP
 	select SND_SOC_DMAENGINE_PCM
 
+config SND_OMAP_SOC_C55
+	tristate "SoC Audio support for C55 audio"
+	depends on SND_OMAP_SOC
+	select SND_OMAP_SOC_MCBSP
+	select SND_SOC_C55
+	help
+	  Say Y if you want to add support for SoC audio from the C55 DSP. This
+	  pulls audio over the McBSP bus in I2S format. The C55 DSP outputs the
+	  data in 16 bit 2 channel 16 kHz audio. It uses an input clock
+	  frequency of 83.456 Mhz.
+
 config SND_OMAP_SOC_DMIC
 	tristate
 

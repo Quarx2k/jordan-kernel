@@ -67,6 +67,13 @@
 	};
 };
 
+&audio_gpio_pins {
+	pinctrl-single,pins = <
+		0x0ba 0x004	/* DSS_DATA7, MODE4 | OUTPUT */
+		0x0c8 0x004	/* DSS_DATA14, MODE4 | OUTPUT */
+	>;
+};
+
 &usb_phy_pins {
 	pinctrl-single,pins = <
 		0x140 0x104     /* MCBSP3_CLKX, MODE4 (GPIO-142) | INPUT */
