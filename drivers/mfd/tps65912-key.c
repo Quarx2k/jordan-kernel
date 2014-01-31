@@ -55,9 +55,7 @@ static int __init tps65912_key_probe(struct platform_device *pdev)
 	}
 
 	set_bit(EV_KEY, key->input_dev->evbit);
-	set_bit(KEY_MEDIA, key->input_dev->keybit);
-	set_bit(KEY_END, key->input_dev->keybit);
-	set_bit(KEY_POWER_DOUBLE, key->input_dev->keybit);
+	set_bit(key->tps65912->powerkey_code, key->input_dev->keybit);
 
 	key->input_dev->name = "tps65912-key";
 
