@@ -34,10 +34,14 @@
 
 	tusb_phy: tusb-usb@0 {
 		compatible = "ti,tusb-usb";
-		irq-gpio = <142>;
-		resetn-gpio = <15>;
-		cs-gpio = <16>;
-		csn-gpio = <27>;
+		gpios = <&gpio5 14 0x1>,  /* IRQ gpio-142    GPIOF_DIR_IN */
+			<&gpio1 15 0x0>,  /* resetn gpio-15  GPIOF_DIR_OUT|GPIOF_INIT_LOW */
+			<&gpio1 16 0x0>,  /* cs gpio-16      GPIOF_DIR_OUT|GPIOF_INIT_LOW */
+			<&gpio1 27 0x2>;  /* cs gpio-27      GPIOF_DIR_OUT|GPIOF_INIT_HIGH */
+		gpio-names = "tusb-irq",
+			     "tusb-resetn",
+			     "tusb-cs",
+			     "tusb-csn";
 		reg = <0 0>;
 	};
 
