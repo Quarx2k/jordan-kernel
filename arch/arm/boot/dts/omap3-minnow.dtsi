@@ -85,6 +85,22 @@
 		mot,bt_fm =		<1>;  /* 0x1 - BT, 0x2 - FM, 0x3 - Both */
 		mot,bt_en-gpio =        <&gpio3 19 0>; /* BT_EN        gpio-083 */
 	};
+
+	matrix-keypad {
+		compatible = "gpio-matrix-keypad";
+		debounce-delay-ms = <5>;
+		col-scan-delay-us = <2>;
+		gpio-activelow;  /* Using pull-ups on rows */
+		linux,wakeup;  /* Any event will wake the host */
+
+		row-gpios = <&gpio2 5 1   /* gpio_37, input */
+			     &gpio2 7 1>; /* gpio_39, input */
+
+		col-gpios = <&gpio2 11 2>; /* gpio_43, output high */
+
+		linux,keymap = <0x00000072   /* Row0, Col0, code 114 (VOLDWN) */
+			        0x01000073>; /* Row1, Col0, code 115 (VOLUP) */
+	};
 };
 
 
@@ -96,7 +112,7 @@
 		compatible = "atmel,atmxt-ts";
 		reg = <0x4a>;
 		interrupt-parent = <&intc>;
-		gpios = <&gpio4 3 0>, /* IRQ   gpio-099 */
+		gpios = <&gpio4 3 1>, /* IRQ   gpio-099 */
 			<&gpio6 4 0>; /* RESET gpio-164*/
 		atmel,atmxt-tdat-filename = "atmxt-r2.tdat";
 	};
@@ -154,6 +170,9 @@
 
 	board_pins: pinmux_board_pins {
 		pinctrl-single,pins = <
+			0x050 0x11C	/* GPMC_A4, MODE4 | INPUT_PULLUP */
+			0x054 0x11C	/* GPMC_A6, MODE4 | INPUT_PULLUP */
+			0x05C 0x004	/* GPMC_A10, MODE4 | OUTPUT */
 			0x08e 0x104	/* GPMC_CLK, MODE4 | INPUT */
 			0x0a0 0x002	/* GPMC_WAIT2, MODE2 | OUTPUT */
 			0x0a2 0x102	/* GPMC_WAIT3, MODE2 | INPUT */
@@ -259,3 +278,4 @@
 	vmmc-supply = <&vmmc>;
 	wl_host_wake_gpio = <10>;
 };
+
