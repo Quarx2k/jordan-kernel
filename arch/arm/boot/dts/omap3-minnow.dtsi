@@ -11,31 +11,6 @@
 	model = "Motorola OMAP3 Platform";
 	compatible = "mot,omap3-minnow", "ti,omap3";
 
-	Display@0 {
-		compatible = "mot,minnow-panel-dsi-cm";
-		/* 0: MINNOW_PANEL_CM_220X176
-		 * 1: MINNOW_PANEL_CM_220X220
-		 * 2: MINNOW_PANEL_CM_BRIDGE_320X320
-		 */
-		id_panel = <2>;
-		gpio_panel_reset = <&gpio1 14 0>;	/* RESET gpio-14 */
-		gpio_bridge_reset = <&gpio1 23 0>;	/* RESET gpio-23 */
-		gpio_clk_en = <&gpio6 17 0>;	/* RESET gpio-177 */
-		/* declare it if ext_te enable */
-		//gpio_te = <&gpio1 0 0>;	/* EXT_TE gpio-0 */
-		//pins = <0 1 2 3>;		/* DSI Pin config */
-		//esd_interval = <0>;		/* ESD_INTERVAL */
-		//pixel_clock = <4608>;		/* kHZ = 320*240*60/1000*/
-		/* 0: RGB888
-		 * 1: RGB666
-		 * 2: RGB666_PACKED
-		 * 3: RGB565
-		 */
-		//pixel_format = <1>;
-		//hs_clk = <90000000 150000000>;	/* min max*/
-		//lp_clk = <7000000 9000000>; 	/* min max*/
-	};
-
 	/* FIXME: this dummy regulator is only needed as
 	   a reference, but is enough to let devices
 	   reference something.  The regulator_get will

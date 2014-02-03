@@ -31,6 +31,7 @@
 #include <linux/workqueue.h>
 #include <linux/slab.h>
 #include <linux/mutex.h>
+#include <linux/regulator/consumer.h>
 
 #include <video/omapdss.h>
 #include <video/omap-panel-data.h>
@@ -309,6 +310,8 @@ struct minnow_panel_data {
 	int clk_en_gpio;
 	struct minnow_panel_hw_reset hw_reset[MINNOW_RESET_MAX];
 	struct minnow_panel_hw_reset bridge_reset;
+	struct regulator *bridge_regulator;
+	struct regulator *panel_regulator;
 
 	bool use_dsi_backlight;
 
@@ -1192,6 +1195,9 @@ static int minnow_panel_dt_init(struct minnow_panel_data *mpd)
 		return -ENODEV;
 	}
 
+	/* Save the dt node entry to the device */
+	mpd->dssdev->dev.of_node = dt_node;
+
 	if (of_property_read_u32(dt_node, "id_panel", &value) \
 		|| (value >= MINNOW_PANEL_MAX)) {
 		dev_err(&mpd->dssdev->dev, \
@@ -1398,6 +1404,18 @@ static int minnow_panel_probe(struct omap_dss_device *dssdev)
 					minnow_panel_te_timeout_work_callback);
 
 		dev_dbg(&dssdev->dev, "Using GPIO TE\n");
+	}
+
+	mpd->bridge_regulator = devm_regulator_get(&dssdev->dev, "bridge");
+	if (IS_ERR(mpd->bridge_regulator)) {
+		mpd->bridge_regulator = NULL;
+		dev_info(&dssdev->dev, "Could not get bridge regulator\n");
+	}
+
+	mpd->panel_regulator = devm_regulator_get(&dssdev->dev, "panel");
+	if (IS_ERR(mpd->panel_regulator)) {
+		mpd->panel_regulator = NULL;
+		dev_info(&dssdev->dev, "Could not get panel regulator\n");
 	}
 
 	mpd->workqueue = create_singlethread_workqueue("minnow_panel_esd");
@@ -1610,6 +1628,19 @@ static int minnow_panel_enable(struct omap_dss_device *dssdev)
 		goto err;
 	}
 
+	if (mpd->bridge_regulator) {
+		if (regulator_enable(mpd->bridge_regulator)) {
+			r = -ENODEV;
+			goto err;
+		}
+	}
+	if (mpd->panel_regulator) {
+		if (regulator_enable(mpd->panel_regulator)) {
+			r = -ENODEV;
+			goto err;
+		}
+	}
+
 	dsi_bus_lock(dssdev);
 
 	r = minnow_panel_power_on(dssdev);
@@ -1656,6 +1687,12 @@ static void minnow_panel_disable(struct omap_dss_device *dssdev)
 	dsi_bus_unlock(dssdev);
 
 	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
+
+	if (mpd->panel_regulator)
+		regulator_disable(mpd->panel_regulator);
+
+	if (mpd->bridge_regulator)
+		regulator_disable(mpd->bridge_regulator);
 
 	mutex_unlock(&mpd->lock);
 }
