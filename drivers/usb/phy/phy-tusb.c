@@ -91,6 +91,14 @@ static void tusb_usb_work_func(struct work_struct *work)
 	bool vbus_state = gpio_get_value(tusb->irq_gpio);
 	int i;
 
+	if (vbus_state) {
+		atomic_notifier_call_chain(&tusb->phy.notifier,
+			USB_EVENT_VBUS, NULL);
+	} else {
+		atomic_notifier_call_chain(&tusb->phy.notifier,
+			USB_EVENT_NONE, NULL);
+	}
+
 	/* For all the GPIOs configured as output:
 	     Set the level to the default state if VBUS is low
 	     Set the level to the opposite of default state if VBUS is high
@@ -241,7 +249,7 @@ static int  tusb_usb_probe(struct platform_device *pdev)
 	tusb->phy.set_suspend	= tusb_set_suspend;
 	tusb->phy.otg		= otg;
 	tusb->phy.type		= USB_PHY_TYPE_USB2;
-
+	ATOMIC_INIT_NOTIFIER_HEAD(&tusb->phy.notifier);
 
 	otg->set_host		= tusb_set_host;
 	otg->set_peripheral	= tusb_set_peripheral;
