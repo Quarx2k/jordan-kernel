@@ -150,15 +150,13 @@ static void m4_report_mpu9150_inputevent(
 		input_sync(mpu9150_client_data->input_dev);
 		break;
 	case TYPE_COMPASS:
-		input_report_abs(mpu9150_client_data->input_dev, ABS_COMPASS_X,
+		input_report_rel(mpu9150_client_data->input_dev, REL_X,
 			 mpu9150_client_data->compass_data.cx);
-		input_report_abs(mpu9150_client_data->input_dev, ABS_COMPASS_Y,
+		input_report_rel(mpu9150_client_data->input_dev, REL_Y,
 			mpu9150_client_data->compass_data.cy);
-		input_report_abs(mpu9150_client_data->input_dev, ABS_COMPASS_Z,
+		input_report_rel(mpu9150_client_data->input_dev, REL_Z,
 			mpu9150_client_data->compass_data.cz);
-		input_report_abs(mpu9150_client_data->input_dev,
-			ABS_COMPASS_ACCURACY,
-			mpu9150_client_data->compass_data.ca);
+		/* TODO : accuracy needs to be sent out through sysfs*/
 		input_sync(mpu9150_client_data->input_dev);
 		break;
 	case TYPE_FUSION:
@@ -430,9 +428,28 @@ static ssize_t m4_mpu9150_write_gyro_setdelay(struct device *dev,
 
 static DEVICE_ATTR(gyro_setdelay, 0222, NULL, m4_mpu9150_write_gyro_setdelay);
 
+static ssize_t m4_mpu9150_write_compass_setdelay(struct device *dev,
+			struct device_attribute *attr,
+			const char *buf, size_t count)
+{
+	int scanresult;
+
+	sscanf(buf, "%d", &scanresult);
+
+	m4_set_mpu9150_delay(misc_mpu9150_data, scanresult, TYPE_COMPASS);
+	mpu9150_irq_enable_disable(misc_mpu9150_data, TYPE_COMPASS,
+				SENSOR_IRQ_ENABLE);
+
+	return count;
+}
+
+static DEVICE_ATTR(compass_setdelay, 0222, NULL,
+				m4_mpu9150_write_compass_setdelay);
+
 static struct attribute *mpu9150_control_attributes[] = {
 	&dev_attr_accel_setdelay.attr,
 	&dev_attr_gyro_setdelay.attr,
+	&dev_attr_compass_setdelay.attr,
 	NULL
 };
 
@@ -924,14 +941,6 @@ static int mpu9150_client_probe(struct platform_device *pdev)
 	mpu9150_client_data->input_dev->name = MPU9150_CLIENT_DRIVER_NAME;
 	set_bit(EV_ABS, mpu9150_client_data->input_dev->evbit);
 	set_bit(EV_REL, mpu9150_client_data->input_dev->evbit);
-	input_set_abs_params(mpu9150_client_data->input_dev,
-		ABS_COMPASS_X, -2147483647, 2147483647, 0, 0);
-	input_set_abs_params(mpu9150_client_data->input_dev,
-		ABS_COMPASS_Y, -2147483647, 2147483647, 0, 0);
-	input_set_abs_params(mpu9150_client_data->input_dev,
-		ABS_COMPASS_Z, -2147483647, 2147483647, 0, 0);
-	input_set_abs_params(mpu9150_client_data->input_dev,
-		ABS_COMPASS_ACCURACY, -128, 127, 0, 0);
 	input_set_abs_params(mpu9150_client_data->input_dev,
 		ABS_X, -2147483647, 2147483647, 0, 0);
 	input_set_abs_params(mpu9150_client_data->input_dev,

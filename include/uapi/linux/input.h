@@ -842,29 +842,7 @@ struct input_keymap_entry {
 
 
 /* MSP (sensor) related events */
-#define ABS_STEPCOUNT           0x40
-#define ABS_ACTIVITY            0x41
-#define ABS_SPEED               0x42
-#define ABS_CADENCE             0x43
 #define ABS_ALTITUDE            0x44
-#define ABS_PRESSURE_PASCAL     0x45
-#define ABS_ASCENT              0x46
-#define ABS_DESCENT             0x47
-#define ABS_INCLINATION         0x48
-#define ABS_STEPLENGTH          0x49
-#define ABS_3D_TAP_TAP          0x4a
-#define ABS_HEADING             0x4b
-#define ABS_TEMPERATURE         0x4c
-#define ABS_MSP_LATITUDE        0x4d
-#define ABS_MSP_LONGITUDE       0x4e
-#define ABS_MSP_HEADING         0x4f
-#define ABS_MSP_ACCURACY        0x50
-
-#define ABS_COMPASS_X           0x51
-#define ABS_COMPASS_Y           0x52
-#define ABS_COMPASS_Z           0x53
-#define ABS_COMPASS_ACCURACY    0x54
-
 #define ABS_TILTSCROLL          0x55
 
 /* TODO TEMP !!! CHeck IKXCLOCK-100 */
