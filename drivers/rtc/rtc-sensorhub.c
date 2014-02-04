@@ -12,10 +12,13 @@
 #include <linux/err.h>
 #include <linux/rtc.h>
 #include <linux/platform_device.h>
+#include <linux/m4sensorhub.h>
+#include <linux/m4sensorhub/m4sensorhub_registers.h>
 
 static int rtc_sensorhub_rtc_read_alarm(struct device *dev,
 	struct rtc_wkalrm *alrm)
 {
+	pr_err("%s:\n", __func__);
 	/* TODO : implement a real handler*/
 	return 0;
 }
@@ -23,6 +26,7 @@ static int rtc_sensorhub_rtc_read_alarm(struct device *dev,
 static int rtc_sensorhub_rtc_set_alarm(struct device *dev,
 	struct rtc_wkalrm *alrm)
 {
+	pr_err("%s:\n", __func__);
 	/* TODO : implement a real handler*/
 	return 0;
 }
@@ -30,16 +34,46 @@ static int rtc_sensorhub_rtc_set_alarm(struct device *dev,
 static int rtc_sensorhub_rtc_read_time(struct device *dev,
 	struct rtc_time *tm)
 {
-	/* TODO : implement a real handler*/
-	rtc_time_to_tm(get_seconds(), tm);
+	u32 seconds;
+
+	struct m4sensorhub_data *p_m4_drvdata =
+				m4sensorhub_client_get_drvdata();
+
+	if (m4sensorhub_reg_getsize(p_m4_drvdata,
+		M4SH_REG_GENERAL_UTC) != m4sensorhub_reg_read(
+		p_m4_drvdata, M4SH_REG_GENERAL_UTC,
+		(char *)&seconds)) {
+		pr_err("%s: Failed get M4 clock!\n", __func__);
+		return -EIO;
+	}
+
+	rtc_time_to_tm(seconds, tm);
 	return 0;
 }
 
 static int rtc_sensorhub_rtc_set_time(struct device *dev,
 	struct rtc_time *tm)
 {
-	/* TODO : implement a real handler*/
-	pr_err("%s:\n", __func__);
+	u32 seconds;
+	unsigned long sec;
+	struct m4sensorhub_data *p_m4_drvdata =
+				m4sensorhub_client_get_drvdata();
+
+	/* M4 expects the UTC time in seconds from Jan 1, 1970,
+	basically epoch_time in seconds */
+	rtc_tm_to_time(tm, &sec);
+
+	/* M4 accepts time as u32*/
+	seconds = (u32) sec;
+
+	if (m4sensorhub_reg_getsize(p_m4_drvdata,
+		M4SH_REG_GENERAL_UTC) != m4sensorhub_reg_write(
+		p_m4_drvdata, M4SH_REG_GENERAL_UTC,
+		(char *)&seconds, m4sh_no_mask)) {
+			pr_err("%s: Failed set M4 clock!\n", __func__);
+			return -EIO;
+	}
+
 	return 0;
 }
 
@@ -56,6 +90,7 @@ static int rtc_sensorhub_rtc_proc(struct device *dev, struct seq_file *seq)
 	struct platform_device *plat_dev = to_platform_device(dev);
 	char buffer[50];
 	int length;
+	pr_err("%s:\n", __func__);
 
 	seq_puts(seq, "sensorhub\t\t: yes\n");
 
@@ -72,6 +107,7 @@ static int rtc_sensorhub_rtc_alarm_irq_enable(struct device *dev,
 					unsigned int enable)
 {
 	/* TODO : implement a real handler*/
+	pr_err("%s:\n", __func__);
 	return 0;
 }
 
@@ -109,29 +145,37 @@ static int rtc_sensorhub_probe(struct platform_device *plat_dev)
 	int err;
 	struct rtc_device *rtc;
 
+	err = device_init_wakeup(&plat_dev->dev, true);
+	if (err) {
+		pr_err("%s: failed to init as wakeup\n", __func__);
+		return err;
+	}
+
 	rtc = devm_rtc_device_register(&plat_dev->dev, "rtc_sensorhub",
 				&rtc_sensorhub_rtc_ops, THIS_MODULE);
+
 	if (IS_ERR(rtc)) {
 		err = PTR_ERR(rtc);
-		return err;
+		goto err_disable_wakeup;
 	}
 
 	err = device_create_file(&plat_dev->dev, &dev_attr_irq);
 	if (err)
-		goto err;
+		goto err_disable_wakeup;
 
 	platform_set_drvdata(plat_dev, rtc);
 
 	return 0;
 
-err:
+err_disable_wakeup:
+	device_init_wakeup(&plat_dev->dev, false);
 	return err;
 }
 
 static int rtc_sensorhub_remove(struct platform_device *plat_dev)
 {
 	device_remove_file(&plat_dev->dev, &dev_attr_irq);
-
+	device_init_wakeup(&plat_dev->dev, false);
 	return 0;
 }
 
