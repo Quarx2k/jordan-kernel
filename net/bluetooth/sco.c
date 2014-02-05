@@ -72,7 +72,7 @@ static void sco_sock_timeout(unsigned long arg)
 	struct sock *sk = (struct sock *) arg;
 
 	BT_DBG("sock %p state %d", sk, sk->sk_state);
-
+	printk("%s\n", __func__);
 	bh_lock_sock(sk);
 	sk->sk_err = ETIMEDOUT;
 	sk->sk_state_change(sk);
@@ -544,6 +544,7 @@ static int sco_sock_listen(struct socket *sock, int backlog)
 	lock_sock(sk);
 
 	if (sk->sk_state != BT_BOUND || sock->type != SOCK_SEQPACKET) {
+		printk("%s: fail1\n", __func__);
 		err = -EBADFD;
 		goto done;
 	}
@@ -619,7 +620,7 @@ static int sco_sock_getname(struct socket *sock, struct sockaddr *addr, int *len
 	struct sock *sk = sock->sk;
 
 	BT_DBG("sock %p, sk %p", sock, sk);
-
+	printk("%s\n", __func__);
 	addr->sa_family = AF_BLUETOOTH;
 	*len = sizeof(struct sockaddr_sco);
 
@@ -638,7 +639,7 @@ static int sco_sock_sendmsg(struct kiocb *iocb, struct socket *sock,
 	int err;
 
 	BT_DBG("sock %p, sk %p", sock, sk);
-
+	printk("%s\n", __func__);
 	err = sock_error(sk);
 	if (err)
 		return err;
@@ -763,7 +764,7 @@ static int sco_sock_shutdown(struct socket *sock, int how)
 	int err = 0;
 
 	BT_DBG("sock %p, sk %p", sock, sk);
-
+	printk("%s\n", __func__);
 	if (!sk)
 		return 0;
 
@@ -787,7 +788,7 @@ static int sco_sock_release(struct socket *sock)
 	int err = 0;
 
 	BT_DBG("sock %p, sk %p", sock, sk);
-
+	printk("%s\n", __func__);
 	if (!sk)
 		return 0;
 

@@ -438,7 +438,7 @@ static int hci_sock_release(struct socket *sock)
 	struct hci_dev *hdev;
 
 	BT_DBG("sock %p sk %p", sock, sk);
-
+	printk("%s\n", __func__);
 	if (!sk)
 		return 0;
 
@@ -501,7 +501,7 @@ static int hci_sock_blacklist_del(struct hci_dev *hdev, void __user *arg)
 static inline int hci_sock_bound_ioctl(struct sock *sk, unsigned int cmd, unsigned long arg)
 {
 	struct hci_dev *hdev = hci_pi(sk)->hdev;
-
+	printk("%s\n", __func__);
 	if (!hdev)
 		return -EBADFD;
 
@@ -550,7 +550,7 @@ static int hci_sock_ioctl(struct socket *sock, unsigned int cmd, unsigned long a
 	int err;
 
 	BT_DBG("cmd %x arg %lx", cmd, arg);
-
+	printk("%s\n", __func__);
 	switch (cmd) {
 	case HCIGETDEVLIST:
 		return hci_get_dev_list(argp);
@@ -612,7 +612,7 @@ static int hci_sock_bind(struct socket *sock, struct sockaddr *addr, int addr_le
 	int len, err = 0;
 
 	BT_DBG("sock %p sk %p", sock, sk);
-
+	printk("%s\n", __func__);
 	if (!addr)
 		return -EINVAL;
 
@@ -709,7 +709,7 @@ static int hci_sock_getname(struct socket *sock, struct sockaddr *addr, int *add
 	struct hci_dev *hdev = hci_pi(sk)->hdev;
 
 	BT_DBG("sock %p sk %p", sock, sk);
-
+	printk("%s\n", __func__);
 	if (!hdev) {
 		printk("Fail 10\n");
 		return -EBADFD;
@@ -768,7 +768,7 @@ static int hci_sock_recvmsg(struct kiocb *iocb, struct socket *sock,
 	int copied, err;
 
 	BT_DBG("sock %p, sk %p", sock, sk);
-
+	printk("%s\n", __func__);
 	if (flags & (MSG_OOB))
 		return -EOPNOTSUPP;
 
@@ -814,7 +814,7 @@ static int hci_sock_sendmsg(struct kiocb *iocb, struct socket *sock,
 	int err;
 
 	BT_DBG("sock %p sk %p", sock, sk);
-
+	printk("%s\n", __func__);
 	if (msg->msg_flags & MSG_OOB)
 		return -EOPNOTSUPP;
 
@@ -1082,7 +1082,7 @@ static int hci_sock_create(struct net *net, struct socket *sock, int protocol)
 	struct sock *sk;
 
 	BT_DBG("sock %p", sock);
-
+	printk("%s\n", __func__);
 	if (sock->type != SOCK_RAW)
 		return -ESOCKTNOSUPPORT;
 

@@ -568,7 +568,7 @@ int rfcomm_dlc_set_modem_status(struct rfcomm_dlc *d, u8 v24_sig)
 {
 	BT_DBG("dlc %p state %ld v24_sig 0x%x",
 			d, d->state, v24_sig);
-
+	printk("%s\n", __func__);
 	if (test_bit(RFCOMM_RX_THROTTLED, &d->flags))
 		v24_sig |= RFCOMM_V24_FC;
 	else
@@ -600,7 +600,7 @@ static struct rfcomm_session *rfcomm_session_add(struct socket *sock, int state)
 		return NULL;
 
 	BT_DBG("session %p sock %p", s, sock);
-
+	printk("%s\n", __func__);
 	setup_timer(&s->timer, rfcomm_session_timeout, (unsigned long) s);
 
 	INIT_LIST_HEAD(&s->dlcs);

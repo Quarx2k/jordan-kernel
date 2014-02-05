@@ -236,7 +236,7 @@ int bt_sock_recvmsg(struct kiocb *iocb, struct socket *sock,
 	int err;
 
 	BT_DBG("sock %p sk %p len %zu", sock, sk, len);
-
+	printk("%s\n", __func__);
 	if (flags & (MSG_OOB))
 		return -EOPNOTSUPP;
 
@@ -269,7 +269,7 @@ EXPORT_SYMBOL(bt_sock_recvmsg);
 static long bt_sock_data_wait(struct sock *sk, long timeo)
 {
 	DECLARE_WAITQUEUE(wait, current);
-
+	printk("%s\n ", __func__);
 	add_wait_queue(sk_sleep(sk), &wait);
 	for (;;) {
 		set_current_state(TASK_INTERRUPTIBLE);
@@ -406,6 +406,7 @@ static inline unsigned int bt_accept_poll(struct sock *parent)
 {
 	struct list_head *p, *n;
 	struct sock *sk;
+	printk("%s\n ", __func__);
 
 	list_for_each_safe(p, n, &bt_sk(parent)->accept_q) {
 		sk = (struct sock *) list_entry(p, struct bt_sock, accept_q);
@@ -424,7 +425,7 @@ unsigned int bt_sock_poll(struct file *file, struct socket *sock, poll_table *wa
 	unsigned int mask = 0;
 
 	BT_DBG("sock %p, sk %p", sock, sk);
-
+	printk("%s state %d\n", __func__, sk->sk_state);
 	poll_wait(file, sk_sleep(sk), wait);
 
 	if (sk->sk_state == BT_LISTEN)

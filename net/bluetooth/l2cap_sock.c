@@ -46,7 +46,7 @@ static int l2cap_sock_bind(struct socket *sock, struct sockaddr *addr, int alen)
 	int len, err = 0;
 
 	BT_DBG("sk %p", sk);
-
+	printk("%s\n", __func__);
 	if (!addr || addr->sa_family != AF_BLUETOOTH)
 		return -EINVAL;
 
@@ -54,12 +54,14 @@ static int l2cap_sock_bind(struct socket *sock, struct sockaddr *addr, int alen)
 	len = min_t(unsigned int, sizeof(la), alen);
 	memcpy(&la, addr, len);
 
-	if (la.l2_cid && la.l2_psm)
+	if (la.l2_cid && la.l2_psm) {
+		printk("%s: fail 1\n", __func__);
 		return -EINVAL;
-
+	}
 	lock_sock(sk);
 
 	if (sk->sk_state != BT_OPEN) {
+		printk("%s: fail 2\n", __func__);
 		err = -EBADFD;
 		goto done;
 	}
@@ -85,9 +87,10 @@ static int l2cap_sock_bind(struct socket *sock, struct sockaddr *addr, int alen)
 	else
 		err = l2cap_add_psm(chan, &la.l2_bdaddr, la.l2_psm);
 
-	if (err < 0)
+	if (err < 0) {
+		printk("%s: fail 3\n", __func__);
 		goto done;
-
+	}
 	if (__le16_to_cpu(la.l2_psm) == 0x0001 ||
 				__le16_to_cpu(la.l2_psm) == 0x0003)
 		chan->sec_level = BT_SECURITY_SDP;
@@ -110,23 +113,27 @@ static int l2cap_sock_connect(struct socket *sock, struct sockaddr *addr, int al
 	int len, err = 0;
 
 	BT_DBG("sk %p", sk);
-
+	printk("%s\n", __func__);
 	if (!addr || alen < sizeof(addr->sa_family) ||
-	    addr->sa_family != AF_BLUETOOTH)
+	    addr->sa_family != AF_BLUETOOTH) {
+		printk("%s: fail 1\n", __func__);
 		return -EINVAL;
+	}
 
 	memset(&la, 0, sizeof(la));
 	len = min_t(unsigned int, sizeof(la), alen);
 	memcpy(&la, addr, len);
 
-	if (la.l2_cid && la.l2_psm)
+	if (la.l2_cid && la.l2_psm) {
+		printk("%s: fail 2\n", __func__);
 		return -EINVAL;
-
+	}
 	err = l2cap_chan_connect(chan, la.l2_psm, __le16_to_cpu(la.l2_cid),
 				&la.l2_bdaddr);
-	if (err)
+	if (err) {
+		printk("%s: fail 3\n", __func__);
 		return err;
-
+	}
 	lock_sock(sk);
 
 	err = bt_sock_wait_state(sk, BT_CONNECTED,
@@ -144,11 +151,12 @@ static int l2cap_sock_listen(struct socket *sock, int backlog)
 	int err = 0;
 
 	BT_DBG("sk %p backlog %d", sk, backlog);
-
+	printk("%s\n", __func__);
 	lock_sock(sk);
 
 	if ((sock->type != SOCK_SEQPACKET && sock->type != SOCK_STREAM)
 			|| sk->sk_state != BT_BOUND) {
+		printk("%s: fail1\n", __func__);
 		err = -EBADFD;
 		goto done;
 	}
@@ -162,6 +170,7 @@ static int l2cap_sock_listen(struct socket *sock, int backlog)
 			break;
 		/* fall through */
 	default:
+		printk("%s: fail 2\n", __func__);
 		err = -ENOTSUPP;
 		goto done;
 	}
@@ -172,8 +181,10 @@ static int l2cap_sock_listen(struct socket *sock, int backlog)
 	chan->state = BT_LISTEN;
 	sk->sk_state = BT_LISTEN;
 
+	printk("%s: err %d \n", __func__, err); 
 done:
-	release_sock(sk);
+	release_sock(sk); 
+
 	return err;
 }
 
@@ -189,7 +200,7 @@ static int l2cap_sock_accept(struct socket *sock, struct socket *newsock, int fl
 	timeo = sock_rcvtimeo(sk, flags & O_NONBLOCK);
 
 	BT_DBG("sk %p timeo %ld", sk, timeo);
-
+	printk("%s\n", __func__);
 	/* Wait for an incoming connection. (wake-one). */
 	add_wait_queue_exclusive(sk_sleep(sk), &wait);
 	while (1) {
@@ -240,7 +251,7 @@ static int l2cap_sock_getname(struct socket *sock, struct sockaddr *addr, int *l
 	struct l2cap_chan *chan = l2cap_pi(sk)->chan;
 
 	BT_DBG("sock %p, sk %p", sock, sk);
-
+	printk("%s\n", __func__);
 	addr->sa_family = AF_BLUETOOTH;
 	*len = sizeof(struct sockaddr_l2);
 
@@ -267,7 +278,7 @@ static int l2cap_sock_getsockopt_old(struct socket *sock, int optname, char __us
 	u32 opt;
 
 	BT_DBG("sk %p", sk);
-
+	printk("%s\n", __func__);
 	if (get_user(len, optlen))
 		return -EFAULT;
 
@@ -353,7 +364,7 @@ static int l2cap_sock_getsockopt(struct socket *sock, int level, int optname, ch
 	int len, err = 0;
 
 	BT_DBG("sk %p", sk);
-
+	printk("%s\n", __func__);
 	if (level == SOL_L2CAP)
 		return l2cap_sock_getsockopt_old(sock, optname, optval, optlen);
 
@@ -446,7 +457,7 @@ static int l2cap_sock_setsockopt_old(struct socket *sock, int optname, char __us
 	u32 opt;
 
 	BT_DBG("sk %p", sk);
-
+	printk("%s\n", __func__);
 	lock_sock(sk);
 
 	switch (optname) {
@@ -541,7 +552,7 @@ static int l2cap_sock_setsockopt(struct socket *sock, int level, int optname, ch
 	u32 opt;
 
 	BT_DBG("sk %p", sk);
-
+	printk("%s\n", __func__);
 	if (level == SOL_L2CAP)
 		return l2cap_sock_setsockopt_old(sock, optname, optval, optlen);
 
@@ -707,7 +718,7 @@ static int l2cap_sock_sendmsg(struct kiocb *iocb, struct socket *sock, struct ms
 	int err;
 
 	BT_DBG("sock %p, sk %p", sock, sk);
-
+	printk("%s\n", __func__);
 	err = sock_error(sk);
 	if (err)
 		return err;
@@ -790,7 +801,7 @@ static void l2cap_sock_kill(struct sock *sk)
 		return;
 
 	BT_DBG("sk %p state %s", sk, state_to_string(sk->sk_state));
-
+	printk("%s\n", __func__);
 	/* Kill poor orphan */
 
 	l2cap_chan_destroy(l2cap_pi(sk)->chan);
@@ -806,7 +817,7 @@ static int l2cap_sock_shutdown(struct socket *sock, int how)
 	int err = 0;
 
 	BT_DBG("sock %p, sk %p", sock, sk);
-
+	printk("%s\n", __func__);
 	if (!sk)
 		return 0;
 
@@ -852,7 +863,7 @@ static int l2cap_sock_release(struct socket *sock)
 	int err;
 
 	BT_DBG("sock %p, sk %p", sock, sk);
-
+	printk("%s\n", __func__);
 	if (!sk)
 		return 0;
 
@@ -866,7 +877,7 @@ static int l2cap_sock_release(struct socket *sock)
 static struct l2cap_chan *l2cap_sock_new_connection_cb(void *data)
 {
 	struct sock *sk, *parent = data;
-
+	printk("%s\n", __func__);
 	sk = l2cap_sock_alloc(sock_net(parent), NULL, BTPROTO_L2CAP,
 								GFP_ATOMIC);
 	if (!sk)
@@ -884,7 +895,7 @@ static int l2cap_sock_recv_cb(void *data, struct sk_buff *skb)
 	int err;
 	struct sock *sk = data;
 	struct l2cap_pinfo *pi = l2cap_pi(sk);
-
+	printk("%s\n", __func__);
 	lock_sock(sk);
 
 	if (pi->rx_busy_skb) {
@@ -918,14 +929,14 @@ done:
 static void l2cap_sock_close_cb(void *data)
 {
 	struct sock *sk = data;
-
+	printk("%s\n", __func__);
 	l2cap_sock_kill(sk);
 }
 
 static void l2cap_sock_state_change_cb(void *data, int state)
 {
 	struct sock *sk = data;
-
+	printk("%s\n", __func__);
 	sk->sk_state = state;
 }
 
@@ -934,7 +945,7 @@ static struct sk_buff *l2cap_sock_alloc_skb_cb(struct l2cap_chan *chan,
 					       int *err)
 {
 	struct sock *sk = chan->sk;
-
+	printk("%s\n", __func__);
 	return bt_skb_send_alloc(sk, len, nb, err);
 }
 
@@ -950,7 +961,7 @@ static struct l2cap_ops l2cap_chan_ops = {
 static void l2cap_sock_destruct(struct sock *sk)
 {
 	BT_DBG("sk %p", sk);
-
+	printk("%s\n", __func__);
 	if (l2cap_pi(sk)->rx_busy_skb) {
 		kfree_skb(l2cap_pi(sk)->rx_busy_skb);
 		l2cap_pi(sk)->rx_busy_skb = NULL;
@@ -966,7 +977,7 @@ static void l2cap_sock_init(struct sock *sk, struct sock *parent)
 	struct l2cap_chan *chan = pi->chan;
 
 	BT_DBG("sk %p", sk);
-
+	printk("%s\n", __func__);
 	if (parent) {
 		struct l2cap_chan *pchan = l2cap_pi(parent)->chan;
 
@@ -1035,7 +1046,7 @@ static struct sock *l2cap_sock_alloc(struct net *net, struct socket *sock, int p
 {
 	struct sock *sk;
 	struct l2cap_chan *chan;
-
+	printk("%s\n", __func__);
 	sk = sk_alloc(net, PF_BLUETOOTH, prio, &l2cap_proto);
 	if (!sk)
 		return NULL;
@@ -1068,7 +1079,7 @@ static int l2cap_sock_create(struct net *net, struct socket *sock, int protocol)
 	struct sock *sk;
 
 	BT_DBG("sock %p", sock);
-
+	printk("%s\n", __func__);
 	sock->state = SS_UNCONNECTED;
 
 	if (sock->type != SOCK_SEQPACKET && sock->type != SOCK_STREAM &&
@@ -1118,7 +1129,7 @@ static const struct net_proto_family l2cap_sock_family_ops = {
 int __init l2cap_init_sockets(void)
 {
 	int err;
-
+	printk("%s\n", __func__);
 	err = proto_register(&l2cap_proto, 0);
 	if (err < 0)
 		return err;

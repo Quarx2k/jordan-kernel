@@ -50,7 +50,7 @@ static int bnep_sock_release(struct socket *sock)
 	struct sock *sk = sock->sk;
 
 	BT_DBG("sock %p sk %p", sock, sk);
-
+	printk("%s\n", __func__);
 	if (!sk)
 		return 0;
 
@@ -70,7 +70,7 @@ static int bnep_sock_ioctl(struct socket *sock, unsigned int cmd, unsigned long 
 	int err;
 
 	BT_DBG("cmd %x arg %lx", cmd, arg);
-
+	printk("%s\n", __func__);
 	switch (cmd) {
 	case BNEPCONNADD:
 		if (!capable(CAP_NET_ADMIN))
@@ -201,7 +201,7 @@ static int bnep_sock_create(struct net *net, struct socket *sock, int protocol)
 	struct sock *sk;
 
 	BT_DBG("sock %p", sock);
-
+	printk("%s\n", __func__);
 	if (sock->type != SOCK_RAW)
 		return -ESOCKTNOSUPPORT;
 

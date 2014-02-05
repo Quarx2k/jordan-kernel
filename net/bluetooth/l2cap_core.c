@@ -271,7 +271,7 @@ struct l2cap_chan *l2cap_chan_create(struct sock *sk)
 		return NULL;
 
 	mutex_init(&chan->lock);
-
+	printk("%s\n", __func__);
 	chan->sk = sk;
 
 	write_lock(&chan_list_lock);
