@@ -71,6 +71,9 @@ enum m4sensorhub_irqs {
 	/* INT1 0x40 : passive buffer full */
 	M4SH_IRQ_PASSIVE_BUFFER_FULL,
 
+	/* INT1 0x80 : lightsensor data full */
+	M4SH_IRQ_LIGHTSENSOR_DATA_READY,
+
 	/* Number of allocated interrupts */
 	M4SH_IRQ__NUM
 };

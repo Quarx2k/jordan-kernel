@@ -65,6 +65,9 @@
 		stillmode {
 			compatible = "mot,m4stillmode";
 		};
+		lightsensor {
+			compatible = "mot,m4als";
+		};
 	};
 
 	sound {
