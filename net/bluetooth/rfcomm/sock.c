@@ -325,7 +325,7 @@ static struct sock *rfcomm_sock_alloc(struct net *net, struct socket *sock, int 
 }
 
 static int rfcomm_sock_create(struct net *net, struct socket *sock,
-			      int protocol, int kern)
+			      int protocol)// int kern)
 {
 	struct sock *sk;
 

@@ -122,8 +122,8 @@ int bt_sock_unregister(int proto)
 }
 EXPORT_SYMBOL(bt_sock_unregister);
 
-static int bt_sock_create(struct net *net, struct socket *sock, int proto,
-			  int kern)
+static int bt_sock_create(struct net *net, struct socket *sock, int proto)
+			  //int kern)
 {
 	int err;
 

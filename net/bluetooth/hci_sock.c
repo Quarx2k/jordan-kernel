@@ -620,12 +620,14 @@ static int hci_sock_bind(struct socket *sock, struct sockaddr *addr, int addr_le
 	len = min_t(unsigned int, sizeof(haddr), addr_len);
 	memcpy(&haddr, addr, len);
 
-	if (haddr.hci_family != AF_BLUETOOTH)
+	if (haddr.hci_family != AF_BLUETOOTH) {
+		printk("Fail 1\n");
 		return -EINVAL;
-
+	}
 	lock_sock(sk);
 
 	if (sk->sk_state == BT_BOUND) {
+		printk("Fail 2\n");
 		err = -EALREADY;
 		goto done;
 	}
@@ -633,6 +635,7 @@ static int hci_sock_bind(struct socket *sock, struct sockaddr *addr, int addr_le
 	switch (haddr.hci_channel) {
 	case HCI_CHANNEL_RAW:
 		if (hci_pi(sk)->hdev) {
+			printk("Fail 4\n");
 			err = -EALREADY;
 			goto done;
 		}
@@ -640,6 +643,7 @@ static int hci_sock_bind(struct socket *sock, struct sockaddr *addr, int addr_le
 		if (haddr.hci_dev != HCI_DEV_NONE) {
 			hdev = hci_dev_get(haddr.hci_dev);
 			if (!hdev) {
+				printk("Fail 3\n");
 				err = -ENODEV;
 				goto done;
 			}
@@ -652,11 +656,13 @@ static int hci_sock_bind(struct socket *sock, struct sockaddr *addr, int addr_le
 
 	case HCI_CHANNEL_CONTROL:
 		if (haddr.hci_dev != HCI_DEV_NONE) {
+			printk("Fail 5\n");
 			err = -EINVAL;
 			goto done;
 		}
 
 		if (!capable(CAP_NET_ADMIN)) {
+			printk("Fail 6\n");
 			err = -EPERM;
 			goto done;
 		}
@@ -665,11 +671,13 @@ static int hci_sock_bind(struct socket *sock, struct sockaddr *addr, int addr_le
 
 	case HCI_CHANNEL_MONITOR:
 		if (haddr.hci_dev != HCI_DEV_NONE) {
+			printk("Fail 7\n");
 			err = -EINVAL;
 			goto done;
 		}
 
 		if (!capable(CAP_NET_RAW)) {
+			printk("Fail 8\n");
 			err = -EPERM;
 			goto done;
 		}
@@ -680,6 +688,7 @@ static int hci_sock_bind(struct socket *sock, struct sockaddr *addr, int addr_le
 		break;
 
 	default:
+		printk("Fail 9\n");
 		err = -EINVAL;
 		goto done;
 	}
@@ -701,9 +710,10 @@ static int hci_sock_getname(struct socket *sock, struct sockaddr *addr, int *add
 
 	BT_DBG("sock %p sk %p", sock, sk);
 
-	if (!hdev)
+	if (!hdev) {
+		printk("Fail 10\n");
 		return -EBADFD;
-
+	}
 	lock_sock(sk);
 
 	*addr_len = sizeof(*haddr);
@@ -1066,8 +1076,8 @@ static struct proto hci_sk_proto = {
 	.obj_size	= sizeof(struct hci_pinfo)
 };
 
-static int hci_sock_create(struct net *net, struct socket *sock, int protocol,
-			   int kern)
+static int hci_sock_create(struct net *net, struct socket *sock, int protocol)
+			//   int kern)
 {
 	struct sock *sk;
 
