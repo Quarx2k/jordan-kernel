@@ -121,16 +121,6 @@
 	};
 };
 
-&mcspi2 {
-	m4sensorhubaudio {
-		compatible = "mot,m4audio";
-		reg = <0>; /* CS 0 */
-		spi-max-frequency = <2000000>;
-		spi-cpha = <0>;
-		spi-cpol = <0>;
-	};
-};
-
 &i2c3 {
 
 	clock-frequency = <400000>;
