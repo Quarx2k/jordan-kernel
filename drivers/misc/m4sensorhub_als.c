@@ -142,9 +142,11 @@ static const struct attribute_group als_attribute_group = {
 	.attrs = als_attributes,
 };
 
-static int als_driver_init(struct m4sensorhub_data *m4sensorhub)
+static int als_driver_init(struct init_calldata *p_arg)
 {
 	int ret;
+	struct m4sensorhub_data *m4sensorhub = p_arg->p_m4sensorhub_data;
+
 	ret = m4sensorhub_irq_register(m4sensorhub,
 					M4SH_IRQ_LIGHTSENSOR_DATA_READY,
 					m4_handle_als_irq,
@@ -183,7 +185,8 @@ static int als_client_probe(struct platform_device *pdev)
 		goto free_mem;
 	}
 	misc_als_data = als_client_data;
-	ret = m4sensorhub_register_initcall(als_driver_init);
+	ret = m4sensorhub_register_initcall(als_driver_init,
+							als_client_data);
 	if (ret < 0) {
 		KDEBUG(M4SH_ERROR, "Unable to register init function"
 			"for als client = %d\n", ret);
