@@ -245,9 +245,10 @@ static struct miscdevice gesture_client_miscdrv = {
 	.fops = &gesture_client_fops,
 };
 
-static int gesture_driver_init(struct m4sensorhub_data *m4sensorhub)
+static int gesture_driver_init(struct init_calldata *p_arg)
 {
 	int ret = 0;
+	struct m4sensorhub_data *m4sensorhub = p_arg->p_m4sensorhub_data;
 	ret = m4sensorhub_irq_register(m4sensorhub, M4SH_IRQ_GESTURE_DETECTED,
 					m4_handle_gesture_irq,
 					misc_gesture_data);
@@ -326,7 +327,8 @@ static int gesture_client_probe(struct platform_device *pdev)
 		goto unregister_input_device;
 	}
 	misc_gesture_data = gesture_client_data;
-	ret = m4sensorhub_register_initcall(gesture_driver_init);
+	ret = m4sensorhub_register_initcall(gesture_driver_init,
+						gesture_client_data);
 	if (ret < 0) {
 		KDEBUG(M4SH_ERROR, "Unable to register init function"
 			"for gesture client = %d\n", ret);

@@ -240,9 +240,10 @@ static struct miscdevice pressure_client_miscdrv = {
 };
 
 
-static int pressure_driver_init(struct m4sensorhub_data *m4sensorhub)
+static int pressure_driver_init(struct init_calldata *p_arg)
 {
 	int ret;
+	struct m4sensorhub_data *m4sensorhub = p_arg->p_m4sensorhub_data;
 	ret = m4sensorhub_irq_register(m4sensorhub,
 					M4SH_IRQ_PRESSURE_DATA_READY,
 					m4_handle_pressure_irq,
@@ -299,7 +300,8 @@ static int pressure_client_probe(struct platform_device *pdev)
 		goto unregister_input_device;
 	}
 	misc_pressure_data = pressure_client_data;
-	ret = m4sensorhub_register_initcall(pressure_driver_init);
+	ret = m4sensorhub_register_initcall(pressure_driver_init,
+					pressure_client_data);
 	if (ret < 0) {
 		KDEBUG(M4SH_ERROR, "Unable to register init function "
 			"for pressure client = %d\n", ret);

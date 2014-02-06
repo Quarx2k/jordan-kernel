@@ -11,18 +11,26 @@
 #include <linux/module.h>
 #include <linux/err.h>
 #include <linux/rtc.h>
+#include <linux/slab.h>
 #include <linux/platform_device.h>
 #include <linux/m4sensorhub.h>
 #include <linux/m4sensorhub/m4sensorhub_registers.h>
 
-static bool g_m4ready;
+struct rtc_sensorhub_private_data {
+	struct rtc_device *p_rtc;
+	struct m4sensorhub_data *p_m4sensorhub_data;
+};
 
 static int rtc_sensorhub_rtc_read_alarm(struct device *dev,
 	struct rtc_wkalrm *alrm)
 {
+	struct platform_device *pdev = to_platform_device(dev);
+	struct rtc_sensorhub_private_data *p_priv_data =
+						platform_get_drvdata(pdev);
+
 	pr_err("%s:\n", __func__);
 
-	if (!g_m4ready) {
+	if (!(p_priv_data->p_m4sensorhub_data)) {
 		pr_err("%s: ignore func call\n", __func__);
 		return -EIO;
 	}
@@ -33,9 +41,12 @@ static int rtc_sensorhub_rtc_read_alarm(struct device *dev,
 static int rtc_sensorhub_rtc_set_alarm(struct device *dev,
 	struct rtc_wkalrm *alrm)
 {
+	struct platform_device *pdev = to_platform_device(dev);
+	struct rtc_sensorhub_private_data *p_priv_data =
+						platform_get_drvdata(pdev);
 	pr_err("%s:\n", __func__);
 
-	if (!g_m4ready) {
+	if (!(p_priv_data->p_m4sensorhub_data)) {
 		pr_err("%s: ignore func call\n", __func__);
 		return -EIO;
 	}
@@ -43,11 +54,10 @@ static int rtc_sensorhub_rtc_set_alarm(struct device *dev,
 	return 0;
 }
 
-static int rtc_sensorhub_get_rtc_from_m4(struct rtc_time *p_tm)
+static int rtc_sensorhub_get_rtc_from_m4(struct rtc_time *p_tm,
+			struct m4sensorhub_data *p_m4_drvdata)
 {
-	struct m4sensorhub_data *p_m4_drvdata;
 	u32 seconds;
-	p_m4_drvdata = m4sensorhub_client_get_drvdata();
 
 	if (m4sensorhub_reg_getsize(p_m4_drvdata,
 		M4SH_REG_GENERAL_UTC) != m4sensorhub_reg_read(
@@ -65,8 +75,11 @@ static int rtc_sensorhub_rtc_read_time(struct device *dev,
 	struct rtc_time *p_tm)
 {
 	int err;
+	struct platform_device *pdev = to_platform_device(dev);
+	struct rtc_sensorhub_private_data *p_priv_data =
+						platform_get_drvdata(pdev);
 
-	if (!g_m4ready) {
+	if (!(p_priv_data->p_m4sensorhub_data)) {
 		pr_err("%s: func called, RTC hardware not ready\n", __func__);
 		/* M4 driver is not yet ready, just give the time since boot
 		and treat boot as start of epoch */
@@ -74,7 +87,8 @@ static int rtc_sensorhub_rtc_read_time(struct device *dev,
 		return 0;
 	}
 
-	err = rtc_sensorhub_get_rtc_from_m4(p_tm);
+	err = rtc_sensorhub_get_rtc_from_m4(p_tm,
+		p_priv_data->p_m4sensorhub_data);
 
 	return err;
 }
@@ -84,13 +98,16 @@ static int rtc_sensorhub_rtc_set_time(struct device *dev,
 {
 	u32 seconds;
 	unsigned long sec;
-	struct m4sensorhub_data *p_m4_drvdata;
+	struct platform_device *pdev = to_platform_device(dev);
+	struct rtc_sensorhub_private_data *p_priv_data =
+						platform_get_drvdata(pdev);
+	struct m4sensorhub_data *p_m4_drvdata =
+			p_priv_data->p_m4sensorhub_data;
 
-	if (!g_m4ready) {
+	if (!(p_m4_drvdata)) {
 		pr_err("%s: ignore func call\n", __func__);
 		return 0;
 	}
-	p_m4_drvdata = m4sensorhub_client_get_drvdata();
 
 	/* M4 expects the UTC time in seconds from Jan 1, 1970,
 	basically epoch_time in seconds */
@@ -115,10 +132,6 @@ static int rtc_sensorhub_rtc_set_mmss(struct device *dev, unsigned long secs)
 	/* TODO : implement a real handler*/
 	dev_info(dev, "%s, secs = %lu\n", __func__, secs);
 
-	if (!g_m4ready) {
-		pr_err("%s: ignore func call\n", __func__);
-		return -EIO;
-	}
 	return 0;
 }
 
@@ -145,10 +158,6 @@ static int rtc_sensorhub_rtc_alarm_irq_enable(struct device *dev,
 					unsigned int enable)
 {
 	/* TODO : implement a real handler*/
-	if (!g_m4ready) {
-		pr_err("%s: ignore func call\n", __func__);
-		return 0;
-	}
 	return 0;
 }
 
@@ -165,11 +174,6 @@ static const struct rtc_class_ops rtc_sensorhub_rtc_ops = {
 static ssize_t rtc_sensorhub_irq_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
-	/* TODO : implement a real handler*/
-	if (!g_m4ready) {
-		pr_err("%s: ignore func call\n", __func__);
-		return -EIO;
-	}
 	return sprintf(buf, "%d\n", 42);
 }
 static ssize_t rtc_sensorhub_irq_store(struct device *dev,
@@ -178,26 +182,25 @@ static ssize_t rtc_sensorhub_irq_store(struct device *dev,
 {
 	/* TODO : implement a real handler*/
 	pr_err("%s:\n", __func__);
-	if (!g_m4ready) {
-		pr_err("%s: ignore func call\n", __func__);
-		return -EIO;
-	}
 	return count;
 }
 
 static DEVICE_ATTR(irq, S_IRUGO | S_IWUSR, rtc_sensorhub_irq_show,
 						rtc_sensorhub_irq_store);
 
-static int rtc_sensorhub_init(struct m4sensorhub_data *m4sensorhub)
+static int rtc_sensorhub_init(struct init_calldata *p_arg)
 {
 	struct rtc_time rtc;
 	int err;
 	struct timespec tv;
+	struct rtc_sensorhub_private_data *p_priv_data =
+			(struct rtc_sensorhub_private_data *)(p_arg->p_data);
 
-	g_m4ready = true;
+	p_priv_data->p_m4sensorhub_data = p_arg->p_m4sensorhub_data;
 
 	/* read RTC time from M4 and set the system time */
-	err = rtc_sensorhub_get_rtc_from_m4(&rtc);
+	err = rtc_sensorhub_get_rtc_from_m4(&rtc,
+				p_priv_data->p_m4sensorhub_data);
 	if (err) {
 		pr_err("%s: get_rtc failed\n", __func__);
 		return 0;
@@ -223,52 +226,71 @@ static int rtc_sensorhub_init(struct m4sensorhub_data *m4sensorhub)
 static int rtc_sensorhub_probe(struct platform_device *plat_dev)
 {
 	int err;
-	struct rtc_device *rtc;
+	struct rtc_device *p_rtc;
+	struct rtc_sensorhub_private_data *p_priv_data;
+
+	p_priv_data = kzalloc(sizeof(*p_priv_data),
+					GFP_KERNEL);
+	if (!p_priv_data)
+		return -ENOMEM;
+
+	p_priv_data->p_m4sensorhub_data = NULL;
+	/* Set the private data before registering this driver with RTC core
+	since hctosys will call rtc interface right away, we need to make sure
+	our private data is set by this time */
+	platform_set_drvdata(plat_dev, p_priv_data);
 
 	err = device_init_wakeup(&plat_dev->dev, true);
 	if (err) {
 		pr_err("%s: failed to init as wakeup\n", __func__);
-		return err;
+		goto err_free_priv_data;
 	}
 
-	rtc = devm_rtc_device_register(&plat_dev->dev, "rtc_sensorhub",
+	p_rtc = devm_rtc_device_register(&plat_dev->dev, "rtc_sensorhub",
 				&rtc_sensorhub_rtc_ops, THIS_MODULE);
 
-	if (IS_ERR(rtc)) {
-		err = PTR_ERR(rtc);
+	if (IS_ERR(p_rtc)) {
+		err = PTR_ERR(p_rtc);
 		goto err_disable_wakeup;
 	}
+
+	p_priv_data->p_rtc = p_rtc;
 
 	err = device_create_file(&plat_dev->dev, &dev_attr_irq);
 	if (err)
 		goto err_unregister_rtc;
 
-	err = m4sensorhub_register_initcall(rtc_sensorhub_init);
+	err = m4sensorhub_register_initcall(rtc_sensorhub_init, p_priv_data);
 	if (err) {
 		pr_err("%s: can't register init with m4\n", __func__);
 		goto err_remove_file;
 	}
-
-	platform_set_drvdata(plat_dev, rtc);
 
 	return 0;
 
 err_remove_file:
 	device_remove_file(&plat_dev->dev, &dev_attr_irq);
 err_unregister_rtc:
-	devm_rtc_device_unregister(&plat_dev->dev, rtc);
+	devm_rtc_device_unregister(&plat_dev->dev, p_rtc);
+	kfree(p_rtc);
 err_disable_wakeup:
 	device_init_wakeup(&plat_dev->dev, false);
+err_free_priv_data:
+	kfree(p_priv_data);
 	return err;
 }
 
 static int rtc_sensorhub_remove(struct platform_device *plat_dev)
 {
-	struct rtc_device *rtc = platform_get_drvdata(plat_dev);
+	struct rtc_sensorhub_private_data *p_priv_data =
+						platform_get_drvdata(plat_dev);
+	struct rtc_device *p_rtc = p_priv_data->p_rtc;
 	device_remove_file(&plat_dev->dev, &dev_attr_irq);
 	device_init_wakeup(&plat_dev->dev, false);
-	devm_rtc_device_unregister(&plat_dev->dev, rtc);
+	devm_rtc_device_unregister(&plat_dev->dev, p_rtc);
 	m4sensorhub_unregister_initcall(rtc_sensorhub_init);
+	kfree(p_priv_data->p_rtc);
+	kfree(p_priv_data);
 	return 0;
 }
 

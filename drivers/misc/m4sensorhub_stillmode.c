@@ -224,9 +224,10 @@ static DEVICE_ATTR(state, 0664, m4_stillmode_getstate,
 static DEVICE_ATTR(timeout, 0664, m4_stillmode_get_timeout,
 		   m4_stillmode_set_timeout);
 
-static int stillmode_driver_init(struct m4sensorhub_data *m4sensorhub)
+static int stillmode_driver_init(struct init_calldata *p_arg)
 {
 	int ret;
+	struct m4sensorhub_data *m4sensorhub = p_arg->p_m4sensorhub_data;
 
 	ret = m4sensorhub_irq_register(m4sensorhub, M4SH_IRQ_STILL_DETECTED,
 					m4_handle_stillmode_irq,
@@ -320,7 +321,8 @@ static int stillmode_client_probe(struct platform_device *pdev)
 	INIT_WORK(&stillmode_client_data->queued_work,
 		m4sensorhub_stillmode_work);
 
-	ret = m4sensorhub_register_initcall(stillmode_driver_init);
+	ret = m4sensorhub_register_initcall(stillmode_driver_init,
+							stillmode_client_data);
 	if (ret < 0) {
 		KDEBUG(M4SH_ERROR, "Unable to register init function "
 			"for stillmode client = %d\n", ret);

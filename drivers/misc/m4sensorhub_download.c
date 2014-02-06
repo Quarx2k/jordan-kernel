@@ -311,9 +311,10 @@ static struct miscdevice download_client_miscdrv = {
 	.fops = &download_client_fops,
 };
 
-static int download_driver_init(struct m4sensorhub_data *m4sensorhub)
+static int download_driver_init(struct init_calldata *p_arg)
 {
 	int ret;
+	struct m4sensorhub_data *m4sensorhub = p_arg->p_m4sensorhub_data;
 	ret = m4sensorhub_irq_register(m4sensorhub, M4SH_IRQ_DLCMD_RESP_READY,
 					m4_handle_download_irq,
 					misc_download_data);
@@ -360,7 +361,8 @@ static int download_client_probe(struct platform_device *pdev)
 		goto free_memory;
 	}
 	misc_download_data = download_client_data;
-	ret = m4sensorhub_register_initcall(download_driver_init);
+	ret = m4sensorhub_register_initcall(download_driver_init,
+						download_client_data);
 	if (ret < 0) {
 		KDEBUG(M4SH_ERROR, "Unable to register init function "
 			"for download client = %d\n", ret);

@@ -903,7 +903,7 @@ static int mpu9150_irq_enable_disable(struct mpu9150_client *mpu9150_client_data
 	return ret;
 }
 
-static int mpu9150_driver_init(struct m4sensorhub_data *m4sensorhub)
+static int mpu9150_driver_init(struct init_calldata *p_arg)
 {
 	int ret;
 	ret = mpu9150_irq_init(misc_mpu9150_data);
@@ -982,7 +982,8 @@ static int mpu9150_client_probe(struct platform_device *pdev)
 		goto unregister_input_device;
 	}
 	misc_mpu9150_data = mpu9150_client_data;
-	ret = m4sensorhub_register_initcall(mpu9150_driver_init);
+	ret = m4sensorhub_register_initcall(mpu9150_driver_init,
+					mpu9150_client_data);
 	if (ret < 0) {
 		KDEBUG(M4SH_ERROR, "Unable to register init function"
 			"for mpu9150 client = %d\n", ret);

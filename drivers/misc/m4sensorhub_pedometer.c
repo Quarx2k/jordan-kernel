@@ -357,9 +357,10 @@ static struct miscdevice pedometer_client_miscdrv = {
 	.fops = &pedometer_client_fops,
 };
 
-static int pedometer_driver_init(struct m4sensorhub_data *m4sensorhub)
+static int pedometer_driver_init(struct init_calldata *p_arg)
 {
 	int ret;
+	struct m4sensorhub_data *m4sensorhub = p_arg->p_m4sensorhub_data;
 
 	ret = m4sensorhub_irq_register(m4sensorhub,
 					M4SH_IRQ_PEDOMETER_DATA_READY,
@@ -449,7 +450,8 @@ static int pedometer_client_probe(struct platform_device *pdev)
 		goto unregister_input_device;
 	}
 	misc_pedometer_data = pedometer_client_data;
-	ret = m4sensorhub_register_initcall(pedometer_driver_init);
+	ret = m4sensorhub_register_initcall(pedometer_driver_init,
+					pedometer_client_data);
 	if (ret < 0) {
 		KDEBUG(M4SH_ERROR, "Unable to register init function "
 			"for pedometer client = %d\n", ret);

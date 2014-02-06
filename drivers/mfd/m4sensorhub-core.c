@@ -51,7 +51,8 @@ static struct miscdevice m4sensorhub_misc_device = {
 };
 
 struct init_call {
-	int(*initcb)(struct m4sensorhub_data *);
+	int(*initcb)(struct init_calldata *);
+	void *pdata;
 	struct init_call *next;
 };
 
@@ -301,7 +302,8 @@ static void m4sensorhub_hw_free(struct m4sensorhub_data *m4sensorhub)
 	m4sensorhub->filename = NULL;
 }
 
-int m4sensorhub_register_initcall(int(*initfunc)(struct m4sensorhub_data *))
+int m4sensorhub_register_initcall(int(*initfunc)(struct init_calldata *),
+								void *pdata)
 {
 	struct init_call *inc = NULL;
 
@@ -311,6 +313,7 @@ int m4sensorhub_register_initcall(int(*initfunc)(struct m4sensorhub_data *))
 		return -ENOMEM;
 	}
 	inc->initcb = initfunc;
+	inc->pdata = pdata;
 	/* add it to the list */
 	if (inithead == NULL)
 		inc->next = NULL;
@@ -321,7 +324,7 @@ int m4sensorhub_register_initcall(int(*initfunc)(struct m4sensorhub_data *))
 }
 EXPORT_SYMBOL_GPL(m4sensorhub_register_initcall);
 
-void m4sensorhub_unregister_initcall(int(*initfunc)(struct m4sensorhub_data *))
+void m4sensorhub_unregister_initcall(int(*initfunc)(struct init_calldata *))
 {
 	struct init_call *node = inithead;
 	struct init_call *prev;
@@ -348,6 +351,7 @@ static void m4sensorhub_initialize(const struct firmware *firmware,
 {
 	int err = 0;
 	struct init_call *inc, *prev;
+	struct init_calldata arg;
 
 	if (firmware == NULL) {
 		KDEBUG(M4SH_ERROR, "%s:No firmware data recieved\n", __func__);
@@ -382,9 +386,11 @@ static void m4sensorhub_initialize(const struct firmware *firmware,
 
 	/* Initialize all the m4 drivers */
 	inc = inithead;
+	arg.p_m4sensorhub_data = &m4sensorhub_misc_data;
 	prev = NULL;
 	while (inc) {
-		err = inc->initcb(&m4sensorhub_misc_data);
+		arg.p_data = inc->pdata;
+		err = inc->initcb(&arg);
 		if (err < 0)
 			dump_stack();
 		prev = inc;

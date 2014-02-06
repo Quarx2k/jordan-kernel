@@ -349,9 +349,10 @@ static const struct file_operations audio_client_fops = {
 	.read = audio_client_read,
 };
 
-static int audio_driver_init(struct m4sensorhub_data *m4sensorhub)
+static int audio_driver_init(struct init_calldata *p_arg)
 {
 	int ret;
+	struct m4sensorhub_data *m4sensorhub = p_arg->p_m4sensorhub_data;
 
 	ret = m4sensorhub_irq_register(m4sensorhub, M4SH_IRQ_MIC_DATA_READY,
 		m4_handle_audio_irq, audio_data);
@@ -387,7 +388,8 @@ static int audio_client_probe(struct spi_device *spi)
 	}
 	audio_client_data->dev_dsp = ret;
 	audio_client_data->dev_dsp_open_count = 0;
-	ret = m4sensorhub_register_initcall(audio_driver_init);
+	ret = m4sensorhub_register_initcall(audio_driver_init,
+						audio_client_data);
 	if (ret < 0) {
 		KDEBUG(M4SH_ERROR, "Unable to register init function "
 			"for audio client = %d\n", ret);

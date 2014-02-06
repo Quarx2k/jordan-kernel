@@ -81,6 +81,15 @@ enum m4sensorhub_panichdl_index {
 
 struct m4sensorhub_data;
 
+/* args passed to init callback,
+	p_m4sensorhub_data is pointer to M4's data
+	p_data is the void * that was registered along
+		with the function pointer*/
+struct init_calldata {
+	struct m4sensorhub_data *p_m4sensorhub_data;
+	void *p_data;
+};
+
 struct m4sensorhub_platform_data {
 	int (*hw_init)(struct m4sensorhub_data *);
 	void (*hw_free)(struct m4sensorhub_data *);
@@ -203,9 +212,15 @@ int m4sensorhub_panic_register(struct m4sensorhub_data *m4sensorhub,
 int m4sensorhub_panic_unregister(struct m4sensorhub_data *m4sensorhub,
 				enum m4sensorhub_panichdl_index index);
 void m4sensorhub_panic_process(struct m4sensorhub_data *m4sensorhub);
-int m4sensorhub_register_initcall(int(*initfunc)(struct m4sensorhub_data *));
+/* all M4 based drivers need to register an init call with the core,
+ this callback will be executed once M4 core has properly set up FW
+ on M4. For registration, a callback and a void* is passed in. When
+ the callback is executed, the client provided void* is passed back
+ as part of (init_calldata).p_data */
+int m4sensorhub_register_initcall(int(*initfunc)(struct init_calldata *),
+							void *pdata);
 void m4sensorhub_unregister_initcall(
-		int(*initfunc)(struct m4sensorhub_data *));
+		int(*initfunc)(struct init_calldata *));
 
 
 #endif /* __KERNEL__ */

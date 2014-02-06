@@ -168,9 +168,10 @@ static struct miscdevice passive_client_miscdrv = {
 	.fops = &passive_client_fops,
 };
 
-static int passive_driver_init(struct m4sensorhub_data *m4sensorhub)
+static int passive_driver_init(struct init_calldata *p_arg)
 {
 	int ret;
+	struct m4sensorhub_data *m4sensorhub = p_arg->p_m4sensorhub_data;
 	ret = m4sensorhub_irq_register(m4sensorhub,
 					M4SH_IRQ_PASSIVE_BUFFER_FULL,
 					m4_handle_passive_irq,
@@ -239,7 +240,8 @@ static int passive_client_probe(struct platform_device *pdev)
 		goto unregister_input_device;
 	}
 	misc_passive_data = passive_client_data;
-	ret = m4sensorhub_register_initcall(passive_driver_init);
+	ret = m4sensorhub_register_initcall(passive_driver_init,
+					passive_client_data);
 	if (ret < 0) {
 		KDEBUG(M4SH_ERROR, "Unable to register init function"
 			"for passive client = %d\n", ret);

@@ -391,9 +391,10 @@ static void display_panic_restore(\
 	}
 }
 
-static int display_driver_init(struct m4sensorhub_data *m4sensorhub)
+static int display_driver_init(struct init_calldata *p_arg)
 {
 	int err;
+	struct m4sensorhub_data *m4sensorhub = p_arg->p_m4sensorhub_data;
 
 	err = m4sensorhub_panic_register(m4sensorhub, PANICHDL_DISPLAY_RESTORE,
 		display_panic_restore, global_display_data);
@@ -448,7 +449,7 @@ static int display_client_probe(struct platform_device *pdev)
 	mutex_init(&(display_data->m4_mutex));
 
 	global_display_data = display_data;
-	ret = m4sensorhub_register_initcall(display_driver_init);
+	ret = m4sensorhub_register_initcall(display_driver_init, display_data);
 	if (ret < 0) {
 		KDEBUG(M4SH_ERROR, "Unable to register init function "
 			"for display client = %d\n", ret);
