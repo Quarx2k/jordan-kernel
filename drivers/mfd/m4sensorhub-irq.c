@@ -34,7 +34,7 @@
 #include <linux/suspend.h>
 #endif
 
-#define NUM_INT_REGS      2
+#define NUM_INT_REGS      3
 #define NUM_INTS_PER_REG  8
 #define NUM_INTS_LAST_REG (((M4SH_IRQ__NUM-1)%NUM_INTS_PER_REG)+1)
 #define INTR_VALID_BITS(n) (unsigned char)((1 << (n)) - 1)
@@ -73,6 +73,8 @@ static const char *irq_name[] = {
 	[M4SH_IRQ_MIC_DATA_READY]         = "MIC_DATA_READY",
 	[M4SH_IRQ_WRIST_READY]            = "WRIST_READY",
 	[M4SH_IRQ_PASSIVE_BUFFER_FULL]    = "PASSIVE_BUFFER_FULL",
+	[M4SH_IRQ_LIGHTSENSOR_DATA_READY] = "ALS_DATA_READY",
+	[M4SH_IRQ_HEARTRATESENSOR_DATA_READY] = "HR_DATA_RADY",
 };
 
 /* -------------- Local Data Structures ------------- */
@@ -112,8 +114,11 @@ static const struct {
 	 M4SH_REG_GENERAL_INTERRUPT0ENABLE,
 	 INTR_VALID_BITS(NUM_INTS_PER_REG)},
 	{M4SH_REG_GENERAL_INTERRUPT1STATUS,
-	 M4SH_REG_GENERAL_INTERRUPT1ENABLE,
-	 INTR_VALID_BITS(NUM_INTS_LAST_REG)},
+	M4SH_REG_GENERAL_INTERRUPT1ENABLE,
+	INTR_VALID_BITS(NUM_INTS_PER_REG)},
+	{M4SH_REG_GENERAL_INTERRUPT2STATUS,
+	M4SH_REG_GENERAL_INTERRUPT2ENABLE,
+	INTR_VALID_BITS(NUM_INTS_LAST_REG)},
 };
 
 static irqreturn_t event_isr(int irq, void *data)
@@ -168,10 +173,12 @@ int m4sensorhub_irq_init(struct m4sensorhub_data *m4sensorhub)
 		retval = -ENOMEM;
 		goto done;
 	}
-
-	KDEBUG(M4SH_INFO, "m4sensorhub: %u IRQs with valid_bits %02X%02X\n",\
-				M4SH_IRQ__NUM, int_registers[1].valid_bits,\
-				int_registers[0].valid_bits);
+	KDEBUG(
+		M4SH_INFO,
+		"m4sensorhub: %u IRQs with valid_bits %02X%02X%02X\n",
+		M4SH_IRQ__NUM, int_registers[2].valid_bits,
+		int_registers[1].valid_bits, int_registers[0].valid_bits
+		);
 	retval = m4sensorhub_irq_disable_all(m4sensorhub);
 	if (retval) {
 		KDEBUG(M4SH_ERROR, "m4sensorhub: Failed disable all irqs\n");
@@ -523,6 +530,8 @@ static unsigned short get_enable_reg(enum m4sensorhub_irqs event)
 
 	if ((event) >= M4SH_IRQ__NUM)
 		ret = M4SH_REG__INVALID;
+	else if ((event) >= M4SH_IRQ_INT2_INDEX)
+		ret = M4SH_REG_GENERAL_INTERRUPT2ENABLE;
 	else if ((event) >= M4SH_IRQ_INT1_INDEX)
 		ret = M4SH_REG_GENERAL_INTERRUPT1ENABLE;
 	else if ((event) >= M4SH_IRQ_INT0_INDEX)

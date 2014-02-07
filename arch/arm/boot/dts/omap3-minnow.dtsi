@@ -68,6 +68,10 @@
 		lightsensor {
 			compatible = "mot,m4als";
 		};
+                heartratesensor {
+                        compatible = "mot,m4heartrate";
+                };
+
 	};
 
 	sound {

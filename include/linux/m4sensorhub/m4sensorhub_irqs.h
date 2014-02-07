@@ -20,6 +20,7 @@
 
 #define M4SH_IRQ_INT0_INDEX 0
 #define M4SH_IRQ_INT1_INDEX 8
+#define M4SH_IRQ_INT2_INDEX 16
 
 /* Keep name mapping in m4sensorhub-irq.c 'irq_name' synchronized */
 enum m4sensorhub_irqs {
@@ -71,8 +72,11 @@ enum m4sensorhub_irqs {
 	/* INT1 0x40 : passive buffer full */
 	M4SH_IRQ_PASSIVE_BUFFER_FULL,
 
-	/* INT1 0x80 : lightsensor data full */
+	/* INT1 0x80 : lightsensor data ready */
 	M4SH_IRQ_LIGHTSENSOR_DATA_READY,
+
+	/* INT2 0x01 : heartratesensor data ready */
+	M4SH_IRQ_HEARTRATESENSOR_DATA_READY = M4SH_IRQ_INT2_INDEX,
 
 	/* Number of allocated interrupts */
 	M4SH_IRQ__NUM
