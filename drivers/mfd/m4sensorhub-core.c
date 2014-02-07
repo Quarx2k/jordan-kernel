@@ -511,6 +511,8 @@ static int m4sensorhub_probe(struct i2c_client *client,
 		m4sensorhub_debug = M4SH_ERROR;
 #endif
 	}
+	/* Enabling detailed level M4 logs for all builds*/
+	m4sensorhub_debug = M4SH_INFO;
 	KDEBUG(M4SH_ERROR, "Initializing M4 Sensor Hub debug=%d\n",
 			m4sensorhub_debug);
 
