@@ -51,7 +51,11 @@
 		gpios = <&gpio3 12 1>, /* IRQ   gpio_ap_int gpio-076 */
 			<&gpio3 16 0>, /*  gpio_reset gpio-80*/
 			<&gpio3 17 2>; /* gpio_c55_int gpio-81*/
-		c55-ctrl-supply = <&ldo9_reg>;
+		vddc-supply = <&ldo9_reg>;
+		vddldo-supply = <&ldo3_reg>;
+		pinctrl-names = "off", "on";
+		pinctrl-0 = <&c55_pins_off>;
+		pinctrl-1 = <&c55_pins_on>;
 	};
 
 	vib-gpio {
