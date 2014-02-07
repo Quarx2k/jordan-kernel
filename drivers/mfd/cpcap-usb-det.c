@@ -139,7 +139,7 @@ static const char *accy_devices[] = {
 };
 
 /* Expects values from 0 to 2: 0=no_log, 1=basic_log, 2=max_log */
-static int cpcap_usb_det_debug = 2;
+static int cpcap_usb_det_debug = 0;
 
 #ifdef CONFIG_USB_TESTING_POWER
 static int testing_power_enable = -1;
