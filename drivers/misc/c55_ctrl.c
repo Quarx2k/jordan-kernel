@@ -24,10 +24,26 @@
 #include <linux/of_gpio.h>
 #include <linux/clk.h>
 
+enum {
+	C55_OFF,
+	C55_ON,
+	C55_MODE_MAX
+};
+
 struct c55_ctrl_data {
 	int int_gpio;
 	struct wake_lock wake_lock;
-	struct regulator *reg;
+	struct regulator *reg_vddc;
+	struct regulator *reg_vddldo;
+	struct pinctrl *pctrl;
+	struct pinctrl_state *states[C55_MODE_MAX];
+	int c55_mode;
+	struct mutex ctrl_mutex;	/* mutex to handle critical area */
+};
+
+const char *c55_pin_state_labels[C55_MODE_MAX] = {
+	"off",
+	"on"
 };
 
 #define NUM_GPIOS 3
@@ -117,6 +133,81 @@ static int c55_ctrl_gpio_setup(struct c55_ctrl_data *cdata, struct device *dev)
 	return 0;
 }
 
+static ssize_t c55_ctrl_enable(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct c55_ctrl_data *cdata = dev_get_drvdata(dev);
+	int mode;
+
+	if (kstrtoint(buf, 10, &mode) < 0)
+		return -EINVAL;
+
+	if (mode >= C55_MODE_MAX) {
+		dev_err(dev, "%s: Invalid mode %d\n", __func__, mode);
+		return -EINVAL;
+	}
+
+	if (mode == cdata->c55_mode)
+		return count;
+
+	mutex_lock(&cdata->ctrl_mutex);
+
+	if (mode == C55_ON) {
+		pinctrl_select_state(cdata->pctrl, cdata->states[mode]);
+		if (cdata->reg_vddc && regulator_enable(cdata->reg_vddc))
+			dev_err(dev, "regulator_enable failed for vddc\n");
+		if (cdata->reg_vddldo && regulator_enable(cdata->reg_vddldo))
+			dev_err(dev, "regulator_enable failed for vddldo\n");
+	} else {
+		if (cdata->reg_vddldo)
+			regulator_disable(cdata->reg_vddldo);
+		if (cdata->reg_vddc)
+			regulator_disable(cdata->reg_vddc);
+		pinctrl_select_state(cdata->pctrl, cdata->states[mode]);
+	}
+
+	cdata->c55_mode = mode;
+
+	mutex_unlock(&cdata->ctrl_mutex);
+
+	dev_info(dev, "%s: power = %d\n", __func__, mode);
+
+	return count;
+}
+
+static DEVICE_ATTR(enable, S_IWUSR, NULL, c55_ctrl_enable);
+
+static int c55_ctrl_pin_setup(struct device *dev, struct c55_ctrl_data *cdata)
+{
+	int i, ret = 0;
+
+	cdata->pctrl = devm_pinctrl_get(dev);
+	if (IS_ERR(cdata->pctrl)) {
+		ret = PTR_ERR(cdata->pctrl);
+		dev_dbg(dev, "no pinctrl handle\n");
+	}
+
+	for (i = 0; !ret && (i < C55_MODE_MAX); i++) {
+		cdata->states[i] = pinctrl_lookup_state(cdata->pctrl,
+					c55_pin_state_labels[i]);
+		if (IS_ERR(cdata->states[i])) {
+			ret = PTR_ERR(cdata->states[i]);
+			dev_dbg(dev, "no %s pinctrl state\n",
+				c55_pin_state_labels[i]);
+		}
+	}
+
+	if (!ret) {
+		ret = pinctrl_select_state(cdata->pctrl,
+					cdata->states[C55_OFF]);
+		if (ret)
+			dev_dbg(dev, "failed to activate %s pinctrl state\n",
+				c55_pin_state_labels[C55_OFF]);
+	}
+
+	return ret;
+}
+
 static int  c55_ctrl_probe(struct platform_device *pdev)
 {
 	struct c55_ctrl_data *cdata;
@@ -132,6 +223,16 @@ static int  c55_ctrl_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "%s: devm_kzalloc failed.\n", __func__);
 		return -ENOMEM;
 	}
+
+	mutex_init(&cdata->ctrl_mutex);
+
+	ret = c55_ctrl_pin_setup(&pdev->dev, cdata);
+	if (ret) {
+		dev_err(&pdev->dev, "%s: c55_ctrl_pin_setup failed.\n",
+			__func__);
+		return ret;
+	}
+
 	cdata->int_gpio = -1;
 	ret = c55_ctrl_gpio_setup(cdata, &pdev->dev);
 
@@ -140,14 +241,20 @@ static int  c55_ctrl_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	cdata->reg = regulator_get(&pdev->dev, "c55-ctrl");
-	if (IS_ERR(cdata->reg)) {
-		return PTR_ERR(cdata->reg);
-	}
-	ret = regulator_enable(cdata->reg);
+	cdata->reg_vddc = devm_regulator_get(&pdev->dev, "vddc");
+	if (IS_ERR(cdata->reg_vddc))
+		cdata->reg_vddc = NULL;
+
+	cdata->reg_vddldo = devm_regulator_get(&pdev->dev, "vddldo");
+	if (IS_ERR(cdata->reg_vddldo))
+		cdata->reg_vddldo = NULL;
+
+	cdata->c55_mode = C55_OFF;
+
+	ret = device_create_file(&pdev->dev, &dev_attr_enable);
 	if (ret) {
-		dev_err(&pdev->dev, "%s: c55_ctrl regulator_enable failed.\n", __func__);
-		regulator_put(cdata->reg);
+		dev_err(&pdev->dev, "%s: c55_ctrl creating set_mode failed.\n",
+			__func__);
 		return ret;
 	}
 
@@ -159,9 +266,7 @@ static int  c55_ctrl_probe(struct platform_device *pdev)
 
 static int  c55_ctrl_remove(struct platform_device *pdev)
 {
-	struct c55_ctrl_data *cdata = platform_get_drvdata(pdev);
-
-	regulator_put(cdata->reg);
+	device_remove_file(&pdev->dev, &dev_attr_enable);
 	return 0;
 }
 
