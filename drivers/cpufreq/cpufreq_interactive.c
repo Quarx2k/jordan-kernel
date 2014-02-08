@@ -82,7 +82,7 @@ static bool suspend_state = false;
 static bool suspend_enabled = true;
 
 /* Suspend Frequency */
-static unsigned int suspend_freq = 300000;
+static unsigned int suspend_freq = 600000;
 
 /* Hi speed to bump to from lo speed when load burst (default max) */
 #define DEFAULT_HISPEED_FREQ 800000
@@ -93,7 +93,7 @@ static unsigned int hispeed_freq = DEFAULT_HISPEED_FREQ;
 static unsigned long go_hispeed_load = DEFAULT_GO_HISPEED_LOAD;
 
 /* Sampling down factor to be applied to min_sample_time at max freq */
-#define DEFAULT_SAMPLING_DOWN_FACTOR 4
+#define DEFAULT_SAMPLING_DOWN_FACTOR 2
 static unsigned int sampling_down_factor = DEFAULT_SAMPLING_DOWN_FACTOR;
 
 /* Target load.  Lower values result in higher CPU speeds. */
@@ -106,13 +106,13 @@ static int ntarget_loads = ARRAY_SIZE(default_target_loads);
 /*
  * The minimum amount of time to spend at a frequency before we can ramp down.
  */
-#define DEFAULT_MIN_SAMPLE_TIME (80 * USEC_PER_MSEC)
+#define DEFAULT_MIN_SAMPLE_TIME (40 * USEC_PER_MSEC)
 static unsigned long min_sample_time = DEFAULT_MIN_SAMPLE_TIME;
 
 /*
  * The sample rate of the timer used to increase frequency
  */
-#define DEFAULT_TIMER_RATE (20 * USEC_PER_MSEC)
+#define DEFAULT_TIMER_RATE (40 * USEC_PER_MSEC)
 static unsigned long timer_rate = DEFAULT_TIMER_RATE;
 
 /*
@@ -620,12 +620,8 @@ static int cpufreq_interactive_speedchange_task(void *data)
 		spin_unlock_irqrestore(&speedchange_cpumask_lock, flags);
 
 		for_each_cpu(cpu, &tmp_mask) {
-			int cpu_load;
-			int new_freq;
 			unsigned int j;
 			unsigned int max_freq = 0;
-			unsigned int loadadjfreq;
-			u64 cputime_speedadj;
 
 			pcpu = &per_cpu(cpuinfo, cpu);
 			if (!down_read_trylock(&pcpu->enable_sem))
@@ -643,16 +639,12 @@ static int cpufreq_interactive_speedchange_task(void *data)
 					max_freq = pjcpu->target_freq;
 			}
 
-			/* Get CPU-Load */
-			cputime_speedadj = pcpu->cputime_speedadj;
-			loadadjfreq = (unsigned int)cputime_speedadj * 100;
-        		cpu_load = (loadadjfreq / pcpu->target_freq);
-			cpu_load = do_div(cpu_load, 100);
-
-			if (max_freq != pcpu->policy->cur && !suspend_state)
-				__cpufreq_driver_target(pcpu->policy,
-							max_freq,
-							CPUFREQ_RELATION_H);
+			if (max_freq != pcpu->policy->cur) {
+				if (!suspend_state || (suspend_state && max_freq <= suspend_freq))
+					__cpufreq_driver_target(pcpu->policy,
+								max_freq,
+								CPUFREQ_RELATION_H);
+			}
 
 			trace_cpufreq_interactive_setspeed(cpu,
 						     pcpu->target_freq,
@@ -677,7 +669,7 @@ static void interactive_suspend(int suspend)
 
         if (!suspend) { 
                 suspend_state = 0;
-                __cpufreq_driver_target(pcpu->policy, pcpu->policy->max, CPUFREQ_RELATION_L);
+                __cpufreq_driver_target(pcpu->policy, pcpu->policy->max, CPUFREQ_RELATION_H);
                 printk("[interactive] awake at %d\n", pcpu->policy->cur);
         } else {
 		/* Going in suspend, take saved suspend_freq */
