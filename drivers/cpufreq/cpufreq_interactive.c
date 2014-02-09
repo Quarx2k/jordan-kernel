@@ -429,7 +429,7 @@ static void cpufreq_interactive_timer(unsigned long data)
         cputime_speedadj = pcpu->cputime_speedadj;
         spin_unlock_irqrestore(&pcpu->load_lock, flags);
 
-        if (WARN_ON_ONCE(!delta_time))
+        if (!delta_time)
                 goto rearm;
 
         do_div(cputime_speedadj, delta_time);
@@ -437,18 +437,18 @@ static void cpufreq_interactive_timer(unsigned long data)
         cpu_load = loadadjfreq / pcpu->target_freq;
         boosted = boost_val || now < boostpulse_endtime;
 
-        if (cpu_load >= go_hispeed_load || boosted) {
-                if (pcpu->target_freq < hispeed_freq) {
-                        new_freq = pcpu->policy->max;
-                } else {
-                        new_freq = choose_freq(pcpu, loadadjfreq);
+	new_freq = choose_freq(pcpu, loadadjfreq);
 
-                        if (new_freq < hispeed_freq)
-                                new_freq = pcpu->policy->max;
-                }
-        } else {
-                new_freq = choose_freq(pcpu, loadadjfreq);
-        }
+        if (cpu_load >= go_hispeed_load) {
+		if (new_freq < hispeed_freq) {
+			new_freq = hispeed_freq;
+			pcpu->hispeed_validate_time = now;		
+		}
+	} 
+	else if (boosted) {
+		if (new_freq < input_boost_freq)
+			new_freq = input_boost_freq; 
+	}
 
         if (pcpu->target_freq >= hispeed_freq &&
             new_freq > pcpu->target_freq &&
@@ -1320,8 +1320,6 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 
         switch (event) {
         case CPUFREQ_GOV_START:
-                if (!cpu_online(policy->cpu))
-                        return -EINVAL;
 
                 mutex_lock(&gov_lock);
 
