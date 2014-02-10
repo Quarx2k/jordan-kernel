@@ -160,13 +160,6 @@
 		mot,mic_bias1_en = <&gpio3 13 0>; /* gpio-077 */
 		mot,mic_bias3_en = <&gpio3 20 0>; /* gpio-084 */
 	};
-
-	wl18xx_rfkill {
-		compatible = "mot,wl18xx-rfkill";
-		status = "ok";
-		mot,bt_fm =		<1>;  /* 0x1 - BT, 0x2 - FM, 0x3 - Both */
-		mot,bt_en-gpio =        <&gpio3 19 0>; /* BT_EN        gpio-083 */
-	};
 };
 
 
