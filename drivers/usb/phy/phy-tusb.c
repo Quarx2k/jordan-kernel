@@ -284,6 +284,9 @@ static int  tusb_usb_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, tusb);
 
+	/* initialize PHY to correct state */
+	queue_work(tusb->workqueue, &tusb->work);
+
 	return 0;
 
 disable_irq:
