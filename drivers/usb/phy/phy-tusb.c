@@ -35,6 +35,8 @@
 #include <linux/of_gpio.h>
 #include <linux/module.h>
 
+static bool factory_override;
+
 struct tusb_usb {
 	struct usb_phy		phy;
 	struct device		*dev;
@@ -99,16 +101,25 @@ static void tusb_usb_work_func(struct work_struct *work)
 			USB_EVENT_NONE, NULL);
 	}
 
-	/* For all the GPIOs configured as output:
-	     Set the level to the default state if VBUS is low
-	     Set the level to the opposite of default state if VBUS is high
+	/* Output GPIOs are driven based on the vbus_state input
+	   and the factory_override flag:
+
+		VBUS | FactoryOverride | Output
+		-----|-----------------|-------
+		  0  |        0        | default (off)
+		  0  |        1        | !default (on)
+		  1  |        0        | !default (on)
+		  1  |        1        | !default (on)
 	 */
+	dev_info(tusb->dev, "%s USB phy [%d/%d]\n",
+		 (vbus_state | factory_override) ? "Enable" : "Disable",
+		 vbus_state, factory_override);
 	for (i = 0; i < tusb->num_gpios; i++) {
 		if (!(tusb->gpio_list[i].flags & GPIOF_DIR_IN)) {
 			bool default_level =
 				!!(tusb->gpio_list[i].flags & GPIOF_INIT_HIGH);
 			gpio_set_value(tusb->gpio_list[i].gpio,
-				       vbus_state ^ default_level);
+			    (vbus_state | factory_override) ^ default_level);
 		}
 	}
 
@@ -172,6 +183,8 @@ static int tusb_parse_of(struct platform_device *pdev, struct tusb_usb *tusb)
 	return 0;
 }
 
+static DEVICE_BOOL_ATTR(factory_override, 0664, factory_override);
+
 static int  tusb_usb_probe(struct platform_device *pdev)
 {
 	struct tusb_usb	*tusb;
@@ -189,6 +202,7 @@ static int  tusb_usb_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "unable to allocate memory for tusb PHY\n");
 		return -ENOMEM;
 	}
+	factory_override = 0;
 
 	ret = tusb_parse_of(pdev, tusb);
 	if (ret) {
@@ -243,6 +257,12 @@ static int  tusb_usb_probe(struct platform_device *pdev)
 		goto cancel_work;
 	}
 
+	ret = device_create_file(&pdev->dev, &(dev_attr_factory_override.attr));
+	if (ret != 0) {
+		dev_err(&pdev->dev, "sysfs file creation failed.\n");
+		goto disable_irq;
+	}
+
 	tusb->dev		= &pdev->dev;
 	tusb->phy.dev		= tusb->dev;
 	tusb->phy.label		= "tusb";
@@ -263,6 +283,8 @@ static int  tusb_usb_probe(struct platform_device *pdev)
 
 	return 0;
 
+disable_irq:
+	disable_irq_wake(irqnum);
 cancel_work:
 	cancel_work_sync(&tusb->work);
 	destroy_workqueue(tusb->workqueue);
@@ -280,7 +302,7 @@ static int tusb_usb_remove(struct platform_device *pdev)
 	struct tusb_usb	*tusb = platform_get_drvdata(pdev);
 	int irqnum = gpio_to_irq(tusb->irq_gpio);
 
-
+	device_remove_file(&pdev->dev, &(dev_attr_factory_override.attr));
 	disable_irq_wake(irqnum);
 	cancel_work_sync(&tusb->work);
 	destroy_workqueue(tusb->workqueue);
