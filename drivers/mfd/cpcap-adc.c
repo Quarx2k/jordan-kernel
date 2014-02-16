@@ -22,6 +22,7 @@
 #include <linux/platform_device.h>
 #include <linux/completion.h>
 #include <linux/sched.h>
+#include <linux/delay.h>
 
 #include <linux/spi/cpcap.h>
 #include <linux/spi/cpcap-regbits.h>
@@ -31,6 +32,11 @@
 #define MAX_ADC_FIFO_DEPTH 8 /* this must be a power of 2 */
 #define MAX_TEMP_LVL 27
 #define FOUR_POINT_TWO_ADC 801
+#define ST_ADC_CAL_CHRGI_UPPER_THRESHOLD 530
+#define ST_ADC_CAL_CHRGI_LOWER_THRESHOLD 494
+#define ST_ADC_CAL_BATTI_UPPER_THRESHOLD 530
+#define ST_ADC_CAL_BATTI_LOWER_THRESHOLD 494
+#define ST_ADC_CALIBRATE_DIFF_THRESHOLD 3
 
 struct cpcap_adc {
 	struct cpcap_device *cpcap;
@@ -182,7 +188,8 @@ static unsigned short convert_to_kelvins(unsigned short value)
 }
 
 static void adc_setup(struct cpcap_device *cpcap,
-		      struct cpcap_adc_request *req)
+		      enum cpcap_adc_type type,
+		      enum cpcap_adc_timing timing)
 {
 	struct cpcap_adc_ato *ato;
 	struct cpcap_platform_data *data;
@@ -192,12 +199,12 @@ static void adc_setup(struct cpcap_device *cpcap,
 	data = cpcap->spi->controller_data;
 	ato = data->adc_ato;
 
-	if (req->type == CPCAP_ADC_TYPE_BANK_1)
+	if (type == CPCAP_ADC_TYPE_BANK_1)
 		value1 |= CPCAP_BIT_AD_SEL1;
-	else if (req->type == CPCAP_ADC_TYPE_BATT_PI)
+	else if (type == CPCAP_ADC_TYPE_BATT_PI)
 		value1 |= CPCAP_BIT_RAND1;
 
-	switch (req->timing) {
+	switch (timing) {
 	case CPCAP_ADC_TIMING_IN:
 		value1 |= ato->ato_in;
 		value1 |= ato->atox_in;
@@ -230,7 +237,7 @@ static void adc_setup(struct cpcap_device *cpcap,
 			    CPCAP_BIT_ADC_PS_FACTOR1 |
 			    CPCAP_BIT_ADC_PS_FACTOR0));
 
-	if (req->timing == CPCAP_ADC_TIMING_IMM) {
+	if (timing == CPCAP_ADC_TIMING_IMM) {
 		cpcap_regacc_write(cpcap, CPCAP_REG_ADCC2,
 				   CPCAP_BIT_ADTRIG_DIS,
 				   CPCAP_BIT_ADTRIG_DIS);
@@ -258,7 +265,7 @@ static void adc_setup_calibrate(struct cpcap_device *cpcap,
 				enum cpcap_adc_bank0 chan)
 {
 	unsigned short value = 0;
-	unsigned long timeout = jiffies + msecs_to_jiffies(11);
+	unsigned long timeout = jiffies + msecs_to_jiffies(550);
 
 	if ((chan != CPCAP_ADC_CHG_ISENSE) &&
 	    (chan != CPCAP_ADC_BATTI_ADC))
@@ -307,6 +314,8 @@ static void trigger_next_adc_job_if_any(struct cpcap_device *cpcap)
 {
 	struct cpcap_adc *adc = cpcap->adcdata;
 	int head;
+	enum cpcap_adc_timing timing;
+	enum cpcap_adc_type   type;
 
 	mutex_lock(&adc->queue_mutex);
 
@@ -316,9 +325,13 @@ static void trigger_next_adc_job_if_any(struct cpcap_device *cpcap)
 		mutex_unlock(&adc->queue_mutex);
 		return;
 	}
+
+	timing = adc->queue[head]->timing;
+	type = adc->queue[head]->type;
+
 	mutex_unlock(&adc->queue_mutex);
 
-	adc_setup(cpcap, adc->queue[head]);
+	adc_setup(cpcap, type, timing);
 }
 
 static int
@@ -496,16 +509,21 @@ static void adc_result(struct cpcap_device *cpcap,
 	int j;
 	unsigned short cal_data;
 
-	cal_data = 0;
-	cpcap_regacc_read(cpcap, CPCAP_REG_ADCAL1, &cal_data);
-	bank0_conversion[CPCAP_ADC_CHG_ISENSE].cal_offset =
-		((short)cal_data * -1) + 512;
 
-	cal_data = 0;
-	cpcap_regacc_read(cpcap, CPCAP_REG_ADCAL2, &cal_data);
-	bank0_conversion[CPCAP_ADC_BATTI_ADC].cal_offset =
-		((short)cal_data * -1) + 512;
 
+	if (cpcap->vendor == CPCAP_VENDOR_TI) {
+		cal_data = 0;
+		cpcap_regacc_read(cpcap, CPCAP_REG_ADCAL1, &cal_data);
+		bank0_conversion[CPCAP_ADC_CHG_ISENSE].cal_offset =
+			((short)cal_data * -1) + 512;
+	}
+
+	if (cpcap->vendor == CPCAP_VENDOR_TI) {
+		cal_data = 0;
+		cpcap_regacc_read(cpcap, CPCAP_REG_ADCAL2, &cal_data);
+		bank0_conversion[CPCAP_ADC_BATTI_ADC].cal_offset =
+			((short)cal_data * -1) + 512;
+	}
 
 	for (i = CPCAP_REG_ADCD0; i <= CPCAP_REG_ADCD7; i++) {
 		j = i - CPCAP_REG_ADCD0;
@@ -538,6 +556,7 @@ static void cpcap_adc_irq(enum cpcap_irqs irq, void *data)
 	struct cpcap_device *cpcap = adc->cpcap;
 	struct cpcap_adc_request *req;
 	int head;
+	char btrigger_next;
 
 	cancel_delayed_work_sync(&adc->work);
 
@@ -557,12 +576,14 @@ static void cpcap_adc_irq(enum cpcap_irqs irq, void *data)
 	}
 	adc->queue[head] = NULL;
 	adc->queue_head = (head + 1) & (MAX_ADC_FIFO_DEPTH - 1);
+	btrigger_next = !!adc->queue[adc->queue_head];
 
 	mutex_unlock(&adc->queue_mutex);
 
 	adc_result(cpcap, req);
 
-	trigger_next_adc_job_if_any(cpcap);
+	if (btrigger_next)
+		trigger_next_adc_job_if_any(cpcap);
 
 	req->status = 0;
 
@@ -607,7 +628,9 @@ static void cpcap_adc_cancel(struct work_struct *work)
 static int __devinit cpcap_adc_probe(struct platform_device *pdev)
 {
 	struct cpcap_adc *adc;
-	unsigned short cal_data;
+	unsigned short cal_data[2];
+	unsigned short cal_data_diff;
+	int i;
 
 	if (pdev->dev.platform_data == NULL) {
 		dev_err(&pdev->dev, "no platform_data\n");
@@ -625,18 +648,68 @@ static int __devinit cpcap_adc_probe(struct platform_device *pdev)
 
 	mutex_init(&adc->queue_mutex);
 
-	adc_setup_calibrate(adc->cpcap, CPCAP_ADC_CHG_ISENSE);
-	adc_setup_calibrate(adc->cpcap, CPCAP_ADC_BATTI_ADC);
+	i = 0;
 
-	cal_data = 0;
-	cpcap_regacc_read(adc->cpcap, CPCAP_REG_ADCAL1, &cal_data);
-	bank0_conversion[CPCAP_ADC_CHG_ISENSE].cal_offset =
-		((short)cal_data * -1) + 512;
+	do {
+		cal_data[0]  = 0;
+		cal_data[1]  = 0;
+		cal_data_diff = 0;
+		adc_setup_calibrate(adc->cpcap, CPCAP_ADC_CHG_ISENSE);
+		cpcap_regacc_read(adc->cpcap, CPCAP_REG_ADCAL1, &cal_data[0]);
+		adc_setup_calibrate(adc->cpcap, CPCAP_ADC_CHG_ISENSE);
+		cpcap_regacc_read(adc->cpcap, CPCAP_REG_ADCAL1, &cal_data[1]);
 
-	cal_data = 0;
-	cpcap_regacc_read(adc->cpcap, CPCAP_REG_ADCAL2, &cal_data);
-	bank0_conversion[CPCAP_ADC_BATTI_ADC].cal_offset =
-		((short)cal_data * -1) + 512;
+		if (cal_data[0] > cal_data[1])
+			cal_data_diff = cal_data[0] - cal_data[1];
+		else
+			cal_data_diff = cal_data[1] - cal_data[0];
+
+		if (((cal_data[1] >= ST_ADC_CAL_CHRGI_LOWER_THRESHOLD) &&
+		    (cal_data[1] <= ST_ADC_CAL_CHRGI_UPPER_THRESHOLD) &&
+		    (cal_data_diff <= ST_ADC_CALIBRATE_DIFF_THRESHOLD)) ||
+		    (adc->cpcap->vendor == CPCAP_VENDOR_TI)) {
+			bank0_conversion[CPCAP_ADC_CHG_ISENSE].cal_offset =
+				((short)cal_data[1] * -1) + 512;
+			dev_info(&(adc->cpcap->spi->dev),
+				 "cpcap_adc_probe: CHRGI Cal complete!\n");
+			break;
+		}
+
+		msleep(5);
+		i++;
+	} while (i > 5);
+
+	i = 0;
+
+	do {
+		cal_data[0]  = 0;
+		cal_data[1]  = 0;
+		cal_data_diff = 0;
+		adc_setup_calibrate(adc->cpcap, CPCAP_ADC_BATTI_ADC);
+		cpcap_regacc_read(adc->cpcap, CPCAP_REG_ADCAL2, &cal_data[0]);
+		adc_setup_calibrate(adc->cpcap, CPCAP_ADC_BATTI_ADC);
+		cpcap_regacc_read(adc->cpcap, CPCAP_REG_ADCAL2, &cal_data[1]);
+
+		if (cal_data[0] > cal_data[1])
+			cal_data_diff = cal_data[0] - cal_data[1];
+		else
+			cal_data_diff = cal_data[1] - cal_data[0];
+
+		if (((cal_data[1] >= ST_ADC_CAL_BATTI_LOWER_THRESHOLD) &&
+		    (cal_data[1] <= ST_ADC_CAL_BATTI_UPPER_THRESHOLD) &&
+		    (cal_data_diff <= ST_ADC_CALIBRATE_DIFF_THRESHOLD)) ||
+		    (adc->cpcap->vendor == CPCAP_VENDOR_TI)) {
+			bank0_conversion[CPCAP_ADC_BATTI_ADC].cal_offset =
+				((short)cal_data[1] * -1) + 512;
+			dev_info(&(adc->cpcap->spi->dev),
+				 "cpcap_adc_probe: BATTI Cal complete!\n");
+			break;
+		}
+
+		msleep(5);
+		i++;
+	} while (i > 5);
+
 
 	INIT_DELAYED_WORK(&adc->work, cpcap_adc_cancel);
 

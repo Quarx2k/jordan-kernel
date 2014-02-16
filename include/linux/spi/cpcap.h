@@ -305,9 +305,9 @@ enum cpcap_reg {
 	CPCAP_REG_LMISC,	/* LMR Misc Bits */
 	CPCAP_REG_LMACE,	/* LMR Mace IC Support */
 	CPCAP_REG_TEST,         /* Test */
-	CPCAP_REG_ST_TEST1,     /* ST Test 1 */
-
-	CPCAP_REG_END = CPCAP_REG_ST_TEST1, /* End of CPCAP registers. */
+	CPCAP_REG_ST_TEST1,     /* ST Test1 */
+	CPCAP_REG_ST_TEST2,     /* ST Test2 */
+	CPCAP_REG_END = CPCAP_REG_ST_TEST2, /* End of CPCAP registers. */
 
 	CPCAP_REG_MAX		/* The largest valid register value. */
 	= CPCAP_REG_END,

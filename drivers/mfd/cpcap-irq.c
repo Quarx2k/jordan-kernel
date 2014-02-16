@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 - 2010, Motorola, All Rights Reserved.
+ * Copyright (C) 2009 - 2011, Motorola, All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -61,6 +61,7 @@ struct cpcap_irqdata {
 	struct cpcap_device *cpcap;
 	struct cpcap_event_handler event_handler[CPCAP_IRQ__NUM];
 	struct cpcap_irq_info irq_info[CPCAP_IRQ__NUM];
+	struct wake_lock wake_lock;
 };
 
 #define EVENT_MASK(event) (1 << ((event) % NUM_INTS_PER_REG))
@@ -75,6 +76,7 @@ static irqreturn_t event_isr(int irq, void *data)
 {
 	struct cpcap_irqdata *irq_data = data;
 	disable_irq_nosync(irq);
+	wake_lock(&irq_data->wake_lock);
 	queue_work(irq_data->workqueue, &irq_data->work);
 
 	return IRQ_HANDLED;
@@ -159,11 +161,12 @@ void cpcap_irq_mask_all(struct cpcap_device *cpcap)
 struct pwrkey_data {
 	struct cpcap_device *cpcap;
 	enum pwrkey_states state;
+	struct wake_lock wake_lock;
 #ifdef CONFIG_PM_DEEPSLEEP
 	struct hrtimer longPress_timer;
 	int expired;
 #endif
-
+	struct delayed_work pwrkey_delayed_work;
 };
 
 #ifdef CONFIG_PM_DBG_DRV
@@ -182,6 +185,9 @@ static enum hrtimer_restart longPress_timer_callback(struct hrtimer *timer)
 		container_of(timer, struct pwrkey_data, longPress_timer);
 	struct cpcap_device *cpcap = pwrkey_data->cpcap;
 	enum pwrkey_states new_state = PWRKEY_PRESS;
+
+	wake_lock_timeout(&pwrkey_data->wake_lock, 20);
+
 
 	pwrkey_data->expired = 1;
 	cpcap_broadcast_key_event(cpcap, KEY_END, new_state);
@@ -205,7 +211,9 @@ static void pwrkey_handler(enum cpcap_irqs irq, void *data)
 
 	if (get_deepsleep_mode()) {
 		if (new_state == PWRKEY_RELEASE) {
+			flush_delayed_work(&pwrkey_data->pwrkey_delayed_work);
 			hrtimer_cancel(&pwrkey_data->longPress_timer);
+			wake_lock_timeout(&pwrkey_data->wake_lock, 20);
 			if (pwrkey_data->expired == 1) {
 				pwrkey_data->expired = 0;
 				cpcap_broadcast_key_event(cpcap,
@@ -216,6 +224,7 @@ static void pwrkey_handler(enum cpcap_irqs irq, void *data)
 			pwrkey_data->expired = 0;
 			hrtimer_start(&pwrkey_data->longPress_timer,
 					ktime_set(2, 0), HRTIMER_MODE_REL);
+			wake_lock_timeout(&pwrkey_data->wake_lock, 2*HZ+5);
 		}
 	}
 
@@ -225,10 +234,31 @@ static void pwrkey_handler(enum cpcap_irqs irq, void *data)
 
 	if ((new_state < PWRKEY_UNKNOWN) && (new_state != last_state)) {
 #endif
+		wake_lock_timeout(&pwrkey_data->wake_lock, 20);
+		flush_delayed_work(&pwrkey_data->pwrkey_delayed_work);
 		cpcap_broadcast_key_event(cpcap, KEY_END, new_state);
 		pwrkey_data->state = new_state;
+	} else if ((last_state == PWRKEY_RELEASE) &&
+		   (new_state == PWRKEY_RELEASE)) {
+		/* Key must have been released before press was handled. Send
+		 * both the press and the release. */
+		wake_lock_timeout(&pwrkey_data->wake_lock,
+				  msecs_to_jiffies(200));
+		if (!delayed_work_pending(&pwrkey_data->pwrkey_delayed_work))
+			cpcap_broadcast_key_event(cpcap, KEY_END, PWRKEY_PRESS);
+		schedule_delayed_work(&pwrkey_data->pwrkey_delayed_work,
+				      msecs_to_jiffies(100));
 	}
 	cpcap_irq_unmask(cpcap, CPCAP_IRQ_ON);
+}
+
+static void pwrkey_delayed_work_func(struct work_struct *pwrkey_delayed_work)
+{
+	struct pwrkey_data *pwrkey_data =
+		container_of(pwrkey_delayed_work, struct pwrkey_data,
+			     pwrkey_delayed_work.work);
+
+	cpcap_broadcast_key_event(pwrkey_data->cpcap, KEY_END, PWRKEY_RELEASE);
 }
 
 static int pwrkey_init(struct cpcap_device *cpcap)
@@ -241,9 +271,11 @@ static int pwrkey_init(struct cpcap_device *cpcap)
 		return -ENOMEM;
 	data->cpcap = cpcap;
 	data->state = PWRKEY_RELEASE;
+	INIT_DELAYED_WORK(&data->pwrkey_delayed_work, pwrkey_delayed_work_func);
 	retval = cpcap_irq_register(cpcap, CPCAP_IRQ_ON, pwrkey_handler, data);
 	if (retval)
 		kfree(data);
+	wake_lock_init(&data->wake_lock, WAKE_LOCK_SUSPEND, "pwrkey");
 #ifdef CONFIG_PM_DEEPSLEEP
 
 	hrtimer_init(&(data->longPress_timer),
@@ -264,6 +296,8 @@ static void pwrkey_remove(struct cpcap_device *cpcap)
 	if (!data)
 		return;
 	cpcap_irq_free(cpcap, CPCAP_IRQ_ON);
+	wake_lock_destroy(&data->wake_lock);
+	cancel_delayed_work_sync(&data->pwrkey_delayed_work);
 	kfree(data);
 }
 
@@ -301,6 +335,7 @@ static void irq_work_func(struct work_struct *work)
 	struct cpcap_irqdata *data;
 	struct cpcap_device *cpcap;
 	struct spi_device *spi;
+	struct cpcap_platform_data *pdata;
 
 	static const struct {
 		unsigned short status_reg;
@@ -320,6 +355,7 @@ static void irq_work_func(struct work_struct *work)
 	data = container_of(work, struct cpcap_irqdata, work);
 	cpcap = data->cpcap;
 	spi = cpcap->spi;
+	pdata = (struct cpcap_platform_data *)spi->controller_data;
 
 	while (gpio_get_value(irq_to_gpio(spi->irq))) {
 		for (i = 0; i < NUM_INT_REGS; ++i) {
@@ -374,6 +410,7 @@ static void irq_work_func(struct work_struct *work)
 	}
 error:
 	mutex_unlock(&data->lock);
+	wake_unlock(&data->wake_lock);
 }
 
 #ifdef CONFIG_DEBUG_FS
@@ -495,6 +532,11 @@ int cpcap_irq_init(struct cpcap_device *cpcap)
 	int retval;
 	struct spi_device *spi = cpcap->spi;
 	struct cpcap_irqdata *data;
+	struct cpcap_platform_data *pdata;
+
+	pdata = (struct cpcap_platform_data *)spi->controller_data;
+	if((spi->irq == -1)) //|| (pdata->irq_pending == NULL))
+		return -EINVAL;
 
 	data = kzalloc(sizeof(struct cpcap_irqdata), GFP_KERNEL);
 	if (!data)
@@ -502,9 +544,10 @@ int cpcap_irq_init(struct cpcap_device *cpcap)
 
 	cpcap_irq_mask_all(cpcap);
 
-	data->workqueue = create_workqueue("cpcap_irq");
+	data->workqueue = create_singlethread_workqueue("cpcap_irq");
 	INIT_WORK(&data->work, irq_work_func);
 	mutex_init(&data->lock);
+	wake_lock_init(&data->wake_lock, WAKE_LOCK_SUSPEND, "cpcap-irq");
 	data->cpcap = cpcap;
 
 	retval = request_irq(spi->irq, event_isr, IRQF_DISABLED |
@@ -709,7 +752,7 @@ void cpcap_irq_pm_dbg_resume(void)
 {
 	pm_dbg_info.suspend = 0;
 	if (pm_dbg_info.wakeup != 0) {
-		printk(KERN_INFO "PM_DBG WAKEUP CPCAP IRQ = 0x%x.0x%x.0%x.0x%x.0x%x\n",
+		printk(KERN_INFO "PM_DBG WAKEUP CPCAP IRQ = 0x%x.0x%x.0x%x.0x%x.0x%x\n",
 			pm_dbg_info.en_ints[0],
 			pm_dbg_info.en_ints[1],
 			pm_dbg_info.en_ints[2],

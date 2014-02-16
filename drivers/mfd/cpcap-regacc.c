@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007-2009 Motorola, Inc.
+ * Copyright (C) 2007-2011 Motorola, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -23,6 +23,7 @@
 #include <linux/spi/cpcap-regbits.h>
 
 #define IS_CPCAP(reg) ((reg) >= CPCAP_REG_START && (reg) <= CPCAP_REG_END)
+#define CPCAP_SECONDARY_CS    1
 
 static DEFINE_MUTEX(reg_access);
 
@@ -252,6 +253,7 @@ static const struct {
 	[CPCAP_REG_LMACE]     = {1183, 0xFFF8, 0xFFFF},
 	[CPCAP_REG_TEST]      = {7936, 0x0000, 0xFFFF},
 	[CPCAP_REG_ST_TEST1]  = {8002, 0x0000, 0xFFFF},
+	[CPCAP_REG_ST_TEST2]  = {8006, 0xFFFC, 0xFFFF},
 };
 
 static int cpcap_spi_access(struct spi_device *spi, u8 *buf,
@@ -329,6 +331,50 @@ int cpcap_regacc_read(struct cpcap_device *cpcap, enum cpcap_reg reg,
 	return retval;
 }
 
+void cpcap_mismatch_detect(struct spi_device *spi, bool do_check,
+			enum cpcap_reg reg, unsigned short value)
+{
+#define CPCAP_MISMATCH_MAX_REG CPCAP_REG_UCC1
+	static unsigned short stored_val[CPCAP_MISMATCH_MAX_REG];
+	static bool stored_val_wrote[CPCAP_MISMATCH_MAX_REG];
+	unsigned short temp_val;
+	int i;
+	int retval;
+
+	if (reg < CPCAP_MISMATCH_MAX_REG) {
+		/*
+		 * Only do the check if the current reg is CPCAP_REG_INTM1 or
+		 * CPCAP_REG_INTM2, these 2 registers were ones which always
+		 * changed in the failure case, and are not changed by the
+		 * CPCAP microcontroller
+		 */
+		if ((do_check) &&
+		   ((reg == CPCAP_REG_INTM1) || (reg == CPCAP_REG_INTM2)) &&
+		   ((stored_val_wrote[reg]) && (stored_val[reg] != value))) {
+			printk(KERN_WARNING "CPCAP register mismatch found in "
+				"register %d, doing full register compare\n",
+				register_info_tbl[reg].address);
+			for (i = 0; i < CPCAP_MISMATCH_MAX_REG; i++) {
+				retval = cpcap_config_for_read(spi,
+						register_info_tbl[i].address,
+						&temp_val);
+				if (!retval)
+					printk(KERN_WARNING "CPCAP register %d "
+						"%s, expected = 0x%04x, actual"
+						" = 0x%04x, wrote = %d\n",
+						register_info_tbl[i].address,
+						((temp_val == stored_val[i]) ?
+						"matches" : "does not match"),
+						stored_val[i], temp_val,
+						stored_val_wrote[i]);
+			}
+		} else if (!do_check) {
+			stored_val[reg] = value;
+			stored_val_wrote[reg] = true;
+		}
+	}
+}
+
 int cpcap_regacc_write(struct cpcap_device *cpcap,
 		       enum cpcap_reg reg,
 		       unsigned short value,
@@ -353,6 +399,9 @@ int cpcap_regacc_write(struct cpcap_device *cpcap,
 						       &old_value);
 			if (retval != 0)
 				goto error;
+			else
+				cpcap_mismatch_detect(spi, true,
+						reg, old_value);
 		}
 
 		old_value &= register_info_tbl[reg].rbw_mask;
@@ -361,9 +410,73 @@ int cpcap_regacc_write(struct cpcap_device *cpcap,
 		retval = cpcap_config_for_write(spi,
 						register_info_tbl[reg].address,
 						value);
+
+		if (!retval)
+			cpcap_mismatch_detect(spi, false, reg, value);
+
 error:
 		mutex_unlock(&reg_access);
 	}
+
+	return retval;
+}
+
+int cpcap_regacc_read_secondary(struct cpcap_device *cpcap, enum cpcap_reg reg,
+		      unsigned short *value_ptr)
+{
+	int retval = -EINVAL;
+	struct cpcap_device secondary_cpcap;
+	struct spi_device secondary_spi;
+
+	/* cpcap & spi structures are duplicated since secondary reads are only
+	performed a couple of times at powerup which doesn't justify completely
+	duplicating the entire CPCAP driver structure or creating static
+	instances of the structures.  Since regacc_read only uses the SPI
+	element in the cpcap_device everything else in it can be safely
+	NULL'ed out
+	 */
+	memset(&secondary_cpcap, 0, sizeof(struct cpcap_device));
+	if (cpcap && cpcap->spi) {
+		memcpy(&secondary_spi, cpcap->spi, sizeof(struct spi_device));
+		secondary_spi.chip_select = CPCAP_SECONDARY_CS;
+		secondary_cpcap.spi = &secondary_spi;
+		retval = cpcap_regacc_read(&secondary_cpcap, reg, value_ptr);
+	}
+
+	if (retval)
+		printk(KERN_ERR "%s: Unable to read from SECONDARY register %d\n",
+			__func__, register_info_tbl[reg].address);
+
+	return retval;
+}
+
+int cpcap_regacc_write_secondary(struct cpcap_device *cpcap,
+		       enum cpcap_reg reg,
+		       unsigned short value,
+		       unsigned short mask)
+{
+	int retval = -EINVAL;
+	struct cpcap_device secondary_cpcap;
+	struct spi_device secondary_spi;
+
+	/* cpcap & spi structures are duplicated since secondary writes are only
+	performed a couple of times at powerup which doesn't justify completely
+	duplicating the entire CPCAP driver structure or creating static
+	instances of the structures.  Since regacc_write only uses the SPI
+	element in the cpcap_device everything else in it can be safely
+	NULL'ed out
+	 */
+	memset(&secondary_cpcap, 0, sizeof(struct cpcap_device));
+	if (cpcap && cpcap->spi) {
+		memcpy(&secondary_spi, cpcap->spi, sizeof(struct spi_device));
+		secondary_spi.chip_select = CPCAP_SECONDARY_CS;
+		secondary_cpcap.spi = &secondary_spi;
+		retval = cpcap_regacc_write(&secondary_cpcap, reg, value, mask);
+	}
+
+	if (retval)
+		printk(KERN_ERR "%s: Unable to write 0x%x & 0x%x to SECONDARY register %d\n",
+			__func__, value, mask, register_info_tbl[reg].address);
 
 	return retval;
 }
