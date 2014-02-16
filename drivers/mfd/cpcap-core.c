@@ -39,6 +39,11 @@ static int ioctl(struct inode *inode,
 static int __devinit cpcap_probe(struct spi_device *spi);
 static int __devexit cpcap_remove(struct spi_device *spi);
 
+#ifdef CONFIG_PM
+static int cpcap_suspend(struct spi_device *spi, pm_message_t mesg);
+static int cpcap_resume(struct spi_device *spi);
+#endif
+
 const static struct file_operations cpcap_fops = {
 	.owner = THIS_MODULE,
 	.ioctl = ioctl,
@@ -58,6 +63,10 @@ static struct spi_driver cpcap_driver = {
 		   },
 	.probe = cpcap_probe,
 	.remove = __devexit_p(cpcap_remove),
+#ifdef CONFIG_PM
+	.suspend = cpcap_suspend,
+	.resume = cpcap_resume,
+#endif
 };
 
 static struct platform_device cpcap_adc_device = {
@@ -574,6 +583,22 @@ static void cpcap_shutdown(void)
 	spi_unregister_driver(&cpcap_driver);
 }
 
+#ifdef CONFIG_PM
+static int cpcap_suspend(struct spi_device *spi, pm_message_t mesg)
+{
+
+	struct cpcap_device *cpcap = spi_get_drvdata(spi);
+
+	return cpcap_irq_suspend(cpcap);
+}
+
+static int cpcap_resume(struct spi_device *spi)
+{
+	struct cpcap_device *cpcap = spi_get_drvdata(spi);
+
+	return cpcap_irq_resume(cpcap);
+}
+#endif
 subsys_initcall(cpcap_init);
 module_exit(cpcap_shutdown);
 

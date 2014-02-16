@@ -847,6 +847,12 @@ int cpcap_direct_misc_write(unsigned short reg, unsigned short value,\
 			    unsigned short mask);
 #endif
 
+#ifdef CONFIG_PM
+int cpcap_irq_suspend(struct cpcap_device *cpcap);
+
+int cpcap_irq_resume(struct cpcap_device *cpcap);
+#endif
+
 #define  cpcap_driver_register platform_driver_register
 #define  cpcap_driver_unregister platform_driver_unregister
 
