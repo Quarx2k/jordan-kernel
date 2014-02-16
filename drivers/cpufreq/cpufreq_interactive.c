@@ -85,7 +85,7 @@ static bool suspend_enabled = true;
 static unsigned int suspend_freq = 600000;
 
 /* Hi speed to bump to from lo speed when load burst (default max) */
-#define DEFAULT_HISPEED_FREQ 800000
+#define DEFAULT_HISPEED_FREQ 600000
 static unsigned int hispeed_freq = DEFAULT_HISPEED_FREQ;
 
 /* Go to hi speed when CPU load at or above this value. */
@@ -106,7 +106,7 @@ static int ntarget_loads = ARRAY_SIZE(default_target_loads);
 /*
  * The minimum amount of time to spend at a frequency before we can ramp down.
  */
-#define DEFAULT_MIN_SAMPLE_TIME (40 * USEC_PER_MSEC)
+#define DEFAULT_MIN_SAMPLE_TIME (60 * USEC_PER_MSEC)
 static unsigned long min_sample_time = DEFAULT_MIN_SAMPLE_TIME;
 
 /*
@@ -267,6 +267,8 @@ static unsigned int freq_to_above_hispeed_delay(unsigned int freq)
 		;
 
 	ret = above_hispeed_delay[i];
+	ret = (ret > (1 * USEC_PER_MSEC)) ? (ret - (1 * USEC_PER_MSEC)) : ret;
+	
 	spin_unlock_irqrestore(&above_hispeed_delay_lock, flags);
 	return ret;
 }
