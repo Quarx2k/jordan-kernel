@@ -6316,9 +6316,12 @@ recheck:
 	    (p->mm && param->sched_priority > MAX_USER_RT_PRIO-1) ||
 	    (!p->mm && param->sched_priority > MAX_RT_PRIO-1))
 		return -EINVAL;
-	if (rt_policy(policy) != (param->sched_priority != 0))
-		return -EINVAL;
 
+	if (rt_policy(policy) != (param->sched_priority != 0)) {
+		// Motorola "opprofdaemon" fix, sched_setscheduler(2837, SCHED_RR, { 0 }) = -1 EINVAL (Invalid argument)
+		printk("opprofdaemon: sched_priority: %d\n", param->sched_priority);
+		//return -EINVAL;
+	}
 	/*
 	 * Allow unprivileged RT tasks to decrease priority:
 	 */
@@ -6332,8 +6335,9 @@ recheck:
 			unlock_task_sighand(p, &flags);
 
 			/* can't set/change the rt policy */
-			if (policy != p->policy && !rlim_rtprio)
-				return -EPERM;
+			// Motorola "opprofdaemon" fix, sched_setscheduler(2743, SCHED_RR, { 0 }) = -1 EPERM (Operation not permitted)
+			//if (policy != p->policy && !rlim_rtprio)
+			//	return -EPERM;
 
 			/* can't increase priority */
 			if (param->sched_priority > p->rt_priority &&
