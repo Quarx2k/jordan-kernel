@@ -43,7 +43,7 @@
 #define CPCAP_BATT_IRQ_ADCDONE 0x08
 #define CPCAP_BATT_IRQ_MACRO   0x10
 
-#undef USE_OWN_CALCULATE_METHOD
+#define USE_OWN_CALCULATE_METHOD
 
 #ifdef USE_OWN_CALCULATE_METHOD
 #include "cpcap_charge_table.h"
@@ -129,6 +129,7 @@ static struct platform_driver cpcap_batt_driver = {
 
 static struct cpcap_batt_ps *cpcap_batt_sply;
 #ifdef USE_OWN_CALCULATE_METHOD
+static struct task_struct * batt_task;
 static int cpcap_batt_status(struct cpcap_batt_ps *sply);
 static int cpcap_batt_counter(struct cpcap_batt_ps *sply);
 static int cpcap_batt_value(struct cpcap_batt_ps *sply, int value);
@@ -336,7 +337,6 @@ if (req.type == 2) {
 	printk("CPCAP_IOCTL_BATT_ATOD_SYNC: \n Dump of CPCAP_ADC_BANK1_NUM:\n CPCAP_ADC_AD8:%d\n CPCAP_ADC_AD9:%d\n CPCAP_ADC_LICELL:%d\n CPCAP_ADC_HV_BATTP:%d\n CPCAP_ADC_TSX1_AD12:%d\n CPCAP_ADC_TSX2_AD13:%d\n CPCAP_ADC_TSY1_AD14:%d\n CPCAP_ADC_TSY2_AD15:%d\n",req_us.result[CPCAP_ADC_AD8],req_us.result[CPCAP_ADC_AD9],req_us.result[CPCAP_ADC_LICELL],req_us.result[CPCAP_ADC_HV_BATTP],
                                req_us.result[CPCAP_ADC_TSX1_AD12],req_us.result[CPCAP_ADC_TSX2_AD13],req_us.result[CPCAP_ADC_TSY1_AD14],req_us.result[CPCAP_ADC_TSY2_AD15]);
 }
-
 */
 #endif
 		if (copy_to_user((void *)arg, (void *)&req_us,
@@ -536,7 +536,7 @@ static int cpcap_batt_value(struct cpcap_batt_ps *sply, int value) {
 }
 
 static int cpcap_batt_counter(struct cpcap_batt_ps *sply) {
-	int i, volt_batt;
+	int i, volt_batt, old_volt;
 	u32 cap = 0;
 
 	volt_batt = cpcap_batt_value(sply, CPCAP_ADC_BATTP);
@@ -562,12 +562,13 @@ static int cpcap_batt_counter(struct cpcap_batt_ps *sply) {
 		cap = tbl[i].capacity;
 		break;
 	}
+	
 	printk("%s: capacity=%d\n",__func__,cap);
 
 	return cap;
 }
 
-#if 0
+
 void delay_ms(__u32 t)
 {
     __u32 timeout = t*HZ/1000;
@@ -575,7 +576,7 @@ void delay_ms(__u32 t)
     set_current_state(TASK_INTERRUPTIBLE);
     schedule_timeout(timeout);
 }
-#endif
+
 #if 0
 static int cpcap_batt_monitor(void* arg) {
 
@@ -687,6 +688,15 @@ CPCAP_MACRO_7 0, 8 0, 9 1, 10 0, 11 0, 12 1
  return 0;
 }
 #endif
+
+static int cpcap_batt_update(void* arg) {
+	struct cpcap_batt_ps *sply = cpcap_batt_sply;
+	while(1) {
+		power_supply_changed(&sply->batt);
+	        delay_ms(60000);
+	}
+	return 0;
+}
 #endif
 
 static int cpcap_batt_probe(struct platform_device *pdev)
@@ -831,8 +841,8 @@ unregac_exit:
 
 prb_exit:
 #ifdef USE_OWN_CALCULATE_METHOD
-       // batt_task = kthread_create(cpcap_batt_monitor, (void*)0, "cpcap_batt_monitor");
-	//wake_up_process(batt_task);
+        batt_task = kthread_create(cpcap_batt_update, (void*)0, "cpcap_batt_monitor");
+	wake_up_process(batt_task);
 #endif
 	return ret;
 }
