@@ -467,7 +467,7 @@ static int cpcap_batt_get_property(struct power_supply *psy,
 
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
 #ifdef USE_OWN_CALCULATE_METHOD
-		val->intval = cpcap_batt_value(sply, CPCAP_ADC_BATTP)*1000;
+		val->intval = (cpcap_batt_value(sply, CPCAP_ADC_BATTP)*1000));
 #else
 		val->intval = sply->batt_state.batt_volt;
 #endif
@@ -513,9 +513,7 @@ static int cpcap_batt_status(struct cpcap_batt_ps *sply) {
 }
 
 static int cpcap_batt_value(struct cpcap_batt_ps *sply, int value) {
-        int i;
 	struct cpcap_adc_request req;
-	struct cpcap_adc_us_request req_us;
 
 	req.format = CPCAP_ADC_FORMAT_CONVERTED;
 	req.timing = CPCAP_ADC_TIMING_IMM;
@@ -523,30 +521,10 @@ static int cpcap_batt_value(struct cpcap_batt_ps *sply, int value) {
  
 	cpcap_adc_sync_read(sply->cpcap, &req);
 
-	req_us.status = req.status;
-
-	for (i = 0; i < CPCAP_ADC_BANK0_NUM; i++)
-	    req_us.result[i] = req.result[i];
-
-        return req_us.result[value];
+        return req.result[value];
 }
 
 static int cpcap_batt_counter(struct cpcap_batt_ps *sply) {
-/*
-        int percent, volt_batt, range, max, min;
-
-	min  = 3500;
-        max  = 4200;
-        volt_batt = cpcap_batt_value(sply, CPCAP_ADC_BATTP);
-	range = (max - min) / 100;
-	percent = (volt_batt - min) / range;
-	if (percent > 100) percent = 100;
-	if (volt_batt > 4150) percent = 100;
-	if (percent < 0)   percent = 0;
-
-	return percent;
-*/
-
 	int i, volt_batt;
 	u32 cap = 0;
 
@@ -586,14 +564,6 @@ void delay_ms(__u32 t)
     schedule_timeout(timeout);
 }
 #endif
-
-#define MAX_LVLS 2 // TODO Change it.
-static const unsigned short percent_map[MAX_LVLS][2] = {
-/*     mV  percent */
-    {3500, 0}, /* 0% */
-    {4200, 100}, /* 100% */
-};
-
 #if 0
 static int cpcap_batt_monitor(void* arg) {
 
