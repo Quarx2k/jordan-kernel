@@ -37,15 +37,17 @@
 #include <linux/delay.h>
 #include <linux/kthread.h>
 
-#include "cpcap_charge_table.h"
-
 #define CPCAP_BATT_IRQ_BATTDET 0x01
 #define CPCAP_BATT_IRQ_OV      0x02
 #define CPCAP_BATT_IRQ_CC_CAL  0x04
 #define CPCAP_BATT_IRQ_ADCDONE 0x08
 #define CPCAP_BATT_IRQ_MACRO   0x10
 
-#define USE_OWN_CALCULATE_METHOD
+#undef USE_OWN_CALCULATE_METHOD
+
+#ifdef USE_OWN_CALCULATE_METHOD
+#include "cpcap_charge_table.h"
+#endif
 
 static int cpcap_batt_ioctl(struct inode *inode,
 			    struct file *file,
@@ -142,7 +144,7 @@ void cpcap_batt_irq_hdlr(enum cpcap_irqs irq, void *data)
 	switch (irq) {
 	case CPCAP_IRQ_BATTDETB:
 #ifdef USE_OWN_CALCULATE_METHOD
-               // printk("CPCAP_IRQ_BATTDETB\n");
+                printk("CPCAP_IRQ_BATTDETB\n");
 #endif
 		sply->irq_status |= CPCAP_BATT_IRQ_BATTDET;
 		cpcap_irq_unmask(sply->cpcap, irq);
@@ -150,7 +152,7 @@ void cpcap_batt_irq_hdlr(enum cpcap_irqs irq, void *data)
 
 	case CPCAP_IRQ_VBUSOV:
 #ifdef USE_OWN_CALCULATE_METHOD
-               // printk("CPCAP_IRQ_VBUSOV\n");
+                printk("CPCAP_IRQ_VBUSOV\n");
 #endif
 		sply->irq_status |=  CPCAP_BATT_IRQ_OV;
 		cpcap_irq_unmask(sply->cpcap, irq);
@@ -158,7 +160,7 @@ void cpcap_batt_irq_hdlr(enum cpcap_irqs irq, void *data)
 
 	case CPCAP_IRQ_CC_CAL:
 #ifdef USE_OWN_CALCULATE_METHOD
-                //printk("CPCAP_IRQ_CC_CAL");
+                printk("CPCAP_IRQ_CC_CAL");
 #endif
 		sply->irq_status |= CPCAP_BATT_IRQ_CC_CAL;
 		cpcap_irq_unmask(sply->cpcap, irq);
@@ -170,7 +172,7 @@ void cpcap_batt_irq_hdlr(enum cpcap_irqs irq, void *data)
 	case CPCAP_IRQ_UC_PRIMACRO_10:
 	case CPCAP_IRQ_UC_PRIMACRO_11:
 #ifdef USE_OWN_CALCULATE_METHOD
-                //printk("CPCAP_IRQ_UC_PRIMACRO\n");
+                printk("CPCAP_IRQ_UC_PRIMACRO\n");
 #endif
 		sply->irq_status |= CPCAP_BATT_IRQ_MACRO;
 		break;
@@ -270,9 +272,6 @@ static int cpcap_batt_ioctl(struct inode *inode,
 				   (void *)arg, sizeof(struct cpcap_batt_data)))
 			return -EFAULT;
 		power_supply_changed(&sply->batt);
-#ifdef USE_OWN_CALCULATE_METHOD
-		printk("CPCAP_IOCTL_BATT_DISPLAY_UPDATE");
-#endif
 		if (data->batt_changed)
 			data->batt_changed(&sply->batt, &sply->batt_state);
 		break;
@@ -293,7 +292,7 @@ static int cpcap_batt_ioctl(struct inode *inode,
 			req_async->callback = cpcap_batt_adc_hdlr;
 			req_async->callback_param = sply;
 #ifdef USE_OWN_CALCULATE_METHOD
-                        printk("CPCAP_IOCTL_BATT_ATOD_ASYNC:\n format %d\n timing %d\n type %d\n",req_us.format , req_us.timing, req_us.type);
+                       // printk("CPCAP_IOCTL_BATT_ATOD_ASYNC:\n format %d\n timing %d\n type %d\n",req_us.format , req_us.timing, req_us.type);
 #endif
 			ret = cpcap_adc_async_read(sply->cpcap, req_async);
 			if (!ret)
@@ -322,25 +321,23 @@ static int cpcap_batt_ioctl(struct inode *inode,
 		if (ret)
 			return ret;
 		req_us.status = req.status;
-#ifdef USE_OWN_CALCULATE_METHOD
-                //printk("CPCAP_IOCTL_BATT_ATOD_SYNC:\n format %d\n timing %d\n type %d\n status %d\n",req.format , req.timing, req.type, req.status);
-#endif
+
 		for (i = 0; i < CPCAP_ADC_BANK0_NUM; i++)
 			req_us.result[i] = req.result[i];
 #ifdef USE_OWN_CALCULATE_METHOD
 /*
 if (req.type == 0) {
-	printk("Dump of CPCAP_ADC_BANK0_NUM:\n CPCAP_ADC_VBUS:%d\n CPCAP_ADC_AD3:%d\n CPCAP_ADC_BPLUS_AD4:%d\n CPCAP_ADC_CHG_ISENSE:%d\n CPCAP_ADC_BATTI_ADC:%d\n CPCAP_ADC_USB_ID:%d\n",
-                           req_us.result[CPCAP_ADC_VBUS],req_us.result[CPCAP_ADC_AD3],req_us.result[CPCAP_ADC_BPLUS_AD4],req_us.result[CPCAP_ADC_CHG_ISENSE],
-                               req_us.result[CPCAP_ADC_BATTI_ADC],req_us.result[CPCAP_ADC_USB_ID]);
+	printk("CPCAP_IOCTL_BATT_ATOD_SYNC: \n Dump of CPCAP_ADC_BANK0_NUM:\n CPCAP_ADC_VBUS:%d\n CPCAP_ADC_AD3:%d\n CPCAP_ADC_BATTP:%d\n CPCAP_ADC_BPLUS_AD4:%d\n CPCAP_ADC_CHG_ISENSE:%d\n CPCAP_ADC_BATTI_ADC:%d\n CPCAP_ADC_USB_ID:%d\n CPCAP_ADC_AD0_BATTDETB: %d\n",
+                           req_us.result[CPCAP_ADC_VBUS],req_us.result[CPCAP_ADC_AD3],req_us.result[CPCAP_ADC_BATTP] ,req_us.result[CPCAP_ADC_BPLUS_AD4],req_us.result[CPCAP_ADC_CHG_ISENSE],
+                               req_us.result[CPCAP_ADC_BATTI_ADC],req_us.result[CPCAP_ADC_USB_ID], req_us.result[CPCAP_ADC_AD0_BATTDETB]);
 }
 
 if (req.type == 2) {
-	printk("Dump of CPCAP_ADC_BANK1_NUM:\n CPCAP_ADC_AD8:%d\n CPCAP_ADC_AD9:%d\n CPCAP_ADC_LICELL:%d\n CPCAP_ADC_HV_BATTP:%d\n CPCAP_ADC_TSX1_AD12:%d\n CPCAP_ADC_TSX2_AD13:%d\n CPCAP_ADC_TSX2_AD13:%d\n, CPCAP_ADC_TSX2_AD14:%d\n",req_us.result[CPCAP_ADC_AD8],req_us.result[CPCAP_ADC_AD9],req_us.result[CPCAP_ADC_LICELL],req_us.result[CPCAP_ADC_HV_BATTP],
+	printk("CPCAP_IOCTL_BATT_ATOD_SYNC: \n Dump of CPCAP_ADC_BANK1_NUM:\n CPCAP_ADC_AD8:%d\n CPCAP_ADC_AD9:%d\n CPCAP_ADC_LICELL:%d\n CPCAP_ADC_HV_BATTP:%d\n CPCAP_ADC_TSX1_AD12:%d\n CPCAP_ADC_TSX2_AD13:%d\n CPCAP_ADC_TSY1_AD14:%d\n CPCAP_ADC_TSY2_AD15:%d\n",req_us.result[CPCAP_ADC_AD8],req_us.result[CPCAP_ADC_AD9],req_us.result[CPCAP_ADC_LICELL],req_us.result[CPCAP_ADC_HV_BATTP],
                                req_us.result[CPCAP_ADC_TSX1_AD12],req_us.result[CPCAP_ADC_TSX2_AD13],req_us.result[CPCAP_ADC_TSY1_AD14],req_us.result[CPCAP_ADC_TSY2_AD15]);
 }
+
 */
-               // printk("Result Voltage: %dmV\n",req_us.result[CPCAP_ADC_BATTP]);
 #endif
 		if (copy_to_user((void *)arg, (void *)&req_us,
 				 sizeof(struct cpcap_adc_us_request)))
@@ -352,12 +349,23 @@ if (req.type == 2) {
 		req_us.timing = req_async->timing;
 		req_us.type = req_async->type;
 		req_us.status = req_async->status;
-#ifdef USE_OWN_CALCULATE_METHOD
-             //   printk("CPCAP_IOCTL_BATT_ATOD_READ:\n format %d\n timing %d\n type %d\n status %d\n",req_us.format , req_us.timing, req_us.type, req_us.status);
-#endif
+                printk("CPCAP_IOCTL_BATT_ATOD_SYNC:\n format %d\n timing %d\n type %d\n status %d\n", req_us.format , req_us.timing, req_us.type, req_us.status);
 		for (i = 0; i < CPCAP_ADC_BANK0_NUM; i++)
 			req_us.result[i] = req_async->result[i];
+#ifdef USE_OWN_CALCULATE_METHOD
+/*
+if (req_us.type == 0) {
+	printk("CPCAP_IOCTL_BATT_ATOD_READ: \n Dump of CPCAP_ADC_BANK0_NUM:\n CPCAP_ADC_VBUS:%d\n CPCAP_ADC_AD3:%d\n CPCAP_ADC_BATTP:%d\n CPCAP_ADC_BPLUS_AD4:%d\n CPCAP_ADC_CHG_ISENSE:%d\n CPCAP_ADC_BATTI_ADC:%d\n CPCAP_ADC_USB_ID:%d\n CPCAP_ADC_AD0_BATTDETB: %d\n",
+                           req_us.result[CPCAP_ADC_VBUS],req_us.result[CPCAP_ADC_AD3],req_us.result[CPCAP_ADC_BATTP] ,req_us.result[CPCAP_ADC_BPLUS_AD4],req_us.result[CPCAP_ADC_CHG_ISENSE],
+                               req_us.result[CPCAP_ADC_BATTI_ADC],req_us.result[CPCAP_ADC_USB_ID], req_us.result[CPCAP_ADC_AD0_BATTDETB]);
+}
 
+if (req_us.type == 2) {
+	printk("CPCAP_IOCTL_BATT_ATOD_READ: \n Dump of CPCAP_ADC_BANK1_NUM:\n CPCAP_ADC_AD8:%d\n CPCAP_ADC_AD9:%d\n CPCAP_ADC_LICELL:%d\n CPCAP_ADC_HV_BATTP:%d\n CPCAP_ADC_TSX1_AD12:%d\n CPCAP_ADC_TSX2_AD13:%d\n CPCAP_ADC_TSY1_AD14:%d\n CPCAP_ADC_TSY2_AD15:%d\n",req_us.result[CPCAP_ADC_AD8],req_us.result[CPCAP_ADC_AD9],req_us.result[CPCAP_ADC_LICELL],req_us.result[CPCAP_ADC_HV_BATTP],
+                               req_us.result[CPCAP_ADC_TSX1_AD12],req_us.result[CPCAP_ADC_TSX2_AD13],req_us.result[CPCAP_ADC_TSY1_AD14],req_us.result[CPCAP_ADC_TSY2_AD15]);
+}
+*/
+#endif
 		if (copy_to_user((void *)arg, (void *)&req_us,
 				 sizeof(struct cpcap_adc_us_request)))
 			return -EFAULT;
@@ -461,7 +469,7 @@ static int cpcap_batt_get_property(struct power_supply *psy,
 #ifdef USE_OWN_CALCULATE_METHOD
 		val->intval = cpcap_batt_counter(sply);
 #else
-		val->intval = sply->batt_state.batt_capacity;
+		val->intval = sply->batt_state.capacity;
 #endif
 		break;
 
