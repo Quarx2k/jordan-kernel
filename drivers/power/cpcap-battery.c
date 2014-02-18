@@ -511,7 +511,9 @@ static int cpcap_batt_get_property(struct power_supply *psy,
 #ifdef USE_OWN_CALCULATE_METHOD
 
 static int cpcap_batt_status(struct cpcap_batt_ps *sply) {
-        if (sply->usb_state.online == 1 || sply->ac_state.online == 1) {
+	int amperage = 0;
+	amperage = cpcap_batt_value(sply, CPCAP_ADC_CHG_ISENSE); // CPCAP_ADC_CHG_ISENSE used for detect charger amperage
+        if (amperage > 10) {
 		if (cpcap_batt_counter(sply) > 95)
 			return POWER_SUPPLY_STATUS_FULL;
 		else
@@ -538,6 +540,7 @@ static int cpcap_batt_counter(struct cpcap_batt_ps *sply) {
 	u32 cap = 0;
 
 	volt_batt = cpcap_batt_value(sply, CPCAP_ADC_BATTP);
+
 	printk("%s: batt_vol=%d\n",__func__, volt_batt);
 
 	for (i=0; i < ARRAY_SIZE(tbl); i++) {
