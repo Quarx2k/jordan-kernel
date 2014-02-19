@@ -43,14 +43,16 @@
 #define CPCAP_BATT_IRQ_ADCDONE 0x08
 #define CPCAP_BATT_IRQ_MACRO   0x10
 
-#undef USE_OWN_CALCULATE_METHOD
+#define USE_OWN_CALCULATE_METHOD
 
 #ifdef USE_OWN_CALCULATE_METHOD
+static u32 battery_old_cap = -1;
 #define USE_OWN_CHARGING_METHOD
-#define BATTERY_DEBUG
+//#define BATTERY_DEBUG
 #include "cpcap_charge_table.h"
 #endif
 #ifndef USE_OWN_CHARGING_METHOD
+
 static int cpcap_batt_ioctl(struct inode *inode,
 			    struct file *file,
 			    unsigned int cmd,
@@ -79,6 +81,9 @@ struct cpcap_batt_ps {
 	char async_req_pending;
 	unsigned long last_run_time;
 	bool no_update;
+#ifdef USE_OWN_CALCULATE_METHOD
+	unsigned int battery_stats_counter[4]; /* Battery stats for past seconds */
+#endif
 };
 #ifndef USE_OWN_CHARGING_METHOD
 static const struct file_operations batt_fops = {
@@ -317,7 +322,6 @@ static int cpcap_batt_ioctl(struct inode *inode,
 		req_us.timing = req_async->timing;
 		req_us.type = req_async->type;
 		req_us.status = req_async->status;
-                printk("CPCAP_IOCTL_BATT_ATOD_SYNC:\n format %d\n timing %d\n type %d\n status %d\n", req_us.format , req_us.timing, req_us.type, req_us.status);
 		for (i = 0; i < CPCAP_ADC_BANK0_NUM; i++)
 			req_us.result[i] = req_async->result[i];
 
@@ -491,9 +495,9 @@ static int cpcap_batt_value(struct cpcap_batt_ps *sply, int value) {
 }
 
 static int cpcap_batt_counter(struct cpcap_batt_ps *sply) {
-	int i, volt_batt;
+	int i, volt_batt, amperage;
 	u32 cap = 0;
-
+	amperage = cpcap_batt_value(sply, CPCAP_ADC_CHG_ISENSE);
 	volt_batt = cpcap_batt_value(sply, CPCAP_ADC_BATTP);
 #ifdef BATTERY_DEBUG
 	printk("%s: batt_vol=%d\n",__func__, volt_batt);
@@ -513,9 +517,24 @@ static int cpcap_batt_counter(struct cpcap_batt_ps *sply) {
 				break;
 			}
 			continue;
+	
+	}
+
+                /* Prevent Voltage from going up again */
+		if (battery_old_cap  == -1) {
+			battery_old_cap = tbl[i].capacity;
+		} else if (battery_old_cap < tbl[i].capacity && 
+				amperage < 10) {
+			cap = battery_old_cap;
+#ifdef BATTERY_DEBUG
+			printk("if2: tbl[i].capacity %d,  battery_old_cap %d\n", tbl[i].capacity, battery_old_cap);
+#endif
+		} else { 
+ 			battery_old_cap = tbl[i].capacity;
+			cap = battery_old_cap;
 		}
-		cap = tbl[i].capacity;
-		break;
+
+	break;
 	}
 #ifdef BATTERY_DEBUG
 	printk("%s: capacity=%d\n",__func__,cap);
