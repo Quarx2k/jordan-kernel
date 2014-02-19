@@ -46,6 +46,7 @@
 #undef USE_OWN_CALCULATE_METHOD
 
 #ifdef USE_OWN_CALCULATE_METHOD
+#undef USE_OWN_CHARGING_METHOD
 #include "cpcap_charge_table.h"
 #endif
 
@@ -536,12 +537,12 @@ static int cpcap_batt_value(struct cpcap_batt_ps *sply, int value) {
 }
 
 static int cpcap_batt_counter(struct cpcap_batt_ps *sply) {
-	int i, volt_batt, old_volt;
+	int i, volt_batt;
 	u32 cap = 0;
 
 	volt_batt = cpcap_batt_value(sply, CPCAP_ADC_BATTP);
 
-	printk("%s: batt_vol=%d\n",__func__, volt_batt);
+	//printk("%s: batt_vol=%d\n",__func__, volt_batt);
 
 	for (i=0; i < ARRAY_SIZE(tbl); i++) {
 		if (volt_batt <= 3500) {
@@ -563,7 +564,7 @@ static int cpcap_batt_counter(struct cpcap_batt_ps *sply) {
 		break;
 	}
 	
-	printk("%s: capacity=%d\n",__func__,cap);
+	//printk("%s: capacity=%d\n",__func__,cap);
 
 	return cap;
 }
@@ -688,12 +689,64 @@ CPCAP_MACRO_7 0, 8 0, 9 1, 10 0, 11 0, 12 1
  return 0;
 }
 #endif
-
-static int cpcap_batt_update(void* arg) {
+#ifdef USE_OWN_CHARGING_METHOD
+static int cpcap_batt_phasing() {
 	struct cpcap_batt_ps *sply = cpcap_batt_sply;
+        struct cpcap_adc_phase phase;
+	printk("****Battery Phasing start ****\n");
+	phase.offset_batti = 0;
+	phase.slope_batti = 128;
+	phase.offset_chrgi = 0;
+	phase.slope_chrgi = 128;
+	phase.offset_battp = 0;
+	phase.slope_battp = 128;
+	phase.offset_bp = 0;
+	phase.slope_bp = 128;
+	phase.offset_battt = 0;
+	phase.slope_battt = 128;
+	phase.offset_chrgv = 128;
+	phase.offset_chrgv = 128;
+	cpcap_adc_phase(sply->cpcap, &phase);
+	printk("****Battery Phasing end ****\n");
+
+//For start Macros 7 we need phasing.
+           //sply->irq_status |= CPCAP_BATT_IRQ_MACRO;  This IRQ Called after start Marco 7 by cpcap_batt_irq_hdlr.
+
+	cpcap_uc_start(sply->cpcap, CPCAP_MACRO_7);
+	cpcap_uc_start(sply->cpcap, CPCAP_MACRO_8);
+	cpcap_uc_start(sply->cpcap, CPCAP_MACRO_9);
+	cpcap_uc_start(sply->cpcap, CPCAP_MACRO_10);
+	cpcap_uc_start(sply->cpcap, CPCAP_MACRO_12);
+	cpcap_regacc_write(sply->cpcap, CPCAP_REG_CRM, 0x351, 0x351);
+	cpcap_regacc_write(sply->cpcap, CPCAP_REG_CCM, 0x3EE, 0x3EE);
+	cpcap_regacc_write(sply->cpcap, CPCAP_REG_UCTM, 1, CPCAP_BIT_UCTM);
+
+	return 0;
+}
+#endif
+static int cpcap_batt_update(void* arg) {
+	int i;
+	struct cpcap_batt_ps *sply = cpcap_batt_sply;
+	struct cpcap_adc_request req;
+	struct cpcap_adc_us_request req_us;
 	while(1) {
-		power_supply_changed(&sply->batt);
-	        delay_ms(60000);
+
+#ifdef USE_OWN_CHARGING_METHOD
+	req.format = CPCAP_ADC_FORMAT_CONVERTED;
+	req.timing = CPCAP_ADC_TIMING_IMM;
+	req.type = CPCAP_ADC_TYPE_BANK_0;
+ 
+	cpcap_adc_sync_read(sply->cpcap, &req);
+
+	for (i = 0; i < CPCAP_ADC_BANK0_NUM; i++)
+	req_us.result[i] = req.result[i];
+
+	printk("CPCAP_IOCTL_BATT_ATOD_READ: \n Dump of CPCAP_ADC_BANK0_NUM:\n CPCAP_ADC_VBUS:%d\n CPCAP_ADC_AD3:%d\n CPCAP_ADC_BATTP:%d\n CPCAP_ADC_BPLUS_AD4:%d\n CPCAP_ADC_CHG_ISENSE:%d\n CPCAP_ADC_BATTI_ADC:%d\n CPCAP_ADC_USB_ID:%d\n CPCAP_ADC_AD0_BATTDETB: %d\n",
+                           req_us.result[CPCAP_ADC_VBUS],req_us.result[CPCAP_ADC_AD3],req_us.result[CPCAP_ADC_BATTP] ,req_us.result[CPCAP_ADC_BPLUS_AD4],req_us.result[CPCAP_ADC_CHG_ISENSE],
+                               req_us.result[CPCAP_ADC_BATTI_ADC],req_us.result[CPCAP_ADC_USB_ID], req_us.result[CPCAP_ADC_AD0_BATTDETB]);
+#endif
+	power_supply_changed(&sply->batt);
+	delay_ms(10000);
 	}
 	return 0;
 }
@@ -841,6 +894,9 @@ unregac_exit:
 
 prb_exit:
 #ifdef USE_OWN_CALCULATE_METHOD
+#ifdef USE_OWN_CHARGING_METHOD
+	cpcap_batt_phasing();
+#endif
         batt_task = kthread_create(cpcap_batt_update, (void*)0, "cpcap_batt_monitor");
 	wake_up_process(batt_task);
 #endif
