@@ -43,7 +43,7 @@
 #define CPCAP_BATT_IRQ_ADCDONE 0x08
 #define CPCAP_BATT_IRQ_MACRO   0x10
 
-#define USE_OWN_CALCULATE_METHOD
+//#define USE_OWN_CALCULATE_METHOD
 
 #ifdef USE_OWN_CALCULATE_METHOD
 static u32 battery_old_cap = -1;
@@ -520,7 +520,7 @@ static int cpcap_batt_counter(struct cpcap_batt_ps *sply) {
 	
 	}
 
-                /* Prevent Voltage from going up again */
+                /* Prevent Percentage from going up again */
 		if (battery_old_cap  == -1) {
 			battery_old_cap = tbl[i].capacity;
 		} else if (battery_old_cap < tbl[i].capacity && 
@@ -886,9 +886,7 @@ void cpcap_batt_set_ac_prop(struct cpcap_device *cpcap, int online)
 
 	if (sply != NULL) {
 		sply->ac_state.online = online;
-#ifndef USE_OWN_CALCULATE_METHOD
 		power_supply_changed(&sply->ac);
-#endif
 		if (data->ac_changed)
 			data->ac_changed(&sply->ac, &sply->ac_state);
 	}
@@ -905,9 +903,7 @@ void cpcap_batt_set_usb_prop_online(struct cpcap_device *cpcap, int online,
 	if (sply != NULL) {
 		sply->usb_state.online = online;
 		sply->usb_state.model = model;
-#ifndef USE_OWN_CALCULATE_METHOD
 		power_supply_changed(&sply->usb);
-#endif
 		if (data->usb_changed)
 			data->usb_changed(&sply->usb, &sply->usb_state);
 	}
