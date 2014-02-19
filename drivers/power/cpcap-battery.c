@@ -259,7 +259,9 @@ static int cpcap_batt_ioctl(struct inode *inode,
 
 	switch (cmd) {
 	case CPCAP_IOCTL_BATT_DISPLAY_UPDATE:
+#ifndef USE_OWN_CALCULATE_METHOD
 		if (sply->no_update)
+#endif
 			return 0;
 		if (copy_from_user((void *)&sply->batt_state,
 				   (void *)arg, sizeof(struct cpcap_batt_data)))
