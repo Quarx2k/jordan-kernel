@@ -46,7 +46,7 @@
 #undef USE_OWN_CALCULATE_METHOD
 
 #ifdef USE_OWN_CALCULATE_METHOD
-#undef USE_OWN_CHARGING_METHOD
+#define USE_OWN_CHARGING_METHOD
 #include "cpcap_charge_table.h"
 #endif
 
@@ -690,7 +690,7 @@ CPCAP_MACRO_7 0, 8 0, 9 1, 10 0, 11 0, 12 1
 }
 #endif
 #ifdef USE_OWN_CHARGING_METHOD
-static int cpcap_batt_phasing() {
+static void cpcap_batt_phasing(void) {
 	struct cpcap_batt_ps *sply = cpcap_batt_sply;
         struct cpcap_adc_phase phase;
 	printk("****Battery Phasing start ****\n");
@@ -710,18 +710,15 @@ static int cpcap_batt_phasing() {
 	printk("****Battery Phasing end ****\n");
 
 //For start Macros 7 we need phasing.
-           //sply->irq_status |= CPCAP_BATT_IRQ_MACRO;  This IRQ Called after start Marco 7 by cpcap_batt_irq_hdlr.
-
 	cpcap_uc_start(sply->cpcap, CPCAP_MACRO_7);
 	cpcap_uc_start(sply->cpcap, CPCAP_MACRO_8);
 	cpcap_uc_start(sply->cpcap, CPCAP_MACRO_9);
 	cpcap_uc_start(sply->cpcap, CPCAP_MACRO_10);
 	cpcap_uc_start(sply->cpcap, CPCAP_MACRO_12);
-	cpcap_regacc_write(sply->cpcap, CPCAP_REG_CRM, 0x351, 0x351);
-	cpcap_regacc_write(sply->cpcap, CPCAP_REG_CCM, 0x3EE, 0x3EE);
-	cpcap_regacc_write(sply->cpcap, CPCAP_REG_UCTM, 1, CPCAP_BIT_UCTM);
 
-	return 0;
+        cpcap_regacc_write(sply->cpcap, CPCAP_REG_CCM, 1002, 1002);
+        cpcap_regacc_write(sply->cpcap, CPCAP_REG_CRM, 0x358, 0x358);
+	cpcap_regacc_write(sply->cpcap, CPCAP_REG_UCTM, 1, CPCAP_BIT_UCTM);  /* UC Turbo Mode */
 }
 #endif
 static int cpcap_batt_update(void* arg) {
@@ -729,14 +726,40 @@ static int cpcap_batt_update(void* arg) {
 	struct cpcap_batt_ps *sply = cpcap_batt_sply;
 	struct cpcap_adc_request req;
 	struct cpcap_adc_us_request req_us;
+	unsigned short value;
 	while(1) {
-
+#if 0
 #ifdef USE_OWN_CHARGING_METHOD
 	req.format = CPCAP_ADC_FORMAT_CONVERTED;
 	req.timing = CPCAP_ADC_TIMING_IMM;
 	req.type = CPCAP_ADC_TYPE_BANK_0;
- 
+
 	cpcap_adc_sync_read(sply->cpcap, &req);
+
+           cpcap_regacc_read(sply->cpcap, CPCAP_REG_CCC1, &value);
+	   printk("CPCAP_REG_CCC1 %x  == %d\n",value,value);
+           cpcap_regacc_read(sply->cpcap, CPCAP_REG_CRM, &value);
+	   printk("CPCAP_REG_CRM %x  == %d\n",value,value);
+           cpcap_regacc_read(sply->cpcap, CPCAP_REG_CCCC2, &value);
+	   printk("CPCAP_REG_CCCC2 %x  == %d\n",value,value);
+           cpcap_regacc_read(sply->cpcap, CPCAP_REG_CCM, &value);
+	   printk("CPCAP_REG_CCM %x  == %d\n",value,value);
+           cpcap_regacc_read(sply->cpcap, CPCAP_REG_CCA1, &value);
+	   printk("CPCAP_REG_CCA1 %x  == %d\n",value,value);
+           cpcap_regacc_read(sply->cpcap, CPCAP_REG_CCA2, &value);
+	   printk("CPCAP_REG_CCA2 %x  == %d\n",value,value);
+           cpcap_regacc_read(sply->cpcap, CPCAP_REG_CCO, &value);
+	   printk("CPCAP_REG_CC0 %x  == %d\n",value,value);
+           cpcap_regacc_read(sply->cpcap, CPCAP_REG_CCI, &value);
+	   printk("CPCAP_REG_CCI %x  == %d\n",value,value);
+           cpcap_regacc_read(sply->cpcap, CPCAP_REG_USBC1, &value);
+	   printk("CPCAP_REG_USBC1 %x  == %d\n",value,value);
+           cpcap_regacc_read(sply->cpcap, CPCAP_REG_USBC2, &value);
+	   printk("CPCAP_REG_USBC2 %x  == %d\n",value,value);
+           cpcap_regacc_read(sply->cpcap, CPCAP_REG_USBC2, &value);
+	   printk("CPCAP_REG_USBC3 %x  == %d\n",value,value);
+           cpcap_regacc_read(sply->cpcap, CPCAP_REG_UCTM, &value);
+	   printk("CPCAP_REG_UCTM %x  == %d\n",value,value);
 
 	for (i = 0; i < CPCAP_ADC_BANK0_NUM; i++)
 	req_us.result[i] = req.result[i];
@@ -744,6 +767,7 @@ static int cpcap_batt_update(void* arg) {
 	printk("CPCAP_IOCTL_BATT_ATOD_READ: \n Dump of CPCAP_ADC_BANK0_NUM:\n CPCAP_ADC_VBUS:%d\n CPCAP_ADC_AD3:%d\n CPCAP_ADC_BATTP:%d\n CPCAP_ADC_BPLUS_AD4:%d\n CPCAP_ADC_CHG_ISENSE:%d\n CPCAP_ADC_BATTI_ADC:%d\n CPCAP_ADC_USB_ID:%d\n CPCAP_ADC_AD0_BATTDETB: %d\n",
                            req_us.result[CPCAP_ADC_VBUS],req_us.result[CPCAP_ADC_AD3],req_us.result[CPCAP_ADC_BATTP] ,req_us.result[CPCAP_ADC_BPLUS_AD4],req_us.result[CPCAP_ADC_CHG_ISENSE],
                                req_us.result[CPCAP_ADC_BATTI_ADC],req_us.result[CPCAP_ADC_USB_ID], req_us.result[CPCAP_ADC_AD0_BATTDETB]);
+#endif
 #endif
 	power_supply_changed(&sply->batt);
 	delay_ms(10000);
