@@ -99,10 +99,10 @@ static int m4sensorhub_jump_to_user(struct m4sensorhub_data *m4sensorhub);
 /* Transfer is done in 256 bytes, or if data is less than 256 bytes, then
 data is 16 bit aligned and sent out */
 #define MAX_TRANSFER_SIZE	256 /* bytes */
-/* If M4 returns back BUSY, then we give it 40 chances to execute the command
-each attempt to check status is delayed by 100 ms, thus 40 attempts give it a
-window of about 4 seconds. */
-#define MAX_ATTEMPTS 40
+/* If M4 returns back BUSY, then we give it 60 chances to execute the command
+each attempt to check status is delayed by 100 ms, thus 60 attempts give it a
+window of about 6 seconds. */
+#define MAX_ATTEMPTS 60
 /* We are flashing/erasing 2 sectors */
 #define NUM_FLASH_TO_ERASE 2
 #define SECTOR_TO_ERASE_1 6
