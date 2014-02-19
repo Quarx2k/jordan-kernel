@@ -556,7 +556,7 @@ static void cpcap_batt_phasing(void) {
 	phase.slope_battt = 128;
 //CPCAP_ADC_VBUS
 	phase.offset_chrgv = 128;
-	phase.offset_chrgv = 128;
+	phase.slope_chrgv = 128;
 
 	cpcap_adc_phase(sply->cpcap, &phase);
 	/*****Battery Phasing end ****/
