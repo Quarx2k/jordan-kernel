@@ -472,12 +472,16 @@ static int cpcap_batt_get_property(struct power_supply *psy,
 #ifdef USE_OWN_CALCULATE_METHOD
 static int cpcap_batt_status(struct cpcap_batt_ps *sply) {
 	int amperage = 0;
-
-        if (sply->usb_state.online == 1 || sply->ac_state.online == 1) {
+	amperage = cpcap_batt_value(sply, CPCAP_ADC_CHG_ISENSE);
+	if (sply->usb_state.online == 1 || sply->ac_state.online == 1) {
 		cpcap_regacc_write(sply->cpcap, CPCAP_REG_CRM, 949, 949);
 		cpcap_regacc_write(sply->cpcap, CPCAP_REG_ADCD0, 186, 186);
 		cpcap_regacc_write(sply->cpcap, CPCAP_REG_ADCC2 , 16758, 16758);
 		cpcap_regacc_write(sply->cpcap, CPCAP_REG_UCTM, 0, CPCAP_BIT_UCTM);
+		if (amperage < 100 && amperage > 50) {
+			printk("Your charger not powerful, try reconnect or change charger, %d mA\n", amperage);
+			return POWER_SUPPLY_STATUS_DISCHARGING;
+		}
 		if (cpcap_batt_counter(sply) > 95)
 			return POWER_SUPPLY_STATUS_FULL;
 		else
@@ -504,9 +508,8 @@ static int cpcap_batt_value(struct cpcap_batt_ps *sply, int value) {
 }
 
 static int cpcap_batt_counter(struct cpcap_batt_ps *sply) {
-	int i, volt_batt, amperage;
+	int i, volt_batt;
 	u32 cap = 0;
-	amperage = cpcap_batt_value(sply, CPCAP_ADC_CHG_ISENSE);
 	volt_batt = cpcap_batt_value(sply, CPCAP_ADC_BATTP);
 #ifdef BATTERY_DEBUG
 	printk("%s: batt_vol=%d\n",__func__, volt_batt);
