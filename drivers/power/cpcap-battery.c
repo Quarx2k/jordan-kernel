@@ -474,10 +474,6 @@ static int cpcap_batt_status(struct cpcap_batt_ps *sply) {
 	int amperage = 0;
 
         if (sply->usb_state.online == 1 || sply->ac_state.online == 1) {
-		cpcap_uc_start(sply->cpcap, CPCAP_MACRO_8);
-		cpcap_uc_start(sply->cpcap, CPCAP_MACRO_9);
-		cpcap_uc_start(sply->cpcap, CPCAP_MACRO_10);
-		cpcap_uc_start(sply->cpcap, CPCAP_MACRO_12);
 		cpcap_regacc_write(sply->cpcap, CPCAP_REG_CRM, 949, 949);
 		cpcap_regacc_write(sply->cpcap, CPCAP_REG_ADCD0, 186, 186);
 		cpcap_regacc_write(sply->cpcap, CPCAP_REG_ADCC2 , 16758, 16758);
@@ -487,10 +483,6 @@ static int cpcap_batt_status(struct cpcap_batt_ps *sply) {
 		else
 			return POWER_SUPPLY_STATUS_CHARGING;
         } else {
-		cpcap_uc_stop(sply->cpcap, CPCAP_MACRO_8);
-		cpcap_uc_stop(sply->cpcap, CPCAP_MACRO_9);
-		cpcap_uc_stop(sply->cpcap, CPCAP_MACRO_10);
-		cpcap_uc_stop(sply->cpcap, CPCAP_MACRO_12);
 		cpcap_regacc_write(sply->cpcap, CPCAP_REG_CRM, 944, 944);
 		cpcap_regacc_write(sply->cpcap, CPCAP_REG_ADCC2 , 310, 310);
 		cpcap_regacc_write(sply->cpcap, CPCAP_REG_ADCD0, 0, 0);
@@ -598,10 +590,11 @@ static void cpcap_batt_phasing(void) {
 	/*****Battery Phasing end ****/
 
 //For start Macros 7 we need phasing.
-	cpcap_uc_stop(sply->cpcap, CPCAP_MACRO_8);
-	cpcap_uc_stop(sply->cpcap, CPCAP_MACRO_9);
-	cpcap_uc_stop(sply->cpcap, CPCAP_MACRO_10);
-	cpcap_uc_stop(sply->cpcap, CPCAP_MACRO_12);
+	cpcap_uc_start(sply->cpcap, CPCAP_MACRO_7);
+	//cpcap_uc_stop(sply->cpcap, CPCAP_MACRO_8);
+	cpcap_uc_start(sply->cpcap, CPCAP_MACRO_9);
+	//cpcap_uc_stop(sply->cpcap, CPCAP_MACRO_10);
+	cpcap_uc_start(sply->cpcap, CPCAP_MACRO_12);
 
 	cpcap_regacc_write(sply->cpcap, CPCAP_REG_CCM, 1002, 1002);  // Always == 1002
 	cpcap_regacc_write(sply->cpcap, CPCAP_REG_CRM, 944, 944); // Charger off == 944, Charger on = 949
