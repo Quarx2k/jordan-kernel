@@ -48,7 +48,7 @@
 #ifdef USE_OWN_CALCULATE_METHOD
 static u32 battery_old_cap = -1;
 #define USE_OWN_CHARGING_METHOD
-//#define BATTERY_DEBUG
+#define BATTERY_DEBUG
 #include "cpcap_charge_table.h"
 #endif
 #ifndef USE_OWN_CHARGING_METHOD
@@ -473,14 +473,29 @@ static int cpcap_batt_get_property(struct power_supply *psy,
 static int cpcap_batt_status(struct cpcap_batt_ps *sply) {
 	int amperage = 0;
 
-	amperage = cpcap_batt_value(sply, CPCAP_ADC_CHG_ISENSE); // CPCAP_ADC_CHG_ISENSE used for detect charger amperage
-        if (amperage > 10) {
+        if (sply->usb_state.online == 1 || sply->ac_state.online == 1) {
+		cpcap_uc_start(sply->cpcap, CPCAP_MACRO_8);
+		cpcap_uc_start(sply->cpcap, CPCAP_MACRO_9);
+		cpcap_uc_start(sply->cpcap, CPCAP_MACRO_10);
+		cpcap_uc_start(sply->cpcap, CPCAP_MACRO_12);
+		cpcap_regacc_write(sply->cpcap, CPCAP_REG_CRM, 949, 949);
+		cpcap_regacc_write(sply->cpcap, CPCAP_REG_ADCD0, 186, 186);
+		cpcap_regacc_write(sply->cpcap, CPCAP_REG_ADCC2 , 16758, 16758);
+		cpcap_regacc_write(sply->cpcap, CPCAP_REG_UCTM, 0, CPCAP_BIT_UCTM);
 		if (cpcap_batt_counter(sply) > 95)
 			return POWER_SUPPLY_STATUS_FULL;
 		else
 			return POWER_SUPPLY_STATUS_CHARGING;
         } else {
-           return POWER_SUPPLY_STATUS_DISCHARGING;
+		cpcap_uc_stop(sply->cpcap, CPCAP_MACRO_8);
+		cpcap_uc_stop(sply->cpcap, CPCAP_MACRO_9);
+		cpcap_uc_stop(sply->cpcap, CPCAP_MACRO_10);
+		cpcap_uc_stop(sply->cpcap, CPCAP_MACRO_12);
+		cpcap_regacc_write(sply->cpcap, CPCAP_REG_CRM, 944, 944);
+		cpcap_regacc_write(sply->cpcap, CPCAP_REG_ADCC2 , 310, 310);
+		cpcap_regacc_write(sply->cpcap, CPCAP_REG_ADCD0, 0, 0);
+		cpcap_regacc_write(sply->cpcap, CPCAP_REG_UCTM, 0, CPCAP_BIT_UCTM);
+		return POWER_SUPPLY_STATUS_DISCHARGING;
 	}
 }
 
@@ -526,7 +541,7 @@ static int cpcap_batt_counter(struct cpcap_batt_ps *sply) {
 		if (battery_old_cap  == -1) {
 			battery_old_cap = tbl[i].capacity;
 		} else if (battery_old_cap < tbl[i].capacity && 
-				amperage < 10) {
+				(sply->usb_state.online == 1 || sply->ac_state.online == 1)) {
 			cap = battery_old_cap;
 #ifdef BATTERY_DEBUG
 			printk("if2: tbl[i].capacity %d,  battery_old_cap %d\n", tbl[i].capacity, battery_old_cap);
@@ -583,15 +598,18 @@ static void cpcap_batt_phasing(void) {
 	/*****Battery Phasing end ****/
 
 //For start Macros 7 we need phasing.
-	cpcap_uc_start(sply->cpcap, CPCAP_MACRO_7);
-	cpcap_uc_start(sply->cpcap, CPCAP_MACRO_8);
-	cpcap_uc_start(sply->cpcap, CPCAP_MACRO_9);
-	cpcap_uc_start(sply->cpcap, CPCAP_MACRO_10);
-	cpcap_uc_start(sply->cpcap, CPCAP_MACRO_12);
+	cpcap_uc_stop(sply->cpcap, CPCAP_MACRO_8);
+	cpcap_uc_stop(sply->cpcap, CPCAP_MACRO_9);
+	cpcap_uc_stop(sply->cpcap, CPCAP_MACRO_10);
+	cpcap_uc_stop(sply->cpcap, CPCAP_MACRO_12);
 
-        cpcap_regacc_write(sply->cpcap, CPCAP_REG_CCM, 1002, 1002);
-        cpcap_regacc_write(sply->cpcap, CPCAP_REG_CRM, 0x358, 0x358);
-	cpcap_regacc_write(sply->cpcap, CPCAP_REG_UCTM, 1, CPCAP_BIT_UCTM);  /* UC Turbo Mode */
+	cpcap_regacc_write(sply->cpcap, CPCAP_REG_CCM, 1002, 1002);  // Always == 1002
+	cpcap_regacc_write(sply->cpcap, CPCAP_REG_CRM, 944, 944); // Charger off == 944, Charger on = 949
+	cpcap_regacc_write(sply->cpcap, CPCAP_REG_ADCC2, 310, 310); // Charger off == 310, Charger on = 16758
+	cpcap_regacc_write(sply->cpcap, CPCAP_REG_ADCAL1, 504, 504); // Always == 504
+	cpcap_regacc_write(sply->cpcap, CPCAP_REG_ADCAL2, 506, 506); // Always == 506
+	cpcap_regacc_write(sply->cpcap, CPCAP_REG_ADCD0, 0, 0); // Charger off == 0, Charger on = 186/187
+	cpcap_regacc_write(sply->cpcap, CPCAP_REG_UCTM, 0, CPCAP_BIT_UCTM);  /* UC Turbo Mode - Always Disabled in battd*/  
 }
 #endif
 #ifdef BATTERY_DEBUG
