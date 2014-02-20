@@ -262,6 +262,11 @@
 	};
 };
 
+/* external */
+&mmc1 {
+	status = "disabled";
+};
+
 /* internal */
 &mmc2 {
 	ti,non-removeable;
