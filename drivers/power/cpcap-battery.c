@@ -472,12 +472,15 @@ static int cpcap_batt_get_property(struct power_supply *psy,
 #ifdef USE_OWN_CALCULATE_METHOD
 static int cpcap_batt_status(struct cpcap_batt_ps *sply) {
 	int amperage = 0;
+
 	amperage = cpcap_batt_value(sply, CPCAP_ADC_CHG_ISENSE);
 	if (sply->usb_state.online == 1 || sply->ac_state.online == 1) {
+#ifdef USE_OWN_CHARGING_METHOD
 		cpcap_regacc_write(sply->cpcap, CPCAP_REG_CRM, 949, 949);
 		cpcap_regacc_write(sply->cpcap, CPCAP_REG_ADCD0, 186, 186);
 		cpcap_regacc_write(sply->cpcap, CPCAP_REG_ADCC2 , 16758, 16758);
 		cpcap_regacc_write(sply->cpcap, CPCAP_REG_UCTM, 0, CPCAP_BIT_UCTM);
+#endif
 		if (amperage < 100 && amperage > 50) {
 			printk("Your charger not powerful, try reconnect or change charger, %d mA\n", amperage);
 			return POWER_SUPPLY_STATUS_DISCHARGING;
@@ -487,10 +490,12 @@ static int cpcap_batt_status(struct cpcap_batt_ps *sply) {
 		else
 			return POWER_SUPPLY_STATUS_CHARGING;
         } else {
+#ifdef USE_OWN_CHARGING_METHOD
 		cpcap_regacc_write(sply->cpcap, CPCAP_REG_CRM, 944, 944);
 		cpcap_regacc_write(sply->cpcap, CPCAP_REG_ADCC2 , 310, 310);
 		cpcap_regacc_write(sply->cpcap, CPCAP_REG_ADCD0, 0, 0);
 		cpcap_regacc_write(sply->cpcap, CPCAP_REG_UCTM, 0, CPCAP_BIT_UCTM);
+#endif
 		return POWER_SUPPLY_STATUS_DISCHARGING;
 	}
 }
@@ -615,11 +620,6 @@ static void cpcap_batt_dump(struct cpcap_batt_ps *sply) {
 	struct cpcap_adc_us_request req_us;
 	unsigned short value;
 
-	req.format = CPCAP_ADC_FORMAT_CONVERTED;
-	req.timing = CPCAP_ADC_TIMING_IMM;
-	req.type = CPCAP_ADC_TYPE_BANK_0;
-	cpcap_adc_sync_read(sply->cpcap, &req);
-
 	cpcap_regacc_read(sply->cpcap, CPCAP_REG_CCC1, &value);
 	printk("CPCAP_REG_CCC1 %x  == %d\n",value,value);
 	cpcap_regacc_read(sply->cpcap, CPCAP_REG_CRM, &value);
@@ -668,6 +668,11 @@ static void cpcap_batt_dump(struct cpcap_batt_ps *sply) {
 	printk("CPCAP_REG_ADCAL1 %x  == %d\n",value,value);
 	cpcap_regacc_read(sply->cpcap, CPCAP_REG_ADCAL2, &value);
 	printk("CPCAP_REG_ADCAL2 %x  == %d\n",value,value);
+
+	req.format = CPCAP_ADC_FORMAT_CONVERTED;
+	req.timing = CPCAP_ADC_TIMING_IMM;
+	req.type = CPCAP_ADC_TYPE_BANK_0;
+	cpcap_adc_sync_read(sply->cpcap, &req);
 
 	for (i = 0; i < CPCAP_ADC_BANK0_NUM; i++)
 		req_us.result[i] = req.result[i];
