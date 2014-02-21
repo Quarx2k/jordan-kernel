@@ -96,9 +96,11 @@ static void tusb_usb_work_func(struct work_struct *work)
 	if (vbus_state) {
 		atomic_notifier_call_chain(&tusb->phy.notifier,
 			USB_EVENT_VBUS, NULL);
+		tusb->phy.last_event = USB_EVENT_VBUS;
 	} else {
 		atomic_notifier_call_chain(&tusb->phy.notifier,
 			USB_EVENT_NONE, NULL);
+		tusb->phy.last_event = USB_EVENT_NONE;
 	}
 
 	/* Output GPIOs are driven based on the vbus_state input
@@ -269,6 +271,7 @@ static int  tusb_usb_probe(struct platform_device *pdev)
 	tusb->phy.set_suspend	= tusb_set_suspend;
 	tusb->phy.otg		= otg;
 	tusb->phy.type		= USB_PHY_TYPE_USB2;
+	tusb->phy.last_event	= USB_EVENT_NONE;
 	ATOMIC_INIT_NOTIFIER_HEAD(&tusb->phy.notifier);
 
 	otg->set_host		= tusb_set_host;
