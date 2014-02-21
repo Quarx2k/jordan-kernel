@@ -145,6 +145,12 @@
 	max17050@36 {
 		compatible = "maxim,max17050";
 		reg = <0x36>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&cc_alert_pin>;	/* gpio 140 pin */
+		gpios = <&gpio5 12 0x1>;	/* gpio-140, GPIOF_DIR_IN */
+		gpio-names = "cc-alert";
+		interrupt-parent = <&gpio5>;
+		interrupts = <12 0>;		/* gpio-140 IRQ */
 	};
 };
 
@@ -247,6 +253,12 @@
 			0x1a8 0x107	/* MCSPI2_SIMO, MODE7 (SAFE) | INPUT */
 			0x1aa 0x107	/* MCSPI2_SOMI, MODE7 (SAFE) | INPUT */
 			0x1ac 0x107	/* MCSPI2_CS0, MODE7 (SAFE) | INPUT */
+		>;
+	};
+
+	cc_alert_pin: pinmax_cc_alert_pin {
+		pinctrl-single,pins = <
+			0x13c 0x11c	/* MCBSP3_DX, MODE4 | INPUT | INPUT_PULLUP */
 		>;
 	};
 };
