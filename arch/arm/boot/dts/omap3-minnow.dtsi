@@ -151,6 +151,10 @@
 		gpio-names = "cc-alert";
 		interrupt-parent = <&gpio5>;
 		interrupts = <12 0>;		/* gpio-140 IRQ */
+		maxim,regs-init-data = <
+			0x01 0xffab /* VALRT, VMAX = 5.1 V and VMIN = 3.42 V */
+		>;
+		maxim,batt_undervoltage_zero_soc;
 	};
 };
 
