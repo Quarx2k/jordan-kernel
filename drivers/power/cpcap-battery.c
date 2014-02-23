@@ -36,6 +36,8 @@
 #include <linux/debugfs.h>
 #include <linux/kthread.h>
 #include <linux/earlysuspend.h>
+#include <linux/sysfs.h>
+#include <linux/kobject.h>
 
 #define CPCAP_BATT_IRQ_BATTDET 0x01
 #define CPCAP_BATT_IRQ_OV      0x02
@@ -49,6 +51,7 @@
 #define SAMPLING_RATE_MS	20000
 static unsigned long sampling_rate;
 static u32 battery_old_cap = -1;
+static unsigned long max_battery_level = 100;
 static struct workqueue_struct *wq;
 static struct delayed_work update_battery;
 #define USE_OWN_CHARGING_METHOD
@@ -531,14 +534,18 @@ static int cpcap_batt_counter(struct cpcap_batt_ps *sply) {
 			cap = 100;
 			break;
 		}
+		/* Let user decide */
+		if (tbl[i].capacity >= max_battery_level) {
+			cap = 100;
+			break;
+		}
 		if (volt_batt >= tbl[i].volt_batt) {
 			if (i == (ARRAY_SIZE(tbl)-1)) {
 				cap = 99;
 				break;
 			}
 			continue;
-	
-	}
+		}
 
                 /* Prevent Percentage from going up again */
 		if (battery_old_cap  == -1) {
@@ -972,9 +979,64 @@ void cpcap_batt_set_usb_prop_curr(struct cpcap_device *cpcap, unsigned int curr)
 }
 EXPORT_SYMBOL(cpcap_batt_set_usb_prop_curr);
 
+#ifdef USE_OWN_CALCULATE_METHOD
+static ssize_t show_max_battery_level(struct kobject *kobj,
+					struct attribute *attr, char *buf)
+{
+	return sprintf(buf, "%lu\n", max_battery_level);
+}
+
+static ssize_t store_max_battery_level(struct kobject *kobj,
+					 struct attribute *attr,
+					 const char *buf, size_t count)
+{
+	int ret;
+	unsigned long val;
+
+	ret = strict_strtoul(buf, 0, &val);
+	if (ret < 0)
+		return ret;
+
+	max_battery_level = val;
+	return count;
+}
+
+static struct kobj_attribute cpcap_batt_attribute = __ATTR(max_battery_level, 0666,
+					show_max_battery_level, store_max_battery_level);
+
+static struct attribute *cpcap_batt_attributes[] = 
+{
+	&cpcap_batt_attribute.attr,
+	NULL
+};
+
+static struct attribute_group battery_control_group = 
+{
+	.attrs  = cpcap_batt_attributes,
+};
+
+static struct kobject *battery_control_kobj;
+#endif
+
 static int __init cpcap_batt_init(void)
 {
 #ifdef USE_OWN_CALCULATE_METHOD
+	int ret;
+
+	battery_control_kobj = kobject_create_and_add("battery_control", kernel_kobj);
+	if (!battery_control_kobj) {
+		pr_err("%s battery_control kobject create failed!\n", __FUNCTION__);
+		return -ENOMEM;
+        }
+
+	ret = sysfs_create_group(battery_control_kobj,
+			&battery_control_group);
+        if (ret) {
+		pr_info("%s battery_control sysfs create failed!\n", __FUNCTION__);
+		kobject_put(battery_control_kobj);
+		return ret;
+	}
+
 	register_early_suspend(&battery_state_suspend);
 #endif
 	return platform_driver_register(&cpcap_batt_driver);
