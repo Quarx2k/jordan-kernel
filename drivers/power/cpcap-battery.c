@@ -34,8 +34,8 @@
 #include <linux/time.h>
 #include <linux/miscdevice.h>
 #include <linux/debugfs.h>
-#include <linux/delay.h>
 #include <linux/kthread.h>
+#include <linux/earlysuspend.h>
 
 #define CPCAP_BATT_IRQ_BATTDET 0x01
 #define CPCAP_BATT_IRQ_OV      0x02
@@ -46,7 +46,11 @@
 //#define USE_OWN_CALCULATE_METHOD
 
 #ifdef USE_OWN_CALCULATE_METHOD
+#define SAMPLING_RATE_MS	20000
+static unsigned long sampling_rate;
 static u32 battery_old_cap = -1;
+static struct workqueue_struct *wq;
+static struct delayed_work update_battery;
 #define USE_OWN_CHARGING_METHOD
 #define BATTERY_DEBUG
 #include "cpcap_charge_table.h"
@@ -137,7 +141,6 @@ static struct platform_driver cpcap_batt_driver = {
 
 static struct cpcap_batt_ps *cpcap_batt_sply;
 #ifdef USE_OWN_CALCULATE_METHOD
-static struct task_struct * batt_task;
 static int cpcap_batt_status(struct cpcap_batt_ps *sply);
 static int cpcap_batt_counter(struct cpcap_batt_ps *sply);
 static int cpcap_batt_value(struct cpcap_batt_ps *sply, int value);
@@ -559,15 +562,6 @@ static int cpcap_batt_counter(struct cpcap_batt_ps *sply) {
 	return cap;
 }
 
-
-void delay_ms(__u32 t)
-{
-    __u32 timeout = t*HZ/1000;
-    	
-    set_current_state(TASK_INTERRUPTIBLE);
-    schedule_timeout(timeout);
-}
-
 #endif
 #ifdef USE_OWN_CHARGING_METHOD
 static void cpcap_batt_phasing(void) {
@@ -687,18 +681,43 @@ CPCAP_ADC_BATTI_ADC:%d\n CPCAP_ADC_USB_ID:%d\n CPCAP_ADC_AD0_BATTDETB:%d\n",
 #endif
 
 #ifdef USE_OWN_CALCULATE_METHOD
-static int cpcap_batt_update(void* arg) {
+static void __ref cpcap_batt_update(struct work_struct *work) {
 	struct cpcap_batt_ps *sply = cpcap_batt_sply;
-	while(1) {
-		power_supply_changed(&sply->batt);
+	power_supply_changed(&sply->batt);
 #ifdef BATTERY_DEBUG
-		cpcap_batt_dump(sply);
+	cpcap_batt_dump(sply);
 #endif
-		delay_ms(20000);
-	}
-	return 0;
+	/* Make a dedicated work_queue for CPU0 */
+	queue_delayed_work_on(0, wq, &update_battery, sampling_rate);
 }
 #endif
+
+#ifdef USE_OWN_CALCULATE_METHOD
+/*
+ * During the android suspend we can stop our workqueue 
+ * and save a few cpu cycles
+ */
+static void battery_early_suspend(struct early_suspend *handler)
+{   
+	flush_workqueue(wq);
+	cancel_delayed_work_sync(&update_battery);
+	pr_info("Battery work has stopped \n");
+}
+
+static void battery_late_resume(struct early_suspend *handler)
+{  
+	queue_delayed_work_on(0, wq, &update_battery, 1);
+	pr_info("Battery work has resumed \n");
+}
+
+static struct early_suspend battery_state_suspend =
+{
+	.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + 1,
+	.suspend = battery_early_suspend,
+	.resume = battery_late_resume,
+};
+#endif
+
 static int cpcap_batt_probe(struct platform_device *pdev)
 {
 	int ret = 0;
@@ -845,8 +864,14 @@ prb_exit:
 #ifdef USE_OWN_CHARGING_METHOD
 	cpcap_batt_phasing();
 #endif
-        batt_task = kthread_create(cpcap_batt_update, (void*)0, "cpcap_batt_update");
-	wake_up_process(batt_task);
+	sampling_rate = msecs_to_jiffies(SAMPLING_RATE_MS);
+	wq = create_singlethread_workqueue("battery_update_workqueue");
+
+	if (!wq)
+		return -ENOMEM;
+
+	INIT_DELAYED_WORK(&update_battery, cpcap_batt_update);
+	queue_delayed_work_on(0, wq, &update_battery, sampling_rate);
 #endif
 	return ret;
 }
@@ -949,17 +974,23 @@ EXPORT_SYMBOL(cpcap_batt_set_usb_prop_curr);
 
 static int __init cpcap_batt_init(void)
 {
+#ifdef USE_OWN_CALCULATE_METHOD
+	register_early_suspend(&battery_state_suspend);
+#endif
 	return platform_driver_register(&cpcap_batt_driver);
 }
 subsys_initcall(cpcap_batt_init);
 
 static void __exit cpcap_batt_exit(void)
 {
+#ifdef USE_OWN_CALCULATE_METHOD
+	unregister_early_suspend(&battery_state_suspend);
+#endif
 	platform_driver_unregister(&cpcap_batt_driver);
 }
 module_exit(cpcap_batt_exit);
 
 MODULE_ALIAS("platform:cpcap_batt");
 MODULE_DESCRIPTION("CPCAP BATTERY driver");
-MODULE_AUTHOR("Motorola, Quarx");
+MODULE_AUTHOR("Motorola, Quarx, Blechdose");
 MODULE_LICENSE("GPL");
