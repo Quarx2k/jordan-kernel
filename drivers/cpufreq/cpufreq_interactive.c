@@ -165,7 +165,7 @@ static int timer_slack_val = DEFAULT_TIMER_SLACK;
  * touched. input_boost needs to be enabled.
  */
 
-static int input_boost_freq = DEFAULT_HISPEED_FREQ + 200000;
+static int input_boost_freq = 1000000;
 
 /* Dedicated workqueue for inputboost */
 static struct workqueue_struct *input_wq;
