@@ -270,7 +270,7 @@
 
 /* internal */
 &mmc2 {
-	ti,non-removeable;
+	ti,non-removable;
 	bus-width = <8>;
 	vmmc-supply = <&dummy>;
 	vmmc_aux-supply = <&dummy>;
@@ -278,7 +278,7 @@
 
 /* wireless */
 &mmc3 {
-	ti,non-removeable;
+	ti,non-removable;
 	cap-power-off-card;
 	bus-width = <4>;
 	vmmc-supply = <&vmmc>;

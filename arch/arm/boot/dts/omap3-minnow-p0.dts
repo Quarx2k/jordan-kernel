@@ -275,7 +275,7 @@
 
 /* internal */
 &mmc2 {
-	ti,non-removeable;
+	ti,non-removable;
 	bus-width = <8>;
 	vmmc-supply = <&ldo5_reg>;
 	vmmc_aux-supply = <&sw3_reg>;
