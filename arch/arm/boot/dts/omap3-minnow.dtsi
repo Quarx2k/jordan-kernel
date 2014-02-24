@@ -145,6 +145,7 @@
 	max17050@36 {
 		compatible = "maxim,max17050";
 		reg = <0x36>;
+		maxim,rsns-microohm = <100>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&cc_alert_pin>;	/* gpio 140 pin */
 		gpios = <&gpio5 12 0x1>;	/* gpio-140, GPIOF_DIR_IN */
