@@ -35,6 +35,10 @@
 #include <linux/spi/spi.h>
 #include <linux/spi/flash.h>
 
+#ifdef CONFIG_M25PXX_M4SENSORHUB_CB
+#include <linux/m4sensorhub.h>
+#endif
+
 /* Flash opcodes. */
 #define	OPCODE_WREN		0x06	/* Write enable */
 #define	OPCODE_RDSR		0x05	/* Read status register */
@@ -900,7 +904,7 @@ static const struct spi_device_id *jedec_probe(struct spi_device *spi)
  * matches what the READ command supports, at least until this driver
  * understands FAST_READ (for clocks over 25 MHz).
  */
-static int m25p_probe(struct spi_device *spi)
+static int m25p_init(struct spi_device *spi)
 {
 	const struct spi_device_id	*id = spi_get_device_id(spi);
 	struct flash_platform_data	*data;
@@ -1077,6 +1081,27 @@ static int m25p_probe(struct spi_device *spi)
 			data ? data->nr_parts : 0);
 }
 
+#ifdef CONFIG_M25PXX_M4SENSORHUB_CB
+static int m25p_finish_init(struct init_calldata *p_arg)
+{
+	return m25p_init((struct spi_device *)p_arg->p_data);
+}
+#endif
+
+static int m25p_probe(struct spi_device *spi)
+{
+	int err;
+
+#ifdef CONFIG_M25PXX_M4SENSORHUB_CB
+	err = m4sensorhub_register_initcall(m25p_finish_init, spi);
+#else
+	err = m25p_init(spi);
+#endif
+	if (err)
+		dev_err(&spi->dev, "can't register init with m4\n");
+
+	return err;
+}
 
 static int m25p_remove(struct spi_device *spi)
 {
@@ -1089,6 +1114,10 @@ static int m25p_remove(struct spi_device *spi)
 		kfree(flash->command);
 		kfree(flash);
 	}
+
+#ifdef CONFIG_M25PXX_M4SENSORHUB_CB
+	m4sensorhub_unregister_initcall(m25p_finish_init);
+#endif
 	return 0;
 }
 
