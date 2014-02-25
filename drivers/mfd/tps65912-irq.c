@@ -75,7 +75,6 @@ static irqreturn_t tps65912_irq(int irq, void *irq_data)
 {
 	struct tps65912 *tps65912 = irq_data;
 	u32 irq_sts;
-	u32 irq_mask;
 	u8 reg;
 	int i;
 
@@ -89,16 +88,7 @@ static irqreturn_t tps65912_irq(int irq, void *irq_data)
 	tps65912->read(tps65912, TPS65912_INT_STS4, 1, &reg);
 	irq_sts |= reg << 24;
 
-	tps65912->read(tps65912, TPS65912_INT_MSK, 1, &reg);
-	irq_mask = reg;
-	tps65912->read(tps65912, TPS65912_INT_MSK2, 1, &reg);
-	irq_mask |= reg << 8;
-	tps65912->read(tps65912, TPS65912_INT_MSK3, 1, &reg);
-	irq_mask |= reg << 16;
-	tps65912->read(tps65912, TPS65912_INT_MSK4, 1, &reg);
-	irq_mask |= reg << 24;
-
-	irq_sts &= ~irq_mask;
+	irq_sts &= ~tps65912->irq_mask;
 	if (!irq_sts)
 		return IRQ_NONE;
 
@@ -242,13 +232,14 @@ int tps65912_irq_init(struct tps65912 *tps65912, int irq,
 #endif
 	}
 
+	ret = request_threaded_irq(irq, NULL, tps65912_irq, flags,
+				   "tps65912", tps65912);
+	if (ret != 0)
+		dev_err(tps65912->dev, "Failed to request IRQ: %d\n", ret);
+
 	ret = request_threaded_irq(tps65912->irq_base +
 		tps65912->powerkey_up_irq, NULL, powerkey_handler,
 		flags, "tps65912_key_rel", tps65912);
-
-	/* enable the interrupt for this irq */
-	tps65912->irq_mask &= ~(1 << tps65912->powerkey_up_irq);
-
 	if (ret != 0)
 		dev_err(tps65912->dev,
 		"Failed to request sub-IRQ for power key rel: %d\n", ret);
@@ -257,18 +248,9 @@ int tps65912_irq_init(struct tps65912 *tps65912, int irq,
 		tps65912->powerkey_down_irq,
 		NULL, powerkey_handler, flags,
 		"tps65912_key_press", tps65912);
-
-	/* enable the interrupt for this irq */
-	tps65912->irq_mask &= ~(1 << tps65912->powerkey_down_irq);
-
 	if (ret != 0)
 		dev_err(tps65912->dev,
 		"Failed to request sub-IRQ for power key press: %d\n", ret);
-
-	ret = request_threaded_irq(irq, NULL, tps65912_irq, flags,
-				   "tps65912", tps65912);
-	if (ret != 0)
-		dev_err(tps65912->dev, "Failed to request IRQ: %d\n", ret);
 
 	return ret;
 }
