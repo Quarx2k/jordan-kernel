@@ -91,7 +91,10 @@
 
 	pmic-wdi@0 {
 		compatible = "mot,pmic-wdi";
-		gpios  = <&gpio5  15 0x0>; /* gpio-143 GPIOF_DIR_OUT|GPIOF_INIT_LOW */
+		gpios  = <&gpio5 15 0x0>, /* gpio-143 GPIOF_DIR_OUT|GPIOF_INIT_LOW */
+			 <&gpio3 30 0x0>; /* gpio-94  GPIOF_DIR_OUT|GPIOF_INIT_LOW */
+		gpio-names = "wdi",
+			     "sys_reset";
 		pinctrl-names = "output", "tristate";
 		pinctrl-0 = <&wdi_phy_gpio_mode>;
 		pinctrl-1 = <&wdi_phy_safe_mode>;
