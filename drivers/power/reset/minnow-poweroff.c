@@ -21,13 +21,14 @@
 #include <linux/pinctrl/consumer.h>
 #include <linux/usb.h>
 
-#define NUM_GPIOS 1
+#define NUM_GPIOS 2
 /*
  * Hold configuration here, cannot be more than one instance of the driver
  * since pm_power_off itself is global.
  */
 
 static int g_gpio_wdi = -1;
+static int g_gpio_sys_resetb = -1;
 static int g_usb_connected = -1;
 static struct pinctrl_state *gp_outputstate;
 static struct pinctrl_state *gp_tristate;
@@ -83,9 +84,8 @@ static struct notifier_block pmic_usb_notifier = {
 
 static int minnow_gpio_poweroff_probe(struct platform_device *pdev)
 {
-	int ret;
+	int i, ret;
 	struct device_node *np;
-	enum of_gpio_flags flags;
 
 	/* Lets register right away for usb notifications */
 	usb_register_notify(&pmic_usb_notifier);
@@ -108,49 +108,74 @@ static int minnow_gpio_poweroff_probe(struct platform_device *pdev)
 		goto unregister_usb;
 	}
 
-	g_gpio_wdi = of_get_gpio_flags(np, 0, &flags);
-
-	ret = gpio_request_one(g_gpio_wdi, flags,
-					"minnow_poweroff-gpio-wdi");
-	if (ret) {
-		pr_err("%s: Can't request gpios err: %d\n", __func__, ret);
+	/* Make sure number of GPIOs defined matches the supplied number of
+	 * GPIO name strings.
+	 */
+	if (of_property_count_strings(np, "gpio-names") != NUM_GPIOS) {
+		dev_err(&pdev->dev, "GPIO info and name mismatch\n");
 		goto unregister_usb;
+	}
+
+	for (i = 0; i < NUM_GPIOS; i++) {
+		int gpio;
+		enum of_gpio_flags flags;
+		const char *label;
+
+		gpio = of_get_gpio_flags(np, i, &flags);
+		of_property_read_string_index(np, "gpio-names", i, &label);
+		ret = gpio_request_one(gpio, flags, label);
+		if (ret)
+			goto free_gpios;
+
+		if (!strcmp(label, "wdi"))
+			g_gpio_wdi = gpio;
+		else if (!strcmp(label, "sys_reset"))
+			g_gpio_sys_resetb = gpio;
+		else {
+			dev_info(&pdev->dev, "Unknown gpio: %s (gpio-%d)\n",
+				 label, gpio);
+			goto free_gpios;
+		}
+		dev_info(&pdev->dev, "%s: gpio-%d  flags: 0x%x\n",
+			 label, gpio, flags);
 	}
 
 	gp_pctrl = devm_pinctrl_get(&(pdev->dev));
 	if (IS_ERR(gp_pctrl)) {
 		ret = PTR_ERR(gp_pctrl);
 		pr_err("%s: no pinctrl handle\n", __func__);
-		goto err;
+		goto free_gpios;
 	}
 
 	gp_outputstate = pinctrl_lookup_state(gp_pctrl, "output");
 	if (IS_ERR(gp_outputstate)) {
 		ret = PTR_ERR(gp_outputstate);
 		pr_err("%s: Can't obtain output pinctrl state\n", __func__);
-		goto err;
+		goto free_gpios;
 	}
 
 	gp_tristate = pinctrl_lookup_state(gp_pctrl, "tristate");
 	if (IS_ERR(gp_tristate)) {
 		ret = PTR_ERR(gp_tristate);
 		pr_err("%s: Can't obtain tristate pinctrl state\n", __func__);
-		goto err;
+		goto free_gpios;
 	}
 
 	ret = pinctrl_select_state(gp_pctrl, gp_tristate);
 	if (ret) {
 		pr_err("%s: failed to set tristate\n", __func__);
-		ret = -EINVAL;
-		goto err;
+		goto free_gpios;
 	}
 
 
 	pm_power_off = &minnow_gpio_poweroff_do_poweroff;
 	return 0;
 
-err:
-	gpio_free(g_gpio_wdi);
+free_gpios:
+	if (gpio_is_valid(g_gpio_wdi))
+		gpio_free(g_gpio_wdi);
+	if (gpio_is_valid(g_gpio_sys_resetb))
+		gpio_free(g_gpio_sys_resetb);
 unregister_usb:
 	usb_unregister_notify(&pmic_usb_notifier);
 	return -ENODEV;
@@ -158,7 +183,10 @@ unregister_usb:
 
 static int minnow_gpio_poweroff_remove(struct platform_device *pdev)
 {
-	gpio_free(g_gpio_wdi);
+	if (gpio_is_valid(g_gpio_wdi))
+		gpio_free(g_gpio_wdi);
+	if (gpio_is_valid(g_gpio_sys_resetb))
+		gpio_free(g_gpio_sys_resetb);
 	if (pm_power_off == &minnow_gpio_poweroff_do_poweroff)
 		pm_power_off = NULL;
 
