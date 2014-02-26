@@ -916,7 +916,8 @@ static struct omap_hwmod_opt_clk gpio1_opt_clks[] = {
 
 static struct omap_hwmod omap3xxx_gpio1_hwmod = {
 	.name		= "gpio1",
-	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
+	.flags		= (HWMOD_CONTROL_OPT_CLKS_IN_RESET |
+			   HWMOD_INIT_NO_RESET),
 	.mpu_irqs	= omap2_gpio1_irqs,
 	.main_clk	= "gpio1_ick",
 	.opt_clks	= gpio1_opt_clks,
@@ -941,7 +942,8 @@ static struct omap_hwmod_opt_clk gpio2_opt_clks[] = {
 
 static struct omap_hwmod omap3xxx_gpio2_hwmod = {
 	.name		= "gpio2",
-	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
+	.flags		= (HWMOD_CONTROL_OPT_CLKS_IN_RESET |
+			   HWMOD_INIT_NO_RESET),
 	.mpu_irqs	= omap2_gpio2_irqs,
 	.main_clk	= "gpio2_ick",
 	.opt_clks	= gpio2_opt_clks,
@@ -966,7 +968,8 @@ static struct omap_hwmod_opt_clk gpio3_opt_clks[] = {
 
 static struct omap_hwmod omap3xxx_gpio3_hwmod = {
 	.name		= "gpio3",
-	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
+	.flags		= (HWMOD_CONTROL_OPT_CLKS_IN_RESET |
+			   HWMOD_INIT_NO_RESET),
 	.mpu_irqs	= omap2_gpio3_irqs,
 	.main_clk	= "gpio3_ick",
 	.opt_clks	= gpio3_opt_clks,
@@ -991,7 +994,8 @@ static struct omap_hwmod_opt_clk gpio4_opt_clks[] = {
 
 static struct omap_hwmod omap3xxx_gpio4_hwmod = {
 	.name		= "gpio4",
-	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
+	.flags		= (HWMOD_CONTROL_OPT_CLKS_IN_RESET |
+			   HWMOD_INIT_NO_RESET),
 	.mpu_irqs	= omap2_gpio4_irqs,
 	.main_clk	= "gpio4_ick",
 	.opt_clks	= gpio4_opt_clks,
@@ -1021,7 +1025,8 @@ static struct omap_hwmod_opt_clk gpio5_opt_clks[] = {
 
 static struct omap_hwmod omap3xxx_gpio5_hwmod = {
 	.name		= "gpio5",
-	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
+	.flags		= (HWMOD_CONTROL_OPT_CLKS_IN_RESET |
+			   HWMOD_INIT_NO_RESET),
 	.mpu_irqs	= omap3xxx_gpio5_irqs,
 	.main_clk	= "gpio5_ick",
 	.opt_clks	= gpio5_opt_clks,
@@ -1051,7 +1056,8 @@ static struct omap_hwmod_opt_clk gpio6_opt_clks[] = {
 
 static struct omap_hwmod omap3xxx_gpio6_hwmod = {
 	.name		= "gpio6",
-	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
+	.flags		= (HWMOD_CONTROL_OPT_CLKS_IN_RESET |
+			   HWMOD_INIT_NO_RESET),
 	.mpu_irqs	= omap3xxx_gpio6_irqs,
 	.main_clk	= "gpio6_ick",
 	.opt_clks	= gpio6_opt_clks,
