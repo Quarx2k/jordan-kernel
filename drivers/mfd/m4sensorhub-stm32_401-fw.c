@@ -274,6 +274,10 @@ int m4sensorhub_401_load_firmware(struct m4sensorhub_data *m4sensorhub,
 done:
 	release_firmware(firmware);
 
+	/* irrespective of whether we upgraded FW or not,
+	the firmware version will be the same as one in the file*/
+	m4sensorhub->fw_version = fw_version_file;
+
 	/* If ret is invalid, then we don't try to jump to user code */
 	if (ret >= 0 && m4sensorhub_jump_to_user(m4sensorhub) < 0)
 		/* If jump to user code fails, return failure */

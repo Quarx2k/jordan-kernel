@@ -397,6 +397,10 @@ static void m4sensorhub_initialize(const struct firmware *firmware,
 		inc = inc->next;
 		kfree(prev);
 	}
+
+	/* Now that all drivers are kicked off, flag this
+	as our normal mode of operation */
+	m4sensorhub_misc_data.mode = NORMALMODE;
 }
 
 static ssize_t m4sensorhub_set_dbg(struct device *dev,
@@ -490,6 +494,27 @@ static ssize_t m4sensorhub_set_loglevel(struct device *dev,
 static DEVICE_ATTR(log_level, S_IRUGO|S_IWUGO, m4sensorhub_get_loglevel,
 		m4sensorhub_set_loglevel);
 
+static ssize_t m4sensorhub_get_download_status(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%s",
+		m4sensorhub_misc_data.mode == NORMALMODE ? "1" : "0");
+}
+
+static DEVICE_ATTR(download_status, S_IRUGO,
+				m4sensorhub_get_download_status, NULL);
+
+static ssize_t m4sensorhub_get_firmware_version(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%hu",
+		m4sensorhub_misc_data.mode == NORMALMODE ?
+				m4sensorhub_misc_data.fw_version : 0xFFFF);
+}
+
+static DEVICE_ATTR(firmware_version, S_IRUGO,
+				m4sensorhub_get_firmware_version, NULL);
+
 static int m4sensorhub_probe(struct i2c_client *client,
 			     const struct i2c_device_id *id)
 {
@@ -515,6 +540,8 @@ static int m4sensorhub_probe(struct i2c_client *client,
 	m4sensorhub_debug = M4SH_INFO;
 	KDEBUG(M4SH_ERROR, "Initializing M4 Sensor Hub debug=%d\n",
 			m4sensorhub_debug);
+
+	m4sensorhub->mode = UNINITIALIZED;
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		KDEBUG(M4SH_ERROR, "client not i2c capable\n");
@@ -553,12 +580,24 @@ static int m4sensorhub_probe(struct i2c_client *client,
 		goto err_del_debug_file;
 	}
 
+	err = device_create_file(&client->dev, &dev_attr_download_status);
+	if (err < 0) {
+		KDEBUG(M4SH_ERROR, "Error creating download status file\n");
+		goto err_del_log_file;
+	}
+
+	err = device_create_file(&client->dev, &dev_attr_firmware_version);
+	if (err < 0) {
+		KDEBUG(M4SH_ERROR, "Error creating FW version file\n");
+		goto err_del_downloadstatus_file;
+	}
+
 	if (m4sensorhub->hwconfig.irq_gpio >= 0)
 		client->irq = gpio_to_irq(m4sensorhub->hwconfig.irq_gpio);
 	else {
 		KDEBUG(M4SH_ERROR, "Error: No IRQ configured\n");
 		err = -ENODEV;
-		goto err_del_log_file;
+		goto err_del_firmwareversion_file;
 	}
 
 	err = m4sensorhub_panic_init(m4sensorhub);
@@ -582,6 +621,10 @@ err_panic_shutdown:
 	m4sensorhub_panic_shutdown(m4sensorhub);
 err_reg_shutdown:
 	m4sensorhub_reg_shutdown(m4sensorhub);
+err_del_firmwareversion_file:
+	device_remove_file(&client->dev, &dev_attr_firmware_version);
+err_del_downloadstatus_file:
+	device_remove_file(&client->dev, &dev_attr_download_status);
 err_del_log_file:
 	device_remove_file(&client->dev, &dev_attr_log_level);
 err_del_debug_file:
@@ -608,6 +651,8 @@ static int __exit m4sensorhub_remove(struct i2c_client *client)
 	m4sensorhub_reg_shutdown(m4sensorhub);
 	device_remove_file(&client->dev, &dev_attr_log_level);
 	device_remove_file(&client->dev, &dev_attr_debug_level);
+	device_remove_file(&client->dev, &dev_attr_firmware_version);
+	device_remove_file(&client->dev, &dev_attr_download_status);
 	m4sensorhub_hw_reset(m4sensorhub);
 	misc_deregister(&m4sensorhub_misc_device);
 	m4sensorhub->i2c_client = NULL;

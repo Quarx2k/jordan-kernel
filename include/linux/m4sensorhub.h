@@ -55,8 +55,7 @@ enum m4sensorhub_debug_level {
 enum m4sensorhub_mode {
 	UNINITIALIZED,
 	BOOTMODE,
-	NORMALMODE,
-	FACTORYMODE
+	NORMALMODE
 };
 
 enum m4sensorhub_bootmode {
@@ -117,6 +116,7 @@ struct m4sensorhub_data {
 	struct m4sensorhub_platform_data *pdev;
 	struct m4sensorhub_hwconfig hwconfig;
 	char *filename;
+	u16 fw_version;
 };
 
 /* Global (kernel) functions */
