@@ -92,7 +92,7 @@ static irqreturn_t tps65912_irq(int irq, void *irq_data)
 	if (!irq_sts)
 		return IRQ_NONE;
 
-	for (i = 0; i < tps65912->irq_num; i++) {
+	for (i = tps65912->irq_num - 1; i >= 0; i--) {
 		if (!(irq_sts & (1 << i)))
 			continue;
 
@@ -181,7 +181,6 @@ int tps65912_irq_init(struct tps65912 *tps65912, int irq,
 			    struct tps65912_platform_data *pdata)
 {
 	int ret, cur_irq;
-	int flags = IRQF_ONESHOT|IRQF_TRIGGER_RISING;
 	u8 reg;
 
 	if (!irq) {
@@ -232,22 +231,24 @@ int tps65912_irq_init(struct tps65912 *tps65912, int irq,
 #endif
 	}
 
-	ret = request_threaded_irq(irq, NULL, tps65912_irq, flags,
-				   "tps65912", tps65912);
+	ret = request_threaded_irq(irq, NULL, tps65912_irq,
+			IRQF_TRIGGER_HIGH | IRQF_ONESHOT,
+			"tps65912", tps65912);
 	if (ret != 0)
 		dev_err(tps65912->dev, "Failed to request IRQ: %d\n", ret);
 
 	ret = request_threaded_irq(tps65912->irq_base +
 		tps65912->powerkey_up_irq, NULL, powerkey_handler,
-		flags, "tps65912_key_rel", tps65912);
+		IRQF_TRIGGER_RISING | IRQF_ONESHOT, "tps65912_key_rel",
+		tps65912);
 	if (ret != 0)
 		dev_err(tps65912->dev,
 		"Failed to request sub-IRQ for power key rel: %d\n", ret);
 
 	ret = request_threaded_irq(tps65912->irq_base +
-		tps65912->powerkey_down_irq,
-		NULL, powerkey_handler, flags,
-		"tps65912_key_press", tps65912);
+		tps65912->powerkey_down_irq, NULL, powerkey_handler,
+		IRQF_TRIGGER_RISING | IRQF_ONESHOT, "tps65912_key_press",
+		tps65912);
 	if (ret != 0)
 		dev_err(tps65912->dev,
 		"Failed to request sub-IRQ for power key press: %d\n", ret);
