@@ -2187,6 +2187,80 @@ static struct omap_hwmod omap3xxx_gpmc_hwmod = {
 			   HWMOD_NO_IDLEST),
 };
 
+#ifdef	CONFIG_SGX_OMAP3630
+/*
+ * 'gpu' class
+ * 2d/3d graphics accelerator
+ */
+
+static struct omap_hwmod_class_sysconfig omap3630_gpu_sysc = {
+	.rev_offs	= 0xfe00,
+	.sysc_offs	= 0xfe10,
+	.sysc_flags	= (SYSC_HAS_MIDLEMODE | SYSC_HAS_SIDLEMODE),
+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
+			   SIDLE_SMART_WKUP | MSTANDBY_FORCE | MSTANDBY_NO |
+			   MSTANDBY_SMART | MSTANDBY_SMART_WKUP),
+	.sysc_fields	= &omap_hwmod_sysc_type2,
+};
+
+static struct omap_hwmod_class omap3630_gpu_hwmod_class = {
+	.name	= "gpu",
+	.sysc	= &omap3630_gpu_sysc,
+};
+
+/* gpu */
+static struct omap_hwmod_irq_info omap3630_gpu_irqs[] = {
+	{ .irq = 21 + OMAP_INTC_START },
+	{ .irq = -1 }
+};
+
+static struct omap_hwmod omap3630_gpu_hwmod = {
+	.name		= "gpu",
+	.class		= &omap3630_gpu_hwmod_class,
+	.clkdm_name	= "sgx_clkdm",
+	.mpu_irqs	= omap3630_gpu_irqs,
+	.main_clk	= "sgx_fck",
+	.prcm = {
+		.omap2 = {
+			.module_offs = OMAP3430ES2_SGX_MOD,
+			.prcm_reg_id = 1,
+			.idlest_reg_id = 1,
+		},
+	},
+	.flags		= HWMOD_NO_IDLEST | HWMOD_NO_OCP_AUTOIDLE,
+};
+
+/* gpu -> l3_main */
+static struct omap_hwmod_ocp_if omap3630_gpu__l3_main = {
+	.master         = &omap3630_gpu_hwmod,
+	.slave          = &omap3xxx_l3_main_hwmod,
+	.clk		= "core_l3_ick",
+	.user           = OCP_USER_MPU | OCP_USER_SDMA,
+};
+
+
+static struct omap_hwmod_addr_space omap3630_gpu_addrs[] = {
+	{
+		.pa_start       = 0x50000000,
+		.pa_end         = 0x5000ffff,
+		.flags          = ADDR_TYPE_RT
+	},
+	{ }
+};
+
+/* l3_main -> gpu interface */
+static struct omap_hwmod_ocp_if omap3630_l3_main__gpu = {
+	.master         = &omap3xxx_l3_main_hwmod,
+	.slave          = &omap3630_gpu_hwmod,
+	.clk		= "sgx_ick",
+	.addr           = omap3630_gpu_addrs,
+	.user           = OCP_USER_MPU | OCP_USER_SDMA,
+};
+
+
+#endif
+
+
 /*
  * interfaces
  */
@@ -3835,6 +3909,10 @@ static struct omap_hwmod_ocp_if *omap36xx_hwmod_ocp_ifs[] __initdata = {
 	&omap3xxx_l4_core__mmu_isp,
 #ifdef CONFIG_OMAP_IOMMU_IVA2
 	&omap3xxx_l3_main__mmu_iva,
+#endif
+#ifdef CONFIG_SGX_OMAP3630
+	&omap3630_l3_main__gpu,
+	&omap3630_gpu__l3_main,
 #endif
 	NULL
 };

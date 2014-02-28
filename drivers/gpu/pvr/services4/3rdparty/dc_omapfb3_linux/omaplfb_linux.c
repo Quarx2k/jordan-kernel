@@ -107,7 +107,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #endif
 
 #if defined(PVR_OMAPFB3_NEEDS_PLAT_VRFB_H)
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,8,0))
 #include <plat/vrfb.h>
+#else
+#include <video/omapvrfb.h>
+#endif
 #else
 #if defined(PVR_OMAPFB3_NEEDS_MACH_VRFB_H)
 #include <mach/vrfb.h>
@@ -153,7 +157,11 @@ MODULE_SUPPORTED_DEVICE(DEVNAME);
 #if !defined(PVR_OMAPLFB_DRM_FB)
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,34))
 #define OMAP_DSS_DRIVER(drv, dev) struct omap_dss_driver *drv = (dev) != NULL ? (dev)->driver : NULL
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,7,0))
 #define OMAP_DSS_MANAGER(man, dev) struct omap_overlay_manager *man = (dev) != NULL ? (dev)->manager : NULL
+#else
+#define OMAP_DSS_MANAGER(man, dev) struct omap_overlay_manager *man = (dev) != NULL ? (dev)->output->manager : NULL
+#endif
 #define	WAIT_FOR_VSYNC(man)	((man)->wait_for_vsync)
 #else
 #define OMAP_DSS_DRIVER(drv, dev) struct omap_dss_device *drv = (dev)
@@ -419,6 +427,10 @@ void OMAPLFBFlip(OMAPLFB_DEVINFO *psDevInfo, OMAPLFB_BUFFER *psBuffer)
 	OMAPLFB_CONSOLE_UNLOCK();
 }
 
+/* Newer kernels don't have any update mode capability */
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
+
 #if !defined(PVR_OMAPLFB_DRM_FB) || defined(DEBUG)
 static OMAPLFB_BOOL OMAPLFBValidateDSSUpdateMode(enum omap_dss_update_mode eMode)
 {
@@ -515,6 +527,23 @@ static const char *OMAPLFBDSSUpdateModeToString(enum omap_dss_update_mode eMode)
 	return OMAPLFBUpdateModeToString(OMAPLFBFromDSSUpdateMode(eMode));
 }
 
+
+#else /* (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0)) */
+
+static const char *OMAPLFBUpdateModeToString(OMAPLFB_UPDATE_MODE eMode)
+{
+	return "Not supported";
+}
+
+#if defined(PVR_OMAPLFB_DRM_FB)
+static const char *OMAPLFBDSSUpdateModeToString(int eMode)
+{
+	return "Not supported";
+}
+#endif /* defined(PVR_OMAPLFB_DRM_FB) */
+
+#endif /* (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0)) */
+
 void OMAPLFBPrintInfo(OMAPLFB_DEVINFO *psDevInfo)
 {
 #if defined(PVR_OMAPLFB_DRM_FB)
@@ -554,6 +583,10 @@ void OMAPLFBPrintInfo(OMAPLFB_DEVINFO *psDevInfo)
 #endif	/* defined(PVR_OMAPLFB_DRM_FB) */
 }
 #endif	/* defined(DEBUG) */
+
+/* Newer kernels don't have any update mode capability */
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0))
 
 /* 
  * Get display update mode.
@@ -709,6 +742,15 @@ OMAPLFB_BOOL OMAPLFBSetUpdateMode(OMAPLFB_DEVINFO *psDevInfo, OMAPLFB_UPDATE_MOD
 	return (res == 0);
 #endif	/* defined(PVR_OMAPLFB_DRM_FB) */
 }
+
+#else /* (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0)) */
+
+OMAPLFB_UPDATE_MODE OMAPLFBGetUpdateMode(OMAPLFB_DEVINFO *psDevInfo)
+{
+	return OMAPLFB_UPDATE_MODE_MANUAL;
+}
+
+#endif /* (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0)) */
 
 /* Wait for VSync */
 OMAPLFB_BOOL OMAPLFBWaitForVSync(OMAPLFB_DEVINFO *psDevInfo)

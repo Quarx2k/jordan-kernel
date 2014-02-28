@@ -1992,6 +1992,7 @@ static PVRSRV_ERROR RA_DumpHeapInfo(RA_ARENA *pArena, IMG_UINT32 ui32DebugLevel)
 {
 	BT 			*pBT;
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0))
 	{
 		IMG_UINT32 ui32PID = OSGetCurrentProcessIDKM();
 		IMG_CHAR dirname_buffer[256];
@@ -2006,6 +2007,7 @@ static PVRSRV_ERROR RA_DumpHeapInfo(RA_ARENA *pArena, IMG_UINT32 ui32DebugLevel)
 		PVR_LOG(("Base Name of the current process with ID %u is %s", ui32PID, proc_basename));
 
 	}
+#endif
 
 	PVR_LOG(("Arena '%s':", pArena->name));
 

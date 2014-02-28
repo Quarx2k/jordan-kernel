@@ -633,6 +633,32 @@ static void __init omap_init_ocp2scp(void)
 static inline void omap_init_ocp2scp(void) { }
 #endif
 
+#if defined(CONFIG_SGX_OMAP3630)
+static struct platform_device mapphone_omaplfb_device = {
+	.name	= "omaplfb",
+	.id	= -1,
+};
+static void __init omap_init_gpu(void)
+{
+	struct omap_hwmod *oh;
+	struct platform_device *pdev;
+	const char *oh_name = "gpu";
+	const char *name = "pvrsrvkm";
+	oh = omap_hwmod_lookup(oh_name);
+	if (!oh) {
+		pr_err("%s: Could not look up %s\n", __func__, oh_name);
+		return;
+	}
+
+	pdev = omap_device_build(name, -1, oh, NULL, 0);
+	WARN(IS_ERR(pdev),
+	     "%s, Can't build omap_device for %s\n", __func__, name);
+	if (platform_device_register(&mapphone_omaplfb_device) < 0)
+		pr_err("%s: Could not register OMAP-LFB device\n", __func__);
+}
+#else
+static inline void omap_init_gpu(void) { }
+#endif
 /*-------------------------------------------------------------------------*/
 
 static int __init omap2_init_devices(void)
@@ -662,6 +688,7 @@ static int __init omap2_init_devices(void)
 	omap_init_rng();
 	omap_init_vout();
 	omap_init_ocp2scp();
+	omap_init_gpu();
 
 	return 0;
 }

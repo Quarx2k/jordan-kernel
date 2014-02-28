@@ -600,7 +600,7 @@ static inline IMG_VOID FreeIONLinuxMemArea(LinuxMemArea *psLinuxMemArea)
 
 static inline IMG_INT32
 GetIONLinuxMemAreaInfo(LinuxMemArea *psLinuxMemArea, IMG_UINT32* ui32AddressOffsets,
-                IMG_UINT32* ui32NumAddr);
+                IMG_UINT32* ui32NumAddr)
 {
     PVR_UNREFERENCED_PARAMETER(psLinuxMemArea);
     PVR_UNREFERENCED_PARAMETER(ui32AddressOffsets);

@@ -1255,7 +1255,9 @@ static INLINE IMG_UINT32 GetDirListBaseReg(IMG_UINT32 ui32Index)
 }
 #endif
 
+#if defined(CONFIG_DSSCOMP)
 void dsscomp_kdump(void);
+#endif
 /*!
 *******************************************************************************
 
@@ -1277,7 +1279,9 @@ IMG_VOID SGXDumpDebugInfo (PVRSRV_SGXDEV_INFO	*psDevInfo,
 {
 	IMG_UINT32	ui32CoreNum;
 
+#if defined(CONFIG_DSSCOMP)
 	dsscomp_kdump();
+#endif
 
 	PVR_LOG(("SGX debug (%s)", PVRVERSION_STRING));
 
