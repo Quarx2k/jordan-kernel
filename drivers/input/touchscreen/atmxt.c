@@ -104,6 +104,7 @@ static void atmxt_active_handler(struct atmxt_driver_data *dd);
 static int atmxt_process_message(struct atmxt_driver_data *dd,
 		uint8_t *msg, uint8_t size);
 static void atmxt_report_touches(struct atmxt_driver_data *dd);
+static void atmxt_report_powerevent(struct atmxt_driver_data *dd);
 static void atmxt_release_touches(struct atmxt_driver_data *dd);
 static int atmxt_message_handler6(struct atmxt_driver_data *dd,
 		uint8_t *msg, uint8_t size);
@@ -370,6 +371,10 @@ static int atmxt_suspend(struct i2c_client *client, pm_message_t message)
 			} else {
 				atmxt_set_ic_state(dd, ATMXT_IC_SLEEP);
 			}
+			break;
+		case ATMXT_IC_SLEEP:
+			pr_info("%s: current IC state is %s already", __func__,
+				atmxt_ic_state_string[ic_state]);
 			break;
 		default:
 			printk(KERN_ERR "%s: Driver %s, IC %s suspend.\n",
@@ -1044,6 +1049,11 @@ static int atmxt_register_inputs(struct atmxt_driver_data *dd,
 
 	input_set_events_per_packet(dd->in_dev,
 		ATMXT_MAX_TOUCHES * (ARRAY_SIZE(dd->rdat->axis) + 1));
+
+	/* Always on Touch requires that this driver be able to
+	send KEY_POWER to wakeup the system */
+	set_bit(EV_KEY, dd->in_dev->evbit);
+	set_bit(KEY_POWER, dd->in_dev->keybit);
 
 	err = input_register_device(dd->in_dev);
 	if (err < 0) {
@@ -2343,7 +2353,10 @@ static void atmxt_active_handler(struct atmxt_driver_data *dd)
 	}
 
 	if (dd->status & (1 << ATMXT_REPORT_TOUCHES)) {
-		atmxt_report_touches(dd);
+		if (atmxt_get_ic_state(dd) == ATMXT_IC_SLEEP)
+			atmxt_report_powerevent(dd);
+		else
+			atmxt_report_touches(dd);
 		dd->status = dd->status & ~(1 << ATMXT_REPORT_TOUCHES);
 	}
 
@@ -2399,6 +2412,17 @@ static int atmxt_process_message(struct atmxt_driver_data *dd,
 
 	kfree(contents);
 	return err;
+}
+
+static void atmxt_report_powerevent(struct atmxt_driver_data *dd)
+{
+	pr_err("%s:\n", __func__);
+	/* power key press */
+	input_report_key(dd->in_dev, KEY_POWER, 1);
+	input_sync(dd->in_dev);
+	/* power key release */
+	input_report_key(dd->in_dev, KEY_POWER, 0);
+	input_sync(dd->in_dev);
 }
 
 static void atmxt_report_touches(struct atmxt_driver_data *dd)
@@ -3180,6 +3204,66 @@ static ssize_t atmxt_debug_drv_stat_show(struct device *dev,
 }
 static DEVICE_ATTR(drv_stat, S_IRUGO, atmxt_debug_drv_stat_show, NULL);
 
+
+static ssize_t atmxt_drv_interactivemode_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	unsigned long value = 0;
+	struct atmxt_driver_data *dd = dev_get_drvdata(dev);
+	int err;
+	uint8_t sleep_cmd[2] =  {0xFE, 0xFE};
+
+	err = kstrtoul(buf, 10, &value);
+	if (err < 0) {
+		pr_err("%s: Failed to convert value.\n", __func__);
+		return err;
+	}
+
+	mutex_lock(dd->mutex);
+
+	if (value == 1) {
+		/* interactive mode, lets bump up rate*/
+		err = atmxt_i2c_write(dd,
+			dd->addr->pwr[0], dd->addr->pwr[1],
+			&(dd->data->pwr[0]), 2);
+		if (err < 0) {
+			pr_err("%s: i2c write failed\n", __func__);
+			goto error;
+		}
+		atmxt_set_ic_state(dd, ATMXT_IC_ACTIVE);
+		err = size;
+	} else if (value == 0) {
+		/* Non interactive mode, lets lower scan rate*/
+		err = atmxt_i2c_write(dd,
+			dd->addr->pwr[0], dd->addr->pwr[1],
+			&(sleep_cmd[0]), 2);
+
+		if (err < 0) {
+			pr_err("%s: i2c write failed\n", __func__);
+			goto error;
+		}
+		atmxt_set_ic_state(dd, ATMXT_IC_SLEEP);
+		err = size;
+	} else {
+		err = -EINVAL;
+	}
+
+error:
+	mutex_unlock(dd->mutex);
+	return err;
+}
+static ssize_t atmxt_drv_interactivemode_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct atmxt_driver_data *dd = dev_get_drvdata(dev);
+	int ic_state = atmxt_get_ic_state(dd);
+	return snprintf(buf, PAGE_SIZE, "%s",
+			(ic_state == ATMXT_IC_ACTIVE ? "1" : "0"));
+}
+static DEVICE_ATTR(interactivemode, S_IRUGO | S_IWGRP | S_IWOTH,
+		atmxt_drv_interactivemode_show,
+		atmxt_drv_interactivemode_store);
+
 #ifdef CONFIG_TOUCHSCREEN_DEBUG
 static ssize_t atmxt_debug_drv_tdat_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -3756,6 +3840,13 @@ static int atmxt_create_sysfs_files(struct atmxt_driver_data *dd)
 		err = check;
 	}
 
+	check = device_create_file(&(dd->client->dev),
+					&dev_attr_interactivemode);
+	if (check < 0) {
+		pr_err("%s: Failed to create ic_ver.\n", __func__);
+		err = check;
+	}
+
 	return err;
 }
 
@@ -3782,5 +3873,6 @@ static void atmxt_remove_sysfs_files(struct atmxt_driver_data *dd)
 	device_remove_file(&(dd->client->dev), &dev_attr_ic_grpoffset);
 #endif
 	device_remove_file(&(dd->client->dev), &dev_attr_ic_ver);
+	device_remove_file(&(dd->client->dev), &dev_attr_interactivemode);
 	return;
 }
