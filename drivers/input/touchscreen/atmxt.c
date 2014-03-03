@@ -3256,7 +3256,10 @@ static ssize_t atmxt_drv_interactivemode_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	struct atmxt_driver_data *dd = dev_get_drvdata(dev);
-	int ic_state = atmxt_get_ic_state(dd);
+	int ic_state;
+	mutex_lock(dd->mutex);
+	ic_state = atmxt_get_ic_state(dd);
+	mutex_unlock(dd->mutex);
 	return snprintf(buf, PAGE_SIZE, "%s",
 			(ic_state == ATMXT_IC_ACTIVE ? "1" : "0"));
 }
