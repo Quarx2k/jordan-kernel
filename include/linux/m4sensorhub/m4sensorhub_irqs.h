@@ -78,6 +78,9 @@ enum m4sensorhub_irqs {
 	/* INT2 0x01 : heartratesensor data ready */
 	M4SH_IRQ_HEARTRATESENSOR_DATA_READY = M4SH_IRQ_INT2_INDEX,
 
+	/* INT2 0x02 : AP-RTC alarm expired */
+	M4SH_IRQ_AP_ALARM_EXPIRED,
+
 	/* Number of allocated interrupts */
 	M4SH_IRQ__NUM
 };
