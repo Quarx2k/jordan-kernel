@@ -17,6 +17,7 @@
 #include <linux/usb/musb.h>
 #include <linux/usb/phy.h>
 #include <linux/usb/nop-usb-xceiv.h>
+#include <linux/ti_wilink_st.h>
 #include "mux.h"
 #include "common.h"
 #include "dss-common.h"
@@ -35,6 +36,32 @@ static const char *omap3_gp_boards_compat[] __initdata = {
 	NULL,
 };
 
+struct ti_st_plat_data wilink_pdata = {
+	.nshutdown_gpio = 83,
+	.dev_name = "/dev/ttyO1",
+	.flow_cntrl = 1,
+	.baud_rate = 3000000,
+	.suspend = NULL,
+	.resume = NULL,
+};
+
+static struct platform_device wl18xx_device = {
+	.name              = "kim",
+	.id                = -1,
+	.dev.platform_data = &wilink_pdata,
+};
+
+static struct platform_device hci_tty_device = {
+	.name = "hci_tty",
+	.id = -1,
+};
+
+static inline void __init minnow_init_btwilink(void)
+{
+	platform_device_register(&wl18xx_device);
+	platform_device_register(&hci_tty_device);
+}
+
 static void __init minnow_init(void)
 {
 	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
@@ -42,6 +69,7 @@ static void __init minnow_init(void)
 	omap_sdrc_init(JEDEC_JESD209A_sdrc_params, JEDEC_JESD209A_sdrc_params);
 	omap3_enable_usim_buffer(); /* Needed for GPIOs in USIM block */
 	omap_minnow_display_init();
+	minnow_init_btwilink();
 }
 
 MACHINE_START(MINNOW, "minnow")
