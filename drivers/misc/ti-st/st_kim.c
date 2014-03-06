@@ -27,7 +27,9 @@
 #include <linux/delay.h>
 #include <linux/wait.h>
 #include <linux/gpio.h>
+#ifdef CONFIG_DEBUG_FS
 #include <linux/debugfs.h>
+#endif
 #include <linux/seq_file.h>
 #include <linux/sched.h>
 #include <linux/sysfs.h>
@@ -561,6 +563,7 @@ long st_kim_stop(void *kim_data)
 	return err;
 }
 
+#ifdef CONFIG_DEBUG_FS
 /**********************************************************************/
 /* functions called from subsystems */
 /* called when debugfs entry is read from */
@@ -580,6 +583,7 @@ static int show_list(struct seq_file *s, void *unused)
 	kim_st_list_protocols(kim_gdata->core_data, s);
 	return 0;
 }
+#endif
 
 static ssize_t show_install(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -685,6 +689,7 @@ void st_kim_ref(struct st_data_s **core_data, int id)
 	*core_data = kim_gdata->core_data;
 }
 
+#ifdef CONFIG_DEBUG_FS
 static int kim_version_open(struct inode *i, struct file *f)
 {
 	return single_open(f, show_version, i->i_private);
@@ -709,6 +714,7 @@ static const struct file_operations list_debugfs_fops = {
 	.llseek = seq_lseek,
 	.release = single_release,
 };
+#endif
 
 /**********************************************************************/
 /* functions called from platform device driver subsystem
@@ -716,7 +722,9 @@ static const struct file_operations list_debugfs_fops = {
  * board-*.c file
  */
 
+#ifdef CONFIG_DEBUG_FS
 static struct dentry *kim_debugfs_dir;
+#endif
 static int kim_probe(struct platform_device *pdev)
 {
 	struct kim_data_s	*kim_gdata;
@@ -779,6 +787,7 @@ static int kim_probe(struct platform_device *pdev)
 	kim_gdata->baud_rate = pdata->baud_rate;
 	pr_info("sysfs entries created\n");
 
+#ifdef CONFIG_DEBUG_FS
 	kim_debugfs_dir = debugfs_create_dir("ti-st", NULL);
 	if (IS_ERR(kim_debugfs_dir)) {
 		pr_err(" debugfs entries creation failed ");
@@ -795,6 +804,9 @@ static int kim_probe(struct platform_device *pdev)
 
 err_debugfs_dir:
 	sysfs_remove_group(&pdev->dev.kobj, &uim_attr_grp);
+#else /* CONFIG_DEBUG_FS */
+	return 0;
+#endif
 
 err_sysfs_group:
 	st_core_exit(kim_gdata->core_data);
@@ -819,7 +831,9 @@ static int kim_remove(struct platform_device *pdev)
 	gpio_free(pdata->nshutdown_gpio);
 	pr_info("nshutdown GPIO Freed");
 
+#ifdef CONFIG_DEBUG_FS
 	debugfs_remove_recursive(kim_debugfs_dir);
+#endif
 	sysfs_remove_group(&pdev->dev.kobj, &uim_attr_grp);
 	pr_info("sysfs entries removed");
 
