@@ -104,7 +104,6 @@ static void atmxt_active_handler(struct atmxt_driver_data *dd);
 static int atmxt_process_message(struct atmxt_driver_data *dd,
 		uint8_t *msg, uint8_t size);
 static void atmxt_report_touches(struct atmxt_driver_data *dd);
-static void atmxt_report_powerevent(struct atmxt_driver_data *dd);
 static void atmxt_release_touches(struct atmxt_driver_data *dd);
 static int atmxt_message_handler6(struct atmxt_driver_data *dd,
 		uint8_t *msg, uint8_t size);
@@ -1049,11 +1048,6 @@ static int atmxt_register_inputs(struct atmxt_driver_data *dd,
 
 	input_set_events_per_packet(dd->in_dev,
 		ATMXT_MAX_TOUCHES * (ARRAY_SIZE(dd->rdat->axis) + 1));
-
-	/* Always on Touch requires that this driver be able to
-	send KEY_POWER to wakeup the system */
-	set_bit(EV_KEY, dd->in_dev->evbit);
-	set_bit(KEY_POWER, dd->in_dev->keybit);
 
 	err = input_register_device(dd->in_dev);
 	if (err < 0) {
@@ -2353,10 +2347,7 @@ static void atmxt_active_handler(struct atmxt_driver_data *dd)
 	}
 
 	if (dd->status & (1 << ATMXT_REPORT_TOUCHES)) {
-		if (atmxt_get_ic_state(dd) == ATMXT_IC_SLEEP)
-			atmxt_report_powerevent(dd);
-		else
-			atmxt_report_touches(dd);
+		atmxt_report_touches(dd);
 		dd->status = dd->status & ~(1 << ATMXT_REPORT_TOUCHES);
 	}
 
@@ -2412,17 +2403,6 @@ static int atmxt_process_message(struct atmxt_driver_data *dd,
 
 	kfree(contents);
 	return err;
-}
-
-static void atmxt_report_powerevent(struct atmxt_driver_data *dd)
-{
-	pr_err("%s:\n", __func__);
-	/* power key press */
-	input_report_key(dd->in_dev, KEY_POWER, 1);
-	input_sync(dd->in_dev);
-	/* power key release */
-	input_report_key(dd->in_dev, KEY_POWER, 0);
-	input_sync(dd->in_dev);
 }
 
 static void atmxt_report_touches(struct atmxt_driver_data *dd)
