@@ -28,6 +28,8 @@
 #include <linux/cpu.h>
 #include <linux/completion.h>
 #include <linux/mutex.h>
+#include <linux/kernel_stat.h>
+#include <linux/tick.h>
 
 #define dprintk(msg...) cpufreq_debug_printk(CPUFREQ_DEBUG_CORE, \
 						"cpufreq-core", msg)
@@ -132,6 +134,41 @@ pure_initcall(init_cpufreq_transition_notifier_list);
 
 static LIST_HEAD(cpufreq_governor_list);
 static DEFINE_MUTEX(cpufreq_governor_mutex);
+
+static inline u64 get_cpu_idle_time_jiffy(unsigned int cpu, u64 *wall)
+{
+        u64 idle_time;
+        u64 cur_wall_time;
+        u64 busy_time;
+
+        cur_wall_time = jiffies64_to_cputime64(get_jiffies_64());
+
+        busy_time  = kstat_cpu(cpu).cpustat.user;
+	busy_time += kstat_cpu(cpu).cpustat.system;
+	busy_time += kstat_cpu(cpu).cpustat.irq;
+	busy_time += kstat_cpu(cpu).cpustat.softirq;
+	busy_time += kstat_cpu(cpu).cpustat.steal;
+	busy_time += kstat_cpu(cpu).cpustat.nice;
+
+        idle_time = cur_wall_time - busy_time;
+        if (wall)
+                *wall = jiffies_to_usecs(cur_wall_time);
+
+        return jiffies_to_usecs(idle_time);
+}
+
+u64 get_cpu_idle_time(unsigned int cpu, u64 *wall, int io_busy)
+{
+        u64 idle_time = get_cpu_idle_time_us(cpu, io_busy ? wall : NULL);
+
+        if (idle_time == -1ULL)
+                return get_cpu_idle_time_jiffy(cpu, wall);
+        else if (!io_busy)
+                idle_time += get_cpu_iowait_time_us(cpu, wall);
+
+        return idle_time;
+}
+EXPORT_SYMBOL_GPL(get_cpu_idle_time);
 
 struct cpufreq_policy *cpufreq_cpu_get(unsigned int cpu)
 {
