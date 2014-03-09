@@ -70,6 +70,11 @@ MODULE_ALIAS("mmc:block");
 
 static DEFINE_MUTEX(block_mutex);
 
+/* HACK to prevent multiple mmc_host_claims that will not get cleared.
+ * This would be really bad for multiple hosts */
+static DEFINE_MUTEX(host_claimed_mutex);
+static bool host_claimed = false;
+
 /*
  * The defaults come from config options but can be overriden by module
  * or bootarg options.
@@ -1904,9 +1909,17 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 		mmc_resume_bus(card->host);
 #endif
 
-	if (req && !mq->mqrq_prev->req)
+	/* HACK: create a slightly less racy method of "claim
+	   host only for the first request */
+	if (req && !mq->mqrq_prev->req) {
 		/* claim host only for the first request */
-		mmc_claim_host(card->host);
+		mutex_lock(&host_claimed_mutex);
+		if (!host_claimed) {
+			host_claimed = true;
+			mmc_claim_host(card->host);
+		}
+		mutex_unlock(&host_claimed_mutex);
+	}
 
 	ret = mmc_blk_part_switch(card, md);
 	if (ret) {
@@ -1943,14 +1956,18 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 
 out:
 	if ((!req && !(mq->flags & MMC_QUEUE_NEW_REQUEST)) ||
-	     (req && (req->cmd_flags & MMC_REQ_SPECIAL_MASK)))
+	    (req && (req->cmd_flags & MMC_REQ_SPECIAL_MASK))) {
 		/*
-		 * Release host when there are no more requests
-		 * and after special request(discard, flush) is done.
-		 * In case sepecial request, there is no reentry to
-		 * the 'mmc_blk_issue_rq' with 'mqrq_prev->req'.
-		 */
+		* Release host when there are no more requests
+		* and after special request(discard, flush) is done.
+		* In case sepecial request, there is no reentry to
+		* the 'mmc_blk_issue_rq' with 'mqrq_prev->req'.
+		*/
+		mutex_lock(&host_claimed_mutex);
+		host_claimed = false;
 		mmc_release_host(card->host);
+		mutex_unlock(&host_claimed_mutex);
+	}
 	return ret;
 }
 
