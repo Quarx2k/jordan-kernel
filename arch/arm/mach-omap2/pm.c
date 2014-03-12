@@ -227,6 +227,9 @@ static int omap_pm_begin(suspend_state_t state)
 static void omap_pm_end(void)
 {
 	cpu_idle_poll_ctrl(false);
+
+	if (cpu_is_omap34xx())
+		omap_prcm_irq_complete();
 }
 
 static void omap_pm_finish(void)
