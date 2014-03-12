@@ -39,6 +39,7 @@
 #include "f_rndis.c"
 #include "rndis.c"
 #include "u_ether.c"
+#include "f_usbnet.c"
 
 MODULE_AUTHOR("Mike Lockwood");
 MODULE_DESCRIPTION("Android Composite USB Driver");
@@ -930,12 +931,94 @@ static struct android_usb_function audio_source_function = {
 	.attributes	= audio_source_function_attributes,
 };
 
+static int usbnet_function_init(struct android_usb_function *f,
+					struct usb_composite_dev *cdev)
+{
+	struct usbnet_device *dev;
+	struct usbnet_context *context;
+	struct net_device *net_dev;
+	int ret;
+
+	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+	if (!dev)
+		return -ENOMEM;
+
+	net_dev = alloc_netdev(sizeof(struct usbnet_context),
+		"usb%d", usb_ether_setup);
+	if (!net_dev) {
+		pr_err("%s: alloc_netdev error\n", __func__);
+		kfree(dev);
+		return -EINVAL;
+	}
+
+	ret = register_netdev(net_dev);
+	if (ret) {
+		pr_err("%s: register_netdev error\n", __func__);
+		free_netdev(net_dev);
+		kfree(dev);
+		return -EINVAL;
+	}
+
+	ret = device_create_file(&net_dev->dev, &dev_attr_description);
+	if (ret < 0) {
+		pr_err("%s: sys file creation  error\n", __func__);
+		unregister_netdev(net_dev);
+		free_netdev(net_dev);
+		kfree(dev);
+		return -EINVAL;
+	}
+
+	context = netdev_priv(net_dev);
+	INIT_WORK(&context->usbnet_config_wq, usbnet_if_config);
+
+	context->config = 0;
+	dev->net_ctxt = context;
+
+	f->config = dev;
+
+	return 0;
+}
+
+static void usbnet_function_cleanup(struct android_usb_function *f)
+{
+	struct usbnet_device *dev = f->config;
+
+	usbnet_cleanup(dev);
+	kfree(dev);
+}
+
+static int usbnet_function_ctrlrequest(struct android_usb_function *f,
+						struct usb_composite_dev *cdev,
+						const struct usb_ctrlrequest *c)
+{
+	struct usbnet_device *dev = f->config;
+
+	return usbnet_ctrlrequest(dev, cdev, c);
+}
+
+static int usbnet_function_bind_config(struct android_usb_function *f,
+		struct usb_configuration *c)
+{
+	struct usbnet_device *dev = f->config;
+
+	return usbnet_bind_config(dev, c);
+}
+
+static struct android_usb_function usbnet_function = {
+	.name		= "usbnet",
+	.init		= usbnet_function_init,
+	.cleanup	= usbnet_function_cleanup,
+	.bind_config	= usbnet_function_bind_config,
+	.ctrlrequest	= usbnet_function_ctrlrequest,
+};
+
 static struct android_usb_function *supported_functions[] = {
 	&ffs_function,
 	&acm_function,
 	&mtp_function,
 	&ptp_function,
 	&rndis_function,
+	&usbnet_function,
 	&mass_storage_function,
 	&accessory_function,
 	&audio_source_function,
