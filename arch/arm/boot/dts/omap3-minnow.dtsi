@@ -146,7 +146,7 @@
 	max17050@36 {
 		compatible = "maxim,max17050";
 		reg = <0x36>;
-		maxim,rsns-microohm = <100>;
+		maxim,rsns-microohm = <10000>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&cc_alert_pin>;	/* gpio 140 pin */
 		gpios = <&gpio5 12 0x1>;	/* gpio-140, GPIOF_DIR_IN */
@@ -155,6 +155,7 @@
 		interrupts = <12 0>;		/* gpio-140 IRQ */
 		maxim,regs-init-data = <
 			0x01 0xffab /* VALRT, VMAX = 5.1 V and VMIN = 3.42 V */
+			0x1d 0x2250 /* CONFIG, Tex = 0, TS = Ten = ETHRM = 1 */
 		>;
 		maxim,batt_undervoltage_zero_soc;
 	};
