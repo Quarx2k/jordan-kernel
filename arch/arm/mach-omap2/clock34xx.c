@@ -357,7 +357,7 @@ static struct omap_clk omap34xx_clks[] = {
  * SDRC_MPURATE_LOOPS: Number of MPU loops to execute at
  * 2^MPURATE_BASE_SHIFT MHz for SDRC to stabilize
  */
-#define SDRC_MPURATE_LOOPS		12
+#define SDRC_MPURATE_LOOPS		96//12
 
 /*
  * DPLL5_FREQ_FOR_USBHOST: USBHOST and USBTLL are the only clocks
@@ -1237,7 +1237,7 @@ void omap2_clk_init_cpufreq_table(struct cpufreq_frequency_table **table)
 		return;
 
 	prcm = mpu_opps + MAX_VDD1_OPP;
-	printk("%s: mpu_opps %d\n prcm->rate %d\n",__func__, mpu_opps->rate,  prcm->rate);
+	printk("%s: mpu_opps %ld\n prcm->rate %ld\n",__func__, mpu_opps->rate,  prcm->rate);
 	for (; prcm->rate; prcm--) {
 		freq_table[i].index = i;
 		freq_table[i].frequency = prcm->rate / 1000;
