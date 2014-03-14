@@ -40,9 +40,4 @@ config PANEL_MAPPHONE
         help
           LCD Panel used in Mapphone
 
-config PANEL_MAPPHONE_HDTV
-        tristate "Mapphone HDTV Panel"
-        help
-	  HDTV Panel used in Mapphone
-
 endmenu
