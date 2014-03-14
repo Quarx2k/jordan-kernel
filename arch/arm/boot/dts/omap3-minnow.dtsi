@@ -394,16 +394,17 @@
 
 	board_pins: pinmux_board_pins {
 		pinctrl-single,pins = <
+			0x05a 0x004	/* GPMC_A9, MODE4 | OUTPUT */
 			0x08e 0x104	/* GPMC_CLK, MODE4 | INPUT */
 			0x0a0 0x002	/* GPMC_WAIT2, MODE2 | OUTPUT */
 			0x0a2 0x102	/* GPMC_WAIT3, MODE2 | INPUT */
-			0x0ac 0x001	/* DSI_DX0, MODE1 | OUTPUT */
-			0x0ae 0x001	/* DSI_DY0, MODE1 | OUTPUT */
-			0x0b0 0x001	/* DSI_DX1, MODE1 | OUTPUT */
-			0x0b2 0x001	/* DSI_DY1, MODE1 | OUTPUT */
-			0x0b8 0x104	/*  DSS_DATA6, MODE4 | INPUT */
-			0x0c0 0x004	/*  DSS_DATA10, MODE4 | OUTPUT */
-			0x0c2 0x004	/*  DSS_DATA11, MODE4 | OUTPUT */
+			0x0ac 0x001	/* DSS_DATA0, MODE1 | OUTPUT */
+			0x0ae 0x001	/* DSS_DATA1, MODE1 | OUTPUT */
+			0x0b0 0x001	/* DSS_DATA2, MODE1 | OUTPUT */
+			0x0b2 0x001	/* DSS_DATA3, MODE1 | OUTPUT */
+			0x0b8 0x104	/* DSS_DATA6, MODE4 | INPUT */
+			0x0c0 0x004	/* DSS_DATA10, MODE4 | OUTPUT */
+			0x0c2 0x004	/* DSS_DATA11, MODE4 | OUTPUT */
 			0x0c6 0x004	/* DSS_DATA13, MODE4 | OUTPUT */
 			0x0dc 0x004	/* CAM_HS, MODE7 | OUTPUT */
 			0x0ea 0x004	/* MUXCAM_D2, MODE4 | OUTPUT */

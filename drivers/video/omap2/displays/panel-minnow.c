@@ -376,6 +376,7 @@ struct minnow_panel_data {
 	int reset_gpio[MINNOW_COMPONENT_MAX];
 	int ext_te_gpio;
 	int clk_en_gpio;
+	int vio_en_gpio;
 	struct minnow_panel_hw_reset hw_reset[MINNOW_COMPONENT_MAX];
 	struct regulator *regulators[MINNOW_COMPONENT_MAX];
 
@@ -1420,10 +1421,9 @@ static void _minnow_panel_hw_reset(struct omap_dss_device *dssdev)
 	msleep(ms_rel);
 }
 
-static int minnow_panel_set_regulators(struct omap_dss_device *dssdev,
+static int minnow_panel_set_regulators(struct minnow_panel_data *mpd,
 	int (*func)(struct regulator *regulator))
 {
-	struct minnow_panel_data *mpd = dev_get_drvdata(&dssdev->dev);
 	int i;
 
 	for (i = 0; i < MINNOW_COMPONENT_MAX; i++) {
@@ -1434,6 +1434,12 @@ static int minnow_panel_set_regulators(struct omap_dss_device *dssdev,
 	}
 
 	return 0;
+}
+
+static void minnow_panel_enable_vio(struct minnow_panel_data *mpd, bool enable)
+{
+	if (gpio_is_valid(mpd->vio_en_gpio))
+		gpio_set_value(mpd->vio_en_gpio, enable ? 0 : 1);
 }
 
 #define	DEBUG_DT
@@ -1518,6 +1524,8 @@ static int minnow_panel_dt_init(struct minnow_panel_data *mpd)
 	DTINFO("gpio_te = %d\n", mpd->ext_te_gpio);
 	mpd->clk_en_gpio = of_get_named_gpio(dt_node, "gpio_clk_en", 0);
 	DTINFO("gpio_clk_en = %d\n", mpd->clk_en_gpio);
+	mpd->vio_en_gpio = of_get_named_gpio(dt_node, "gpio_vio_en", 0);
+	DTINFO("gpio_vio_en = %d\n", mpd->vio_en_gpio);
 
 	mpd->esd_interval = 0;
 	if (!of_property_read_u32(dt_node, "esd_interval", &value)) {
@@ -1636,9 +1644,21 @@ static int minnow_panel_probe(struct omap_dss_device *dssdev)
 
 	if (gpio_is_valid(mpd->clk_en_gpio)) {
 		r = devm_gpio_request_one(&dssdev->dev, mpd->clk_en_gpio,
-				GPIOF_OUT_INIT_HIGH, "minnow-panel clk_en");
+					  GPIOF_OUT_INIT_HIGH,
+					  "minnow-panel clk_en");
 		if (r) {
-			dev_err(&dssdev->dev, "failed to request panel clk_en gpio\n");
+			dev_err(&dssdev->dev,
+				"failed to request panel clk_en gpio\n");
+			return r;
+		}
+	}
+	if (gpio_is_valid(mpd->vio_en_gpio)) {
+		r = devm_gpio_request_one(&dssdev->dev, mpd->vio_en_gpio,
+					  GPIOF_OUT_INIT_HIGH,
+					  "minnow-panel vio_en");
+		if (r) {
+			dev_err(&dssdev->dev,
+				"failed to request panel vio_en gpio\n");
 			return r;
 		}
 	}
@@ -1946,9 +1966,10 @@ static int minnow_panel_enable(struct omap_dss_device *dssdev)
 		goto err;
 	}
 
-	r = minnow_panel_set_regulators(dssdev, regulator_enable);
+	r = minnow_panel_set_regulators(mpd, regulator_enable);
 	if (r)
 		goto err;
+	minnow_panel_enable_vio(mpd, true);
 
 	dsi_bus_lock(dssdev);
 
@@ -1997,7 +2018,8 @@ static void minnow_panel_disable(struct omap_dss_device *dssdev)
 
 	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
 
-	minnow_panel_set_regulators(dssdev, regulator_disable);
+	minnow_panel_enable_vio(mpd, false);
+	minnow_panel_set_regulators(mpd, regulator_disable);
 
 
 	mutex_unlock(&mpd->lock);

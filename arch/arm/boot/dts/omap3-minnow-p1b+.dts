@@ -17,6 +17,7 @@
 
 	Display@0 {
 		/* place holder for P1B display support */
+		gpio_vio_en = <&gpio2 10 0>;    /* VDDIO gpio-42 */
 	};
 
 };
