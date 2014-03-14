@@ -1,0 +1,21 @@
+/*
+ * Copyright (C) 2013 Motorola Mobility LLC
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+/dts-v1/;
+
+/include/ "omap3-minnow.dtsi"
+
+/ {
+	mmi,revision = "p0";
+	mmi,hwrev = <
+		0x00   /* Minnow P0 wingboard */
+		0x01   /* Minnow P0 portable */
+		0x03   /* Minnow P1A portable */
+		0x02   /* Minnow P1A CLK distributor test portable */
+	>;
+
+};
