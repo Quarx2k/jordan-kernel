@@ -11,6 +11,20 @@
 	model = "Motorola OMAP3 Platform";
 	compatible = "mot,omap3-minnow", "ti,omap3";
 
+	cpus {
+		cpu@0 {
+			operating-points = <
+				/* kHz    uV */
+				300000   970000
+				600000  1140000
+				800000  1270000
+			>;
+			cpu0-supply = <&sw4_core_reg>;
+			/* OPP tolerance in percentage */
+			voltage-tolerance = <4>;
+		};
+	};
+
 	regulators {
 		compatible = "simple-bus";
 
@@ -233,9 +247,6 @@
 			0x2d 0x88 /* DISCHARGE1: Enable LDO4, LDO8 */
 		>;
 
-		dcdc1_avs;
-		dcdc4_avs;
-
 		tps_irq_gpio = <0>;
 
 		powerkey_up_irq = <10>;		/* TPS65912_IRQ_GPIO3_R the key down */
@@ -253,6 +264,7 @@
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <1287500>;
 				regulator-boot-on;
+				regulator-always-on;
 			};
 
 			sw2_reg: regulator@1 {
@@ -282,6 +294,7 @@
 				regulator-min-microvolt = <500000>;
 				regulator-max-microvolt = <1287500>;
 				regulator-boot-on;
+				regulator-always-on;
 			};
 
 			ldo1_reg: regulator@4 {
