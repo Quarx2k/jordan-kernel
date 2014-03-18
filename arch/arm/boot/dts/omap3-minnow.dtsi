@@ -117,7 +117,7 @@
 		compatible = "simple-bus";
 
 		pressure {
-			compatible = "mot,m4pressure";
+			compatible = "mot,m4sensorhub_pressure";
 		};
 		mpu9150 {
 			compatible = "mot,m4mpu9150";
