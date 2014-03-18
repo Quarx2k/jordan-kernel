@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2012 Motorola, Inc.
+ *  Copyright (C) 2012-2014 Motorola, Inc.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -23,270 +23,435 @@
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
-#include <linux/miscdevice.h>
 #include <linux/platform_device.h>
-#include <linux/proc_fs.h>
-#include <linux/input.h>
+#include <linux/fs.h>
 #include <linux/m4sensorhub.h>
-#include <linux/uaccess.h>
+#include <linux/input.h>
 #include <linux/slab.h>
 
-#define ALS_CLIENT_DRIVER_NAME	"m4sensorhub_als"
+#define m4als_err(format, args...)  KDEBUG(M4SH_ERROR, format, ## args)
 
-struct als_client {
-	struct m4sensorhub_data *m4sensorhub;
-	u16 als_signal;
+#define M4ALS_DRIVER_NAME           "m4sensorhub_als"
+
+#define M4ALS_IRQ_ENABLED_BIT       0
+
+struct m4als_driver_data {
+	struct platform_device      *pdev;
+	struct m4sensorhub_data     *m4;
+	struct mutex                mutex; /* controls driver entry points */
+	struct input_dev            *indev;
+
+	uint16_t        luminosity;
+	int16_t         samplerate;
+
+	uint16_t        status;
 };
 
-static struct als_client *misc_als_data;
 
-static int als_client_open(struct inode *inode, struct file *file)
+static void m4als_isr(enum m4sensorhub_irqs int_event, void *handle)
+{
+	int err = 0;
+	struct m4als_driver_data *dd = handle;
+	int size = 0;
+	uint16_t luminosity = 0;
+
+	mutex_lock(&(dd->mutex));
+
+	size = m4sensorhub_reg_getsize(dd->m4, M4SH_REG_LIGHTSENSOR_SIGNAL);
+	if (size < 0) {
+		m4als_err("%s: Reading from invalid register %d.\n",
+			  __func__, size);
+		err = size;
+		goto m4als_isr_fail;
+	}
+
+	err = m4sensorhub_reg_read(dd->m4, M4SH_REG_LIGHTSENSOR_SIGNAL,
+		(char *)&luminosity);
+	if (err < 0) {
+		m4als_err("%s: Failed to read luminosity data.\n", __func__);
+		goto m4als_isr_fail;
+	} else if (err != size) {
+		m4als_err("%s: Read %d bytes instead of %d.\n",
+			  __func__, err, size);
+		goto m4als_isr_fail;
+	}
+
+	dd->luminosity = luminosity;
+
+	input_event(dd->indev, EV_MSC, MSC_RAW, dd->luminosity);
+	input_sync(dd->indev);
+
+m4als_isr_fail:
+	if (err < 0)
+		m4als_err("%s: Failed with error code %d.\n", __func__, err);
+
+	mutex_unlock(&(dd->mutex));
+
+	return;
+}
+
+static int m4als_set_samplerate(struct m4als_driver_data *dd, int16_t rate)
+{
+	int err = 0;
+	int size = 0;
+
+	if (rate == dd->samplerate)
+		goto m4als_set_samplerate_fail;
+
+	size = m4sensorhub_reg_getsize(dd->m4, M4SH_REG_LIGHTSENSOR_SAMPLERATE);
+	if (size < 0) {
+		m4als_err("%s: Writing to invalid register %d.\n",
+			  __func__, size);
+		err = size;
+		goto m4als_set_samplerate_fail;
+	}
+
+	err = m4sensorhub_reg_write(dd->m4, M4SH_REG_LIGHTSENSOR_SAMPLERATE,
+		(char *)&rate, m4sh_no_mask);
+	if (err < 0) {
+		m4als_err("%s: Failed to set sample rate.\n", __func__);
+		goto m4als_set_samplerate_fail;
+	} else if (err != size) {
+		m4als_err("%s: Wrote %d bytes instead of %d.\n",
+			  __func__, err, size);
+		goto m4als_set_samplerate_fail;
+	}
+
+	dd->samplerate = rate;
+
+m4als_set_samplerate_fail:
+	return err;
+}
+
+static ssize_t m4als_enable_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct m4als_driver_data *dd = dev_get_drvdata(dev);
+
+	if (dd->status & (1 << M4ALS_IRQ_ENABLED_BIT))
+		return sprintf(buf, "Sensor is ENABLED.\n");
+	else
+		return sprintf(buf, "Sensor is DISABLED.\n");
+}
+static ssize_t m4als_enable_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	int err = 0;
+	struct m4als_driver_data *dd = dev_get_drvdata(dev);
+	int value = 0;
+
+	mutex_lock(&(dd->mutex));
+
+	err = kstrtoint(buf, 10, &value);
+	if (err < 0) {
+		m4als_err("%s: Failed to convert value.\n", __func__);
+		goto m4als_enable_store_exit;
+	}
+
+	switch (value) {
+	case 0:
+		if (dd->status & (1 << M4ALS_IRQ_ENABLED_BIT)) {
+			err = m4sensorhub_irq_disable(dd->m4,
+				M4SH_IRQ_LIGHTSENSOR_DATA_READY);
+			if (err < 0) {
+				m4als_err("%s: Failed to disable interrupt.\n",
+					  __func__);
+				goto m4als_enable_store_exit;
+			}
+			dd->status = dd->status & ~(1 << M4ALS_IRQ_ENABLED_BIT);
+		}
+		break;
+
+	case 1:
+		if (!(dd->status & (1 << M4ALS_IRQ_ENABLED_BIT))) {
+			err = m4sensorhub_irq_enable(dd->m4,
+				M4SH_IRQ_LIGHTSENSOR_DATA_READY);
+			if (err < 0) {
+				m4als_err("%s: Failed to enable interrupt.\n",
+					  __func__);
+				goto m4als_enable_store_exit;
+			}
+			dd->status = dd->status | (1 << M4ALS_IRQ_ENABLED_BIT);
+		}
+		break;
+
+	default:
+		m4als_err("%s: Invalid value %d passed.\n", __func__, value);
+		err = -EINVAL;
+		goto m4als_enable_store_exit;
+	}
+
+m4als_enable_store_exit:
+	if (err < 0)
+		m4als_err("%s: Failed with error code %d.\n", __func__, err);
+
+	mutex_unlock(&(dd->mutex));
+
+	return size;
+}
+static DEVICE_ATTR(als_enable, S_IRUSR | S_IWUSR,
+		m4als_enable_show, m4als_enable_store);
+
+static ssize_t m4als_setrate_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct m4als_driver_data *dd = dev_get_drvdata(dev);
+
+	return sprintf(buf, "Current rate: %hd\n", dd->samplerate);
+}
+static ssize_t m4als_setrate_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	int err = 0;
+	struct m4als_driver_data *dd = dev_get_drvdata(dev);
+	int value = 0;
+
+	mutex_lock(&(dd->mutex));
+
+	err = kstrtoint(buf, 10, &value);
+	if (err < 0) {
+		m4als_err("%s: Failed to convert value.\n", __func__);
+		goto m4als_enable_store_exit;
+	}
+
+	if ((value < -32768) || (value > 32767)) {
+		m4als_err("%s: Value of %d is outside range of int16_t.\n",
+			  __func__, value);
+		err = -EOVERFLOW;
+		goto m4als_enable_store_exit;
+	}
+
+	err = m4als_set_samplerate(dd, value);
+	if (err < 0) {
+		m4als_err("%s: Failed to set sample rate.\n", __func__);
+		goto m4als_enable_store_exit;
+	}
+
+m4als_enable_store_exit:
+	if (err < 0)
+		m4als_err("%s: Failed with error code %d.\n", __func__, err);
+
+	mutex_unlock(&(dd->mutex));
+
+	return size;
+}
+static DEVICE_ATTR(als_setrate, S_IRUSR | S_IWUSR,
+		m4als_setrate_show, m4als_setrate_store);
+
+static ssize_t m4als_luminosity_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct m4als_driver_data *dd = dev_get_drvdata(dev);
+
+	return sprintf(buf, "Current luminosity: %hd\n", dd->luminosity);
+}
+static DEVICE_ATTR(luminosity, S_IRUGO, m4als_luminosity_show, NULL);
+
+static int m4als_create_sysfs(struct m4als_driver_data *dd)
 {
 	int err = 0;
 
-	err = nonseekable_open(inode, file);
+	err = device_create_file(&(dd->pdev->dev), &dev_attr_als_enable);
 	if (err < 0) {
-		KDEBUG(M4SH_ERROR, "%s failed\n", __func__);
-		return err;
-	}
-	file->private_data = misc_als_data;
-
-	return 0;
-}
-
-static int als_client_close(struct inode *inode, struct file *file)
-{
-	KDEBUG(M4SH_DEBUG, "als_client in %s\n", __func__);
-	return 0;
-}
-
-
-static void m4_read_als_data(struct als_client *als_client_data)
-{
-	m4sensorhub_reg_read(
-			als_client_data->m4sensorhub,
-			M4SH_REG_LIGHTSENSOR_SIGNAL,
-			(char *)&als_client_data->als_signal
-			);
-}
-
-static void m4_handle_als_irq(enum m4sensorhub_irqs int_event,
-					void *als_data)
-{
-	struct als_client *als_client_data = als_data;
-	m4_read_als_data(als_client_data);
-}
-
-static const struct file_operations als_client_fops = {
-	.owner = THIS_MODULE,
-	.open  = als_client_open,
-	.release = als_client_close,
-};
-
-static struct miscdevice als_client_miscdrv = {
-	.minor = MISC_DYNAMIC_MINOR,
-	.name  = ALS_CLIENT_DRIVER_NAME,
-	.fops = &als_client_fops,
-};
-
-static ssize_t als_set_samplerate(struct device *dev,
-				struct device_attribute *attr,
-				const char *buf, size_t count)
-{
-	int samplerate, ret;
-	struct platform_device *pdev = to_platform_device(dev);
-	struct als_client *als_client_data = platform_get_drvdata(pdev);
-
-	sscanf(buf, "%d", &samplerate);
-	/* set sample rate */
-	ret = m4sensorhub_reg_write(
-				als_client_data->m4sensorhub,
-				M4SH_REG_LIGHTSENSOR_SAMPLERATE,
-				(char *)&samplerate, m4sh_no_mask
-				);
-	if (ret < 0)
-		KDEBUG(
-			M4SH_ERROR, "Failed to set als samplerate to %d\n",
-			samplerate
-			);
-	/* enable interrupt */
-	ret = m4sensorhub_irq_enable(
-				als_client_data->m4sensorhub,
-				M4SH_IRQ_LIGHTSENSOR_DATA_READY
-				);
-	if (ret < 0)
-		KDEBUG(M4SH_ERROR, "Error enabling als int(%d)\n", ret);
-
-	return count;
-}
-
-static ssize_t als_get_signal(struct device *dev,
-			struct device_attribute *attr, char *buf)
-{
-	struct platform_device *pdev = to_platform_device(dev);
-	struct als_client *als_client_data = platform_get_drvdata(pdev);
-
-	return sprintf(buf, "%ud\n", als_client_data->als_signal);
-}
-
-static DEVICE_ATTR(samplerate, 0222, NULL, als_set_samplerate);
-static DEVICE_ATTR(signal, 0444, als_get_signal, NULL);
-
-static struct attribute *als_attributes[] = {
-	&dev_attr_samplerate.attr,
-	&dev_attr_signal.attr,
-	NULL
-};
-
-static const struct attribute_group als_attribute_group = {
-	.attrs = als_attributes,
-};
-
-static int als_driver_init(struct init_calldata *p_arg)
-{
-	int ret;
-	struct m4sensorhub_data *m4sensorhub = p_arg->p_m4sensorhub_data;
-
-	ret = m4sensorhub_irq_register(m4sensorhub,
-					M4SH_IRQ_LIGHTSENSOR_DATA_READY,
-					m4_handle_als_irq,
-					misc_als_data);
-	if (ret < 0) {
-		KDEBUG(
-			M4SH_ERROR,
-			"Error registering int %d (%d)\n",
-			M4SH_IRQ_PASSIVE_BUFFER_FULL, ret
-			);
+		m4als_err("%s: Failed to create als_enable %s %d.\n",
+			  __func__, "with error", err);
+		goto m4als_create_sysfs_als_enable_fail;
 	}
 
-	return ret;
-}
-
-static int als_client_probe(struct platform_device *pdev)
-{
-	int ret = -1;
-	struct als_client *als_client_data;
-	struct m4sensorhub_data *m4sensorhub = m4sensorhub_client_get_drvdata();
-
-	if (!m4sensorhub)
-		return -EFAULT;
-
-	als_client_data = kzalloc(sizeof(*als_client_data),
-						GFP_KERNEL);
-	if (!als_client_data)
-		return -ENOMEM;
-
-	als_client_data->m4sensorhub = m4sensorhub;
-	platform_set_drvdata(pdev, als_client_data);
-
-	ret = misc_register(&als_client_miscdrv);
-	if (ret < 0) {
-		KDEBUG(M4SH_ERROR, "Error registering %s driver\n", __func__);
-		goto free_mem;
+	err = device_create_file(&(dd->pdev->dev), &dev_attr_als_setrate);
+	if (err < 0) {
+		m4als_err("%s: Failed to create als_setrate %s %d.\n",
+			  __func__, "with error", err);
+		goto m4als_create_sysfs_als_setrate_fail;
 	}
-	misc_als_data = als_client_data;
-	ret = m4sensorhub_register_initcall(als_driver_init,
-							als_client_data);
-	if (ret < 0) {
-		KDEBUG(M4SH_ERROR, "Unable to register init function"
-			"for als client = %d\n", ret);
-		goto unregister_misc_device;
+
+	err = device_create_file(&(dd->pdev->dev), &dev_attr_luminosity);
+	if (err < 0) {
+		m4als_err("%s: Failed to create luminosity %s %d.\n",
+			  __func__, "with error", err);
+		goto m4als_create_sysfs_luminosity_fail;
 	}
-	ret = sysfs_create_group(&pdev->dev.kobj, &als_attribute_group);
-	if (ret)
-		goto unregister_initcall;
 
+	goto m4als_create_sysfs_als_enable_fail;
 
-	KDEBUG(M4SH_INFO, "Initialized %s driver\n", __func__);
-	return 0;
-unregister_initcall:
-	m4sensorhub_unregister_initcall(als_driver_init);
-unregister_misc_device:
-	misc_als_data = NULL;
-	misc_deregister(&als_client_miscdrv);
-free_mem:
-	platform_set_drvdata(pdev, NULL);
-	als_client_data->m4sensorhub = NULL;
-	kfree(als_client_data);
-	als_client_data = NULL;
-	return ret;
+m4als_create_sysfs_luminosity_fail:
+	device_remove_file(&(dd->pdev->dev), &dev_attr_als_setrate);
+m4als_create_sysfs_als_setrate_fail:
+	device_remove_file(&(dd->pdev->dev), &dev_attr_als_enable);
+m4als_create_sysfs_als_enable_fail:
+	return err;
 }
 
-static int __exit als_client_remove(struct platform_device *pdev)
+static int m4als_remove_sysfs(struct m4als_driver_data *dd)
 {
-	struct als_client *als_client_data =
-						platform_get_drvdata(pdev);
+	int err = 0;
 
-	m4sensorhub_irq_disable(als_client_data->m4sensorhub,
-				M4SH_IRQ_LIGHTSENSOR_DATA_READY);
-	m4sensorhub_irq_unregister(
-				als_client_data->m4sensorhub,
-				M4SH_IRQ_LIGHTSENSOR_DATA_READY
-				);
-	m4sensorhub_unregister_initcall(als_driver_init);
+	device_remove_file(&(dd->pdev->dev), &dev_attr_als_enable);
+	device_remove_file(&(dd->pdev->dev), &dev_attr_als_setrate);
+	device_remove_file(&(dd->pdev->dev), &dev_attr_luminosity);
 
-	misc_als_data = NULL;
-	misc_deregister(&als_client_miscdrv);
-	platform_set_drvdata(pdev, NULL);
-	als_client_data->m4sensorhub = NULL;
-	kfree(als_client_data);
-	als_client_data = NULL;
+	return err;
+}
+
+static int m4als_create_m4eventdev(struct m4als_driver_data *dd)
+{
+	int err = 0;
+
+	dd->indev = input_allocate_device();
+	if (dd->indev == NULL) {
+		m4als_err("%s: Failed to allocate input device.\n",
+			  __func__);
+		err = -ENODATA;
+		goto m4als_create_m4eventdev_fail;
+	}
+
+	dd->indev->name = M4ALS_DRIVER_NAME;
+	input_set_drvdata(dd->indev, dd);
+	input_set_capability(dd->indev, EV_MSC, MSC_RAW);
+
+	err = input_register_device(dd->indev);
+	if (err < 0) {
+		m4als_err("%s: Failed to register input device.\n",
+			  __func__);
+		input_free_device(dd->indev);
+		dd->indev = NULL;
+		goto m4als_create_m4eventdev_fail;
+	}
+
+m4als_create_m4eventdev_fail:
+	return err;
+}
+
+static int m4als_driver_init(struct init_calldata *p_arg)
+{
+	struct m4als_driver_data *dd = p_arg->p_data;
+	int err = 0;
+
+	mutex_lock(&(dd->mutex));
+
+	err = m4als_create_m4eventdev(dd);
+	if (err < 0) {
+		m4als_err("%s: Failed to create M4 event device.\n", __func__);
+		goto m4als_driver_init_fail;
+	}
+
+	err = m4als_create_sysfs(dd);
+	if (err < 0) {
+		m4als_err("%s: Failed to create sysfs.\n", __func__);
+		goto m4als_driver_init_sysfs_fail;
+	}
+
+	err = m4sensorhub_irq_register(dd->m4, M4SH_IRQ_LIGHTSENSOR_DATA_READY,
+		m4als_isr, dd);
+	if (err < 0) {
+		m4als_err("%s: Failed to register M4 IRQ.\n", __func__);
+		goto m4als_driver_init_irq_fail;
+	}
+
+	goto m4als_driver_init_exit;
+
+m4als_driver_init_irq_fail:
+	m4als_remove_sysfs(dd);
+m4als_driver_init_sysfs_fail:
+	input_unregister_device(dd->indev);
+m4als_driver_init_fail:
+	m4als_err("%s: Init failed with error code %d.\n", __func__, err);
+m4als_driver_init_exit:
+	mutex_unlock(&(dd->mutex));
+	return err;
+}
+
+static int m4als_probe(struct platform_device *pdev)
+{
+	struct m4als_driver_data *dd = NULL;
+	int err = 0;
+
+	dd = kzalloc(sizeof(*dd), GFP_KERNEL);
+	if (dd == NULL) {
+		m4als_err("%s: Failed to allocate driver data.\n", __func__);
+		err = -ENOMEM;
+		goto m4als_probe_fail_nodd;
+	}
+
+	dd->pdev = pdev;
+	mutex_init(&(dd->mutex));
+	platform_set_drvdata(pdev, dd);
+
+	dd->m4 = m4sensorhub_client_get_drvdata();
+	if (dd->m4 == NULL) {
+		m4als_err("%s: M4 sensor data is NULL.\n", __func__);
+		err = -ENODATA;
+		goto m4als_probe_fail;
+	}
+
+	err = m4sensorhub_register_initcall(m4als_driver_init, dd);
+	if (err < 0) {
+		m4als_err("%s: Failed to register initcall.\n", __func__);
+		goto m4als_probe_fail;
+	}
+
+	return 0;
+
+m4als_probe_fail:
+	mutex_destroy(&(dd->mutex));
+	kfree(dd);
+m4als_probe_fail_nodd:
+	m4als_err("%s: Probe failed with error code %d.\n", __func__, err);
+	return err;
+}
+
+static int __exit m4als_remove(struct platform_device *pdev)
+{
+	struct m4als_driver_data *dd = platform_get_drvdata(pdev);
+
+	mutex_lock(&(dd->mutex));
+	m4als_remove_sysfs(dd);
+	if (dd->status & (1 << M4ALS_IRQ_ENABLED_BIT)) {
+		m4sensorhub_irq_disable(dd->m4, M4SH_IRQ_PRESSURE_DATA_READY);
+		dd->status = dd->status & ~(1 << M4ALS_IRQ_ENABLED_BIT);
+	}
+	m4sensorhub_irq_unregister(dd->m4, M4SH_IRQ_PRESSURE_DATA_READY);
+	m4sensorhub_unregister_initcall(m4als_driver_init);
+	if (dd->indev != NULL)
+		input_unregister_device(dd->indev);
+	mutex_destroy(&(dd->mutex));
+	kfree(dd);
+
 	return 0;
 }
-
-static void als_client_shutdown(struct platform_device *pdev)
-{
-	return;
-}
-#ifdef CONFIG_PM
-static int als_client_suspend(struct platform_device *pdev,
-				pm_message_t message)
-{
-	return 0;
-}
-
-static int als_client_resume(struct platform_device *pdev)
-{
-	return 0;
-}
-#else
-#define als_client_suspend NULL
-#define als_client_resume  NULL
-#endif
 
 static struct of_device_id m4als_match_tbl[] = {
 	{ .compatible = "mot,m4als" },
 	{},
 };
 
-static struct platform_driver als_client_driver = {
-	.probe		= als_client_probe,
-	.remove		= __exit_p(als_client_remove),
-	.shutdown	= als_client_shutdown,
-	.suspend	= als_client_suspend,
-	.resume		= als_client_resume,
+static struct platform_driver m4als_driver = {
+	.probe		= m4als_probe,
+	.remove		= __exit_p(m4als_remove),
+	.shutdown	= NULL,
+	.suspend	= NULL,
+	.resume		= NULL,
 	.driver		= {
-		.name	= ALS_CLIENT_DRIVER_NAME,
+		.name	= M4ALS_DRIVER_NAME,
 		.owner	= THIS_MODULE,
 		.of_match_table = of_match_ptr(m4als_match_tbl),
 	},
 };
 
-static int __init als_client_init(void)
+static int __init m4als_init(void)
 {
-	return platform_driver_register(&als_client_driver);
+	return platform_driver_register(&m4als_driver);
 }
 
-static void __exit als_client_exit(void)
+static void __exit m4als_exit(void)
 {
-	platform_driver_unregister(&als_client_driver);
+	platform_driver_unregister(&m4als_driver);
 }
 
-module_init(als_client_init);
-module_exit(als_client_exit);
+module_init(m4als_init);
+module_exit(m4als_exit);
 
-MODULE_ALIAS("platform:als_client");
-MODULE_DESCRIPTION("M4 Sensor Hub Passive mode client driver");
+MODULE_ALIAS("platform:m4als");
+MODULE_DESCRIPTION("M4 Sensor Hub Ambient Light client driver");
 MODULE_AUTHOR("Motorola");
 MODULE_LICENSE("GPL");
-
