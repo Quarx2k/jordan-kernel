@@ -234,9 +234,17 @@ int m4sensorhub_reg_write_1byte(struct m4sensorhub_data *m4sensorhub,
 				enum m4sensorhub_reg reg, unsigned char value,
 				unsigned char mask)
 {
-	if (register_info_tbl[reg].size == 1)
-		return m4sensorhub_reg_write(m4sensorhub, reg, &value, &mask);
-
+	if (register_info_tbl[reg].size == 1) {
+		if (mask == 0xFF) {
+			return m4sensorhub_reg_write(
+					m4sensorhub, reg, &value, NULL
+					);
+		} else {
+			return m4sensorhub_reg_write(
+				m4sensorhub, reg, &value, &mask
+				);
+		}
+	}
 	return -EINVAL;
 }
 EXPORT_SYMBOL_GPL(m4sensorhub_reg_write_1byte);
