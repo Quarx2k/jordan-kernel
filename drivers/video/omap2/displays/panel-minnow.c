@@ -252,6 +252,7 @@ SWITCH_TO_BRIDGE,
 1, WAIT_MS, 50,
 1, DCS_WRITE, MIPI_DCS_ENTER_SLEEP_MODE,
 1, WAIT_MS, 20,
+6, GENERIC_WRITE, 0x10, 0x28, 0x00, 0x00, 0x00, 0x01, /*power cut enabled*/
 0
 };
 
@@ -358,6 +359,8 @@ static void minnow_panel_te_timeout_work_callback(struct work_struct *work);
 static int _minnow_panel_enable_te(struct omap_dss_device *dssdev, bool enable);
 
 static int minnow_panel_reset(struct omap_dss_device *dssdev);
+static int minnow_panel_update(struct omap_dss_device *dssdev,
+			       u16 x, u16 y, u16 w, u16 h);
 
 
 struct minnow_panel_data {
@@ -386,10 +389,13 @@ struct minnow_panel_data {
 	struct omap_dss_dsi_config dsi_config;
 	struct minnow_panel_cmd_buf power_on;
 	struct minnow_panel_cmd_buf power_off;
+	u8 *last_init_data;
 
 	int id_panel;
 	int x_offset;
 	int y_offset;
+	int reset_ms;
+	int release_ms;
 
 	/* runtime variables */
 	bool enabled;
@@ -857,25 +863,38 @@ static int minnow_panel_verify_cmdbuf(struct minnow_panel_data *mpd,
 	return r;
 }
 
-static int minnow_panel_process_cmdbuf(struct minnow_panel_data *mpd,
-				       struct minnow_panel_cmd_buf *cmd_buf)
+static int minnow_panel_check_cmdbuf(struct minnow_panel_data *mpd,
+				     u8 *data, int count)
 {
-	u8 *data;
 	int i, r = 0;
 
-	for (i = cmd_buf->count, data = cmd_buf->cmdbuf; *data && (i > 0); ) {
+	for (i = count; *data && (i > 0); ) {
 		if (data[1] >= CMD_TYPE_MAX)
 			break;
 		i -= ((u32)*data + 2);
 		data += (*data + 2);
 	}
 
-	/* Init command data shall end with 0 */
+	/* command data shall end with 0 */
 	if (*data || (i != 1)) {
 		dev_err(&mpd->dssdev->dev, "Invalid command data(0x%02x) "
-			"found at offset %d", *data, cmd_buf->count - i);
-		return -EINVAL;
+			"found at offset %d", *data, count - i);
+		r = -EINVAL;
 	}
+
+	return r;
+}
+
+static int minnow_panel_process_cmdbuf(struct minnow_panel_data *mpd,
+				       struct minnow_panel_cmd_buf *cmd_buf)
+{
+	u8 *data;
+	int i, r;
+
+	/* be safe to check command data every time before sent to driver */
+	r = minnow_panel_check_cmdbuf(mpd, cmd_buf->cmdbuf, cmd_buf->count);
+	if (r)
+		return r;
 
 	for (i = 0, data = cmd_buf->cmdbuf; *data; i++, data += *data+2) {
 		if (data[1] == CHECK_MS)
@@ -1354,6 +1373,63 @@ static ssize_t minnow_panel_show_ulps_timeout(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%u\n", t);
 }
 
+static ssize_t minnow_panel_store_init_data(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+	struct omap_dss_device *dssdev = to_dss_device(dev);
+	struct minnow_panel_data *mpd = dev_get_drvdata(&dssdev->dev);
+	u8 *data;
+	int r;
+
+	r = minnow_panel_check_cmdbuf(mpd, (u8 *)buf, count);
+	if (r)
+		return r;
+
+	data = devm_kzalloc(&dssdev->dev, count, GFP_KERNEL);
+	if (!data)
+		return -ENOMEM;
+	memcpy(data, buf, count);
+
+	mutex_lock(&mpd->lock);
+	mpd->power_on.count = count;
+	mpd->power_on.cmdbuf = data;
+	if (mpd->last_init_data)
+		devm_kfree(&dssdev->dev, mpd->last_init_data);
+	mpd->last_init_data = data;
+	mutex_unlock(&mpd->lock);
+
+	return count;
+}
+
+static ssize_t minnow_panel_show_init_data(struct device *dev,
+		struct device_attribute *attr,
+		char *buf)
+{
+	struct omap_dss_device *dssdev = to_dss_device(dev);
+	struct minnow_panel_data *mpd = dev_get_drvdata(&dssdev->dev);
+	int i, j;
+	u8 *data;
+
+	mutex_lock(&mpd->lock);
+	data = mpd->power_on.cmdbuf;
+	mutex_unlock(&mpd->lock);
+
+	for (i = 0; i < PAGE_SIZE && *data; ) {
+		snprintf(buf+i, PAGE_SIZE-i, "%02d %02d:", data[0], data[1]);
+		i += 6;
+		for (j = 0; j < *data && i < PAGE_SIZE; j++) {
+			snprintf(buf+i, PAGE_SIZE-i, " %02X", data[2+j]);
+			i += 3;
+		}
+		snprintf(buf+i, PAGE_SIZE-i, "\n");
+		i++;
+		data += *data + 2;
+	}
+
+	return i < PAGE_SIZE ? i : PAGE_SIZE;
+}
+
 static DEVICE_ATTR(num_dsi_errors, S_IRUGO, minnow_panel_num_errors_show, NULL);
 static DEVICE_ATTR(hw_revision, S_IRUGO, minnow_panel_hw_revision_show, NULL);
 static DEVICE_ATTR(cabc_mode, S_IRUGO | S_IWUSR,
@@ -1366,6 +1442,8 @@ static DEVICE_ATTR(ulps, S_IRUGO | S_IWUSR,
 		minnow_panel_show_ulps, minnow_panel_store_ulps);
 static DEVICE_ATTR(ulps_timeout, S_IRUGO | S_IWUSR,
 		minnow_panel_show_ulps_timeout, minnow_panel_store_ulps_timeout);
+static DEVICE_ATTR(init_data, S_IRUGO | S_IWUSR,
+		minnow_panel_show_init_data, minnow_panel_store_init_data);
 
 static struct attribute *minnow_panel_attrs[] = {
 	&dev_attr_num_dsi_errors.attr,
@@ -1375,6 +1453,7 @@ static struct attribute *minnow_panel_attrs[] = {
 	&dev_attr_esd_interval.attr,
 	&dev_attr_ulps.attr,
 	&dev_attr_ulps_timeout.attr,
+	&dev_attr_init_data.attr,
 	NULL,
 };
 
@@ -1382,24 +1461,11 @@ static struct attribute_group minnow_panel_attr_group = {
 	.attrs = minnow_panel_attrs,
 };
 
-static void _minnow_panel_hw_reset(struct omap_dss_device *dssdev)
+static void _minnow_panel_hw_active_reset(struct minnow_panel_data *mpd)
 {
-	struct minnow_panel_data *mpd = dev_get_drvdata(&dssdev->dev);
-	int i, ms_rst = -1, ms_rel = -1;
-
-	for (i = 0; i < MINNOW_COMPONENT_MAX; i++) {
-		if (!gpio_is_valid(mpd->reset_gpio[i]))
-			continue;
-		gpio_set_value(mpd->reset_gpio[i],
-			       mpd->hw_reset[i].active ? 0 : 1);
-		if (ms_rst < mpd->hw_reset[i].reset_ms)
-			ms_rst = mpd->hw_reset[i].reset_ms;
-		if (ms_rel < mpd->hw_reset[i].wait_ms)
-			ms_rel = mpd->hw_reset[i].wait_ms;
-	}
-	if (ms_rst == -1)
+	int i;
+	if (mpd->reset_ms < 0)
 		return;
-	msleep(5);
 
 	/* reset the device */
 	for (i = 0; i < MINNOW_COMPONENT_MAX; i++) {
@@ -1408,8 +1474,18 @@ static void _minnow_panel_hw_reset(struct omap_dss_device *dssdev)
 		gpio_set_value(mpd->reset_gpio[i],
 			       mpd->hw_reset[i].active ? 1 : 0);
 	}
+
 	/* wait device reset */
-	msleep(ms_rst);
+	msleep(mpd->reset_ms);
+}
+
+static void _minnow_panel_hw_reset(struct omap_dss_device *dssdev)
+{
+	struct minnow_panel_data *mpd = dev_get_drvdata(&dssdev->dev);
+	int i;
+
+	_minnow_panel_hw_active_reset(mpd);
+
 	/* assert reset */
 	for (i = 0; i < MINNOW_COMPONENT_MAX; i++) {
 		if (!gpio_is_valid(mpd->reset_gpio[i]))
@@ -1417,8 +1493,10 @@ static void _minnow_panel_hw_reset(struct omap_dss_device *dssdev)
 		gpio_set_value(mpd->reset_gpio[i],
 			       mpd->hw_reset[i].active ? 0 : 1);
 	}
+
 	/* wait after releasing reset */
-	msleep(ms_rel);
+	if (mpd->release_ms > 0)
+		msleep(mpd->release_ms);
 }
 
 static int minnow_panel_set_regulators(struct minnow_panel_data *mpd,
@@ -1663,6 +1741,8 @@ static int minnow_panel_probe(struct omap_dss_device *dssdev)
 		}
 	}
 
+	mpd->reset_ms = -1;
+	mpd->release_ms = -1;
 	for (i = 0; i < MINNOW_COMPONENT_MAX; i++) {
 		static const char * const name[MINNOW_COMPONENT_MAX] = {
 			"minnow-panel reset",
@@ -1671,13 +1751,17 @@ static int minnow_panel_probe(struct omap_dss_device *dssdev)
 		if (!gpio_is_valid(mpd->reset_gpio[i]))
 			continue;
 		r = devm_gpio_request_one(&dssdev->dev, mpd->reset_gpio[i],
-			mpd->hw_reset[i].active ? GPIOF_OUT_INIT_LOW
-			: GPIOF_OUT_INIT_HIGH, name[i]);
+			mpd->hw_reset[i].active ? GPIOF_OUT_INIT_HIGH
+			: GPIOF_OUT_INIT_LOW, name[i]);
 		if (r) {
 			dev_err(&dssdev->dev,
 				"failed to request %s gpio\n", name[i]);
 			return r;
 		}
+		if (mpd->reset_ms < mpd->hw_reset[i].reset_ms)
+			mpd->reset_ms = mpd->hw_reset[i].reset_ms;
+		if (mpd->release_ms < mpd->hw_reset[i].wait_ms)
+			mpd->release_ms = mpd->hw_reset[i].wait_ms;
 	}
 
 	if (gpio_is_valid(mpd->ext_te_gpio)) {
@@ -1891,6 +1975,8 @@ init_start:
 	if (r)
 		goto err;
 
+	/* it needed enable TE to force update after display enabled */
+	mpd->te_enabled = true;
 	r = _minnow_panel_enable_te(dssdev, mpd->te_enabled);
 	if (r)
 		goto err;
@@ -1932,11 +2018,9 @@ static void minnow_panel_power_off(struct omap_dss_device *dssdev)
 	dsi_disable_video_output(dssdev, mpd->channel);
 
 	r = minnow_panel_process_cmdbuf(mpd, &mpd->power_off);
-	if (r) {
+	if (r)
 		dev_err(&dssdev->dev,
-				"error disabling panel, issuing HW reset\n");
-		_minnow_panel_hw_reset(dssdev);
-	}
+			"error disabling panel, return %d\n", r);
 
 	omapdss_dsi_display_disable(dssdev, true, false);
 
@@ -1957,7 +2041,8 @@ static int minnow_panel_enable(struct omap_dss_device *dssdev)
 	struct minnow_panel_data *mpd = dev_get_drvdata(&dssdev->dev);
 	int r;
 
-	dev_dbg(&dssdev->dev, "enable\n");
+	dev_info(&dssdev->dev, "%s: current state = %d\n",
+		 __func__, dssdev->state);
 
 	mutex_lock(&mpd->lock);
 
@@ -1986,9 +2071,14 @@ static int minnow_panel_enable(struct omap_dss_device *dssdev)
 
 	mutex_unlock(&mpd->lock);
 
+	r = minnow_panel_update(dssdev, 0, 0,
+				dssdev->panel.timings.x_res,
+				dssdev->panel.timings.y_res);
+	dev_info(&dssdev->dev, "Display enabled, manual update ret = %d\n", r);
+
 	return 0;
 err:
-	dev_dbg(&dssdev->dev, "enable failed\n");
+	dev_err(&dssdev->dev, "Display enable failed, err = %d\n", r);
 	mutex_unlock(&mpd->lock);
 	return r;
 }
@@ -1997,7 +2087,8 @@ static void minnow_panel_disable(struct omap_dss_device *dssdev)
 {
 	struct minnow_panel_data *mpd = dev_get_drvdata(&dssdev->dev);
 
-	dev_dbg(&dssdev->dev, "disable\n");
+	dev_info(&dssdev->dev, "%s: current state = %d\n",
+		 __func__, dssdev->state);
 
 	mutex_lock(&mpd->lock);
 
@@ -2018,9 +2109,9 @@ static void minnow_panel_disable(struct omap_dss_device *dssdev)
 
 	dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
 
+	_minnow_panel_hw_active_reset(mpd);
 	minnow_panel_enable_vio(mpd, false);
 	minnow_panel_set_regulators(mpd, regulator_disable);
-
 
 	mutex_unlock(&mpd->lock);
 }
