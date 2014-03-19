@@ -1199,6 +1199,7 @@ static void acc_disconnect(void)
 static void acc_cleanup(void)
 {
 	misc_deregister(&acc_device);
+	cancel_work_sync(&_acc_dev->hid_work);
 	kfree(_acc_dev);
 	_acc_dev = NULL;
 }
