@@ -79,7 +79,7 @@ void __init omap_ion_init(void)
 
 	for (i = 0; i < omap_ion_data.nr; i++)
 		if (omap_ion_data.heaps[i].type == ION_HEAP_TYPE_CARVEOUT ||
-		    omap_ion_data.heaps[i].type == OMAP_ION_HEAP_TYPE_TILER) {
+		    omap_ion_data.heaps[i].type == (enum ion_heap_type)OMAP_ION_HEAP_TYPE_TILER) {
 			ret = memblock_remove(omap_ion_data.heaps[i].base,
 					      omap_ion_data.heaps[i].size);
 			if (ret)
