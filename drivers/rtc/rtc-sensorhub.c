@@ -21,6 +21,8 @@
 #define SECONDS_IN_DAY (24*60*60)
 #define DRIVER_NAME "rtc-sensorhub"
 
+#define ANDROID_EPOCH	1227312001
+
 struct rtc_sensorhub_private_data {
 	struct rtc_device *p_rtc;
 	struct m4sensorhub_data *p_m4sensorhub_data;
@@ -152,6 +154,8 @@ static int rtc_sensorhub_get_rtc_from_m4(struct rtc_time *p_tm,
 		return -EIO;
 	}
 
+	if (seconds < ANDROID_EPOCH)
+		seconds = ANDROID_EPOCH;
 	rtc_time_to_tm(seconds, p_tm);
 	return 0;
 }
@@ -167,8 +171,8 @@ static int rtc_sensorhub_rtc_read_time(struct device *p_dev,
 	if (!(p_priv_data->p_m4sensorhub_data)) {
 		dev_err(p_dev, "read time, but RTC hardware not ready\n");
 		/* M4 driver is not yet ready, just give the time since boot
-		and treat boot as start of epoch */
-		rtc_time_to_tm(get_seconds(), p_tm);
+		and treat boot as start of ANDROID_EPOCH */
+		rtc_time_to_tm(ANDROID_EPOCH + get_seconds(), p_tm);
 		return 0;
 	}
 
