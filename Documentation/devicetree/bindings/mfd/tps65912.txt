@@ -1,0 +1,186 @@
+TPS65910 Power Management Integrated Circuit
+
+Required properties:
+- compatible: "ti,tps65912"
+- reg: I2C slave address or SPI CS
+- tps_irq_gpio: GPIO number of interrupt pin
+- regulators: This is the list of child nodes that specify the regulator
+  initialization data for defined regulators. Not all regulators for the given
+  device need to be present. The definition for each of these nodes is defined
+  using the standard binding for regulators found at
+  Documentation/devicetree/bindings/regulator/regulator.txt.
+  The regulator is matched with the regulator-compatible.
+
+  The valid regulator-compatible values are:
+    DCDC1, DCDC2, DCSC3, DCDC4,
+    LDO1, LDO2, LDO3, LDO4, LDO5, LDO6, LDO7, LDO8, LDO9, LDO10
+
+- xxx-supply: Input voltage supply regulator.
+  These entries are require if regulators are enabled for a device. Missing of these
+  properties can cause the regulator registration fails.
+  If some of input supply is powered through battery or always-on supply then
+  also it is require to have these parameters with proper node handle of always
+  on power supply.
+    LDO1:  DCDC2 input
+    LDO2:  DCDC2 input
+    LDO4:  DCDC2 input
+    LDO6:  DCDC2 input
+    LDO7:  DCDC2 input
+    LDO9:  DCDC3 input
+    LDO10: DCDC2 input
+
+Optional properties:
+
+  - dcdc1_avs, dcdc2_avs, dcdc3_avs, dcdc4_avs: set switcher to AVS mode
+  - powerkey_up_irq, powerkey_up_irq: Interrupt bit generates a key up/down event
+  - powerkey_code: keycode to be sent for key event
+
+Example:
+
+	tps65912 {
+
+		compatible = "ti,tps65912";
+		reg = <0>; /* CS 0 */
+		spi-max-frequency = <1000000>;
+		spi-cs-high;
+
+		register-init-data = <
+			0x2d 0x88 /* DISCHARGE1: Enable LDO4, LDO8 */
+		>;
+
+		dcdc1_avs;
+		dcdc4_avs;
+
+		tps_irq_gpio = <0>;
+
+		powerkey_up_irq = <10>;		/* TPS65912_IRQ_GPIO3_R the key down */
+		powerkey_down_irq = <11>;	/* TPS65912_IRQ_GPIO3_F the key up */
+		powerkey_code = <116>;		/* power key code for android*/
+
+		regulators {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			sw1_iva_reg: regulator@0 {
+				reg = <0>;
+				regulator-compatible = "DCDC1";
+				regulator-name = "DCDC1";
+				regulator-min-microvolt = <500000>;
+				regulator-max-microvolt = <1287500>;
+				regulator-boot-on;
+			};
+
+			sw2_reg: regulator@1 {
+				reg = <1>;
+				regulator-compatible = "DCDC2";
+				regulator-name = "DCDC2";
+				regulator-min-microvolt = <3000000>;
+				regulator-max-microvolt = <3000000>;
+				regulator-boot-on;
+				regulator-always-on;
+			};
+
+			sw3_reg: regulator@2 {
+				reg = <2>;
+				regulator-compatible = "DCDC3";
+				regulator-name = "DCDC3";
+				regulator-min-microvolt = <1875000>;
+				regulator-max-microvolt = <1875000>;
+				regulator-boot-on;
+				regulator-always-on;
+			};
+
+			sw4_core_reg: regulator@3 {
+				reg = <3>;
+				regulator-compatible = "DCDC4";
+				regulator-name = "DCDC4";
+				regulator-min-microvolt = <500000>;
+				regulator-max-microvolt = <1287500>;
+				regulator-boot-on;
+			};
+
+			ldo1_reg: regulator@4 {
+				reg = <4>;
+				regulator-compatible = "LDO1";
+				regulator-name = "LDO1";
+				regulator-min-microvolt = <1200000>;
+				regulator-max-microvolt = <1200000>;
+			};
+
+			ldo2_reg: regulator@5 {
+				reg = <5>;
+				regulator-compatible = "LDO2";
+				regulator-name = "LDO2";
+				regulator-min-microvolt = <1700000>;
+				regulator-max-microvolt = <1700000>;
+			};
+
+			ldo3_reg: regulator@6 {
+				reg = <6>;
+				regulator-compatible = "LDO3";
+				regulator-name = "LDO3";
+				regulator-min-microvolt = <2950000>;
+				regulator-max-microvolt = <2950000>;
+			};
+
+			ldo4_reg: regulator@7 {
+				reg = <7>;
+				regulator-compatible = "LDO4";
+				regulator-name = "LDO4";
+				regulator-min-microvolt = <1800000>;
+				regulator-max-microvolt = <1800000>;
+				regulator-always-on;
+			};
+
+			ldo5_reg: regulator@8 {
+				reg = <8>;
+				regulator-compatible = "LDO5";
+				regulator-name = "LDO5";
+				regulator-min-microvolt = <2800000>;
+				regulator-max-microvolt = <2800000>;
+			};
+
+			ldo6_reg: regulator@9 {
+				reg = <9>;
+				regulator-compatible = "LDO6";
+				regulator-name = "LDO6";
+				regulator-min-microvolt = <2300000>;
+				regulator-max-microvolt = <2300000>;
+			};
+
+			ldo7_reg: regulator@10 {
+				reg = <10>;
+				regulator-compatible = "LDO7";
+				regulator-name = "LDO7";
+				regulator-min-microvolt = <2850000>;
+				regulator-max-microvolt = <2850000>;
+			};
+
+			ldo8_reg: regulator@11 {
+				reg = <11>;
+				regulator-compatible = "LDO8";
+				regulator-name = "LDO8";
+				regulator-min-microvolt = <2800000>;
+				regulator-max-microvolt = <2800000>;
+				regulator-boot-on;
+				regulator-always-on;
+			};
+
+			ldo9_reg: regulator@12 {
+				reg = <12>;
+				regulator-compatible = "LDO9";
+				regulator-name = "LDO9";
+				regulator-min-microvolt = <1700000>;
+				regulator-max-microvolt = <1700000>;
+			};
+
+			ldo10_reg: regulator@13 {
+				reg = <13>;
+				regulator-compatible = "LDO10";
+				regulator-name = "LDO10";
+				regulator-min-microvolt = <2500000>;
+				regulator-max-microvolt = <2500000>;
+				regulator-always-on;
+			};
+		};
+	};

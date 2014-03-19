@@ -131,6 +131,51 @@ int tps65912_reg_write(struct tps65912 *tps65912, u8 reg, u8 val)
 EXPORT_SYMBOL_GPL(tps65912_reg_write);
 
 #ifdef CONFIG_OF
+
+static struct tps65912_register_init_data *
+tps65912_get_register_init_data(struct device *dev, int *num_init_data)
+{
+	struct device_node *np = dev->of_node;
+	const __be32 *property;
+	static struct tps65912_register_init_data *init_data;
+	int i, lenp, num_cells, init_data_size;
+
+	property = of_get_property(np, "register-init-data", &lenp);
+
+	if (!property || lenp <= 0)
+		return NULL;
+
+	/*
+	 * Check data validity and whether number of cells is even
+	 */
+	if (lenp % sizeof(*property)) {
+		dev_err(dev, "regulator-init-data has invalid data\n");
+		return NULL;
+	}
+
+	num_cells = lenp / sizeof(*property);
+	if (num_cells % 2) {
+		dev_err(dev, "regulator-init-data must have even "
+			     " number of cells\n");
+		return NULL;
+	}
+
+	init_data_size = sizeof(struct tps65912_register_init_data) *
+			 (num_cells / 2);
+	init_data = (struct tps65912_register_init_data *)
+		    kmalloc(init_data_size, GFP_KERNEL);
+
+	if (init_data) {
+		for (i = 0; i < num_cells / 2; i++) {
+			init_data[i].addr = be32_to_cpu(property[2 * i]);
+			init_data[i].data = be32_to_cpu(property[2 * i + 1]);
+		}
+	}
+	*num_init_data = num_cells / 2;
+
+	return init_data;
+}
+
 static struct tps65912_board *tps65912_parse_dt(struct tps65912 *tps65912)
 {
 	struct device_node *np = tps65912->dev->of_node;
@@ -205,6 +250,11 @@ static struct tps65912_board *tps65912_parse_dt(struct tps65912 *tps65912)
 	}
 	board_info->irq_base = irq_alloc_descs(-1, 0, TPS65912_NUM_IRQ, 0);
 	pr_info("irq_base:%d\n", board_info->irq_base);
+
+	board_info->register_init_data =
+		tps65912_get_register_init_data(tps65912->dev,
+						&board_info->
+						num_init_registers);
 	return board_info;
 err:
 	kfree(board_info);
@@ -222,16 +272,16 @@ int tps65912_device_init(struct tps65912 *tps65912)
 {
 	struct tps65912_board *pmic_plat_data;
 	struct tps65912_platform_data *init_data;
-	int ret, dcdc_avs, value;
+	int i, ret, dcdc_avs, value;
 
 	init_data = kzalloc(sizeof(struct tps65912_platform_data), GFP_KERNEL);
 	if (init_data == NULL)
 		return -ENOMEM;
 
-	pmic_plat_data = dev_get_platdata(tps65912->dev);
-
-	if (!pmic_plat_data && tps65912->dev->of_node)
+	if (tps65912->dev->of_node)
 		pmic_plat_data = tps65912_parse_dt(tps65912);
+	else
+		pmic_plat_data = dev_get_platdata(tps65912->dev);
 
 	if (!pmic_plat_data) {
 		pr_info("Platform data not found\n");
@@ -241,6 +291,12 @@ int tps65912_device_init(struct tps65912 *tps65912)
 
 	mutex_init(&tps65912->io_mutex);
 	dev_set_drvdata(tps65912->dev, tps65912);
+
+	for (i = 0; i < pmic_plat_data->num_init_registers; i++) {
+		tps65912_write(tps65912,
+			       pmic_plat_data->register_init_data[i].addr,
+			       pmic_plat_data->register_init_data[i].data);
+	}
 
 	dcdc_avs = (pmic_plat_data->is_dcdc1_avs << 0 |
 			pmic_plat_data->is_dcdc2_avs  << 1 |
@@ -276,6 +332,10 @@ int tps65912_device_init(struct tps65912 *tps65912)
 		goto err_debugfs;
 #endif
 
+	if (tps65912->dev->of_node) {
+		kfree(pmic_plat_data->register_init_data);
+		kfree(pmic_plat_data);
+	}
 	kfree(init_data);
 	return ret;
 
@@ -287,7 +347,10 @@ err_irq:
 	platform_device_unregister(&tps65912_key_device);
 err:
 	kfree(init_data);
-	kfree(pmic_plat_data);
+	if (tps65912->dev->of_node) {
+		kfree(pmic_plat_data->register_init_data);
+		kfree(pmic_plat_data);
+	}
 	mfd_remove_devices(tps65912->dev);
 	kfree(tps65912);
 	return ret;

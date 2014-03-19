@@ -522,10 +522,10 @@ static struct tps65912_board *tps65912_parse_dt_reg_data(
 		if (!matches[idx].init_data || !matches[idx].of_node)
 			continue;
 
-		pmic_plat_data->tps65912_pmic_init_data[idx] =
+		pmic_plat_data->regulator_init_data[idx] =
 							matches[idx].init_data;
 		/* store the of_node */
-		pmic_plat_data->tps65912_pmic_init_data[idx]->driver_data =
+		pmic_plat_data->regulator_init_data[idx]->driver_data =
 						(void *)matches[idx].of_node;
 	}
 
@@ -572,7 +572,7 @@ static int tps65912_probe(struct platform_device *pdev)
 
 	for (i = 0; i < TPS65912_NUM_REGULATOR; i++, info++) {
 		int range = 0;
-		reg_data = pmic_plat_data->tps65912_pmic_init_data[i];
+		reg_data = pmic_plat_data->regulator_init_data[i];
 		/* Register the regulators */
 		pmic->info[i] = info;
 

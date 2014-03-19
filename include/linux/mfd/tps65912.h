@@ -278,6 +278,11 @@
 /* Number of total regulators available */
 #define TPS65912_NUM_REGULATOR		(TPS65912_NUM_DCDC + TPS65912_NUM_LDO)
 
+struct tps65912_register_init_data {
+	u8 addr;
+	u16 data;
+};
+
 /**
  * struct tps65912_board
  * Board platform dat may be used to initialize regulators.
@@ -290,8 +295,10 @@ struct tps65912_board {
 	int irq;
 	int irq_base;
 	int gpio_base;
+	int num_init_registers;
+	struct tps65912_register_init_data *register_init_data;
 	struct regulator_init_data
-		*tps65912_pmic_init_data[TPS65912_NUM_REGULATOR];
+		*regulator_init_data[TPS65912_NUM_REGULATOR];
 };
 
 /**
