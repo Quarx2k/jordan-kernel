@@ -229,6 +229,10 @@
 		spi-max-frequency = <1000000>;
 		spi-cs-high;
 
+		register-init-data = <
+			0x2d 0x88 /* DISCHARGE1: Enable LDO4, LDO8 */
+		>;
+
 		dcdc1_avs;
 		dcdc4_avs;
 
