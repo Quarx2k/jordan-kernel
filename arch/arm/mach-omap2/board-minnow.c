@@ -25,6 +25,10 @@
 
 #include "sdram-toshiba-hynix-numonyx.h"
 
+static int platform_wilink_kim_suspend(struct platform_device *pdev,
+		pm_message_t msg);
+static int platform_wilink_kim_resume(struct platform_device *pdev);
+
 static struct of_device_id omap_dt_match_table[] __initdata = {
 	{ .compatible = "simple-bus", },
 	{ .compatible = "ti,omap-infra", },
@@ -41,8 +45,8 @@ struct ti_st_plat_data wilink_pdata = {
 	.dev_name = "/dev/ttyO1",
 	.flow_cntrl = 1,
 	.baud_rate = 3000000,
-	.suspend = NULL,
-	.resume = NULL,
+	.suspend = platform_wilink_kim_suspend,
+	.resume = platform_wilink_kim_resume,
 };
 
 static struct platform_device wl18xx_device = {
@@ -55,6 +59,17 @@ static struct platform_device hci_tty_device = {
 	.name = "hci_tty",
 	.id = -1,
 };
+
+static int platform_wilink_kim_suspend(struct platform_device *pdev,
+		pm_message_t msg)
+{
+	return 0;
+}
+
+static int platform_wilink_kim_resume(struct platform_device *pdev)
+{
+	return 0;
+}
 
 static inline void __init minnow_init_btwilink(void)
 {
