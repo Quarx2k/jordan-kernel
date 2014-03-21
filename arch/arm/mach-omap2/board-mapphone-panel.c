@@ -27,6 +27,9 @@
 #include <mach/dt_path.h>
 #include <asm/prom.h>
 
+#include <plat/dispsw.h>
+#include <media/tda19989_platform.h>
+
 #ifdef DEBUG
 #define PANELDBG(format, ...) \
 	printk(KERN_DEBUG "board_panel: " format, \
@@ -38,10 +41,32 @@
 #ifndef CONFIG_ARM_OF
 #error CONFIG_ARM_OF must be defined for Mapphone to compile
 #endif
+#ifndef CONFIG_PANEL_MAPPHONE_HDTV
+#error CONFIG_PANEL_MAPPHONE_HDTV must be defined for Mapphone to compile
+#endif
 #ifndef CONFIG_USER_PANEL_DRIVER
 #error CONFIG_USER_PANEL_DRIVER must be defined for Mapphone to compile
 #endif
 
+#define MAPPHONE_HDMI_DSS_0_5_MUX  (OMAP34XX_MUX_MODE0 | OMAP34XX_PIN_OUTPUT)
+
+static u16 mapphone_hdmi_stored_mux[6];
+static int mapphone_feature_hdmi;
+#ifdef CONFIG_HDMI_TDA19989
+static struct tda19989_platform_data mapphone_tda19989_data = {
+	.pwr_en_gpio = 0,
+	.int_gpio = 0,
+	.cec_i2c_dev = 0x34,  /* Hardcoding is ok here */
+	.cec_reg_name = "vwlan2",
+};
+
+static struct platform_device mapphone_tda19989_device = {
+	.name = "tda19989",
+	.dev = {
+		.platform_data = &mapphone_tda19989_data,
+	},
+};
+#endif
 static bool mapphone_panel_device_read_dt; /* This is by default false */
 
 /* This must be match in the DT */
@@ -83,9 +108,53 @@ static struct omap_dss_device mapphone_lcd_device = {
 	.platform_disable = mapphone_panel_disable,
 };
 
+static int mapphone_hdtv_mux_en_gpio;	/* 0 by default */
+static int mapphone_hdtv_mux_sel_gpio;	/* 0 by default */
+
+static int mapphone_panel_enable_hdtv(struct omap_dss_device *dssdev);
+static void mapphone_panel_disable_hdtv(struct omap_dss_device *dssdev);
+
+static struct omap_dss_device mapphone_hdtv_device = {
+	.type = OMAP_DISPLAY_TYPE_DPI,
+	.name = "hdtv",
+	.driver_name = "hdtv-panel",
+	.phy.dpi.data_lines = 24,
+	.panel.config = OMAP_DSS_LCD_TFT,
+	.platform_enable = mapphone_panel_enable_hdtv,
+	.platform_disable = mapphone_panel_disable_hdtv,
+};
+
+static int mapphone_panel_regulator(bool enable)
+{
+	static int regulator_cnt;
+
+	if (enable) {
+		if (!regulator_cnt) {
+			display_regulator = regulator_get(NULL, "vhvio");
+			if (IS_ERR(display_regulator)) {
+				printk(KERN_ERR "failed to get regulator "
+						"for display \n");
+				return PTR_ERR(display_regulator);
+			}
+
+			regulator_enable(display_regulator);
+			mdelay(1);
+		}
+		regulator_cnt++;
+	} else {
+		if (regulator_cnt != 0) {
+			regulator_cnt--;
+			if (!regulator_cnt)
+				regulator_disable(display_regulator);
+		} else
+			printk(KERN_WARNING "regulatore is reached zero \n");
+	}
+
+	return regulator_cnt;
+}
+
 static void mapphone_panel_reset(bool reset)
 {
-	printk("%s\n",__func__);
 	if (reset) {
 		if (!first_boot) {
 			/* don't toggle reset line when the kernel is booting*/
@@ -101,7 +170,7 @@ static void mapphone_panel_reset(bool reset)
 
 static int mapphone_panel_enable(struct omap_dss_device *dssdev)
 {
-	printk("%s\n",__func__);
+	mapphone_panel_regulator(true);
 	mapphone_panel_reset(true);
 
 	return 0;
@@ -110,12 +179,14 @@ static int mapphone_panel_enable(struct omap_dss_device *dssdev)
 static void mapphone_panel_disable(struct omap_dss_device *dssdev)
 {
 	bool deep_sleep_mode_sup = false;
-	printk("%s\n",__func__);
+
 	if (dssdev->driver->deep_sleep_mode)
 		deep_sleep_mode_sup = dssdev->driver->deep_sleep_mode(dssdev);
 
 	if (!deep_sleep_mode_sup)
 		mapphone_panel_reset(false);
+
+	mapphone_panel_regulator(false);
 }
 
 static struct omapfb_platform_data mapphone_fb_data = {
@@ -132,6 +203,7 @@ static struct omapfb_platform_data mapphone_fb_data = {
 
 static struct omap_dss_device *mapphone_dss_devices[] = {
 	&mapphone_lcd_device,
+	&mapphone_hdtv_device,
 };
 
 static struct omap_dss_board_info mapphone_dss_data = {
@@ -294,6 +366,82 @@ static int mapphone_dt_get_dsi_vm_info(void)
 
 	return 0;
 }
+#ifdef CONFIG_HDMI_TDA19989
+static int mapphone_dt_get_tda19989_info(void)
+{
+	struct device_node *panel_node;
+	const void *panel_prop;
+
+	PANELDBG("dt_get_tda19989_info()\n");
+
+	/* return err if fail to open DT */
+	panel_node = of_find_node_by_path(DT_PATH_DISPLAY2);
+	if (panel_node == NULL)
+		return -ENODEV;
+
+	panel_prop = of_get_property(panel_node, "gpio_pwr_en", NULL);
+	if (panel_prop != NULL)
+		mapphone_tda19989_data.pwr_en_gpio = *(u32 *)panel_prop;
+
+	panel_prop = of_get_property(panel_node, "gpio_int", NULL);
+	if (panel_prop != NULL)
+		mapphone_tda19989_data.int_gpio = *(u32 *)panel_prop;
+
+
+	panel_prop = of_get_property(panel_node, "cec_reg_name", NULL);
+
+	if (panel_prop != NULL) {
+		strncpy(mapphone_tda19989_data.cec_reg_name,
+				(char *)panel_prop,
+				(TDA19989_CEC_REGULATOR_NAME_SIZE - 1));
+		mapphone_tda19989_data.cec_reg_name \
+			[TDA19989_CEC_REGULATOR_NAME_SIZE - 1] = '\0';
+	}
+
+	return 0;
+}
+#endif
+static int mapphone_dt_get_hdtv_info(void)
+{
+	struct device_node *panel_node;
+	const void *panel_prop;
+
+	PANELDBG("dt_get_hdtv_info()\n");
+
+	/* return err if fail to open DT */
+	panel_node = of_find_node_by_path(DT_PATH_DISPLAY2);
+	if (panel_node == NULL)
+		return -ENODEV;
+
+	panel_prop = of_get_property(panel_node, "gpio_mux_en", NULL);
+	if (panel_prop != NULL)
+		mapphone_hdtv_mux_en_gpio = *(u32 *)panel_prop;
+
+	panel_prop = of_get_property(panel_node, "gpio_mux_select", NULL);
+	if (panel_prop != NULL)
+		mapphone_hdtv_mux_sel_gpio = *(u32 *)panel_prop;
+
+	return 0;
+}
+
+static int mapphone_dt_get_feature_info(void)
+{
+	struct device_node *panel_node;
+	const void *panel_prop;
+
+	PANELDBG("dt_get_feature_info()\n");
+
+	/* return err if fail to open DT */
+	panel_node = of_find_node_by_path(DT_HIGH_LEVEL_FEATURE);
+	if (panel_node == NULL)
+		return -ENODEV;
+
+	panel_prop = of_get_property(panel_node, "feature_hdmi", NULL);
+	if (panel_prop != NULL)
+		mapphone_feature_hdmi = *(u8 *)panel_prop;
+
+	return 0;
+}
 
 static int __init mapphone_dt_panel_init(void)
 {
@@ -302,13 +450,26 @@ static int __init mapphone_dt_panel_init(void)
 	PANELDBG("dt_panel_init\n");
 
 	if (mapphone_panel_device_read_dt == false) {
-		if (mapphone_dt_get_dsi_panel_info() != 0) {
+		if (mapphone_dt_get_feature_info() != 0) {
+			printk(KERN_ERR "failed to parse feature info \n");
+			ret = -ENODEV;
+		} else if (mapphone_dt_get_dsi_panel_info() != 0) {
 			printk(KERN_ERR "failed to parse DSI panel info \n");
 			ret = -ENODEV;
 		} else if ((mapphone_lcd_device.phy.dsi.xfer_mode ==
 						OMAP_DSI_XFER_VIDEO_MODE) &&
 				(mapphone_dt_get_dsi_vm_info() != 0)) {
 			printk(KERN_ERR "failed to parse DSI VM info \n");
+			ret = -ENODEV;
+#ifdef CONFIG_HDMI_TDA19989
+		} else if (mapphone_feature_hdmi &&
+				mapphone_dt_get_tda19989_info() != 0) {
+			printk(KERN_ERR "failed to parse TDA19989 info \n");
+			ret = -ENODEV;
+#endif
+		} else if (mapphone_feature_hdmi &&
+				mapphone_dt_get_hdtv_info() != 0) {
+			printk(KERN_ERR "failed to parse hdtv info \n");
 			ret = -ENODEV;
 		} else {
 			mapphone_panel_device_read_dt = true;
@@ -330,14 +491,186 @@ void panel_print(void)
 		PANELDBG(" DT: data2_lane= %d data2_pos= %d\n",
 			mapphone_lcd_device.phy.dsi.data2_lane,
 			mapphone_lcd_device.phy.dsi.data2_pol);
+
 		PANELDBG(" DT: gpio_reset=%d xfer_mode=%d panel_id=0x%lx\n",
 			mapphone_lcd_device.reset_gpio,
 			mapphone_lcd_device.phy.dsi.xfer_mode,
 			mapphone_lcd_device.panel.panel_id);
 
+#if 0
+		PANELDBG(" DT: width= %d height= %d\n",
+			dt_panel_timings.x_res, dt_panel_timings.y_res);
 
+		PANELDBG(" DT: dsi1_pll_fclk= %d dsi2_pll_fclk= %d\n",
+			dt_panel_timings.dsi1_pll_fclk,
+			dt_panel_timings.dsi2_pll_fclk);
+
+		PANELDBG(" DT: hfp=%d hsw=%d hbp=%d vfp=%d vsw=%d vbp=%d\n",
+			dt_panel_timings.hfp, dt_panel_timings.hsw,
+			dt_panel_timings.hbp, dt_panel_timings.vfp,
+			dt_panel_timings.vsw, dt_panel_timings.vbp);
+#endif
 }
 
+static int mapphone_panel_enable_hdtv(struct omap_dss_device *dssdev)
+{
+	int i;
+	int offset;
+
+	PANELDBG("mapphone_panel_enable_hdtv\n");
+
+	offset = 0xDC;
+	for (i = 0; i < 6; i++) {
+		mapphone_hdmi_stored_mux[i] = omap_ctrl_readw(offset);
+		omap_ctrl_writew(MAPPHONE_HDMI_DSS_0_5_MUX, offset);
+		offset += 2;
+	}
+
+	gpio_set_value(mapphone_hdtv_mux_sel_gpio, 1);
+
+	return 0;
+}
+
+static void mapphone_panel_disable_hdtv(struct omap_dss_device *dssdev)
+{
+	int i;
+	int offset;
+
+	PANELDBG("mapphone_panel_disable_hdtv\n");
+
+	offset = 0xDC;
+	for (i = 0; i < 6; i++) {
+		omap_ctrl_writew(mapphone_hdmi_stored_mux[i], offset);
+		offset += 2;
+	}
+
+	gpio_set_value(mapphone_hdtv_mux_sel_gpio, 0);
+}
+#ifdef CONFIG_OMAP2_DSS_DISPSW
+static struct dispsw_mr_support mapphone_dispsw_hdtv_1_60Hz = {
+	.dev_name = "hdtv",
+	.res_name = "hdtv_1_60hz",
+	.dev_timing = {
+		.x_res	= 640,
+		.y_res	= 480,
+		.pixel_clock = 25200,
+		.hsw	= 96,
+		.hfp	= 16,
+		.hbp	= 48,
+		.vsw	= 2,
+		.vfp	= 10,
+		.vbp	= 33,
+	},
+	.panel_config = (OMAP_DSS_LCD_TFT|OMAP_DSS_LCD_IVS|OMAP_DSS_LCD_IHS),
+};
+
+static struct dispsw_mr_support mapphone_dispsw_hdtv_2_3_60Hz = {
+	.dev_name = "hdtv",
+	.res_name = "hdtv_2_3_60hz",
+	.dev_timing = {
+		.x_res	= 720,
+		.y_res	= 480,
+		.pixel_clock = 27027,
+		.hsw	= 62,
+		.hfp	= 16,
+		.hbp	= 60,
+		.vsw	= 6,
+		.vfp	= 9,
+		.vbp	= 30,
+	},
+	.panel_config = (OMAP_DSS_LCD_TFT|OMAP_DSS_LCD_IVS|OMAP_DSS_LCD_IHS),
+};
+
+static struct dispsw_mr_support mapphone_dispsw_hdtv_4_60Hz = {
+	.dev_name = "hdtv",
+	.res_name = "hdtv_4_60hz",
+	.dev_timing = {
+		.x_res	= 1280,
+		.y_res	= 720,
+		.pixel_clock = 74250,
+		.hsw	= 40,
+		.hfp	= 110,
+		.hbp	= 220,
+		.vsw	= 5,
+		.vfp	= 5,
+		.vbp	= 20,
+	},
+	.panel_config = OMAP_DSS_LCD_TFT,
+};
+
+static struct dispsw_mr_support mapphone_dispsw_hdtv_17_18_50Hz = {
+	.dev_name = "hdtv",
+	.res_name = "hdtv_17_18_50hz",
+	.dev_timing = {
+		.x_res	= 720,
+		.y_res	= 576,
+		.pixel_clock = 27000,
+		.hsw	= 64,
+		.hfp	= 12,
+		.hbp	= 68,
+		.vsw	= 5,
+		.vfp	= 5,
+		.vbp	= 39,
+	},
+	.panel_config = (OMAP_DSS_LCD_TFT|OMAP_DSS_LCD_IVS|OMAP_DSS_LCD_IHS),
+};
+
+static struct dispsw_mr_support mapphone_dispsw_hdtv_19_50Hz = {
+	.dev_name = "hdtv",
+	.res_name = "hdtv_19_50hz",
+	.dev_timing = {
+		.x_res	= 1280,
+		.y_res	= 720,
+		.pixel_clock = 74250,
+		.hsw	= 40,
+		.hfp	= 440,
+		.hbp	= 220,
+		.vsw	= 5,
+		.vfp	= 5,
+		.vbp	= 20,
+	},
+	.panel_config = OMAP_DSS_LCD_TFT,
+};
+
+static struct dispsw_mr_support mapphone_dispsw_hdtv_21_22_50Hz = {
+	.dev_name = "hdtv",
+	.res_name = "hdtv_21_22_50hz",
+	.dev_timing = {
+		.x_res	= 720,
+		.y_res	= 576,
+		.pixel_clock = 13500,
+		.hsw	= 63,
+		.hfp	= 12,
+		.hbp	= 69,
+		.vsw	= 2,
+		.vfp	= 3,
+		.vbp	= 19,
+	},
+	.panel_config = (OMAP_DSS_LCD_TFT|OMAP_DSS_LCD_IVS|OMAP_DSS_LCD_IHS),
+};
+
+static struct dispsw_mr_support *mapphone_dispsw_resolutions[] = {
+	&mapphone_dispsw_hdtv_1_60Hz,
+	&mapphone_dispsw_hdtv_2_3_60Hz,
+	&mapphone_dispsw_hdtv_4_60Hz,
+	&mapphone_dispsw_hdtv_17_18_50Hz,
+	&mapphone_dispsw_hdtv_19_50Hz,
+	&mapphone_dispsw_hdtv_21_22_50Hz,
+};
+
+static struct dispsw_board_info mapphone_dispsw_data = {
+	.num_resolutions = ARRAY_SIZE(mapphone_dispsw_resolutions),
+	.resolutions = mapphone_dispsw_resolutions,
+};
+
+static struct platform_device mapphone_dispsw_device = {
+	.name = "dispsw",
+	.id = -1,
+	.dev = {
+		.platform_data = &mapphone_dispsw_data,
+	},
+};
+#endif
 static struct platform_device omap_panel_device = {
 	.name = "omap-panel",
 	.id = -1,
@@ -364,16 +697,54 @@ void __init mapphone_panel_init(void)
 	ret = gpio_request(mapphone_lcd_device.reset_gpio, "display reset");
 	if (ret) {
 		printk(KERN_ERR "failed to get display reset gpio\n");
-		return;
+		goto error;
 	}
 
 	first_boot = true;
 
 	gpio_direction_output(mapphone_lcd_device.reset_gpio, 1);
 
+	mapphone_feature_hdmi = false;
+
+	if (mapphone_feature_hdmi) {
+		ret = gpio_request(mapphone_hdtv_mux_en_gpio,
+							"HDMI-mux-enable");
+		if (ret) {
+			printk(KERN_ERR "Failed hdtv mux en gpio request\n");
+			goto failed_mux_en;
+		}
+		gpio_direction_output(mapphone_hdtv_mux_en_gpio, 0);
+		gpio_set_value(mapphone_hdtv_mux_en_gpio, 0);
+
+		ret = gpio_request(mapphone_hdtv_mux_sel_gpio,
+							"HDMI-mux-select");
+		if (ret) {
+			printk(KERN_ERR "failed hdtv mux sel gpio request\n");
+			goto failed_mux_sel;
+		}
+		gpio_direction_output(mapphone_hdtv_mux_sel_gpio, 0);
+		gpio_set_value(mapphone_hdtv_mux_sel_gpio, 0);
+#ifdef CONFIG_OMAP2_DSS_DISPSW
+		platform_device_register(&mapphone_dispsw_device);
+#endif
+#ifdef CONFIG_HDMI_TDA19989
+		platform_device_register(&mapphone_tda19989_device);
+#endif
+	} else {
+		/* Remove HDTV from the DSS device list */
+		mapphone_dss_data.num_devices--;
+	}
+
 	platform_device_register(&omap_panel_device);
 	platform_device_register(&mapphone_dss_device);
 
+	return;
+
+failed_mux_sel:
+	gpio_free(mapphone_hdtv_mux_en_gpio);
+failed_mux_en:
+	gpio_free(mapphone_lcd_device.reset_gpio);
+error:
 	return;
 }
 
