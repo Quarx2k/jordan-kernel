@@ -842,7 +842,6 @@ struct input_keymap_entry {
 
 
 /* MSP (sensor) related events */
-#define ABS_ALTITUDE            0x44
 #define ABS_TILTSCROLL          0x55
 
 /* TODO TEMP !!! CHeck IKXCLOCK-100 */
