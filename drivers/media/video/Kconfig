@@ -109,6 +109,10 @@ config VIDEO_IR_I2C
 
 source "drivers/media/video/hp3a/Kconfig"
 
+config HDMI_TDA19989
+	bool "TDA19989 HDMI Support"
+	default n
+
 #
 # Encoder / Decoder module configuration
 #

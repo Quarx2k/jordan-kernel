@@ -8,4 +8,4 @@ obj-$(CONFIG_PANEL_TAAL) += panel-taal.o
 obj-$(CONFIG_PANEL_ZOOM2) += panel-zoom2.o
 obj-$(CONFIG_PANEL_SHOLES) += panel-sholes.o
 obj-$(CONFIG_PANEL_MAPPHONE) += panel-mapphone.o
-
+obj-$(CONFIG_PANEL_MAPPHONE_HDTV) += panel-mapphone-hdtv.o
