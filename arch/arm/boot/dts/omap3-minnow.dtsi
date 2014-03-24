@@ -19,9 +19,10 @@
 				600000  1140000
 				800000  1270000
 			>;
-			cpu0-supply = <&sw4_core_reg>;
+			/* FIXME: voltage scaling on suspend resume */
+			/* cpu0-supply = <&sw1_iva_reg>; */
 			/* OPP tolerance in percentage */
-			voltage-tolerance = <4>;
+			/* voltage-tolerance = <1>; */
 		};
 	};
 
