@@ -264,6 +264,11 @@ static u8 panel_off_common[] = {
 0
 };
 
+enum minnow_panel_dummy_type {
+	DUMMY_NONE = 0,
+	DUMMY_ENABLED,
+	DUMMY_DISABLED
+};
 
 struct minnow_panel_clk_range {
 	int	min;
@@ -399,7 +404,7 @@ struct minnow_panel_data {
 
 	/* runtime variables */
 	bool enabled;
-	bool dummy_panel;
+	enum minnow_panel_dummy_type dummy_panel;
 
 	bool te_enabled;
 
@@ -410,7 +415,7 @@ struct minnow_panel_data {
 
 	unsigned cabc_mode;
 
-	bool intro_printed;
+	bool first_enable;
 
 	struct workqueue_struct *workqueue;
 
@@ -803,9 +808,11 @@ static int minnow_panel_dummy_check(struct minnow_panel_data *mpd)
 		if (r) {
 			dev_err(&mpd->dssdev->dev, "Failed get panel id, "
 				"enable dummy panel !!!");
-			mpd->dummy_panel = true;
-		} else
+			mpd->dummy_panel = DUMMY_ENABLED;
+		} else {
+			mpd->dummy_panel = DUMMY_DISABLED;
 			r = set_bridge_retrans(mpd, false);
+		}
 	}
 	return r;
 }
@@ -819,7 +826,7 @@ static int minnow_panel_verify_cmdbuf(struct minnow_panel_data *mpd,
 	unsigned int delay_ms;
 
 	/* it check dummy panel only at first time power on */
-	if (!mpd->intro_printed && !mpd->dummy_panel) {
+	if (mpd->dummy_panel == DUMMY_NONE) {
 		r = minnow_panel_dummy_check(mpd);
 		if (r)
 			return r;
@@ -839,7 +846,7 @@ static int minnow_panel_verify_cmdbuf(struct minnow_panel_data *mpd,
 			r = minnow_panel_verify_ssd2848(mpd, data);
 			continue;
 		case OTM3201_CMD:
-			if (!mpd->dummy_panel)
+			if (mpd->dummy_panel == DUMMY_DISABLED)
 				r = minnow_panel_verify_otm3201(mpd, data);
 			continue;
 		}
@@ -1711,6 +1718,7 @@ static int minnow_panel_probe(struct omap_dss_device *dssdev)
 
 	dev_set_drvdata(&dssdev->dev, mpd);
 	mpd->dssdev = dssdev;
+	mpd->first_enable = true;
 
 	r = minnow_panel_dt_init(mpd);
 	if (r)
@@ -1732,7 +1740,7 @@ static int minnow_panel_probe(struct omap_dss_device *dssdev)
 	}
 	if (gpio_is_valid(mpd->vio_en_gpio)) {
 		r = devm_gpio_request_one(&dssdev->dev, mpd->vio_en_gpio,
-					  GPIOF_OUT_INIT_HIGH,
+					  GPIOF_OUT_INIT_LOW,
 					  "minnow-panel vio_en");
 		if (r) {
 			dev_err(&dssdev->dev,
@@ -1751,8 +1759,8 @@ static int minnow_panel_probe(struct omap_dss_device *dssdev)
 		if (!gpio_is_valid(mpd->reset_gpio[i]))
 			continue;
 		r = devm_gpio_request_one(&dssdev->dev, mpd->reset_gpio[i],
-			mpd->hw_reset[i].active ? GPIOF_OUT_INIT_HIGH
-			: GPIOF_OUT_INIT_LOW, name[i]);
+			mpd->hw_reset[i].active ? GPIOF_OUT_INIT_LOW
+			: GPIOF_OUT_INIT_HIGH, name[i]);
 		if (r) {
 			dev_err(&dssdev->dev,
 				"failed to request %s gpio\n", name[i]);
@@ -1920,7 +1928,7 @@ static int minnow_panel_check_panel_status(struct minnow_panel_data *mpd)
 	return 0;
 }
 
-#define	POWER_ON_RETRY_TIMES	2
+#define	POWER_ON_RETRY_TIMES	3
 static int minnow_panel_power_on(struct omap_dss_device *dssdev)
 {
 	struct minnow_panel_data *mpd = dev_get_drvdata(&dssdev->dev);
@@ -1949,13 +1957,16 @@ init_start:
 
 	omapdss_dsi_vc_enable_hs(dssdev, mpd->channel, false);
 
-#ifdef	CONFIG_OMAP2_DSS_RESET
-	_minnow_panel_hw_reset(dssdev);
-#endif
+	/* for the first time power on, do not reset h/w to keep logo on */
+	if (mpd->first_enable) {
+		dsi_vc_send_bta_sync(dssdev, mpd->channel);
+		retry = 0;
+	} else
+		_minnow_panel_hw_reset(dssdev);
 	while (retry--) {
 		r = minnow_panel_process_cmdbuf(mpd, &mpd->power_on);
 		if (!r) {
-			if (!mpd->dummy_panel)
+			if (mpd->dummy_panel == DUMMY_DISABLED)
 				r = minnow_panel_check_panel_status(mpd);
 			if (!r)
 				break;
@@ -1965,21 +1976,23 @@ init_start:
 		dev_err(&dssdev->dev, "Reset hardware to retry ...\n");
 		_minnow_panel_hw_reset(dssdev);
 		/* for dummy panel, it needs reset DSI */
-		if (mpd->dummy_panel) {
+		if (mpd->dummy_panel == DUMMY_ENABLED) {
 			omapdss_dsi_display_disable(dssdev, true, false);
 			goto init_start;
 		}
 	}
-
-	r = minnow_panel_get_id(mpd, &id1, &id2, &id3);
-	if (r)
-		goto err;
 
 	/* it needed enable TE to force update after display enabled */
 	mpd->te_enabled = true;
 	r = _minnow_panel_enable_te(dssdev, mpd->te_enabled);
 	if (r)
 		goto err;
+
+	if (mpd->first_enable) {
+		r = minnow_panel_get_id(mpd, &id1, &id2, &id3);
+		if (r)
+			goto err;
+	}
 
 	r = minnow_panel_dcs_write_0(mpd, MIPI_DCS_SET_DISPLAY_ON);
 	if (r)
@@ -1993,11 +2006,9 @@ init_start:
 
 	mpd->enabled = 1;
 
-	if (!mpd->intro_printed) {
+	if (mpd->first_enable)
 		dev_info(&dssdev->dev, "panel revision %02x.%02x.%02x\n",
 			id1, id2, id3);
-		mpd->intro_printed = true;
-	}
 
 	return 0;
 err:
@@ -2071,9 +2082,13 @@ static int minnow_panel_enable(struct omap_dss_device *dssdev)
 
 	mutex_unlock(&mpd->lock);
 
-	r = minnow_panel_update(dssdev, 0, 0,
-				dssdev->panel.timings.x_res,
-				dssdev->panel.timings.y_res);
+	/* do not force update at first time to keep logo on */
+	if (mpd->first_enable)
+		mpd->first_enable = false;
+	else
+		r = minnow_panel_update(dssdev, 0, 0,
+					dssdev->panel.timings.x_res,
+					dssdev->panel.timings.y_res);
 	dev_info(&dssdev->dev, "Display enabled, manual update ret = %d\n", r);
 
 	return 0;
