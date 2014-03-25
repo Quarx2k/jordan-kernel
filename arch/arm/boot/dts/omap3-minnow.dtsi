@@ -223,7 +223,7 @@
 		maxim,rsns-microohm = <10000>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&cc_alert_pin>;	/* gpio 140 pin */
-		gpios = <&gpio5 12 0x1>;	/* gpio-140, GPIOF_DIR_IN */
+		gpios = <&gpio5 12 0x11>;	/* gpio-140, GPIOF_DIR_IN|GPIOF_EXPORT */
 		gpio-names = "cc-alert";
 		interrupt-parent = <&gpio5>;
 		interrupts = <12 0>;		/* gpio-140 IRQ */
