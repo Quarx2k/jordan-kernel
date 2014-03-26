@@ -39,6 +39,9 @@
 
 #include "../dss/dss.h"
 
+/* panel parameter to indicate if it needs skip first time initialize */
+static bool	def_skip_first_init;
+module_param_named(skip_first_init, def_skip_first_init, bool, 0);
 
 /* DSI Virtual channel. Hardcoded for now. */
 #define TCH 0
@@ -357,7 +360,6 @@ static struct minnow_panel_attr panel_attr_table[MINNOW_PANEL_MAX] = {
 		.bridge_reset = { ACTIVE_LOW, 20, 10 }
 	},
 };
-
 
 static irqreturn_t minnow_panel_te_isr(int irq, void *data);
 static void minnow_panel_te_timeout_work_callback(struct work_struct *work);
@@ -1728,9 +1730,14 @@ static int minnow_panel_probe(struct omap_dss_device *dssdev)
 
 	atomic_set(&mpd->do_update, 0);
 
+	dev_info(&dssdev->dev, "skip first time initialization is %s\n",
+		 def_skip_first_init ? "enabled" : "disabled");
+
 	if (gpio_is_valid(mpd->clk_en_gpio)) {
 		r = devm_gpio_request_one(&dssdev->dev, mpd->clk_en_gpio,
-					  GPIOF_OUT_INIT_HIGH,
+					  def_skip_first_init
+					  ? GPIOF_OUT_INIT_HIGH
+					  : GPIOF_OUT_INIT_LOW,
 					  "minnow-panel clk_en");
 		if (r) {
 			dev_err(&dssdev->dev,
@@ -1740,7 +1747,9 @@ static int minnow_panel_probe(struct omap_dss_device *dssdev)
 	}
 	if (gpio_is_valid(mpd->vio_en_gpio)) {
 		r = devm_gpio_request_one(&dssdev->dev, mpd->vio_en_gpio,
-					  GPIOF_OUT_INIT_LOW,
+					  def_skip_first_init
+					  ? GPIOF_OUT_INIT_LOW
+					  : GPIOF_OUT_INIT_HIGH,
 					  "minnow-panel vio_en");
 		if (r) {
 			dev_err(&dssdev->dev,
@@ -1759,8 +1768,14 @@ static int minnow_panel_probe(struct omap_dss_device *dssdev)
 		if (!gpio_is_valid(mpd->reset_gpio[i]))
 			continue;
 		r = devm_gpio_request_one(&dssdev->dev, mpd->reset_gpio[i],
-			mpd->hw_reset[i].active ? GPIOF_OUT_INIT_LOW
-			: GPIOF_OUT_INIT_HIGH, name[i]);
+					  def_skip_first_init
+					  ? (mpd->hw_reset[i].active
+					     ? GPIOF_OUT_INIT_LOW
+					     : GPIOF_OUT_INIT_HIGH)
+					  : (mpd->hw_reset[i].active
+					     ? GPIOF_OUT_INIT_HIGH
+					     : GPIOF_OUT_INIT_LOW),
+					  name[i]);
 		if (r) {
 			dev_err(&dssdev->dev,
 				"failed to request %s gpio\n", name[i]);
@@ -1958,7 +1973,7 @@ init_start:
 	omapdss_dsi_vc_enable_hs(dssdev, mpd->channel, false);
 
 	/* for the first time power on, do not reset h/w to keep logo on */
-	if (mpd->first_enable) {
+	if (mpd->first_enable && def_skip_first_init) {
 		dsi_vc_send_bta_sync(dssdev, mpd->channel);
 		retry = 0;
 	} else
@@ -2082,14 +2097,14 @@ static int minnow_panel_enable(struct omap_dss_device *dssdev)
 
 	mutex_unlock(&mpd->lock);
 
-	/* do not force update at first time to keep logo on */
-	if (mpd->first_enable)
-		mpd->first_enable = false;
-	else
+	/* do not force update at first time if it needs keep logo on */
+	if (!(mpd->first_enable && def_skip_first_init))
 		r = minnow_panel_update(dssdev, 0, 0,
 					dssdev->panel.timings.x_res,
 					dssdev->panel.timings.y_res);
+
 	dev_info(&dssdev->dev, "Display enabled, manual update ret = %d\n", r);
+	mpd->first_enable = false;
 
 	return 0;
 err:
