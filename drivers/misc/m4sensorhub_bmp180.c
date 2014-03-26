@@ -133,7 +133,14 @@ static ssize_t setdelay_store(struct device *dev,
 		dev_err(dev, "error getting int\n");
 		return ret;
 	}
-
+	/* Input validation  */
+	if (samplerate < -1) {
+		KDEBUG(
+			M4SH_ERROR, "%s() invalid input %d\n",
+			__func__ , samplerate
+			);
+		return -EINVAL;
+	}
 	ret = m4_set_pressure_samplerate(pressure_client_data, samplerate);
 	if (ret < 0) {
 		dev_err(dev, "error setting samplerate\n");

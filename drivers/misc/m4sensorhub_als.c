@@ -96,7 +96,7 @@ static int m4als_set_samplerate(struct m4als_driver_data *dd, int16_t rate)
 	int size = 0;
 
 	if (rate == dd->samplerate)
-		goto m4als_set_samplerate_fail;
+		goto m4als_change_interrupt_bit;
 
 	size = m4sensorhub_reg_getsize(dd->m4, M4SH_REG_LIGHTSENSOR_SAMPLERATE);
 	if (size < 0) {
@@ -114,83 +114,39 @@ static int m4als_set_samplerate(struct m4als_driver_data *dd, int16_t rate)
 	} else if (err != size) {
 		m4als_err("%s: Wrote %d bytes instead of %d.\n",
 			  __func__, err, size);
+		err = -EBADE;
 		goto m4als_set_samplerate_fail;
 	}
-
 	dd->samplerate = rate;
 
-m4als_set_samplerate_fail:
-	return err;
-}
-
-static ssize_t m4als_enable_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct m4als_driver_data *dd = dev_get_drvdata(dev);
-
-	if (dd->status & (1 << M4ALS_IRQ_ENABLED_BIT))
-		return sprintf(buf, "Sensor is ENABLED.\n");
-	else
-		return sprintf(buf, "Sensor is DISABLED.\n");
-}
-static ssize_t m4als_enable_store(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t size)
-{
-	int err = 0;
-	struct m4als_driver_data *dd = dev_get_drvdata(dev);
-	int value = 0;
-
-	mutex_lock(&(dd->mutex));
-
-	err = kstrtoint(buf, 10, &value);
-	if (err < 0) {
-		m4als_err("%s: Failed to convert value.\n", __func__);
-		goto m4als_enable_store_exit;
-	}
-
-	switch (value) {
-	case 0:
+m4als_change_interrupt_bit:
+	if (rate == -1) {
 		if (dd->status & (1 << M4ALS_IRQ_ENABLED_BIT)) {
 			err = m4sensorhub_irq_disable(dd->m4,
 				M4SH_IRQ_LIGHTSENSOR_DATA_READY);
 			if (err < 0) {
 				m4als_err("%s: Failed to disable interrupt.\n",
 					  __func__);
-				goto m4als_enable_store_exit;
+				goto m4als_set_samplerate_fail;
 			}
 			dd->status = dd->status & ~(1 << M4ALS_IRQ_ENABLED_BIT);
 		}
-		break;
-
-	case 1:
-		if (!(dd->status & (1 << M4ALS_IRQ_ENABLED_BIT))) {
+	} else {
+		 if (!(dd->status & (1 << M4ALS_IRQ_ENABLED_BIT))) {
 			err = m4sensorhub_irq_enable(dd->m4,
 				M4SH_IRQ_LIGHTSENSOR_DATA_READY);
 			if (err < 0) {
 				m4als_err("%s: Failed to enable interrupt.\n",
 					  __func__);
-				goto m4als_enable_store_exit;
+				goto m4als_set_samplerate_fail;
 			}
 			dd->status = dd->status | (1 << M4ALS_IRQ_ENABLED_BIT);
 		}
-		break;
-
-	default:
-		m4als_err("%s: Invalid value %d passed.\n", __func__, value);
-		err = -EINVAL;
-		goto m4als_enable_store_exit;
 	}
 
-m4als_enable_store_exit:
-	if (err < 0)
-		m4als_err("%s: Failed with error code %d.\n", __func__, err);
-
-	mutex_unlock(&(dd->mutex));
-
-	return size;
+m4als_set_samplerate_fail:
+	return err;
 }
-static DEVICE_ATTR(als_enable, S_IRUSR | S_IWUSR,
-		m4als_enable_show, m4als_enable_store);
 
 static ssize_t m4als_setrate_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -214,8 +170,8 @@ static ssize_t m4als_setrate_store(struct device *dev,
 		goto m4als_enable_store_exit;
 	}
 
-	if ((value < -32768) || (value > 32767)) {
-		m4als_err("%s: Value of %d is outside range of int16_t.\n",
+	if ((value < -1) || (value > 32767)) {
+		m4als_err("%s: Invalid sample rate requested = %d\n",
 			  __func__, value);
 		err = -EOVERFLOW;
 		goto m4als_enable_store_exit;
@@ -251,18 +207,11 @@ static int m4als_create_sysfs(struct m4als_driver_data *dd)
 {
 	int err = 0;
 
-	err = device_create_file(&(dd->pdev->dev), &dev_attr_als_enable);
-	if (err < 0) {
-		m4als_err("%s: Failed to create als_enable %s %d.\n",
-			  __func__, "with error", err);
-		goto m4als_create_sysfs_als_enable_fail;
-	}
-
 	err = device_create_file(&(dd->pdev->dev), &dev_attr_als_setrate);
 	if (err < 0) {
 		m4als_err("%s: Failed to create als_setrate %s %d.\n",
 			  __func__, "with error", err);
-		goto m4als_create_sysfs_als_setrate_fail;
+		goto m4als_create_sysfs_als_exit;
 	}
 
 	err = device_create_file(&(dd->pdev->dev), &dev_attr_luminosity);
@@ -272,13 +221,11 @@ static int m4als_create_sysfs(struct m4als_driver_data *dd)
 		goto m4als_create_sysfs_luminosity_fail;
 	}
 
-	goto m4als_create_sysfs_als_enable_fail;
+	goto m4als_create_sysfs_als_exit;
 
 m4als_create_sysfs_luminosity_fail:
 	device_remove_file(&(dd->pdev->dev), &dev_attr_als_setrate);
-m4als_create_sysfs_als_setrate_fail:
-	device_remove_file(&(dd->pdev->dev), &dev_attr_als_enable);
-m4als_create_sysfs_als_enable_fail:
+m4als_create_sysfs_als_exit:
 	return err;
 }
 
@@ -286,7 +233,6 @@ static int m4als_remove_sysfs(struct m4als_driver_data *dd)
 {
 	int err = 0;
 
-	device_remove_file(&(dd->pdev->dev), &dev_attr_als_enable);
 	device_remove_file(&(dd->pdev->dev), &dev_attr_als_setrate);
 	device_remove_file(&(dd->pdev->dev), &dev_attr_luminosity);
 

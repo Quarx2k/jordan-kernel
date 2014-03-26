@@ -393,79 +393,75 @@ static void m4_handle_mpu9150_fusion_irq(enum m4sensorhub_irqs int_event,
 	m4_report_mpu9150_inputevent(mpu9150_client_data, TYPE_FUSION);
 }
 
-static ssize_t m4_mpu9150_write_accel_enable(struct device *dev,
-			struct device_attribute *attr,
-			const char *buf, size_t count)
-{
-	int scanresult;
-
-	sscanf(buf, "%d", &scanresult);
-
-	if (scanresult == 0) {
-		m4_set_mpu9150_delay(misc_mpu9150_data, -1, TYPE_ACCEL);
-		mpu9150_irq_enable_disable(misc_mpu9150_data, TYPE_ACCEL,
-				SENSOR_IRQ_DISABLE);
-	} else
-		/* nothing to be done, just return, setdelay will enable irq*/
-		pr_info("%s: ignoring non 0 values\n", __func__);
-
-	return count;
-}
-
-static DEVICE_ATTR(accel_enable, 0222, NULL, m4_mpu9150_write_accel_enable);
-
 static ssize_t m4_mpu9150_write_accel_setdelay(struct device *dev,
 			struct device_attribute *attr,
 			const char *buf, size_t count)
 {
-	int scanresult;
+	int scanresult, err;
 
-	sscanf(buf, "%d", &scanresult);
-
+	err = kstrtoint(buf, 10, &scanresult);
+	if (err < 0) {
+		KDEBUG(M4SH_ERROR, "%s: conversion failed\n", __func__);
+		return err;
+	}
+	/* Input validation  */
+	if (scanresult < -1) {
+		KDEBUG(
+			M4SH_ERROR, "%s() invalid input %d\n",
+			__func__ , scanresult
+			);
+		return -EINVAL;
+	}
 	m4_set_mpu9150_delay(misc_mpu9150_data, scanresult, TYPE_ACCEL);
-	mpu9150_irq_enable_disable(misc_mpu9150_data, TYPE_ACCEL,
-							SENSOR_IRQ_ENABLE);
+
+	if (scanresult == -1) {
+		mpu9150_irq_enable_disable(
+					misc_mpu9150_data, TYPE_ACCEL,
+					SENSOR_IRQ_DISABLE
+					);
+	} else {
+		mpu9150_irq_enable_disable(
+					misc_mpu9150_data, TYPE_ACCEL,
+					SENSOR_IRQ_ENABLE
+					);
+	}
 
 	return count;
-
 }
 
 static DEVICE_ATTR(accel_setdelay, 0222, NULL, m4_mpu9150_write_accel_setdelay);
-
-static ssize_t m4_mpu9150_write_gyro_enable(struct device *dev,
-			struct device_attribute *attr,
-			const char *buf, size_t count)
-{
-	int scanresult;
-
-	sscanf(buf, "%d", &scanresult);
-
-	if (scanresult == 0) {
-		m4_set_mpu9150_delay(misc_mpu9150_data, -1, TYPE_GYRO);
-		mpu9150_irq_enable_disable(misc_mpu9150_data, TYPE_GYRO,
-				SENSOR_IRQ_DISABLE);
-	} else
-		/* nothing to be done, just return, setdelay will enable irq*/
-		pr_info("%s: ignoring non 0 values\n", __func__);
-
-	return count;
-}
-
-static DEVICE_ATTR(gyro_enable, 0222, NULL,
-				m4_mpu9150_write_gyro_enable);
 
 static ssize_t m4_mpu9150_write_gyro_setdelay(struct device *dev,
 			struct device_attribute *attr,
 			const char *buf, size_t count)
 {
-	int scanresult;
+	int scanresult, err;
 
-	sscanf(buf, "%d", &scanresult);
-
+	err = kstrtoint(buf, 10, &scanresult);
+	if (err < 0) {
+		KDEBUG(M4SH_ERROR, "%s: conversion failed\n", __func__);
+		return err;
+	}
+	/* Input validation  */
+	if (scanresult < -1) {
+		KDEBUG(
+			M4SH_ERROR, "%s() invalid input %d\n",
+			__func__ , scanresult
+			);
+		return -EINVAL;
+	}
 	m4_set_mpu9150_delay(misc_mpu9150_data, scanresult, TYPE_GYRO);
-	mpu9150_irq_enable_disable(misc_mpu9150_data, TYPE_GYRO,
-				SENSOR_IRQ_ENABLE);
-
+	if (scanresult == -1) {
+		mpu9150_irq_enable_disable(
+					misc_mpu9150_data, TYPE_GYRO,
+					SENSOR_IRQ_DISABLE
+					);
+	} else {
+		mpu9150_irq_enable_disable(
+					misc_mpu9150_data, TYPE_GYRO,
+					SENSOR_IRQ_ENABLE
+					);
+	}
 	return count;
 }
 
@@ -475,48 +471,41 @@ static ssize_t m4_mpu9150_write_compass_setdelay(struct device *dev,
 			struct device_attribute *attr,
 			const char *buf, size_t count)
 {
-	int scanresult;
+	int scanresult, err;
 
-	sscanf(buf, "%d", &scanresult);
-
+	err = kstrtoint(buf, 10, &scanresult);
+	if (err < 0) {
+		KDEBUG(M4SH_ERROR, "%s: conversion failed\n", __func__);
+		return err;
+	}
+	/* Input validation  */
+	if (scanresult < -1) {
+		KDEBUG(
+			M4SH_ERROR, "%s() invalid input %d\n",
+			__func__ , scanresult
+			);
+		return -EINVAL;
+	}
 	m4_set_mpu9150_delay(misc_mpu9150_data, scanresult, TYPE_COMPASS);
-	mpu9150_irq_enable_disable(misc_mpu9150_data, TYPE_COMPASS,
-				SENSOR_IRQ_ENABLE);
-
+	if (scanresult == -1) {
+		mpu9150_irq_enable_disable(
+				misc_mpu9150_data, TYPE_COMPASS,
+				SENSOR_IRQ_DISABLE
+				);
+	} else {
+		mpu9150_irq_enable_disable(
+				misc_mpu9150_data, TYPE_COMPASS,
+				SENSOR_IRQ_ENABLE
+			);
+	}
 	return count;
 }
 static DEVICE_ATTR(compass_setdelay, 0222, NULL,
 				m4_mpu9150_write_compass_setdelay);
-
-static ssize_t m4_mpu9150_write_compass_enable(struct device *dev,
-			struct device_attribute *attr,
-			const char *buf, size_t count)
-{
-	int scanresult;
-
-	sscanf(buf, "%d", &scanresult);
-
-	if (scanresult == 0) {
-		m4_set_mpu9150_delay(misc_mpu9150_data, -1, TYPE_COMPASS);
-		mpu9150_irq_enable_disable(misc_mpu9150_data, TYPE_COMPASS,
-				SENSOR_IRQ_DISABLE);
-	} else
-		/* nothing to be done, just return, setdelay will enable irq*/
-		pr_info("%s: ignoring non 0 values\n", __func__);
-
-	return count;
-}
-
-static DEVICE_ATTR(compass_enable, 0222, NULL,
-				m4_mpu9150_write_compass_enable);
-
 static struct attribute *mpu9150_control_attributes[] = {
 	&dev_attr_accel_setdelay.attr,
-	&dev_attr_accel_enable.attr,
 	&dev_attr_gyro_setdelay.attr,
-	&dev_attr_gyro_enable.attr,
 	&dev_attr_compass_setdelay.attr,
-	&dev_attr_compass_enable.attr,
 	NULL
 };
 
@@ -1115,23 +1104,6 @@ static void mpu9150_client_shutdown(struct platform_device *pdev)
 static int mpu9150_client_suspend(struct platform_device *pdev,
 				pm_message_t message)
 {
-	struct mpu9150_client *mpu9150_client_data =
-						platform_get_drvdata(pdev);
-
-	mpu9150_irq_enable_disable(mpu9150_client_data, TYPE_COMPASS,
-				SENSOR_IRQ_DISABLE);
-	mpu9150_irq_enable_disable(mpu9150_client_data, TYPE_GYRO,
-				SENSOR_IRQ_DISABLE);
-	mpu9150_irq_enable_disable(mpu9150_client_data, TYPE_ACCEL,
-				SENSOR_IRQ_DISABLE);
-	mpu9150_irq_enable_disable(mpu9150_client_data, TYPE_FUSION,
-				SENSOR_IRQ_DISABLE);
-
-	m4_set_mpu9150_delay(mpu9150_client_data, -1, TYPE_COMPASS);
-	m4_set_mpu9150_delay(mpu9150_client_data, -1, TYPE_GYRO);
-	m4_set_mpu9150_delay(mpu9150_client_data, -1, TYPE_ACCEL);
-	m4_set_mpu9150_delay(mpu9150_client_data, -1, TYPE_FUSION);
-
 	return 0;
 }
 

@@ -371,17 +371,6 @@ the sensor. This is global M4 strategy, nothing specific for this driver */
 static int m4sensorhub_pressure_suspend(struct platform_device *pdev,
 				pm_message_t message)
 {
-	struct iio_dev *p_iio_dev =
-						platform_get_drvdata(pdev);
-	struct m4sensorhub_pressure_drvdata *p_priv_data = iio_priv(p_iio_dev);
-	struct m4sensorhub_data *p_m4sensorhub = p_priv_data->p_m4sensorhub;
-	int samplerate = -1;
-
-	m4sensorhub_irq_disable(p_m4sensorhub,
-			M4SH_IRQ_PRESSURE_DATA_READY);
-	m4sensorhub_reg_write(p_m4sensorhub,
-				M4SH_REG_PRESSURE_SAMPLERATE,
-				(char *)&samplerate, m4sh_no_mask);
 	return 0;
 }
 
