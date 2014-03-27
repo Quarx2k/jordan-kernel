@@ -306,6 +306,7 @@ ssize_t hci_tty_read(struct file *file, char __user *data, size_t size,
 	/* Forward the data to the user */
 	if (skb->len >= size) {
 		pr_err("FIONREAD not done before read\n");
+		skb_queue_head(&hst->rx_list, skb);
 		return -ENOMEM;
 	} else {
 		/* returning skb */
@@ -401,6 +402,7 @@ static long hci_tty_ioctl(struct file *file,
 	struct sk_buff *skb = NULL;
 	int		retCode = 0;
 	struct ti_st	*hst;
+	int retVal;
 
 	pr_debug("inside %s (%p, %u, %lx)", __func__, file, cmd, arg);
 
@@ -421,13 +423,15 @@ static long hci_tty_ioctl(struct file *file,
 		 */
 		skb = skb_dequeue(&hst->rx_list);
 		if (skb != NULL) {
-			*(unsigned int *)arg = skb->len + 1;
+			retVal = skb->len + 1;
 			/* Re-Store the SKB for furtur Read operations */
 			skb_queue_head(&hst->rx_list, skb);
 		} else {
-			*(unsigned int *)arg = 0;
+			retVal = 0;
 		}
-		pr_debug("returning %d\n", *(unsigned int *)arg);
+		pr_debug("returning %d\n", retVal);
+		if (copy_to_user((void*)arg, &retVal, sizeof(retVal)))
+			retCode = -EFAULT;
 		break;
 	default:
 		pr_debug("Un-Identified IOCTL %d", cmd);
