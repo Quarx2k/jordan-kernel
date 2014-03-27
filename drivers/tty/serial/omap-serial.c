@@ -943,7 +943,9 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 
 	serial_out(up, UART_TI752_TCR, OMAP_UART_TCR_TRIG);
 
-	if (termios->c_cflag & CRTSCTS && up->port.flags & UPF_HARD_FLOW) {
+	if ((up->port.line == 1 && termios->c_cflag & CRTSCTS) ||
+	    (termios->c_cflag & CRTSCTS &&
+	    up->port.flags & UPF_HARD_FLOW)) {
 		/* Enable AUTORTS and AUTOCTS */
 		up->efr |= UART_EFR_CTS | UART_EFR_RTS;
 
