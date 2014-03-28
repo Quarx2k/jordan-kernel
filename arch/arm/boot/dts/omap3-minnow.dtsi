@@ -396,8 +396,8 @@
 				reg = <12>;
 				regulator-compatible = "LDO9";
 				regulator-name = "LDO9";
-				regulator-min-microvolt = <1700000>;
-				regulator-max-microvolt = <1700000>;
+				regulator-min-microvolt = <1050000>;
+				regulator-max-microvolt = <1050000>;
 			};
 
 			ldo10_reg: regulator@13 {
