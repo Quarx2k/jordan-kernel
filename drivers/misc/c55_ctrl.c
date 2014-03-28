@@ -84,7 +84,7 @@ static void c55_ctrl_int_setup(struct c55_ctrl_data *cdata, int gpio)
 	flags |= IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING;
 	flags |= IRQF_SHARED;
 
-	ret = request_threaded_irq(irq, NULL, c55_ctrl_isr,
+	ret = request_threaded_irq(irq, c55_ctrl_isr, NULL,
 				   flags, "c55_ctrl", cdata);
 	if (ret) {
 		pr_err("%s: IRQ request failed: %d\n", __func__, ret);
