@@ -13,6 +13,8 @@
 
 	cpus {
 		cpu@0 {
+			device_type = "cpu";
+			reg = <0>;
 			operating-points = <
 				/* kHz    uV */
 				300000   970000
