@@ -359,6 +359,7 @@
 			0x29 0x90 /* SET_OFF1: LDO5 off in sleep mode
 			                       LDO8 off in sleep mode */
 			0x2d 0x88 /* DISCHARGE1: Enable LDO4, LDO8 */
+			0x06 0x7F /* DCDC1_LIMIT: 0.7V-1.4875V in 12.5mV steps */
 		>;
 
 		tps_irq_gpio = <0>;
@@ -375,8 +376,8 @@
 				reg = <0>;
 				regulator-compatible = "DCDC1";
 				regulator-name = "DCDC1";
-				regulator-min-microvolt = <500000>;
-				regulator-max-microvolt = <1287500>;
+				regulator-min-microvolt =  <700000>;
+				regulator-max-microvolt = <1487500>;
 				regulator-boot-on;
 				regulator-always-on;
 			};
