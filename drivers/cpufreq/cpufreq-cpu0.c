@@ -20,6 +20,7 @@
 #include <linux/platform_device.h>
 #include <linux/regulator/consumer.h>
 #include <linux/slab.h>
+#include <linux/suspend.h>
 
 static unsigned int transition_latency;
 static unsigned int voltage_tolerance; /* in percentage */
@@ -28,6 +29,9 @@ static struct device *cpu_dev;
 static struct clk *cpu_clk;
 static struct regulator *cpu_reg;
 static struct cpufreq_frequency_table *freq_table;
+
+static DEFINE_MUTEX(cpu0_cpufreq_lock);
+static bool is_suspended;
 
 static int cpu0_verify_speed(struct cpufreq_policy *policy)
 {
@@ -39,7 +43,7 @@ static unsigned int cpu0_get_speed(unsigned int cpu)
 	return clk_get_rate(cpu_clk) / 1000;
 }
 
-static int cpu0_set_target(struct cpufreq_policy *policy,
+static int __cpu0_set_target(struct cpufreq_policy *policy,
 			   unsigned int target_freq, unsigned int relation)
 {
 	struct cpufreq_freqs freqs;
@@ -124,6 +128,47 @@ post_notify:
 	return ret;
 }
 
+static int cpu0_set_target(struct cpufreq_policy *policy,
+			   unsigned int target_freq, unsigned int relation)
+{
+	int ret;
+
+	mutex_lock(&cpu0_cpufreq_lock);
+	if (is_suspended) {
+		ret = -EBUSY;
+		goto out;
+	}
+
+	ret = __cpu0_set_target(policy, target_freq, relation);
+out:
+	mutex_unlock(&cpu0_cpufreq_lock);
+	return  ret;
+
+}
+
+static int cpu0_cpufreq_pm_notify(struct notifier_block *nb,
+	unsigned long event, void *dummy)
+{
+	mutex_lock(&cpu0_cpufreq_lock);
+	if (event == PM_SUSPEND_PREPARE) {
+		struct cpufreq_policy *policy = cpufreq_cpu_get(0);
+		is_suspended = true;
+		pr_info("cpu0 cpufreq suspend: setting frequency to %d kHz\n",
+			policy->max);
+		__cpu0_set_target(policy, policy->max, CPUFREQ_RELATION_L);
+		cpufreq_cpu_put(policy);
+	} else if (event == PM_POST_SUSPEND) {
+		is_suspended = false;
+	}
+	mutex_unlock(&cpu0_cpufreq_lock);
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block cpu0_cpufreq_pm_notifier = {
+	.notifier_call = cpu0_cpufreq_pm_notify,
+};
+
 static int cpu0_cpufreq_init(struct cpufreq_policy *policy)
 {
 	int ret;
@@ -146,11 +191,17 @@ static int cpu0_cpufreq_init(struct cpufreq_policy *policy)
 
 	cpufreq_frequency_table_get_attr(freq_table, policy->cpu);
 
+	if (policy->cpu == 0)
+		register_pm_notifier(&cpu0_cpufreq_pm_notifier);
+
 	return 0;
 }
 
 static int cpu0_cpufreq_exit(struct cpufreq_policy *policy)
 {
+	if (policy->cpu == 0)
+		unregister_pm_notifier(&cpu0_cpufreq_pm_notifier);
+
 	cpufreq_frequency_table_put_attr(policy->cpu);
 
 	return 0;
