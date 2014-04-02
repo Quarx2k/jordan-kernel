@@ -25,6 +25,8 @@
 #include <linux/i2c.h>
 #include <linux/input.h>
 #include <linux/mutex.h>
+#include <linux/workqueue.h>
+#include <linux/wakelock.h>
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
 #endif
@@ -56,6 +58,7 @@
 #define ATMXT_RECEIVED_CALIBRATION  6
 #define ATMXT_RESTART_REQUIRED      7
 #define ATMXT_SET_MESSAGE_POINTER   8
+#define ATMXT_RESUME_HANDLE_ISR     9
 
 #define ATMXT_I2C_ATTEMPTS          10
 #define ATMXT_I2C_WAIT_TIME         50
@@ -69,12 +72,14 @@ enum atmxt_driver_state {
 	ATMXT_DRV_IDLE,
 	ATMXT_DRV_REFLASH,
 	ATMXT_DRV_INIT,
+	ATMXT_DRV_SUSPENDED,
 };
 static const char * const atmxt_driver_state_string[] = {
 	"ACTIVE",
 	"IDLE",
 	"REFLASH",
 	"INIT",
+	"SUSPENDED",
 };
 
 enum atmxt_ic_state {
@@ -181,6 +186,9 @@ struct atmxt_driver_data {
 
 	uint16_t        status;
 	uint16_t        settings;
+	struct workqueue_struct *workqueue;
+	struct work_struct work;
+	struct wake_lock wake_lock;
 } __packed;
 
 #endif /* _LINUX_ATMXT_H */

@@ -187,7 +187,9 @@
 	atmxt@4a {
 		compatible = "atmel,atmxt-ts";
 		reg = <0x4a>;
-		interrupt-parent = <&intc>;
+		interrupt-parent = <&gpio4>;
+		interrupts = <3 0>;  /* gpio-99 32 * 3 + 3 */
+		wakeup-source;
 		gpios = <&gpio4 3 0>, /* IRQ   gpio-099 */
 			<&gpio6 4 0>; /* RESET gpio-164*/
 		atmel,atmxt-tdat-filename = "atmxt-r2.tdat";

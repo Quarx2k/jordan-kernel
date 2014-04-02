@@ -183,6 +183,23 @@ atmxt_of_init(struct i2c_client *client)
 }
 #endif
 
+static void atmxt_irq_work_func(struct work_struct *work)
+{
+	struct atmxt_driver_data *dd = NULL;
+
+	dd = container_of(work, struct atmxt_driver_data, work);
+	if (dd == NULL) {
+		pr_err("%s: dd NULL, can't execute work\n", __func__);
+		goto err;
+	}
+	/* handle the interrupt, release wakelock*/
+	pr_info("executing touch related pending work\n");
+	atmxt_isr(1, dd);
+err:
+	dd->status = dd->status & ~(1 << ATMXT_RESUME_HANDLE_ISR);
+	wake_unlock(&dd->wake_lock);
+}
+
 static int atmxt_probe(struct i2c_client *client,
 		const struct i2c_device_id *id)
 {
@@ -286,8 +303,20 @@ static int atmxt_probe(struct i2c_client *client,
 		debugfail = true;
 	}
 
+	dd->workqueue = create_workqueue("atmxt-irq");
+	if (dd->workqueue == NULL) {
+		err = -ENOMEM;
+		dev_err(&client->dev, "failed creating workqueue\n");
+		goto atmxt_workqueue_fail;
+	}
+
+	INIT_WORK(&dd->work, atmxt_irq_work_func);
+	wake_lock_init(&dd->wake_lock, WAKE_LOCK_SUSPEND, "atmxt-irq");
+
 	goto atmxt_probe_pass;
 
+atmxt_workqueue_fail:
+	atmxt_remove_sysfs_files(dd);
 atmxt_free_irq:
 	free_irq(dd->client->irq, dd);
 atmxt_unreg_suspend:
@@ -315,6 +344,12 @@ static int atmxt_remove(struct i2c_client *client)
 
 	dd = i2c_get_clientdata(client);
 	if (dd != NULL) {
+		if (wake_lock_active(&dd->wake_lock))
+			wake_unlock(&dd->wake_lock);
+
+		wake_lock_destroy(&dd->wake_lock);
+		cancel_work_sync(&dd->work);
+		destroy_workqueue(dd->workqueue);
 		free_irq(dd->client->irq, dd);
 		atmxt_remove_sysfs_files(dd);
 		gpio_free(dd->pdata->gpio_reset);
@@ -386,6 +421,8 @@ static int atmxt_suspend(struct i2c_client *client, pm_message_t message)
 		printk(KERN_ERR "%s: Driver state \"%s\" suspend.\n",
 			__func__, atmxt_driver_state_string[drv_state]);
 	}
+
+	atmxt_set_drv_state(dd, ATMXT_DRV_SUSPENDED);
 
 	atmxt_dbg(dd, ATMXT_DBG3, "%s: Suspend complete.\n", __func__);
 
@@ -475,6 +512,19 @@ static int atmxt_resume(struct i2c_client *client)
 				goto atmxt_resume_fail;
 			}
 		}
+
+		break;
+
+	case ATMXT_DRV_SUSPENDED:
+			if (dd->status & (1 << ATMXT_RESUME_HANDLE_ISR)) {
+				pr_info("Resuming from suspend state, and ISR pending\n");
+				/* there is a pending interrupt
+				hold the wakelock, queue the work,
+				work when finished will release wakelock*/
+				wake_lock(&dd->wake_lock);
+				queue_work(dd->workqueue, &dd->work);
+			}
+			atmxt_set_drv_state(dd, ATMXT_DRV_ACTIVE);
 		break;
 
 	case ATMXT_DRV_INIT:
@@ -985,7 +1035,6 @@ static int atmxt_gpio_init(struct atmxt_driver_data *dd)
 		goto atmxt_gpio_init_fail;
 	}
 
-	dd->client->irq = gpio_to_irq(dd->pdata->gpio_interrupt);
 
 atmxt_gpio_init_fail:
 	return err;
@@ -1383,6 +1432,11 @@ static irqreturn_t atmxt_isr(int irq, void *handle)
 		}
 		break;
 
+	case ATMXT_DRV_SUSPENDED:
+			pr_err("%s:isr received while suspended\n", __func__);
+			dd->status = dd->status |
+						(1 << ATMXT_RESUME_HANDLE_ISR);
+		break;
 	default:
 		printk(KERN_ERR "%s: Driver state \"%s\" IRQ received.\n",
 			__func__, atmxt_driver_state_string[drv_state]);
