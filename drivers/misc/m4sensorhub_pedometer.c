@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2012 Motorola, Inc.
+ *  Copyright (C) 2012-2014 Motorola, Inc.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -23,598 +23,518 @@
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
-#include <linux/miscdevice.h>
 #include <linux/platform_device.h>
-#include <linux/proc_fs.h>
-#include <linux/input.h>
+#include <linux/fs.h>
 #include <linux/m4sensorhub.h>
-#include <linux/m4sensorhub_client_ioctl.h>
-#include <linux/m4sensorhub/MemMapPedometer.h>
-#include <linux/uaccess.h>
 #include <linux/slab.h>
+#include <linux/iio/iio.h>
+#include <linux/iio/types.h>
+#include <linux/iio/sysfs.h>
+#include <linux/iio/events.h>
+#include <linux/iio/buffer.h>
+#include <linux/iio/kfifo_buf.h>
+#include <linux/iio/m4sensorhub/m4sensorhub_pedometer.h>
 
-#define PEDOMETER_CLIENT_DRIVER_NAME "m4sensorhub_pedometer"
+#define m4ped_err(format, args...)  KDEBUG(M4SH_ERROR, format, ## args)
 
-struct pedometer_data {
-	unsigned char activity;
-	unsigned int distance;
-	unsigned int mets;
-	unsigned char metsactivity;
-	unsigned int calories;
-	unsigned short stepcount;
-	unsigned short speed;
-	unsigned short floorsclimbed;
+#define M4PED_IRQ_ENABLED_BIT       0
+
+struct m4ped_driver_data {
+	struct platform_device      *pdev;
+	struct m4sensorhub_data     *m4;
+	struct mutex                mutex; /* controls driver entry points */
+
+	struct m4sensorhub_pedometer_iio_data   iiodat;
+	int16_t         samplerate;
+	uint16_t        status;
 };
 
-struct pedometer_client {
-	struct m4sensorhub_data *m4sensorhub;
-	struct input_dev *input_dev;
-	struct pedometer_data prev_data;
-	struct pedometer_data curr_data;
-};
 
-struct pedometer_client *misc_pedometer_data;
-
-static int pedometer_client_open(struct inode *inode, struct file *file)
+static void m4ped_isr(enum m4sensorhub_irqs int_event, void *handle)
 {
 	int err = 0;
+	struct iio_dev *iio = handle;
+	struct m4ped_driver_data *dd = iio_priv(iio);
+	int size = 0;
 
-	err = nonseekable_open(inode, file);
+	mutex_lock(&(dd->mutex));
+
+	size = m4sensorhub_reg_getsize(dd->m4, M4SH_REG_PEDOMETER_ACTIVITY);
+	err = m4sensorhub_reg_read(dd->m4, M4SH_REG_PEDOMETER_ACTIVITY,
+		(char *)&(dd->iiodat.ped_activity));
 	if (err < 0) {
-		KDEBUG(M4SH_ERROR, "%s failed\n", __func__);
-		return err;
-	}
-	file->private_data = misc_pedometer_data;
-
-	return 0;
-}
-
-static int pedometer_client_close(struct inode *inode, struct file *file)
-{
-	KDEBUG(M4SH_DEBUG, "pedometer_client in %s\n", __func__);
-	return 0;
-}
-
-static void m4_report_pedometer_inputevent(
-	struct pedometer_client *pedo_client_data)
-{
-	input_event(pedo_client_data->input_dev, EV_MSC, MSC_ACTIVITY_TYPE,
-		pedo_client_data->curr_data.activity);
-	input_event(pedo_client_data->input_dev, EV_MSC, MSC_STEPCOUNT,
-		pedo_client_data->curr_data.stepcount);
-	input_event(pedo_client_data->input_dev, EV_MSC, MSC_DISTANCE,
-		pedo_client_data->curr_data.distance);
-	input_event(pedo_client_data->input_dev, EV_MSC, MSC_SPEED,
-		pedo_client_data->curr_data.speed);
-	input_event(pedo_client_data->input_dev, EV_MSC, MSC_METS,
-		pedo_client_data->curr_data.mets);
-	input_event(pedo_client_data->input_dev, EV_MSC, MSC_CALORIES,
-		pedo_client_data->curr_data.calories);
-	input_event(pedo_client_data->input_dev, EV_MSC, MSC_FLOORSCLIMBED,
-		pedo_client_data->curr_data.floorsclimbed);
-	input_event(pedo_client_data->input_dev, EV_MSC, MSC_METSACTIVITY,
-		pedo_client_data->curr_data.metsactivity);
-	input_sync(pedo_client_data->input_dev);
-
-	KDEBUG(M4SH_DEBUG, "Sending pedometer data : stepcount = %d,\
-		speed = %d,distance = %d,mets = %d,calories = %d, \
-		activity = %d,floorsclimbed = %d, metsactivity = %d\n",
-		pedo_client_data->curr_data.stepcount,
-		pedo_client_data->curr_data.speed,
-		pedo_client_data->curr_data.distance,
-		pedo_client_data->curr_data.mets,
-		pedo_client_data->curr_data.calories,
-		pedo_client_data->curr_data.activity,
-		pedo_client_data->curr_data.floorsclimbed,
-		pedo_client_data->curr_data.metsactivity);
-}
-
-
-static void m4_set_delay(int delay)
-{
-
-}
-
-static void m4_read_pedometer_data(struct pedometer_client *pedo_client_data)
-{
-	m4sensorhub_reg_read(pedo_client_data->m4sensorhub,
-		M4SH_REG_PEDOMETER_ACTIVITY,
-		(char *)&pedo_client_data->curr_data.activity);
-	m4sensorhub_reg_read(pedo_client_data->m4sensorhub,
-		M4SH_REG_PEDOMETER_TOTATDISTANCE,
-		(char *)&pedo_client_data->curr_data.distance);
-	m4sensorhub_reg_read(pedo_client_data->m4sensorhub,
-		M4SH_REG_PEDOMETER_TOTALSTEPS,
-		(char *)&pedo_client_data->curr_data.stepcount);
-	m4sensorhub_reg_read(pedo_client_data->m4sensorhub,
-		M4SH_REG_PEDOMETER_CURRENTSPEED,
-		(char *)&pedo_client_data->curr_data.speed);
-	m4sensorhub_reg_read(pedo_client_data->m4sensorhub,
-		M4SH_REG_METS_METS,
-		(char *)&pedo_client_data->curr_data.mets);
-	m4sensorhub_reg_read(pedo_client_data->m4sensorhub,
-		M4SH_REG_METS_CALORIES,
-		(char *)&pedo_client_data->curr_data.calories);
-	m4sensorhub_reg_read(pedo_client_data->m4sensorhub,
-		M4SH_REG_PEDOMETER_FLOORSCLIMBED,
-		(char *)&pedo_client_data->curr_data.floorsclimbed);
-	m4sensorhub_reg_read(pedo_client_data->m4sensorhub,
-		M4SH_REG_METS_METSACTIVITY,
-		(char *)&pedo_client_data->curr_data.metsactivity);
-}
-
-static void m4_handle_pedometer_irq(enum m4sensorhub_irqs int_event,
-					void *pedometer_data)
-{
-	struct pedometer_client *pedometer_client_data = pedometer_data;
-
-	m4_read_pedometer_data(pedometer_client_data);
-	m4_report_pedometer_inputevent(pedometer_client_data);
-}
-
-/*
- * Handle commands from user-space.
- */
-static long pedometer_client_ioctl(struct file *filp,
-				 unsigned int cmd, unsigned long arg)
-{
-	int ret = 0;
-	int flag;
-	unsigned char byte;
-	void __user *argp = (void __user *)arg;
-	struct m4sh_user_profile user;
-	struct m4sh_workout_data workout_data;
-	struct pedometer_client *pedometer_client_data = filp->private_data;
-
-	switch (cmd) {
-	case M4_SENSOR_IOCTL_GET_PEDOMETER:
-		m4_read_pedometer_data(pedometer_client_data);
-		m4_report_pedometer_inputevent(pedometer_client_data);
-		break;
-	case M4_SENSOR_IOCTL_SET_DELAY:
-		if (copy_from_user(&flag, argp, sizeof(flag)))
-			return -EFAULT;
-		m4_set_delay(flag);
-		break;
-	/* TO DO
-	Need to implement the following ioctl's when M4 side implementation
-	will be ready
-	*/
-	case M4_SENSOR_IOCTL_SET_POSIX_TIME:
-		break;
-	case M4_SENSOR_IOCTL_SET_EQUIPMENT_TYPE:
-		if (copy_from_user(&byte, argp, sizeof(byte))) {
-			printk(KERN_ERR "copy from user returned error eq type\n");
-			ret = -EFAULT;
-			break;
-		}
-		m4sensorhub_reg_write(pedometer_client_data->m4sensorhub,
-			M4SH_REG_PEDOMETER_EQUIPMENTTYPE, &byte, m4sh_no_mask);
-		break;
-	case M4_SENSOR_IOCTL_SET_MANUAL_CALIB_WALK_SPEED:
-		break;
-	case M4_SENSOR_IOCTL_SET_MANUAL_CALIB_JOG_SPEED:
-		break;
-	case M4_SENSOR_IOCTL_SET_MANUAL_CALIB_RUN_SPEED:
-		break;
-	case M4_SENSOR_IOCTL_SET_MANUAL_CALIB_STATUS:
-		break;
-	case M4_SENSOR_IOCTL_SET_USER_PROFILE:
-		if (copy_from_user(&user, argp, sizeof(user))) {
-			printk(KERN_ERR "copy from user returned error\n");
-			ret = -EFAULT;
-			break;
-		}
-		m4sensorhub_reg_write_1byte(pedometer_client_data->m4sensorhub,
-			M4SH_REG_USERSETTINGS_USERAGE, user.age, 0xff);
-		m4sensorhub_reg_write_1byte(pedometer_client_data->m4sensorhub,
-			M4SH_REG_USERSETTINGS_USERGENDER, user.gender, 0xff);
-		m4sensorhub_reg_write_1byte(pedometer_client_data->m4sensorhub,
-			M4SH_REG_USERSETTINGS_USERHEIGHT, user.height, 0xff);
-		m4sensorhub_reg_write_1byte(pedometer_client_data->m4sensorhub,
-			M4SH_REG_USERSETTINGS_USERWEIGHT, user.weight, 0xff);
-		break;
-	case M4_SENSOR_IOCTL_SET_USER_DISTANCE:
-		if (copy_from_user(&workout_data, argp, sizeof(workout_data))) {
-			printk(KERN_ERR "copy from user returned error\n");
-			ret = -EFAULT;
-			break;
-		}
-		m4sensorhub_reg_write(pedometer_client_data->m4sensorhub,
-			M4SH_REG_PEDOMETER_USERDISTANCE,
-			(unsigned char *)&workout_data.user_distance,
-			m4sh_no_mask);
-		m4sensorhub_reg_write(pedometer_client_data->m4sensorhub,
-			M4SH_REG_PEDOMETER_REPORTEDDISTANCE,
-			(unsigned char *)&workout_data.msp_distance,
-			m4sh_no_mask);
-		break;
-	case M4_SENSOR_IOCTL_SET_USER_CALIB_TABLE:
-		break;
-	case M4_SENSOR_IOCTL_GET_MANUAL_CALIB_STATUS:
-		break;
-	case M4_SENSOR_IOCTL_ERASE_CALIB:
-		break;
-	default:
-		KDEBUG(M4SH_ERROR, "Invalid IOCTL Command in %s\n", __func__);
-		 ret = -EINVAL;
-	}
-	return ret;
-}
-
-static ssize_t m4_pedometer_activity(struct device *dev,
-				struct device_attribute *attr, char *buf)
-{
-	struct platform_device *pdev = to_platform_device(dev);
-	struct pedometer_client *pedo_client_data = platform_get_drvdata(pdev);
-
-	m4_read_pedometer_data(pedo_client_data);
-	KDEBUG(M4SH_DEBUG, "%s  : activity = %d\n",
-			__func__, pedo_client_data->curr_data.activity);
-	return sprintf(buf, "%d \n", pedo_client_data->curr_data.activity);
-}
-
-static ssize_t m4_pedometer_distance(struct device *dev,
-				struct device_attribute *attr, char *buf)
-{
-	struct platform_device *pdev = to_platform_device(dev);
-	struct pedometer_client *pedo_client_data = platform_get_drvdata(pdev);
-
-	m4_read_pedometer_data(pedo_client_data);
-	KDEBUG(M4SH_DEBUG, "%s  : distance = %d\n",
-			__func__, pedo_client_data->curr_data.distance);
-	return sprintf(buf, "%d \n", pedo_client_data->curr_data.distance);
-}
-
-static ssize_t m4_pedometer_speed(struct device *dev,
-				struct device_attribute *attr, char *buf)
-{
-	struct platform_device *pdev = to_platform_device(dev);
-	struct pedometer_client *pedo_client_data = platform_get_drvdata(pdev);
-
-	m4_read_pedometer_data(pedo_client_data);
-	KDEBUG(M4SH_DEBUG, "%s  : speed = %d\n",
-			__func__, pedo_client_data->curr_data.speed);
-	return sprintf(buf, "%d \n", pedo_client_data->curr_data.speed);
-}
-
-static ssize_t m4_pedometer_stepcount(struct device *dev,
-				struct device_attribute *attr, char *buf)
-{
-	struct platform_device *pdev = to_platform_device(dev);
-	struct pedometer_client *pedo_client_data = platform_get_drvdata(pdev);
-
-	m4_read_pedometer_data(pedo_client_data);
-	KDEBUG(M4SH_DEBUG, "%s  : stepcount = %d\n",
-			__func__, pedo_client_data->curr_data.stepcount);
-	return sprintf(buf, "%d \n", pedo_client_data->curr_data.stepcount);
-}
-
-static ssize_t m4_pedometer_mets(struct device *dev,
-				struct device_attribute *attr, char *buf)
-{
-	struct platform_device *pdev = to_platform_device(dev);
-	struct pedometer_client *pedo_client_data = platform_get_drvdata(pdev);
-
-	KDEBUG(M4SH_DEBUG, "%s  : mets = %d\n",
-			__func__, pedo_client_data->curr_data.mets);
-	return sprintf(buf, "%d \n", pedo_client_data->curr_data.mets);
-}
-
-static ssize_t m4_pedometer_calories(struct device *dev,
-				struct device_attribute *attr, char *buf)
-{
-	struct platform_device *pdev = to_platform_device(dev);
-	struct pedometer_client *pedo_client_data = platform_get_drvdata(pdev);
-
-	KDEBUG(M4SH_DEBUG, "%s  : calories = %d\n",
-			__func__, pedo_client_data->curr_data.calories);
-	return sprintf(buf, "%d \n", pedo_client_data->curr_data.calories);
-}
-
-static ssize_t m4_pedometer_floorsclimbed(struct device *dev,
-				struct device_attribute *attr, char *buf)
-{
-	struct platform_device *pdev = to_platform_device(dev);
-	struct pedometer_client *pedo_client_data = platform_get_drvdata(pdev);
-
-	m4_read_pedometer_data(pedo_client_data);
-	KDEBUG(M4SH_DEBUG, "%s  : floorsclimbed = %d\n",
-			__func__, pedo_client_data->curr_data.floorsclimbed);
-	return sprintf(buf, "%d\n", pedo_client_data->curr_data.floorsclimbed);
-}
-
-static ssize_t m4_pedometer_metsactivity(struct device *dev,
-				struct device_attribute *attr, char *buf)
-{
-	struct platform_device *pdev = to_platform_device(dev);
-	struct pedometer_client *pedo_client_data = platform_get_drvdata(pdev);
-
-	KDEBUG(M4SH_DEBUG, "%s  : metsactivity = %d\n",
-			__func__, pedo_client_data->curr_data.metsactivity);
-	return sprintf(buf, "%d\n", pedo_client_data->curr_data.metsactivity);
-}
-
-static DEVICE_ATTR(activity, 0444, m4_pedometer_activity, NULL);
-static DEVICE_ATTR(distance, 0444, m4_pedometer_distance, NULL);
-static DEVICE_ATTR(speed, 0444, m4_pedometer_speed, NULL);
-static DEVICE_ATTR(stepcount, 0444, m4_pedometer_stepcount, NULL);
-static DEVICE_ATTR(mets, 0444, m4_pedometer_mets, NULL);
-static DEVICE_ATTR(calories, 0444, m4_pedometer_calories, NULL);
-static DEVICE_ATTR(floorsclimbed, 0444, m4_pedometer_floorsclimbed, NULL);
-static DEVICE_ATTR(metsactivity, 0444, m4_pedometer_metsactivity, NULL);
-
-static const struct file_operations pedometer_client_fops = {
-	.owner = THIS_MODULE,
-	.unlocked_ioctl = pedometer_client_ioctl,
-	.open  = pedometer_client_open,
-	.release = pedometer_client_close,
-};
-
-static struct miscdevice pedometer_client_miscdrv = {
-	.minor = MISC_DYNAMIC_MINOR,
-	.name  = PEDOMETER_CLIENT_DRIVER_NAME,
-	.fops = &pedometer_client_fops,
-};
-
-static int pedometer_driver_init(struct init_calldata *p_arg)
-{
-	int ret;
-	struct m4sensorhub_data *m4sensorhub = p_arg->p_m4sensorhub_data;
-
-	ret = m4sensorhub_irq_register(m4sensorhub,
-					M4SH_IRQ_PEDOMETER_DATA_READY,
-					m4_handle_pedometer_irq,
-					misc_pedometer_data);
-	if (ret < 0) {
-		KDEBUG(M4SH_ERROR, "Error registering m4 int %d (%d)\n",
-			M4SH_IRQ_PEDOMETER_DATA_READY, ret);
-		return ret;
-	}
-	ret = m4sensorhub_irq_register(m4sensorhub,
-					M4SH_IRQ_ACTIVITY_CHANGE,
-					m4_handle_pedometer_irq,
-					misc_pedometer_data);
-	if (ret < 0) {
-		KDEBUG(M4SH_ERROR, "Error registering m4 int %d (%d)\n",
-			M4SH_IRQ_ACTIVITY_CHANGE, ret);
-		goto exit1;
-	}
-	ret = m4sensorhub_irq_enable(m4sensorhub, M4SH_IRQ_ACTIVITY_CHANGE);
-	if (ret < 0) {
-		KDEBUG(M4SH_ERROR, "Error enabling m4 int %d (%d)\n",
-			M4SH_IRQ_ACTIVITY_CHANGE, ret);
-		goto exit;
+		m4ped_err("%s: Failed to read ped_activity data.\n", __func__);
+		goto m4ped_isr_fail;
+	} else if (err != size) {
+		m4ped_err("%s: Read %d bytes instead of %d for %s.\n",
+			  __func__, err, size, "ped_activity");
+		err = -EBADE;
+		goto m4ped_isr_fail;
 	}
 
-	return ret;
-exit:
-	m4sensorhub_irq_unregister(m4sensorhub, M4SH_IRQ_ACTIVITY_CHANGE);
-exit1:
-	m4sensorhub_irq_unregister(m4sensorhub, M4SH_IRQ_PEDOMETER_DATA_READY);
-	return ret;
-}
-
-static int pedometer_client_probe(struct platform_device *pdev)
-{
-	int ret = -1;
-	struct pedometer_client *pedometer_client_data;
-	struct m4sensorhub_data *m4sensorhub = m4sensorhub_client_get_drvdata();
-
-	if (!m4sensorhub)
-		return -EFAULT;
-
-	pedometer_client_data = kzalloc(sizeof(*pedometer_client_data),
-						GFP_KERNEL);
-	if (!pedometer_client_data)
-		return -ENOMEM;
-
-	pedometer_client_data->m4sensorhub = m4sensorhub;
-	platform_set_drvdata(pdev, pedometer_client_data);
-
-	pedometer_client_data->prev_data.stepcount = 0;
-	pedometer_client_data->prev_data.distance = 0;
-	pedometer_client_data->prev_data.activity = 0;
-	pedometer_client_data->prev_data.speed = 0;
-	pedometer_client_data->prev_data.floorsclimbed = 0;
-
-	pedometer_client_data->input_dev = input_allocate_device();
-	if (!pedometer_client_data->input_dev) {
-		ret = -ENOMEM;
-		KDEBUG(M4SH_ERROR, "%s: input device allocate failed: %d\n",
-			__func__, ret);
-		goto free_mem;
+	size = m4sensorhub_reg_getsize(dd->m4,
+		M4SH_REG_PEDOMETER_TOTATDISTANCE);
+	err = m4sensorhub_reg_read(dd->m4, M4SH_REG_PEDOMETER_TOTATDISTANCE,
+		(char *)&(dd->iiodat.total_distance));
+	if (err < 0) {
+		m4ped_err("%s: Failed to read total_distance data.\n",
+			  __func__);
+		goto m4ped_isr_fail;
+	} else if (err != size) {
+		m4ped_err("%s: Read %d bytes instead of %d for %s.\n",
+			  __func__, err, size, "total_distance");
+		err = -EBADE;
+		goto m4ped_isr_fail;
 	}
 
-	pedometer_client_data->input_dev->name = PEDOMETER_CLIENT_DRIVER_NAME;
-	set_bit(EV_MSC, pedometer_client_data->input_dev->evbit);
-	set_bit(MSC_ACTIVITY_TYPE, pedometer_client_data->input_dev->mscbit);
-	set_bit(MSC_STEPCOUNT, pedometer_client_data->input_dev->mscbit);
-	set_bit(MSC_SPEED, pedometer_client_data->input_dev->mscbit);
-	set_bit(MSC_DISTANCE, pedometer_client_data->input_dev->mscbit);
-	set_bit(MSC_METS, pedometer_client_data->input_dev->mscbit);
-	set_bit(MSC_CALORIES, pedometer_client_data->input_dev->mscbit);
-	set_bit(MSC_FLOORSCLIMBED, pedometer_client_data->input_dev->mscbit);
-	set_bit(MSC_METSACTIVITY, pedometer_client_data->input_dev->mscbit);
-
-	if (input_register_device(pedometer_client_data->input_dev)) {
-		KDEBUG(M4SH_ERROR, "%s: input device register failed\n",
-			__func__);
-		input_free_device(pedometer_client_data->input_dev);
-		goto free_mem;
+	size = m4sensorhub_reg_getsize(dd->m4, M4SH_REG_PEDOMETER_TOTALSTEPS);
+	err = m4sensorhub_reg_read(dd->m4, M4SH_REG_PEDOMETER_TOTALSTEPS,
+		(char *)&(dd->iiodat.total_steps));
+	if (err < 0) {
+		m4ped_err("%s: Failed to read total_steps data.\n", __func__);
+		goto m4ped_isr_fail;
+	} else if (err != size) {
+		m4ped_err("%s: Read %d bytes instead of %d for %s.\n",
+			  __func__, err, size, "total_steps");
+		err = -EBADE;
+		goto m4ped_isr_fail;
 	}
 
-	ret = misc_register(&pedometer_client_miscdrv);
-	if (ret < 0) {
-		KDEBUG(M4SH_ERROR, "Error registering %s driver\n", __func__);
-		goto unregister_input_device;
+	size = m4sensorhub_reg_getsize(dd->m4,
+		M4SH_REG_PEDOMETER_CURRENTSPEED);
+	err = m4sensorhub_reg_read(dd->m4, M4SH_REG_PEDOMETER_CURRENTSPEED,
+		(char *)&(dd->iiodat.current_speed));
+	if (err < 0) {
+		m4ped_err("%s: Failed to read current_speed data.\n", __func__);
+		goto m4ped_isr_fail;
+	} else if (err != size) {
+		m4ped_err("%s: Read %d bytes instead of %d for %s.\n",
+			  __func__, err, size, "current_speed");
+		err = -EBADE;
+		goto m4ped_isr_fail;
 	}
-	misc_pedometer_data = pedometer_client_data;
-	ret = m4sensorhub_register_initcall(pedometer_driver_init,
-					pedometer_client_data);
-	if (ret < 0) {
-		KDEBUG(M4SH_ERROR, "Unable to register init function "
-			"for pedometer client = %d\n", ret);
-		goto unregister_misc_device;
-	}
-	if (device_create_file(&pdev->dev, &dev_attr_activity)) {
-		KDEBUG(M4SH_ERROR, "Error creating %s sys entry\n", __func__);
-		ret = -1;
-		goto unregister_initcall;
-	}
-	if (device_create_file(&pdev->dev, &dev_attr_distance)) {
-		KDEBUG(M4SH_ERROR, "Error creating %s sys entry\n", __func__);
-		ret = -1;
-		goto remove_activity_device_file;
-	}
-	if (device_create_file(&pdev->dev, &dev_attr_speed)) {
-		KDEBUG(M4SH_ERROR, "Error creating %s sys entry\n", __func__);
-		ret = -1;
-		goto remove_distance_device_file;
-	}
-	if (device_create_file(&pdev->dev, &dev_attr_stepcount)) {
-		KDEBUG(M4SH_ERROR, "Error creating %s sys entry\n", __func__);
-		ret = -1;
-		goto remove_speed_device_file;
-	}
-	if (device_create_file(&pdev->dev, &dev_attr_mets)) {
-		KDEBUG(M4SH_ERROR, "Error creating %s sys entry\n", __func__);
-		ret = -1;
-		goto remove_stepcount_device_file;
-	}
-	if (device_create_file(&pdev->dev, &dev_attr_calories)) {
-		KDEBUG(M4SH_ERROR, "Error creating %s sys entry\n", __func__);
-		ret = -1;
-		goto remove_mets_device_file;
-	}
-	if (device_create_file(&pdev->dev, &dev_attr_floorsclimbed)) {
-		KDEBUG(M4SH_ERROR, "Error creating %s sys entry\n", __func__);
-		ret = -1;
-		goto remove_cals_device_file;
-	}
-	if (device_create_file(&pdev->dev, &dev_attr_metsactivity)) {
-		KDEBUG(M4SH_ERROR, "Error creating %s sys entry\n", __func__);
-		ret = -1;
-		goto remove_floorsclimbed_device_file;
-	}
-	KDEBUG(M4SH_INFO, "Initialized %s driver\n", __func__);
-	return 0;
 
-remove_floorsclimbed_device_file:
-	device_remove_file(&pdev->dev, &dev_attr_floorsclimbed);
-remove_cals_device_file:
-	device_remove_file(&pdev->dev, &dev_attr_calories);
-remove_mets_device_file:
-	device_remove_file(&pdev->dev, &dev_attr_mets);
-remove_stepcount_device_file:
-	device_remove_file(&pdev->dev, &dev_attr_stepcount);
-remove_speed_device_file:
-	device_remove_file(&pdev->dev, &dev_attr_speed);
-remove_distance_device_file:
-	device_remove_file(&pdev->dev, &dev_attr_distance);
-remove_activity_device_file:
-	device_remove_file(&pdev->dev, &dev_attr_activity);
-unregister_initcall:
-	m4sensorhub_unregister_initcall(pedometer_driver_init);
-unregister_misc_device:
-	misc_pedometer_data = NULL;
-	misc_deregister(&pedometer_client_miscdrv);
-unregister_input_device:
-	input_unregister_device(pedometer_client_data->input_dev);
-free_mem:
-	platform_set_drvdata(pdev, NULL);
-	pedometer_client_data->m4sensorhub = NULL;
-	kfree(pedometer_client_data);
-	pedometer_client_data = NULL;
-	return ret;
-}
+	size = m4sensorhub_reg_getsize(dd->m4,
+		M4SH_REG_PEDOMETER_FLOORSCLIMBED);
+	err = m4sensorhub_reg_read(dd->m4, M4SH_REG_PEDOMETER_FLOORSCLIMBED,
+		(char *)&(dd->iiodat.floors_climbed));
+	if (err < 0) {
+		m4ped_err("%s: Failed to read floors_climbed data.\n",
+			  __func__);
+		goto m4ped_isr_fail;
+	} else if (err != size) {
+		m4ped_err("%s: Read %d bytes instead of %d for %s.\n",
+			  __func__, err, size, "floors_climbed");
+		err = -EBADE;
+		goto m4ped_isr_fail;
+	}
 
-static int __exit pedometer_client_remove(struct platform_device *pdev)
-{
-	struct pedometer_client *pedometer_client_data =
-						platform_get_drvdata(pdev);
+	size = m4sensorhub_reg_getsize(dd->m4, M4SH_REG_METS_CALORIES);
+	err = m4sensorhub_reg_read(dd->m4, M4SH_REG_METS_CALORIES,
+		(char *)&(dd->iiodat.calories));
+	if (err < 0) {
+		m4ped_err("%s: Failed to read calories data.\n", __func__);
+		goto m4ped_isr_fail;
+	} else if (err != size) {
+		m4ped_err("%s: Read %d bytes instead of %d for %s.\n",
+			  __func__, err, size, "calories");
+		err = -EBADE;
+		goto m4ped_isr_fail;
+	}
 
-	device_remove_file(&pdev->dev, &dev_attr_mets);
-	device_remove_file(&pdev->dev, &dev_attr_calories);
-	device_remove_file(&pdev->dev, &dev_attr_stepcount);
-	device_remove_file(&pdev->dev, &dev_attr_speed);
-	device_remove_file(&pdev->dev, &dev_attr_distance);
-	device_remove_file(&pdev->dev, &dev_attr_activity);
-	device_remove_file(&pdev->dev, &dev_attr_floorsclimbed);
-	device_remove_file(&pdev->dev, &dev_attr_metsactivity);
+	dd->iiodat.timestamp = iio_get_time_ns();
+	iio_push_to_buffers(iio, (unsigned char *)&(dd->iiodat));
 
-	m4sensorhub_irq_unregister(pedometer_client_data->m4sensorhub,
-				M4SH_IRQ_PEDOMETER_DATA_READY);
-	m4sensorhub_irq_disable(pedometer_client_data->m4sensorhub,
-				M4SH_IRQ_ACTIVITY_CHANGE);
-	m4sensorhub_irq_unregister(pedometer_client_data->m4sensorhub,
-				M4SH_IRQ_ACTIVITY_CHANGE);
-	m4sensorhub_unregister_initcall(pedometer_driver_init);
-	misc_pedometer_data = NULL;
-	misc_deregister(&pedometer_client_miscdrv);
-	input_unregister_device(pedometer_client_data->input_dev);
-	platform_set_drvdata(pdev, NULL);
-	pedometer_client_data->m4sensorhub = NULL;
-	kfree(pedometer_client_data);
-	pedometer_client_data = NULL;
-	return 0;
-}
+m4ped_isr_fail:
+	if (err < 0)
+		m4ped_err("%s: Failed with error code %d.\n", __func__, err);
 
-static void pedometer_client_shutdown(struct platform_device *pdev)
-{
+	mutex_unlock(&(dd->mutex));
+
 	return;
 }
-#ifdef CONFIG_PM
-static int pedometer_client_suspend(struct platform_device *pdev,
-				pm_message_t message)
+
+static int m4ped_set_samplerate(struct iio_dev *iio, int16_t rate)
 {
-	return 0;
+	int err = 0;
+	struct m4ped_driver_data *dd = iio_priv(iio);
+
+	/*
+	 * Currently, there is no concept of setting a sample rate for this
+	 * sensor, so this function only enables/disables interrupt reporting.
+	 */
+	dd->samplerate = rate;
+
+	if (rate >= 0) {
+		/* Enable the IRQ if necessary */
+		if (!(dd->status & (1 << M4PED_IRQ_ENABLED_BIT))) {
+			err = m4sensorhub_irq_enable(dd->m4,
+				M4SH_IRQ_PEDOMETER_DATA_READY);
+			if (err < 0) {
+				m4ped_err("%s: Failed to enable ped irq.\n",
+					  __func__);
+				goto m4ped_set_samplerate_fail;
+			}
+
+			err = m4sensorhub_irq_enable(dd->m4,
+				M4SH_IRQ_ACTIVITY_CHANGE);
+			if (err < 0) {
+				m4ped_err("%s: Failed to enable act irq.\n",
+					  __func__);
+				goto m4ped_set_samplerate_fail;
+			}
+
+			dd->status = dd->status | (1 << M4PED_IRQ_ENABLED_BIT);
+		}
+	} else {
+		/* Disable the IRQ if necessary */
+		if (dd->status & (1 << M4PED_IRQ_ENABLED_BIT)) {
+			err = m4sensorhub_irq_disable(dd->m4,
+				M4SH_IRQ_PEDOMETER_DATA_READY);
+			if (err < 0) {
+				m4ped_err("%s: Failed to disable ped irq.\n",
+					  __func__);
+				goto m4ped_set_samplerate_fail;
+			}
+
+			err = m4sensorhub_irq_disable(dd->m4,
+				M4SH_IRQ_ACTIVITY_CHANGE);
+			if (err < 0) {
+				m4ped_err("%s: Failed to disable act irq.\n",
+					  __func__);
+				goto m4ped_set_samplerate_fail;
+			}
+
+			dd->status = dd->status & ~(1 << M4PED_IRQ_ENABLED_BIT);
+		}
+	}
+
+m4ped_set_samplerate_fail:
+	return err;
 }
 
-static int pedometer_client_resume(struct platform_device *pdev)
+static ssize_t m4ped_setrate_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
 {
+	struct platform_device *pdev = to_platform_device(dev);
+	struct iio_dev *iio = platform_get_drvdata(pdev);
+	struct m4ped_driver_data *dd = iio_priv(iio);
+	ssize_t size = 0;
+
+	mutex_lock(&(dd->mutex));
+	size = snprintf(buf, PAGE_SIZE, "Current rate: %hd\n", dd->samplerate);
+	mutex_unlock(&(dd->mutex));
+	return size;
+}
+static ssize_t m4ped_setrate_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	int err = 0;
+	struct platform_device *pdev = to_platform_device(dev);
+	struct iio_dev *iio = platform_get_drvdata(pdev);
+	struct m4ped_driver_data *dd = iio_priv(iio);
+	int value = 0;
+
+	mutex_lock(&(dd->mutex));
+
+	err = kstrtoint(buf, 10, &value);
+	if (err < 0) {
+		m4ped_err("%s: Failed to convert value.\n", __func__);
+		goto m4ped_enable_store_exit;
+	}
+
+	if ((value < -1) || (value > 32767)) {
+		m4ped_err("%s: Invalid samplerate %d passed.\n",
+			  __func__, value);
+		err = -EINVAL;
+		goto m4ped_enable_store_exit;
+	}
+
+	err = m4ped_set_samplerate(iio, value);
+	if (err < 0) {
+		m4ped_err("%s: Failed to set sample rate.\n", __func__);
+		goto m4ped_enable_store_exit;
+	}
+
+m4ped_enable_store_exit:
+	if (err < 0) {
+		m4ped_err("%s: Failed with error code %d.\n", __func__, err);
+		size = err;
+	}
+
+	mutex_unlock(&(dd->mutex));
+
+	return size;
+}
+static IIO_DEVICE_ATTR(setrate, S_IRUSR | S_IWUSR,
+		m4ped_setrate_show, m4ped_setrate_store, 0);
+
+static ssize_t m4ped_iiodata_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct iio_dev *iio = platform_get_drvdata(pdev);
+	struct m4ped_driver_data *dd = iio_priv(iio);
+	ssize_t size = 0;
+
+	mutex_lock(&(dd->mutex));
+	size = snprintf(buf, PAGE_SIZE,
+		"%s%hhu\n%s%u\n%s%hu\n%s%u\n%s%hu\n%s%u\n",
+		"ped_activity: ", dd->iiodat.ped_activity,
+		"total_distance: ", dd->iiodat.total_distance,
+		"total_steps: ", dd->iiodat.total_steps,
+		"current_speed: ", dd->iiodat.current_speed,
+		"floors_climbed: ", dd->iiodat.floors_climbed,
+		"calories: ", dd->iiodat.calories);
+	mutex_unlock(&(dd->mutex));
+	return size;
+}
+static IIO_DEVICE_ATTR(iiodata, S_IRUGO, m4ped_iiodata_show, NULL, 0);
+
+static struct attribute *m4ped_iio_attributes[] = {
+	&iio_dev_attr_setrate.dev_attr.attr,
+	&iio_dev_attr_iiodata.dev_attr.attr,
+	NULL,
+};
+
+static const struct attribute_group m4ped_iio_attr_group = {
+	.attrs = m4ped_iio_attributes,
+};
+
+static const struct iio_info m4ped_iio_info = {
+	.driver_module = THIS_MODULE,
+	.attrs = &m4ped_iio_attr_group,
+};
+
+static const struct iio_chan_spec m4ped_iio_channels[] = {
+	{
+		.type = IIO_PEDOMETER,
+		.indexed = 1,
+		.channel = 0,
+		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),
+		.scan_index = 0,
+		.scan_type = {
+			.sign = 'u',
+			.realbits = M4PED_DATA_STRUCT_SIZE_BITS,
+			.storagebits = M4PED_DATA_STRUCT_SIZE_BITS,
+			.shift = 0,
+		},
+	},
+};
+
+static void m4ped_remove_iiodev(struct iio_dev *iio)
+{
+	struct m4ped_driver_data *dd = iio_priv(iio);
+
+	/* Remember, only call when dd->mutex is locked */
+	iio_kfifo_free(iio->buffer);
+	iio_buffer_unregister(iio);
+	iio_device_unregister(iio);
+	mutex_destroy(&(dd->mutex));
+	iio_device_free(iio); /* dd is freed here */
+	return;
+}
+
+static int m4ped_create_iiodev(struct iio_dev *iio)
+{
+	int err = 0;
+	struct m4ped_driver_data *dd = iio_priv(iio);
+
+	iio->name = M4PED_DRIVER_NAME;
+	iio->modes = INDIO_DIRECT_MODE | INDIO_BUFFER_HARDWARE;
+	iio->num_channels = 1;
+	iio->info = &m4ped_iio_info;
+	iio->channels = m4ped_iio_channels;
+
+	iio->buffer = iio_kfifo_allocate(iio);
+	if (iio->buffer == NULL) {
+		m4ped_err("%s: Failed to allocate IIO buffer.\n", __func__);
+		err = -ENOMEM;
+		goto m4ped_create_iiodev_kfifo_fail;
+	}
+
+	iio->buffer->scan_timestamp = true;
+	iio->buffer->access->set_bytes_per_datum(iio->buffer,
+		sizeof(dd->iiodat));
+	err = iio_buffer_register(iio, iio->channels, iio->num_channels);
+	if (err < 0) {
+		m4ped_err("%s: Failed to register IIO buffer.\n", __func__);
+		goto m4ped_create_iiodev_buffer_fail;
+	}
+
+	err = iio_device_register(iio);
+	if (err < 0) {
+		m4ped_err("%s: Failed to register IIO device.\n", __func__);
+		goto m4ped_create_iiodev_iioreg_fail;
+	}
+
+	goto m4ped_create_iiodev_exit;
+
+m4ped_create_iiodev_iioreg_fail:
+	iio_buffer_unregister(iio);
+m4ped_create_iiodev_buffer_fail:
+	iio_kfifo_free(iio->buffer);
+m4ped_create_iiodev_kfifo_fail:
+	iio_device_free(iio); /* dd is freed here */
+m4ped_create_iiodev_exit:
+	return err;
+}
+
+static int m4ped_driver_init(struct init_calldata *p_arg)
+{
+	struct iio_dev *iio = p_arg->p_data;
+	struct m4ped_driver_data *dd = iio_priv(iio);
+	int err = 0;
+
+	mutex_lock(&(dd->mutex));
+
+	dd->m4 = p_arg->p_m4sensorhub_data;
+	if (dd->m4 == NULL) {
+		m4ped_err("%s: M4 sensor data is NULL.\n", __func__);
+		err = -ENODATA;
+		goto m4ped_driver_init_fail;
+	}
+
+	err = m4ped_create_iiodev(iio);
+	if (err < 0) {
+		m4ped_err("%s: Failed to create IIO device.\n", __func__);
+		goto m4ped_driver_init_fail;
+	}
+
+	err = m4sensorhub_irq_register(dd->m4,
+		M4SH_IRQ_PEDOMETER_DATA_READY, m4ped_isr, iio);
+	if (err < 0) {
+		m4ped_err("%s: Failed to register M4 PED IRQ.\n", __func__);
+		goto m4ped_driver_init_irq_ped_fail;
+	}
+
+	err = m4sensorhub_irq_register(dd->m4,
+		M4SH_IRQ_ACTIVITY_CHANGE, m4ped_isr, iio);
+	if (err < 0) {
+		m4ped_err("%s: Failed to register M4 ACT IRQ.\n", __func__);
+		goto m4ped_driver_init_irq_act_fail;
+	}
+
+	/*
+	 * NOTE: We're intentionally unlocking here instead of
+	 *       at function end (after error cases).  The reason
+	 *       is that the mutex ceases to exist because IIO is
+	 *       freed, so we would cause a panic putting the unlock
+	 *       after m4ped_driver_init_exit.
+	 */
+	mutex_unlock(&(dd->mutex));
+
+	goto m4ped_driver_init_exit;
+
+m4ped_driver_init_irq_act_fail:
+	m4sensorhub_irq_unregister(dd->m4, M4SH_IRQ_PEDOMETER_DATA_READY);
+m4ped_driver_init_irq_ped_fail:
+	m4ped_remove_iiodev(iio); /* dd is freed here */
+m4ped_driver_init_fail:
+	m4ped_err("%s: Init failed with error code %d.\n", __func__, err);
+m4ped_driver_init_exit:
+	return err;
+}
+
+static int m4ped_probe(struct platform_device *pdev)
+{
+	struct m4ped_driver_data *dd = NULL;
+	struct iio_dev *iio = NULL;
+	int err = 0;
+
+	iio = iio_device_alloc(sizeof(dd));
+	if (iio == NULL) {
+		m4ped_err("%s: Failed to allocate IIO data.\n", __func__);
+		err = -ENOMEM;
+		goto m4ped_probe_fail_noiio;
+	}
+
+	dd = iio_priv(iio);
+	dd->pdev = pdev;
+	mutex_init(&(dd->mutex));
+	platform_set_drvdata(pdev, iio);
+	dd->samplerate = -1; /* We always start disabled */
+
+	err = m4sensorhub_register_initcall(m4ped_driver_init, iio);
+	if (err < 0) {
+		m4ped_err("%s: Failed to register initcall.\n", __func__);
+		goto m4ped_probe_fail;
+	}
+
+	return 0;
+
+m4ped_probe_fail:
+	mutex_destroy(&(dd->mutex));
+	iio_device_free(iio); /* dd is freed here */
+m4ped_probe_fail_noiio:
+	m4ped_err("%s: Probe failed with error code %d.\n", __func__, err);
+	return err;
+}
+
+static int __exit m4ped_remove(struct platform_device *pdev)
+{
+	struct iio_dev *iio = platform_get_drvdata(pdev);
+	struct m4ped_driver_data *dd = NULL;
+
+	if (iio == NULL)
+		goto m4ped_remove_exit;
+
+	dd = iio_priv(iio);
+	if (dd == NULL)
+		goto m4ped_remove_exit;
+
+	mutex_lock(&(dd->mutex));
+	if (dd->status & (1 << M4PED_IRQ_ENABLED_BIT)) {
+		m4sensorhub_irq_disable(dd->m4,
+					M4SH_IRQ_PEDOMETER_DATA_READY);
+		m4sensorhub_irq_disable(dd->m4,
+					M4SH_IRQ_ACTIVITY_CHANGE);
+		dd->status = dd->status & ~(1 << M4PED_IRQ_ENABLED_BIT);
+	}
+	m4sensorhub_irq_unregister(dd->m4,
+				   M4SH_IRQ_PEDOMETER_DATA_READY);
+	m4sensorhub_irq_unregister(dd->m4,
+				   M4SH_IRQ_ACTIVITY_CHANGE);
+	m4sensorhub_unregister_initcall(m4ped_driver_init);
+	mutex_destroy(&(dd->mutex));
+	m4ped_remove_iiodev(iio);  /* dd is freed here */
+
+m4ped_remove_exit:
 	return 0;
 }
-#else
-#define pedometer_client_suspend NULL
-#define pedometer_client_resume  NULL
-#endif
-
 
 static struct of_device_id m4pedometer_match_tbl[] = {
 	{ .compatible = "mot,m4pedometer" },
 	{},
 };
 
-
-static struct platform_driver pedometer_client_driver = {
-	.probe		= pedometer_client_probe,
-	.remove		= __exit_p(pedometer_client_remove),
-	.shutdown	= pedometer_client_shutdown,
-	.suspend	= pedometer_client_suspend,
-	.resume		= pedometer_client_resume,
+static struct platform_driver m4ped_driver = {
+	.probe		= m4ped_probe,
+	.remove		= __exit_p(m4ped_remove),
+	.shutdown	= NULL,
+	.suspend	= NULL,
+	.resume		= NULL,
 	.driver		= {
-		.name	= PEDOMETER_CLIENT_DRIVER_NAME,
+		.name	= M4PED_DRIVER_NAME,
 		.owner	= THIS_MODULE,
 		.of_match_table = of_match_ptr(m4pedometer_match_tbl),
 	},
 };
 
-static int __init pedometer_client_init(void)
+static int __init m4ped_init(void)
 {
-	return platform_driver_register(&pedometer_client_driver);
+	return platform_driver_register(&m4ped_driver);
 }
 
-static void __exit pedometer_client_exit(void)
+static void __exit m4ped_exit(void)
 {
-	platform_driver_unregister(&pedometer_client_driver);
+	platform_driver_unregister(&m4ped_driver);
 }
 
-module_init(pedometer_client_init);
-module_exit(pedometer_client_exit);
+module_init(m4ped_init);
+module_exit(m4ped_exit);
 
-MODULE_ALIAS("platform:pedometer_client");
+MODULE_ALIAS("platform:m4ped");
 MODULE_DESCRIPTION("M4 Sensor Hub Pedometer client driver");
 MODULE_AUTHOR("Motorola");
 MODULE_LICENSE("GPL");
-

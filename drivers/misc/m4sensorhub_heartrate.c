@@ -43,11 +43,9 @@ struct m4hrt_driver_data {
 	struct platform_device      *pdev;
 	struct m4sensorhub_data     *m4;
 	struct mutex                mutex; /* controls driver entry points */
-	struct iio_dev              *iio;
 
-	uint16_t        heartrate;
+	struct m4sensorhub_heartrate_iio_data   iiodat;
 	int16_t         samplerate;
-
 	uint16_t        status;
 };
 
@@ -55,34 +53,27 @@ struct m4hrt_driver_data {
 static void m4hrt_isr(enum m4sensorhub_irqs int_event, void *handle)
 {
 	int err = 0;
-	struct m4hrt_driver_data *dd = handle;
+	struct iio_dev *iio = handle;
+	struct m4hrt_driver_data *dd = iio_priv(iio);
 	int size = 0;
-	struct m4sensorhub_heartrate_iio_data databuf;
 
 	mutex_lock(&(dd->mutex));
 
 	size = m4sensorhub_reg_getsize(dd->m4, M4SH_REG_HEARTRATE_HEARTRATE);
-	if (size < 0) {
-		m4hrt_err("%s: Reading from invalid register %d.\n",
-			  __func__, size);
-		err = size;
-		goto m4hrt_isr_fail;
-	}
-
 	err = m4sensorhub_reg_read(dd->m4, M4SH_REG_HEARTRATE_HEARTRATE,
-		(char *)&(databuf.heartrate));
+		(char *)&(dd->iiodat.heartrate));
 	if (err < 0) {
 		m4hrt_err("%s: Failed to read heartrate data.\n", __func__);
 		goto m4hrt_isr_fail;
 	} else if (err != size) {
-		m4hrt_err("%s: Read %d bytes instead of %d.\n",
-			  __func__, err, size);
+		m4hrt_err("%s: Read %d bytes instead of %d for %s.\n",
+			  __func__, err, size, "heartrate");
+		err = -EBADE;
 		goto m4hrt_isr_fail;
 	}
 
-	dd->heartrate = databuf.heartrate;
-	databuf.timestamp = iio_get_time_ns();
-	iio_push_to_buffers(dd->iio, (unsigned char *)&databuf);
+	dd->iiodat.timestamp = iio_get_time_ns();
+	iio_push_to_buffers(iio, (unsigned char *)&(dd->iiodat));
 
 m4hrt_isr_fail:
 	if (err < 0)
@@ -93,17 +84,17 @@ m4hrt_isr_fail:
 	return;
 }
 
-static int m4hrt_set_samplerate(struct m4hrt_driver_data *dd, int16_t rate)
+static int m4hrt_set_samplerate(struct iio_dev *iio, int16_t rate)
 {
 	int err = 0;
+	struct m4hrt_driver_data *dd = iio_priv(iio);
 	int size = 0;
 
 	if (rate == dd->samplerate)
-		goto m4hrt_change_interrupt_bit;
+		goto m4hrt_set_samplerate_irq_check;
 
 	size = m4sensorhub_reg_getsize(dd->m4,
 		M4SH_REG_HEARTRATESENSOR_SAMPLERATE);
-
 	err = m4sensorhub_reg_write(dd->m4, M4SH_REG_HEARTRATESENSOR_SAMPLERATE,
 		(char *)&rate, m4sh_no_mask);
 	if (err < 0) {
@@ -117,35 +108,36 @@ static int m4hrt_set_samplerate(struct m4hrt_driver_data *dd, int16_t rate)
 	}
 	dd->samplerate = rate;
 
-m4hrt_change_interrupt_bit:
-	if (rate == -1) {
-		if (dd->status & (1 << M4HRT_IRQ_ENABLED_BIT)) {
-			err = m4sensorhub_irq_disable(dd->m4,
-				M4SH_IRQ_HEARTRATESENSOR_DATA_READY);
-			if (err < 0) {
-				m4hrt_err("%s: Failed to disable interrupt.\n",
-				__func__);
-				goto m4hrt_set_samplerate_fail;
-			}
-			dd->status = dd->status & ~(1 << M4HRT_IRQ_ENABLED_BIT);
-		}
-	} else {
+m4hrt_set_samplerate_irq_check:
+	if (rate >= 0) {
+		/* Enable the IRQ if necessary */
 		if (!(dd->status & (1 << M4HRT_IRQ_ENABLED_BIT))) {
 			err = m4sensorhub_irq_enable(dd->m4,
 				M4SH_IRQ_HEARTRATESENSOR_DATA_READY);
 			if (err < 0) {
-				m4hrt_err("%s: Failed to enable interrupt.\n",
-					__func__);
+				m4hrt_err("%s: Failed to enable irq.\n",
+					  __func__);
 				goto m4hrt_set_samplerate_fail;
 			}
 			dd->status = dd->status | (1 << M4HRT_IRQ_ENABLED_BIT);
+		}
+	} else {
+		/* Disable the IRQ if necessary */
+		if (dd->status & (1 << M4HRT_IRQ_ENABLED_BIT)) {
+			err = m4sensorhub_irq_disable(dd->m4,
+				M4SH_IRQ_HEARTRATESENSOR_DATA_READY);
+			if (err < 0) {
+				m4hrt_err("%s: Failed to disable irq.\n",
+					  __func__);
+				goto m4hrt_set_samplerate_fail;
+			}
+			dd->status = dd->status & ~(1 << M4HRT_IRQ_ENABLED_BIT);
 		}
 	}
 
 m4hrt_set_samplerate_fail:
 	return err;
 }
-
 
 static ssize_t m4hrt_setrate_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -178,13 +170,13 @@ static ssize_t m4hrt_setrate_store(struct device *dev,
 	}
 
 	if ((value < -1) || (value > 32767)) {
-		m4hrt_err("%s: Invalid samplerate %d\n",
+		m4hrt_err("%s: Invalid samplerate %d passed.\n",
 			  __func__, value);
-		err = -EOVERFLOW;
+		err = -EINVAL;
 		goto m4hrt_enable_store_exit;
 	}
 
-	err = m4hrt_set_samplerate(dd, value);
+	err = m4hrt_set_samplerate(iio, value);
 	if (err < 0) {
 		m4hrt_err("%s: Failed to set sample rate.\n", __func__);
 		goto m4hrt_enable_store_exit;
@@ -203,7 +195,7 @@ m4hrt_enable_store_exit:
 static IIO_DEVICE_ATTR(setrate, S_IRUSR | S_IWUSR,
 		m4hrt_setrate_show, m4hrt_setrate_store, 0);
 
-static ssize_t m4hrt_heartrate_show(struct device *dev,
+static ssize_t m4hrt_iiodata_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	struct platform_device *pdev = to_platform_device(dev);
@@ -212,16 +204,16 @@ static ssize_t m4hrt_heartrate_show(struct device *dev,
 	ssize_t size = 0;
 
 	mutex_lock(&(dd->mutex));
-	size = snprintf(buf, PAGE_SIZE, "Current heartrate: %d\n",
-		dd->heartrate);
+	size = snprintf(buf, PAGE_SIZE, "%s%hu\n",
+		"heartrate: ", dd->iiodat.heartrate);
 	mutex_unlock(&(dd->mutex));
 	return size;
 }
-static IIO_DEVICE_ATTR(heartrate, S_IRUGO, m4hrt_heartrate_show, NULL, 0);
+static IIO_DEVICE_ATTR(iiodata, S_IRUGO, m4hrt_iiodata_show, NULL, 0);
 
 static struct attribute *m4hrt_iio_attributes[] = {
 	&iio_dev_attr_setrate.dev_attr.attr,
-	&iio_dev_attr_heartrate.dev_attr.attr,
+	&iio_dev_attr_iiodata.dev_attr.attr,
 	NULL,
 };
 
@@ -250,44 +242,47 @@ static const struct iio_chan_spec m4hrt_iio_channels[] = {
 	},
 };
 
-static void m4hrt_remove_iiodev(struct m4hrt_driver_data *dd)
+static void m4hrt_remove_iiodev(struct iio_dev *iio)
 {
-	iio_kfifo_free(dd->iio->buffer);
-	iio_buffer_unregister(dd->iio);
-	iio_device_unregister(dd->iio);
+	struct m4hrt_driver_data *dd = iio_priv(iio);
+
+	/* Remember, only call when dd->mutex is locked */
+	iio_kfifo_free(iio->buffer);
+	iio_buffer_unregister(iio);
+	iio_device_unregister(iio);
 	mutex_destroy(&(dd->mutex));
-	iio_device_free(dd->iio); /* dd is freed here */
+	iio_device_free(iio); /* dd is freed here */
 	return;
 }
 
-static int m4hrt_create_iiodev(struct m4hrt_driver_data *dd)
+static int m4hrt_create_iiodev(struct iio_dev *iio)
 {
 	int err = 0;
+	struct m4hrt_driver_data *dd = iio_priv(iio);
 
-	dd->iio->name = M4HRT_DRIVER_NAME;
-	dd->iio->modes = INDIO_DIRECT_MODE | INDIO_BUFFER_HARDWARE;
-	dd->iio->num_channels = 1;
-	dd->iio->info = &m4hrt_iio_info;
-	dd->iio->channels = m4hrt_iio_channels;
+	iio->name = M4HRT_DRIVER_NAME;
+	iio->modes = INDIO_DIRECT_MODE | INDIO_BUFFER_HARDWARE;
+	iio->num_channels = 1;
+	iio->info = &m4hrt_iio_info;
+	iio->channels = m4hrt_iio_channels;
 
-	dd->iio->buffer = iio_kfifo_allocate(dd->iio);
-	if (dd->iio->buffer == NULL) {
+	iio->buffer = iio_kfifo_allocate(iio);
+	if (iio->buffer == NULL) {
 		m4hrt_err("%s: Failed to allocate IIO buffer.\n", __func__);
 		err = -ENOMEM;
 		goto m4hrt_create_iiodev_kfifo_fail;
 	}
 
-	dd->iio->buffer->scan_timestamp = true;
-	dd->iio->buffer->access->set_bytes_per_datum(dd->iio->buffer,
-		sizeof(struct m4sensorhub_heartrate_iio_data));
-	err = iio_buffer_register(dd->iio, dd->iio->channels,
-		dd->iio->num_channels);
+	iio->buffer->scan_timestamp = true;
+	iio->buffer->access->set_bytes_per_datum(iio->buffer,
+		sizeof(dd->iiodat));
+	err = iio_buffer_register(iio, iio->channels, iio->num_channels);
 	if (err < 0) {
 		m4hrt_err("%s: Failed to register IIO buffer.\n", __func__);
 		goto m4hrt_create_iiodev_buffer_fail;
 	}
 
-	err = iio_device_register(dd->iio);
+	err = iio_device_register(iio);
 	if (err < 0) {
 		m4hrt_err("%s: Failed to register IIO device.\n", __func__);
 		goto m4hrt_create_iiodev_iioreg_fail;
@@ -296,19 +291,19 @@ static int m4hrt_create_iiodev(struct m4hrt_driver_data *dd)
 	goto m4hrt_create_iiodev_exit;
 
 m4hrt_create_iiodev_iioreg_fail:
-	iio_buffer_unregister(dd->iio);
+	iio_buffer_unregister(iio);
 m4hrt_create_iiodev_buffer_fail:
-	iio_kfifo_free(dd->iio->buffer);
+	iio_kfifo_free(iio->buffer);
 m4hrt_create_iiodev_kfifo_fail:
-	iio_device_free(dd->iio);
-	dd->iio = NULL;
+	iio_device_free(iio); /* dd is freed here */
 m4hrt_create_iiodev_exit:
 	return err;
 }
 
 static int m4hrt_driver_init(struct init_calldata *p_arg)
 {
-	struct m4hrt_driver_data *dd = p_arg->p_data;
+	struct iio_dev *iio = p_arg->p_data;
+	struct m4hrt_driver_data *dd = iio_priv(iio);
 	int err = 0;
 
 	mutex_lock(&(dd->mutex));
@@ -320,25 +315,32 @@ static int m4hrt_driver_init(struct init_calldata *p_arg)
 		goto m4hrt_driver_init_fail;
 	}
 
-	err = m4hrt_create_iiodev(dd);
+	err = m4hrt_create_iiodev(iio);
 	if (err < 0) {
-		m4hrt_err("%s: Failed to create M4 event device.\n", __func__);
+		m4hrt_err("%s: Failed to create IIO device.\n", __func__);
 		goto m4hrt_driver_init_fail;
 	}
 
 	err = m4sensorhub_irq_register(dd->m4,
-		M4SH_IRQ_HEARTRATESENSOR_DATA_READY, m4hrt_isr, dd);
+		M4SH_IRQ_HEARTRATESENSOR_DATA_READY, m4hrt_isr, iio);
 	if (err < 0) {
 		m4hrt_err("%s: Failed to register M4 IRQ.\n", __func__);
 		goto m4hrt_driver_init_irq_fail;
 	}
 
+	/*
+	 * NOTE: We're intentionally unlocking here instead of
+	 *       at function end (after error cases).  The reason
+	 *       is that the mutex ceases to exist because IIO is
+	 *       freed, so we would cause a panic putting the unlock
+	 *       after m4hrt_driver_init_exit.
+	 */
 	mutex_unlock(&(dd->mutex));
 
 	goto m4hrt_driver_init_exit;
 
 m4hrt_driver_init_irq_fail:
-	m4hrt_remove_iiodev(dd); /* dd is freed here */
+	m4hrt_remove_iiodev(iio); /* dd is freed here */
 m4hrt_driver_init_fail:
 	m4hrt_err("%s: Init failed with error code %d.\n", __func__, err);
 m4hrt_driver_init_exit:
@@ -359,12 +361,12 @@ static int m4hrt_probe(struct platform_device *pdev)
 	}
 
 	dd = iio_priv(iio);
-	dd->iio = iio;
 	dd->pdev = pdev;
 	mutex_init(&(dd->mutex));
-	platform_set_drvdata(pdev, dd);
+	platform_set_drvdata(pdev, iio);
+	dd->samplerate = -1; /* We always start disabled */
 
-	err = m4sensorhub_register_initcall(m4hrt_driver_init, dd);
+	err = m4sensorhub_register_initcall(m4hrt_driver_init, iio);
 	if (err < 0) {
 		m4hrt_err("%s: Failed to register initcall.\n", __func__);
 		goto m4hrt_probe_fail;
@@ -374,7 +376,7 @@ static int m4hrt_probe(struct platform_device *pdev)
 
 m4hrt_probe_fail:
 	mutex_destroy(&(dd->mutex));
-	iio_device_free(dd->iio); /* dd is freed here */
+	iio_device_free(iio); /* dd is freed here */
 m4hrt_probe_fail_noiio:
 	m4hrt_err("%s: Probe failed with error code %d.\n", __func__, err);
 	return err;
@@ -382,8 +384,13 @@ m4hrt_probe_fail_noiio:
 
 static int __exit m4hrt_remove(struct platform_device *pdev)
 {
-	struct m4hrt_driver_data *dd = platform_get_drvdata(pdev);
+	struct iio_dev *iio = platform_get_drvdata(pdev);
+	struct m4hrt_driver_data *dd = NULL;
 
+	if (iio == NULL)
+		goto m4hrt_remove_exit;
+
+	dd = iio_priv(iio);
 	if (dd == NULL)
 		goto m4hrt_remove_exit;
 
@@ -397,8 +404,7 @@ static int __exit m4hrt_remove(struct platform_device *pdev)
 				   M4SH_IRQ_HEARTRATESENSOR_DATA_READY);
 	m4sensorhub_unregister_initcall(m4hrt_driver_init);
 	mutex_destroy(&(dd->mutex));
-	if (dd->iio != NULL)
-		m4hrt_remove_iiodev(dd);  /* dd is freed here */
+	m4hrt_remove_iiodev(iio);  /* dd is freed here */
 
 m4hrt_remove_exit:
 	return 0;

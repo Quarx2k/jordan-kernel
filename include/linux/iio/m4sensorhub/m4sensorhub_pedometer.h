@@ -20,16 +20,21 @@
  *
  */
 
-#ifndef _M4SENSORHUB_HEARTRATE_IIO_H
-#define _M4SENSORHUB_HEARTRATE_IIO_H
+#ifndef _M4SENSORHUB_PEDOMETER_IIO_H
+#define _M4SENSORHUB_PEDOMETER_IIO_H
 
-struct m4sensorhub_heartrate_iio_data {
-	uint16_t        heartrate;
+struct m4sensorhub_pedometer_iio_data {
+	uint8_t         ped_activity;
+	uint32_t        total_distance;
+	uint16_t        total_steps;
+	uint32_t        current_speed;
+	uint16_t        floors_climbed;
+	uint32_t        calories;
 	long long       timestamp;
 } __packed;
 
-#define M4HRT_DRIVER_NAME           "m4sensorhub_heartrate"
-#define M4HRT_DATA_STRUCT_SIZE_BITS \
-	(sizeof(struct m4sensorhub_heartrate_iio_data) * 8)
+#define M4PED_DRIVER_NAME           "m4sensorhub_pedometer"
+#define M4PED_DATA_STRUCT_SIZE_BITS \
+	(sizeof(struct m4sensorhub_pedometer_iio_data) * 8)
 
-#endif /* _M4SENSORHUB_HEARTRATE_IIO_H */
+#endif /* _M4SENSORHUB_PEDOMETER_IIO_H */

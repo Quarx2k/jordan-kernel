@@ -891,18 +891,10 @@ struct input_keymap_entry {
 #define MSC_GESTURE_VALUE1      0x0c
 #define MSC_GESTURE_VALUE2      0x0d
 #define MSC_GESTURE_VALUE3      0x0e
-#define MSC_STEPCOUNT           0x0f
-#define MSC_DISTANCE            0x10
-#define MSC_SPEED               0x11
-#define MSC_ACTIVITY_TYPE       0x12
-#define MSC_METS                0x13
-#define MSC_CALORIES            0x14
-#define MSC_METSACTIVITY        0x15
-#define MSC_FLOORSCLIMBED       0x16
-#define MSC_PASSIVE_STEPS       0x17
-#define MSC_PASSIVE_METS        0x18
-#define MSC_PASSIVE_TIMESTAMP   0x19
-#define MSC_PASSIVE_FLOORSCLIMBED 0x1a
+#define MSC_PASSIVE_STEPS       0x0f
+#define MSC_PASSIVE_METS        0x10
+#define MSC_PASSIVE_TIMESTAMP   0x11
+#define MSC_PASSIVE_FLOORSCLIMBED 0x12
 
 #define MSC_MAX			0x1f
 #define MSC_CNT			(MSC_MAX+1)

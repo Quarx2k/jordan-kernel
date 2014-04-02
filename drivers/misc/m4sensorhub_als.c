@@ -353,10 +353,11 @@ static int __exit m4als_remove(struct platform_device *pdev)
 	mutex_lock(&(dd->mutex));
 	m4als_remove_sysfs(dd);
 	if (dd->status & (1 << M4ALS_IRQ_ENABLED_BIT)) {
-		m4sensorhub_irq_disable(dd->m4, M4SH_IRQ_PRESSURE_DATA_READY);
+		m4sensorhub_irq_disable(dd->m4,
+					M4SH_IRQ_LIGHTSENSOR_DATA_READY);
 		dd->status = dd->status & ~(1 << M4ALS_IRQ_ENABLED_BIT);
 	}
-	m4sensorhub_irq_unregister(dd->m4, M4SH_IRQ_PRESSURE_DATA_READY);
+	m4sensorhub_irq_unregister(dd->m4, M4SH_IRQ_LIGHTSENSOR_DATA_READY);
 	m4sensorhub_unregister_initcall(m4als_driver_init);
 	if (dd->indev != NULL)
 		input_unregister_device(dd->indev);
