@@ -103,6 +103,8 @@ static int tps65912_spi_probe(struct spi_device *spi)
 	tps65912->read = tps65912_spi_read;
 	tps65912->write = tps65912_spi_write;
 
+	mutex_init(&tps65912->pm_lock);
+
 	spi_set_drvdata(spi, tps65912);
 
 	return tps65912_device_init(tps65912);
@@ -117,9 +119,30 @@ static int tps65912_spi_remove(struct spi_device *spi)
 	return 0;
 }
 
+int tps65912_spi_suspend_late(struct device *dev)
+{
+	struct tps65912 *tps65912 = dev_get_drvdata(dev);
+	if (tps65912)
+		mutex_lock(&tps65912->pm_lock);
+	return 0;
+}
+int tps65912_spi_resume_early(struct device *dev)
+{
+	struct tps65912 *tps65912 = dev_get_drvdata(dev);
+	if (tps65912)
+		mutex_unlock(&tps65912->pm_lock);
+	return 0;
+}
+
+static struct dev_pm_ops tps65912_pm_ops = {
+	.suspend_late = tps65912_spi_suspend_late,
+	.resume_early = tps65912_spi_resume_early,
+};
+
 static struct spi_driver tps65912_spi_driver = {
 	.driver = {
 		.name = "tps65912",
+		.pm = &tps65912_pm_ops,
 		.bus = &spi_bus_type,
 		.owner = THIS_MODULE,
 		.of_match_table = of_match_ptr(tps65912_of_match),

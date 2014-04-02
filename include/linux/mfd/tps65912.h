@@ -334,6 +334,7 @@ struct tps65912 {
 	u32 powerkey_code;
 	u32 powerkey_up_irq;
 	u32 powerkey_down_irq;
+	struct mutex pm_lock;   /* guard access to spi bus from irq */
 };
 
 struct tps65912_platform_data {

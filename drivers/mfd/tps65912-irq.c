@@ -81,6 +81,7 @@ static irqreturn_t tps65912_irq(int irq, void *irq_data)
 	int i;
 
 	pr_debug("tps65912 handle irq %d\n", irq);
+	mutex_lock(&tps65912->pm_lock);
 
 	tps65912->read(tps65912, TPS65912_INT_STS, 1, &reg);
 	irq_sts = reg;
@@ -93,6 +94,7 @@ static irqreturn_t tps65912_irq(int irq, void *irq_data)
 
 	irq_sts &= ~tps65912->irq_mask;
 	if (!irq_sts) {
+		mutex_unlock(&tps65912->pm_lock);
 		pr_debug("tps65912 %d IRQ_NONE\n", irq);
 		return IRQ_NONE;
 	}
@@ -120,6 +122,8 @@ static irqreturn_t tps65912_irq(int irq, void *irq_data)
 	reg = irq_sts & 0xFF;
 	if (reg)
 		tps65912->write(tps65912, TPS65912_INT_STS4, 1, &reg);
+
+	mutex_unlock(&tps65912->pm_lock);
 
 	pr_debug("tps65912 %d IRQ_HANDLED\n", irq);
 	return IRQ_HANDLED;
