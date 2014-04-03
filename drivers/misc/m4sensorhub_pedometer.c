@@ -395,17 +395,11 @@ static int m4ped_driver_init(struct init_calldata *p_arg)
 		goto m4ped_driver_init_fail;
 	}
 
-	err = m4ped_create_iiodev(iio);
-	if (err < 0) {
-		m4ped_err("%s: Failed to create IIO device.\n", __func__);
-		goto m4ped_driver_init_fail;
-	}
-
 	err = m4sensorhub_irq_register(dd->m4,
 		M4SH_IRQ_PEDOMETER_DATA_READY, m4ped_isr, iio);
 	if (err < 0) {
 		m4ped_err("%s: Failed to register M4 PED IRQ.\n", __func__);
-		goto m4ped_driver_init_irq_ped_fail;
+		goto m4ped_driver_init_fail;
 	}
 
 	err = m4sensorhub_irq_register(dd->m4,
@@ -415,24 +409,14 @@ static int m4ped_driver_init(struct init_calldata *p_arg)
 		goto m4ped_driver_init_irq_act_fail;
 	}
 
-	/*
-	 * NOTE: We're intentionally unlocking here instead of
-	 *       at function end (after error cases).  The reason
-	 *       is that the mutex ceases to exist because IIO is
-	 *       freed, so we would cause a panic putting the unlock
-	 *       after m4ped_driver_init_exit.
-	 */
-	mutex_unlock(&(dd->mutex));
-
 	goto m4ped_driver_init_exit;
 
 m4ped_driver_init_irq_act_fail:
 	m4sensorhub_irq_unregister(dd->m4, M4SH_IRQ_PEDOMETER_DATA_READY);
-m4ped_driver_init_irq_ped_fail:
-	m4ped_remove_iiodev(iio); /* dd is freed here */
 m4ped_driver_init_fail:
 	m4ped_err("%s: Init failed with error code %d.\n", __func__, err);
 m4ped_driver_init_exit:
+	mutex_unlock(&(dd->mutex));
 	return err;
 }
 
@@ -455,6 +439,12 @@ static int m4ped_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, iio);
 	dd->samplerate = -1; /* We always start disabled */
 
+	err = m4ped_create_iiodev(iio); /* iio and dd are freed on fail */
+	if (err < 0) {
+		m4ped_err("%s: Failed to create IIO device.\n", __func__);
+		goto m4ped_probe_fail_noiio;
+	}
+
 	err = m4sensorhub_register_initcall(m4ped_driver_init, iio);
 	if (err < 0) {
 		m4ped_err("%s: Failed to register initcall.\n", __func__);
@@ -465,7 +455,7 @@ static int m4ped_probe(struct platform_device *pdev)
 
 m4ped_probe_fail:
 	mutex_destroy(&(dd->mutex));
-	iio_device_free(iio); /* dd is freed here */
+	m4ped_remove_iiodev(iio); /* iio and dd are freed here */
 m4ped_probe_fail_noiio:
 	m4ped_err("%s: Probe failed with error code %d.\n", __func__, err);
 	return err;

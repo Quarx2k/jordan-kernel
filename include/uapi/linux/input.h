@@ -773,22 +773,7 @@ struct input_keymap_entry {
 #define REL_DIAL		0x07
 #define REL_WHEEL		0x08
 #define REL_MISC		0x09
-#define REL_ROLL                0x0a
-#define REL_PITCH               0x0b
-#define REL_YAW                 0x0c
-#define REL_LX                  0x0d
-#define REL_LY                  0x0e
-#define REL_LZ                  0x0f
-#define REL_WX                  0x10
-#define REL_WY                  0x11
-#define REL_WZ                  0x12
-#define REL_GX                  0x13
-#define REL_GY                  0x14
-#define REL_GZ                  0x15
-#define REL_HEADING             0x16
-#define REL_HEADING_ACCURACY    0x17
-#define REL_ACTIVITY_LEVEL      0x18
-#define REL_MAX                 0x1f
+#define REL_MAX                 0x0f
 #define REL_CNT			(REL_MAX+1)
 
 /*
@@ -841,10 +826,6 @@ struct input_keymap_entry {
 #define ABS_MT_TOOL_Y		0x3d	/* Center Y tool position */
 
 
-/* MSP (sensor) related events */
-#define ABS_TILTSCROLL          0x3e
-
-/* TODO TEMP !!! CHeck IKXCLOCK-100 */
 #define ABS_MAX			0x3f
 #define ABS_CNT			(ABS_MAX+1)
 
@@ -882,21 +863,7 @@ struct input_keymap_entry {
 #define MSC_RAW			0x03
 #define MSC_SCAN		0x04
 #define MSC_TIMESTAMP		0x05
-#define MSC_GESTURE1            0x06
-#define MSC_GESTURE2            0x07
-#define MSC_GESTURE3            0x08
-#define MSC_GESTURE_CONFIDENCE1 0x09
-#define MSC_GESTURE_CONFIDENCE2 0x0a
-#define MSC_GESTURE_CONFIDENCE3 0x0b
-#define MSC_GESTURE_VALUE1      0x0c
-#define MSC_GESTURE_VALUE2      0x0d
-#define MSC_GESTURE_VALUE3      0x0e
-#define MSC_PASSIVE_STEPS       0x0f
-#define MSC_PASSIVE_METS        0x10
-#define MSC_PASSIVE_TIMESTAMP   0x11
-#define MSC_PASSIVE_FLOORSCLIMBED 0x12
-
-#define MSC_MAX			0x1f
+#define MSC_MAX			0x07
 #define MSC_CNT			(MSC_MAX+1)
 
 /*

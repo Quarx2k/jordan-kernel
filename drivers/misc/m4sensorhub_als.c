@@ -322,6 +322,7 @@ static int m4als_probe(struct platform_device *pdev)
 	dd->pdev = pdev;
 	mutex_init(&(dd->mutex));
 	platform_set_drvdata(pdev, dd);
+	dd->samplerate = -1; /* We always start disabled */
 
 	dd->m4 = m4sensorhub_client_get_drvdata();
 	if (dd->m4 == NULL) {

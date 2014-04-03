@@ -31,6 +31,8 @@ enum iio_chan_type {
 	IIO_PRESSURE,
 	IIO_HEARTRATE,
 	IIO_PEDOMETER,
+	IIO_PASSIVE,
+	IIO_GESTURE,
 };
 
 enum iio_modifier {
