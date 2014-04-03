@@ -34,6 +34,7 @@
 #include <linux/of.h>
 #include <linux/of_gpio.h>
 #include <linux/module.h>
+#include <linux/clk.h>
 
 static bool factory_override;
 
@@ -46,6 +47,8 @@ struct tusb_usb {
 	int irq_gpio;
 	int num_gpios;
 	struct gpio *gpio_list;
+	struct clk *clk_in;
+	bool clk_in_en;
 };
 
 static int tusb_set_suspend(struct usb_phy *x, int suspend)
@@ -86,6 +89,20 @@ static int tusb_usb_start_srp(struct usb_otg *otg)
 	return 0;
 }
 
+static int tusb_usb_enable_clkin(struct tusb_usb *tusb, bool enable)
+{
+	int r = 0;
+	if ((tusb->clk_in_en != enable) && (tusb->clk_in != NULL)) {
+		if (enable)
+			r = clk_prepare_enable(tusb->clk_in);
+		else
+			clk_disable_unprepare(tusb->clk_in);
+		if (!r)
+			tusb->clk_in_en = enable;
+	}
+	return r;
+}
+
 static void tusb_usb_work_func(struct work_struct *work)
 {
 	struct tusb_usb *tusb =
@@ -116,6 +133,9 @@ static void tusb_usb_work_func(struct work_struct *work)
 	dev_info(tusb->dev, "%s USB phy [%d/%d]\n",
 		 (vbus_state | factory_override) ? "Enable" : "Disable",
 		 vbus_state, factory_override);
+	/* enable external clock at first */
+	if (vbus_state | factory_override)
+		tusb_usb_enable_clkin(tusb, true);
 	for (i = 0; i < tusb->num_gpios; i++) {
 		if (!(tusb->gpio_list[i].flags & GPIOF_DIR_IN)) {
 			bool default_level =
@@ -124,6 +144,9 @@ static void tusb_usb_work_func(struct work_struct *work)
 			    (vbus_state | factory_override) ^ default_level);
 		}
 	}
+	/* disable external clock at last */
+	if (!(vbus_state | factory_override))
+		tusb_usb_enable_clkin(tusb, false);
 
 	if (wake_lock_active(&tusb->wake_lock))
 		wake_unlock(&tusb->wake_lock);
@@ -145,6 +168,7 @@ static int tusb_parse_of(struct platform_device *pdev, struct tusb_usb *tusb)
 	int i;
 	struct device_node *np = pdev->dev.of_node;
 	enum of_gpio_flags flags;
+	char *clkin;
 
 	if (!tusb)
 		return -EINVAL;
@@ -180,6 +204,18 @@ static int tusb_parse_of(struct platform_device *pdev, struct tusb_usb *tusb)
 		dev_dbg(&pdev->dev, "%s: gpio-%d  flags: 0x%lx\n",
 			tusb->gpio_list[i].label, tusb->gpio_list[i].gpio,
 			tusb->gpio_list[i].flags);
+	}
+
+	clkin = (char *)of_get_property(np, "clk_in", NULL);
+	if (clkin) {
+		tusb->clk_in = clk_get(NULL, clkin);
+		if (IS_ERR(tusb->clk_in)) {
+			dev_err(&pdev->dev,
+				"Failed get external clock %s!\n", clkin);
+			i = PTR_ERR(tusb->clk_in);
+			tusb->clk_in = NULL;
+			return i;
+		}
 	}
 
 	return 0;

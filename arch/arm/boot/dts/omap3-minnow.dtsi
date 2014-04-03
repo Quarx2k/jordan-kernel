@@ -42,6 +42,15 @@
 
 	};
 
+	/* external 26MHz clock which is controlled by gpio
+	 * it's used for both Display Bridge and USB
+	 */
+	periph_26mhz {
+		compatible = "gpio-clock";
+		#clock-cells = <0>;
+		enable-gpios = <&gpio6 17 0>;  /* GPIO-177, OF_GPIO_ACTIVE_HIGH */
+	};
+
 	Display@0 {
 		compatible = "mot,minnow-panel-dsi-cm";
 		bridge-supply = <&ldo1_reg>;
@@ -53,7 +62,7 @@
 		id_panel = <2>;
 		gpio_panel_reset = <&gpio1 14 0>;       /* RESET gpio-14 */
 		gpio_bridge_reset = <&gpio1 23 0>;      /* RESET gpio-23 */
-		gpio_clk_en = <&gpio6 17 0>;    /* RESET gpio-177 */
+		clk_in = "periph_26mhz";        /* external 26MHz clock */
 		/* declare it if ext_te enable */
 		//gpio_te = <&gpio1 0 0>;       /* EXT_TE gpio-0 */
 		//pins = <0 1 2 3>;             /* DSI Pin config */
@@ -97,6 +106,7 @@
 			     "tusb-resetn",
 			     "tusb-cs",
 			     "tusb-csn";
+		clk_in = "periph_26mhz";  /* external 26MHz clock */
 		reg = <0 0>;
 	};
 
@@ -494,6 +504,7 @@
 			0x19c 0x100	/* MCSPI1_SOMI, MODE0 | INPUT */
 			0x19e 0x000	/* MCSPI1_CS0, MODE0 | OUTPUT */
 			0x1a0 0x000	/* MCSPI1_CS1, MODE0 | OUTPUT */
+			0x1a4 0x004	/* MCSPI1_CS3, MODE4 | OUTPUT */
 			0x1ae 0x004	/* MCSPI2_CS1, MODE4 | OUTPUT */
 			0x1b0 0x104	/* SYS_NIRQ, MODE4 | INPUT  */
 			0x1b2 0x004	/* SYS_CLKOUT2, MODE4 | OUTPUT  */

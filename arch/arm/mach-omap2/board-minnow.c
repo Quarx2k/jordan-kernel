@@ -18,6 +18,8 @@
 #include <linux/usb/phy.h>
 #include <linux/usb/nop-usb-xceiv.h>
 #include <linux/ti_wilink_st.h>
+#include <linux/clk-provider.h>
+#include <linux/clkdev.h>
 #include "mux.h"
 #include "common.h"
 #include "dss-common.h"
@@ -77,10 +79,27 @@ static inline void __init minnow_init_btwilink(void)
 	platform_device_register(&hci_tty_device);
 }
 
+static void __init minnow_init_gpio_clock(void)
+{
+	struct of_phandle_args clkspec;
+	struct clk *clk;
+	struct clk_lookup *cl;
+	clkspec.np = of_find_compatible_node(NULL, NULL, "gpio-clock");
+	if (clkspec.np) {
+		of_gpio_clk_setup(clkspec.np);
+		clk = of_clk_get_from_provider(&clkspec);
+		if (!IS_ERR(clk)) {
+			cl = clkdev_alloc(clk, clkspec.np->name, NULL);
+			if (cl)
+				clkdev_add(cl);
+		}
+	}
+}
+
 static void __init minnow_init(void)
 {
 	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
-
+	minnow_init_gpio_clock();
 	omap_sdrc_init(JEDEC_JESD209A_sdrc_params, JEDEC_JESD209A_sdrc_params);
 	omap3_enable_usim_buffer(); /* Needed for GPIOs in USIM block */
 	omap_minnow_display_init();

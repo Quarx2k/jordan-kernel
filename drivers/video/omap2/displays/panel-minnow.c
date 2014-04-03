@@ -32,6 +32,7 @@
 #include <linux/slab.h>
 #include <linux/mutex.h>
 #include <linux/regulator/consumer.h>
+#include <linux/clk.h>
 
 #include <video/omapdss.h>
 #include <video/omap-panel-data.h>
@@ -385,10 +386,11 @@ struct minnow_panel_data {
 	/* panel HW configuration from DT or platform data */
 	int reset_gpio[MINNOW_COMPONENT_MAX];
 	int ext_te_gpio;
-	int clk_en_gpio;
 	int vio_en_gpio;
 	struct minnow_panel_hw_reset hw_reset[MINNOW_COMPONENT_MAX];
 	struct regulator *regulators[MINNOW_COMPONENT_MAX];
+	struct clk *clk_in;
+	bool clk_in_en;
 
 	bool use_dsi_backlight;
 
@@ -1529,6 +1531,21 @@ static void minnow_panel_enable_vio(struct minnow_panel_data *mpd, bool enable)
 		gpio_set_value(mpd->vio_en_gpio, enable ? 0 : 1);
 }
 
+static int minnow_panel_enable_clkin(struct minnow_panel_data *mpd,
+				     bool enable)
+{
+	int r = 0;
+	if ((mpd->clk_in_en != enable) && (mpd->clk_in != NULL)) {
+		if (enable)
+			r = clk_prepare_enable(mpd->clk_in);
+		else
+			clk_disable_unprepare(mpd->clk_in);
+		if (!r)
+			mpd->clk_in_en = enable;
+	}
+	return r;
+}
+
 #define	DEBUG_DT
 #ifdef DEBUG_DT
 #define DTINFO(fmt, ...) \
@@ -1561,6 +1578,7 @@ static int minnow_panel_dt_init(struct minnow_panel_data *mpd)
 	u32 range[2], value = 0;
 	struct minnow_panel_attr *panel_attr;
 	struct device_node *dt_node;
+	char *clkin;
 
 	dt_node = of_find_matching_node(NULL, minnow_panel_ids);
 	if (dt_node == NULL) {
@@ -1609,11 +1627,19 @@ static int minnow_panel_dt_init(struct minnow_panel_data *mpd)
 	       mpd->reset_gpio[MINNOW_BRIDGE]);
 	mpd->ext_te_gpio = of_get_named_gpio(dt_node, "gpio_te", 0);
 	DTINFO("gpio_te = %d\n", mpd->ext_te_gpio);
-	mpd->clk_en_gpio = of_get_named_gpio(dt_node, "gpio_clk_en", 0);
-	DTINFO("gpio_clk_en = %d\n", mpd->clk_en_gpio);
 	mpd->vio_en_gpio = of_get_named_gpio(dt_node, "gpio_vio_en", 0);
 	DTINFO("gpio_vio_en = %d\n", mpd->vio_en_gpio);
-
+	clkin = (char *)of_get_property(dt_node, "clk_in", NULL);
+	if (clkin) {
+		mpd->clk_in = clk_get(NULL, clkin);
+		if (IS_ERR(mpd->clk_in)) {
+			int r = PTR_ERR(mpd->clk_in);
+			dev_err(&mpd->dssdev->dev,
+				"Failed get external clock %s!\n", clkin);
+			mpd->clk_in = NULL;
+			return r;
+		}
+	}
 	mpd->esd_interval = 0;
 	if (!of_property_read_u32(dt_node, "esd_interval", &value)) {
 		mpd->esd_interval = value;
@@ -1733,18 +1759,6 @@ static int minnow_panel_probe(struct omap_dss_device *dssdev)
 	dev_info(&dssdev->dev, "skip first time initialization is %s\n",
 		 def_skip_first_init ? "enabled" : "disabled");
 
-	if (gpio_is_valid(mpd->clk_en_gpio)) {
-		r = devm_gpio_request_one(&dssdev->dev, mpd->clk_en_gpio,
-					  def_skip_first_init
-					  ? GPIOF_OUT_INIT_HIGH
-					  : GPIOF_OUT_INIT_LOW,
-					  "minnow-panel clk_en");
-		if (r) {
-			dev_err(&dssdev->dev,
-				"failed to request panel clk_en gpio\n");
-			return r;
-		}
-	}
 	if (gpio_is_valid(mpd->vio_en_gpio)) {
 		r = devm_gpio_request_one(&dssdev->dev, mpd->vio_en_gpio,
 					  def_skip_first_init
@@ -2077,6 +2091,9 @@ static int minnow_panel_enable(struct omap_dss_device *dssdev)
 		goto err;
 	}
 
+	r = minnow_panel_enable_clkin(mpd, true);
+	if (r)
+		goto err;
 	r = minnow_panel_set_regulators(mpd, regulator_enable);
 	if (r)
 		goto err;
@@ -2142,6 +2159,7 @@ static void minnow_panel_disable(struct omap_dss_device *dssdev)
 	_minnow_panel_hw_active_reset(mpd);
 	minnow_panel_enable_vio(mpd, false);
 	minnow_panel_set_regulators(mpd, regulator_disable);
+	minnow_panel_enable_clkin(mpd, false);
 
 	mutex_unlock(&mpd->lock);
 }
