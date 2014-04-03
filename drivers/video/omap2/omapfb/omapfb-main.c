@@ -1058,21 +1058,21 @@ static int omapfb_pan_display(struct fb_var_screeninfo *var,
 
 	DBG("pan_display(%d)\n", FB2OFB(fbi)->id);
 
-	if (var->xoffset == fbi->var.xoffset &&
-	    var->yoffset == fbi->var.yoffset)
-		return 0;
+	if (var->xoffset != fbi->var.xoffset ||
+	    var->yoffset != fbi->var.yoffset) {
 
-	new_var = fbi->var;
-	new_var.xoffset = var->xoffset;
-	new_var.yoffset = var->yoffset;
+		new_var = fbi->var;
+		new_var.xoffset = var->xoffset;
+		new_var.yoffset = var->yoffset;
 
-	fbi->var = new_var;
+		fbi->var = new_var;
 
-	omapfb_get_mem_region(ofbi->region);
+		omapfb_get_mem_region(ofbi->region);
 
-	r = omapfb_apply_changes(fbi, 0);
+		r = omapfb_apply_changes(fbi, 0);
 
-	omapfb_put_mem_region(ofbi->region);
+		omapfb_put_mem_region(ofbi->region);
+	}
 
 	if (display && display->driver->update && display->driver->sync) {
 		DBG("sync_update(%d, %d)\n", var->xres, var->yres);
