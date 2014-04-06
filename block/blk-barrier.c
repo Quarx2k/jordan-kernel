@@ -285,9 +285,8 @@ static void bio_end_empty_barrier(struct bio *bio, int err)
 			set_bit(BIO_EOPNOTSUPP, &bio->bi_flags);
 		clear_bit(BIO_UPTODATE, &bio->bi_flags);
 	}
-	if (bio->bi_private)
-		complete(bio->bi_private);
-	bio_put(bio);
+
+	complete(bio->bi_private);
 }
 
 /**
@@ -298,8 +297,7 @@ static void bio_end_empty_barrier(struct bio *bio, int err)
  * Description:
  *    Issue a flush for the block device in question. Caller can supply
  *    room for storing the error offset in case of a flush error, if they
- *    wish to. If WAIT flag is not passed then caller may check only what
- *    request was pushed in some internal queue for later handling.
+ *    wish to.
  */
 int blkdev_issue_flush(struct block_device *bdev, sector_t *error_sector)
 {
@@ -317,22 +315,19 @@ int blkdev_issue_flush(struct block_device *bdev, sector_t *error_sector)
 
 	bio = bio_alloc(GFP_KERNEL, 0);
 	bio->bi_end_io = bio_end_empty_barrier;
+	bio->bi_private = &wait;
 	bio->bi_bdev = bdev;
-	if (test_bit(BLKDEV_WAIT, &flags))
-		bio->bi_private = &wait;
-
-	bio_get(bio);
 	submit_bio(WRITE_BARRIER, bio);
-	if (test_bit(BLKDEV_WAIT, &flags)) {
-		wait_for_completion(&wait);
-		/*
-		 * The driver must store the error location in ->bi_sector, if
-		 * it supports it. For non-stacked drivers, this should be
-		 * copied from blk_rq_pos(rq).
-		 */
-		if (error_sector)
-			*error_sector = bio->bi_sector;
-	}
+
+	wait_for_completion(&wait);
+
+	/*
+	 * The driver must store the error location in ->bi_sector, if
+	 * it supports it. For non-stacked drivers, this should be copied
+	 * from blk_rq_pos(rq).
+	 */
+	if (error_sector)
+		*error_sector = bio->bi_sector;
 
 	ret = 0;
 	if (bio_flagged(bio, BIO_EOPNOTSUPP))
