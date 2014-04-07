@@ -61,6 +61,7 @@ static struct m4sensorhub_data m4sensorhub_misc_data;
 static DEFINE_MUTEX(m4sensorhub_driver_lock);
 static struct init_call *inithead;
 static int firmware_download_status = -1;
+static char tcmd_exec_status;
 
 unsigned short force_upgrade;
 module_param(force_upgrade, short, 0644);
@@ -419,7 +420,7 @@ static ssize_t m4sensorhub_set_dbg(struct device *dev,
 	return count;
 }
 
-static DEVICE_ATTR(debug_level, S_IRUGO|S_IWUGO, m4sensorhub_get_dbg,
+static DEVICE_ATTR(debug_level, S_IRUSR|S_IWUSR, m4sensorhub_get_dbg,
 		m4sensorhub_set_dbg);
 
 static ssize_t m4sensorhub_get_loglevel(struct device *dev,
@@ -491,29 +492,85 @@ static ssize_t m4sensorhub_set_loglevel(struct device *dev,
 		m4sh_no_mask);
 }
 
-static DEVICE_ATTR(log_level, S_IRUGO|S_IWUGO, m4sensorhub_get_loglevel,
+static DEVICE_ATTR(log_level, S_IRUSR|S_IWUSR, m4sensorhub_get_loglevel,
 		m4sensorhub_set_loglevel);
+
+static ssize_t m4sensorhub_get_tcmd_response(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	if (tcmd_exec_status)
+		return sprintf(buf, "TCMD execution passed\n");
+	else
+		return sprintf(buf, "TCMD execution failed\n");
+}
+
+static ssize_t m4sensorhub_execute_tcmd(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	unsigned int opcode, subopcode;
+	int ret, tcmd_resp_len, i;
+	char tcmd_buf[20];
+	tcmd_exec_status = 0;
+
+	sscanf(buf, "0x%x 0x%x 0x%x", &opcode, &subopcode, &tcmd_resp_len);
+	tcmd_buf[0] = M4SH_TYPE_TCMD;
+	tcmd_buf[1] = (opcode & 0xFF);
+	tcmd_buf[2] = (subopcode & 0xFF);
+	ret = m4sensorhub_i2c_write_read(&m4sensorhub_misc_data,
+			tcmd_buf, 3, tcmd_resp_len);
+	if (ret < 0) {
+		KDEBUG(M4SH_ERROR, "m4sensorhub tcmd i2c failed\n");
+		return ret;
+	}
+	if (ret != tcmd_resp_len) {
+		KDEBUG(M4SH_ERROR, "m4sensorhub tcmd wrong num bytes read\n");
+		return -EBADE;
+	}
+	for (i = 0; i < tcmd_resp_len; i++)
+		KDEBUG(M4SH_INFO, "%#x ", (unsigned char)tcmd_buf[i]);
+	KDEBUG(M4SH_INFO, "\n");
+
+	if (tcmd_buf[0] == 0x00)
+		tcmd_exec_status = 1;
+
+	return count;
+}
+static DEVICE_ATTR(tcmd, S_IRUSR|S_IWUSR, m4sensorhub_get_tcmd_response,
+		m4sensorhub_execute_tcmd);
 
 static ssize_t m4sensorhub_get_download_status(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
-	return snprintf(buf, PAGE_SIZE, "%s",
+	return snprintf(buf, PAGE_SIZE, "%s\n",
 		m4sensorhub_misc_data.mode == NORMALMODE ? "1" : "0");
 }
 
-static DEVICE_ATTR(download_status, S_IRUGO,
+static DEVICE_ATTR(download_status, S_IRUSR,
 				m4sensorhub_get_download_status, NULL);
 
 static ssize_t m4sensorhub_get_firmware_version(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
-	return snprintf(buf, PAGE_SIZE, "%hu",
+	return snprintf(buf, PAGE_SIZE, "%#hx\n",
 		m4sensorhub_misc_data.mode == NORMALMODE ?
 				m4sensorhub_misc_data.fw_version : 0xFFFF);
 }
 
-static DEVICE_ATTR(firmware_version, S_IRUGO,
+static DEVICE_ATTR(firmware_version, S_IRUSR,
 				m4sensorhub_get_firmware_version, NULL);
+
+static struct attribute *m4sensorhub_control_attributes[] = {
+	&dev_attr_tcmd.attr,
+	&dev_attr_log_level.attr,
+	&dev_attr_debug_level.attr,
+	&dev_attr_firmware_version.attr,
+	&dev_attr_download_status.attr,
+	NULL
+};
+
+static const struct attribute_group m4sensorhub_control_group = {
+	.attrs = m4sensorhub_control_attributes,
+};
 
 static int m4sensorhub_probe(struct i2c_client *client,
 			     const struct i2c_device_id *id)
@@ -568,36 +625,16 @@ static int m4sensorhub_probe(struct i2c_client *client,
 		goto err_hw_free;
 	}
 
-	err = device_create_file(&client->dev, &dev_attr_debug_level);
-	if (err < 0) {
-		KDEBUG(M4SH_ERROR, "Error creating debug_level file\n");
+	err = sysfs_create_group(&client->dev.kobj, &m4sensorhub_control_group);
+	if (err)
 		goto err_deregister;
-	}
-
-	err = device_create_file(&client->dev, &dev_attr_log_level);
-	if (err < 0) {
-		KDEBUG(M4SH_ERROR, "Error creating log_level file\n");
-		goto err_del_debug_file;
-	}
-
-	err = device_create_file(&client->dev, &dev_attr_download_status);
-	if (err < 0) {
-		KDEBUG(M4SH_ERROR, "Error creating download status file\n");
-		goto err_del_log_file;
-	}
-
-	err = device_create_file(&client->dev, &dev_attr_firmware_version);
-	if (err < 0) {
-		KDEBUG(M4SH_ERROR, "Error creating FW version file\n");
-		goto err_del_downloadstatus_file;
-	}
 
 	if (m4sensorhub->hwconfig.irq_gpio >= 0)
 		client->irq = gpio_to_irq(m4sensorhub->hwconfig.irq_gpio);
 	else {
 		KDEBUG(M4SH_ERROR, "Error: No IRQ configured\n");
 		err = -ENODEV;
-		goto err_del_firmwareversion_file;
+		goto err_unregister_control_group;
 	}
 
 	err = m4sensorhub_panic_init(m4sensorhub);
@@ -621,14 +658,8 @@ err_panic_shutdown:
 	m4sensorhub_panic_shutdown(m4sensorhub);
 err_reg_shutdown:
 	m4sensorhub_reg_shutdown(m4sensorhub);
-err_del_firmwareversion_file:
-	device_remove_file(&client->dev, &dev_attr_firmware_version);
-err_del_downloadstatus_file:
-	device_remove_file(&client->dev, &dev_attr_download_status);
-err_del_log_file:
-	device_remove_file(&client->dev, &dev_attr_log_level);
-err_del_debug_file:
-	device_remove_file(&client->dev, &dev_attr_debug_level);
+err_unregister_control_group:
+	sysfs_remove_group(&client->dev.kobj, &m4sensorhub_control_group);
 err_deregister:
 	misc_deregister(&m4sensorhub_misc_device);
 err_hw_free:
@@ -649,10 +680,7 @@ static int __exit m4sensorhub_remove(struct i2c_client *client)
 	m4sensorhub_irq_shutdown(m4sensorhub);
 	m4sensorhub_panic_shutdown(m4sensorhub);
 	m4sensorhub_reg_shutdown(m4sensorhub);
-	device_remove_file(&client->dev, &dev_attr_log_level);
-	device_remove_file(&client->dev, &dev_attr_debug_level);
-	device_remove_file(&client->dev, &dev_attr_firmware_version);
-	device_remove_file(&client->dev, &dev_attr_download_status);
+	sysfs_remove_group(&client->dev.kobj, &m4sensorhub_control_group);
 	m4sensorhub_hw_reset(m4sensorhub);
 	misc_deregister(&m4sensorhub_misc_device);
 	m4sensorhub->i2c_client = NULL;
