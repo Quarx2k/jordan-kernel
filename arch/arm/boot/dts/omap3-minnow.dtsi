@@ -32,7 +32,7 @@
 				600000  1150000
 				800000  1275000
 			>;
-			cpu0-supply = <&sw1_iva_reg>;
+			cpu0-supply = <&omap_tps65912_dcdc1>;
 			/* OPP tolerance in percentage */
 			voltage-tolerance = <0>;
 			reset-voltage = <1275000>;
@@ -52,7 +52,6 @@
 			startup-delay-us = <70000>;
 			enable-active-high;
 		};
-
 	};
 
 	/* external 26MHz clock which is controlled by gpio
@@ -199,9 +198,41 @@
 		mot,mic_bias1_en = <&gpio3 13 0>; /* gpio-077 */
 		mot,mic_bias3_en = <&gpio3 20 0>; /* gpio-084 */
 	};
+
+	omap_pimic {
+		omap_tps65912_dcdc1: omap_vdd1 {
+			compatible = "ti,omap-tps65912-dcdc1";
+			ti,boot-voltage-micro-volts = <1275000>;
+			ti,vp = <&vp_mpu>;
+		};
+
+		omap_tps65912_dcdc4: omap_vdd2 {
+			compatible = "ti,omap-tps65912-dcdc4";
+			ti,boot-voltage-micro-volts = <1200000>;
+			ti,vp = <&vp_core>;
+		};
+	};
 };
 
+&vc {
+	status = "ok";
+	ti,i2c-high-speed;
+	ti,i2c-pad-load = <3>;
+	vc_mpu{
+		ti,master-channel;
+	};
 
+	vc_core{
+		ti,use-master-slave-addr;
+	};
+};
+&vp_mpu {
+	status = "ok";
+};
+
+&vp_core {
+	status = "ok";
+};
 
 &i2c1 {
 	clock-frequency = <400000>;
@@ -317,6 +348,8 @@
 		spi-cs-high;
 
 		register-init-data = <
+			0x26 0x49 /* I2C_SPI_CFG: AVS ADDR = 0x13,
+					DCDC1, DCDC4 is AVS ctrl */
 			0x2d 0x88 /* DISCHARGE1: Enable LDO4, LDO8 */
 		>;
 
