@@ -488,6 +488,35 @@ static const struct omap_pmic_info omap_twl6035_smps8 = {
 	.voltage_selector_setbits = 0x0,
 	.voltage_selector_zero = true,
 };
+static const struct omap_pmic_info omap_tps65912_dcdc1 = {
+	.slave_addr = 0x13,
+	.voltage_reg_addr = 0x04,
+	.cmd_reg_addr = 0x04,
+	.i2c_timeout_us = 200,
+	.slew_rate_uV = 6250,
+	.step_size_uV = 12500,
+	.min_uV = 500000,
+	.max_uV = 1287500,
+	.voltage_selector_offset = 0,
+	.voltage_selector_mask = 0x3F,
+	.voltage_selector_setbits = 0x0,
+	.voltage_selector_zero = true,
+};
+
+static const struct omap_pmic_info omap_tps65912_dcdc4 = {
+	.slave_addr = 0x13,
+	.voltage_reg_addr = 0x0d,
+	.cmd_reg_addr = 0x0d,
+	.i2c_timeout_us = 200,
+	.slew_rate_uV = 6250,
+	.step_size_uV = 12500,
+	.min_uV = 500000,
+	.max_uV = 1287500,
+	.voltage_selector_offset = 0,
+	.voltage_selector_mask = 0x3F,
+	.voltage_selector_setbits = 0x0,
+	.voltage_selector_zero = true,
+};
 
 static const struct of_device_id omap_pmic_of_match_tbl[] = {
 	{.compatible = "ti,omap-twl4030-vdd1", .data = &omap_twl4030_vdd1,},
@@ -502,6 +531,8 @@ static const struct of_device_id omap_pmic_of_match_tbl[] = {
 	{.compatible = "ti,omap-twl6035-smps1", .data = &omap_twl6035_smps1,},
 	{.compatible = "ti,omap-twl6035-smps4", .data = &omap_twl6035_smps4,},
 	{.compatible = "ti,omap-twl6035-smps8", .data = &omap_twl6035_smps8,},
+	{.compatible = "ti,omap-tps65912-dcdc1", .data = &omap_tps65912_dcdc1,},
+	{.compatible = "ti,omap-tps65912-dcdc4", .data = &omap_tps65912_dcdc4,},
 	{},
 };
 MODULE_DEVICE_TABLE(of, omap_pmic_of_match_tbl);
