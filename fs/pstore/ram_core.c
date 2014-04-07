@@ -345,8 +345,11 @@ static void *persistent_ram_vmap(phys_addr_t start, size_t size)
 	page_start = start - offset_in_page(start);
 	page_count = DIV_ROUND_UP(size + offset_in_page(start), PAGE_SIZE);
 
+#ifdef CONFIG_SOC_OMAP3430
+	prot = pgprot_dmacoherent(PAGE_KERNEL);
+#else
 	prot = pgprot_noncached(PAGE_KERNEL);
-
+#endif
 	pages = kmalloc(sizeof(struct page *) * page_count, GFP_KERNEL);
 	if (!pages) {
 		pr_err("%s: Failed to allocate array for %u pages\n", __func__,
