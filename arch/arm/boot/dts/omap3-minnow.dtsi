@@ -5,11 +5,23 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+/* reserve memory for ram_console */
+/memreserve/ 0x83000000 0x20000; /* IMAGE_DOWN_LOAD_ADDR */
+
 /include/ "omap36xx.dtsi"
 
 / {
 	model = "Motorola OMAP3 Platform";
 	compatible = "mot,omap3-minnow", "ti,omap3";
+
+	ramoops {
+		compatible = "ramoops";
+		status = "ok";
+
+		android,ramoops-buffer-start = <0x83000000>;
+		android,ramoops-buffer-size  = <0x20000>;
+		android,ramoops-console-size = <0x20000>;
+	};
 
 	cpus {
 		cpu@0 {
@@ -182,6 +194,7 @@
 	};
 
 	soc {
+
 		compatible = "mot,soc-c55";
 		mot,mic_bias1_en = <&gpio3 13 0>; /* gpio-077 */
 		mot,mic_bias3_en = <&gpio3 20 0>; /* gpio-084 */
