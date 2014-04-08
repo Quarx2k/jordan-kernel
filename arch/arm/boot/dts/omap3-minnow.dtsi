@@ -23,6 +23,7 @@
 			cpu0-supply = <&sw1_iva_reg>;
 			/* OPP tolerance in percentage */
 			voltage-tolerance = <0>;
+			reset-voltage = <1275000>;
 		};
 	};
 
