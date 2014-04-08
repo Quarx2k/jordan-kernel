@@ -18,6 +18,7 @@
 #include <linux/of.h>
 #include <linux/opp.h>
 #include <linux/platform_device.h>
+#include <linux/reboot.h>
 #include <linux/regulator/consumer.h>
 #include <linux/slab.h>
 #include <linux/suspend.h>
@@ -169,6 +170,37 @@ static struct notifier_block cpu0_cpufreq_pm_notifier = {
 	.notifier_call = cpu0_cpufreq_pm_notify,
 };
 
+static int cpu0_cpufreq_reboot_notify(struct notifier_block *nb,
+	unsigned long event, void *dummy)
+{
+	struct cpufreq_policy *policy;
+
+	switch(event) {
+	case SYS_DOWN:
+	case SYS_HALT:
+	case SYS_POWER_OFF:
+		mutex_lock(&cpu0_cpufreq_lock);
+		policy = cpufreq_cpu_get(0);
+		is_suspended = true;
+		pr_info("cpu0 cpufreq shutdown: setting frequency to %d kHz\n",
+				policy->max);
+		__cpu0_set_target(policy, policy->max, CPUFREQ_RELATION_L);
+		cpufreq_cpu_put(policy);
+		mutex_unlock(&cpu0_cpufreq_lock);
+		break;
+	default:
+		pr_warn("cpu0 cpufreq shutdown: INVALID event type %lu\n",
+			event);
+		break;
+	}
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block cpu0_cpufreq_reboot_notifier = {
+	.notifier_call = cpu0_cpufreq_reboot_notify,
+};
+
 static int cpu0_cpufreq_init(struct cpufreq_policy *policy)
 {
 	int ret;
@@ -194,6 +226,8 @@ static int cpu0_cpufreq_init(struct cpufreq_policy *policy)
 	if (policy->cpu == 0)
 		register_pm_notifier(&cpu0_cpufreq_pm_notifier);
 
+	register_reboot_notifier(&cpu0_cpufreq_reboot_notifier);
+
 	return 0;
 }
 
@@ -201,6 +235,8 @@ static int cpu0_cpufreq_exit(struct cpufreq_policy *policy)
 {
 	if (policy->cpu == 0)
 		unregister_pm_notifier(&cpu0_cpufreq_pm_notifier);
+
+	unregister_reboot_notifier(&cpu0_cpufreq_reboot_notifier);
 
 	cpufreq_frequency_table_put_attr(policy->cpu);
 
