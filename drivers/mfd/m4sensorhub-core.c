@@ -545,7 +545,7 @@ static ssize_t m4sensorhub_get_download_status(struct device *dev,
 		m4sensorhub_misc_data.mode == NORMALMODE ? "1" : "0");
 }
 
-static DEVICE_ATTR(download_status, S_IRUSR,
+static DEVICE_ATTR(download_status, S_IRUGO,
 				m4sensorhub_get_download_status, NULL);
 
 static ssize_t m4sensorhub_get_firmware_version(struct device *dev,
