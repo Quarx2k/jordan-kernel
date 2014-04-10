@@ -60,6 +60,8 @@ static irqreturn_t powerkey_handler(int irq, void *irq_data)
 		tps65912->powerkey_state = new_state;
 	}
 	mutex_unlock(&tps65912->irq_lock);
+	pr_debug("tps65912 handle irq %d state = %s\n", irq,
+		new_state == PWRKEY_RELEASE ? "RELEASE" : "PRESS" );
 	return IRQ_HANDLED;
 }
 /*
@@ -78,6 +80,7 @@ static irqreturn_t tps65912_irq(int irq, void *irq_data)
 	u8 reg;
 	int i;
 
+	pr_debug("tps65912 handle irq %d\n", irq);
 
 	tps65912->read(tps65912, TPS65912_INT_STS, 1, &reg);
 	irq_sts = reg;
@@ -89,8 +92,10 @@ static irqreturn_t tps65912_irq(int irq, void *irq_data)
 	irq_sts |= reg << 24;
 
 	irq_sts &= ~tps65912->irq_mask;
-	if (!irq_sts)
+	if (!irq_sts) {
+		pr_debug("tps65912 %d IRQ_NONE\n", irq);
 		return IRQ_NONE;
+	}
 
 	for (i = tps65912->irq_num - 1; i >= 0; i--) {
 		if (!(irq_sts & (1 << i)))
@@ -116,6 +121,7 @@ static irqreturn_t tps65912_irq(int irq, void *irq_data)
 	if (reg)
 		tps65912->write(tps65912, TPS65912_INT_STS4, 1, &reg);
 
+	pr_debug("tps65912 %d IRQ_HANDLED\n", irq);
 	return IRQ_HANDLED;
 }
 
