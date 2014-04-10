@@ -53,6 +53,7 @@
 
 /* pm34xx errata defined in pm.h */
 u16 pm34xx_errata;
+bool suspend_debug;
 
 struct power_state {
 	struct powerdomain *pwrdm;
@@ -228,6 +229,11 @@ static void omap34xx_save_context(u32 *save)
 
 static int omap34xx_do_sram_idle(unsigned long save_state)
 {
+	if (suspend_debug)
+		pr_debug("OMAP3_PRM_IRQENABLE_MPU_OFFSET 0x%08x\n",
+			 omap2_prm_read_mod_reg(OCP_MOD,
+				OMAP3_PRM_IRQENABLE_MPU_OFFSET));
+
 	omap34xx_cpu_suspend(save_state);
 	return 0;
 }
@@ -362,6 +368,8 @@ static int omap3_pm_suspend(void)
 	struct power_state *pwrst;
 	int state, ret = 0;
 
+	suspend_debug = true;
+
 	/* Read current next_pwrsts */
 	list_for_each_entry(pwrst, &pwrst_list, node)
 		pwrst->saved_state = pwrdm_read_next_pwrst(pwrst->pwrdm);
@@ -393,6 +401,7 @@ restore:
 	else
 		pr_info("Successfully put all powerdomains to target state\n");
 
+	suspend_debug = false;
 	return ret;
 }
 
