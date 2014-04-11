@@ -284,11 +284,7 @@
 		gpio-names = "cc-alert";
 		interrupt-parent = <&gpio5>;
 		interrupts = <12 0>;		/* gpio-140 IRQ */
-		maxim,regs-init-data = <
-			0x01 0xffab /* VALRT, VMAX = 5.1 V and VMIN = 3.42 V */
-		>;
 		maxim,enable_por_init;
-		maxim,batt_undervoltage_zero_soc;
 		maxim,configuration {
 			/* Required properties */
 			config		= /bits/ 16 <0x2254>;	/* Tex = 0, TS = Ten = ETHRM = 1,  Aen = 1 */
