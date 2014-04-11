@@ -49,27 +49,28 @@ struct m4ped_driver_data {
 	uint16_t        status;
 };
 
-
-static void m4ped_isr(enum m4sensorhub_irqs int_event, void *handle)
+static int m4ped_read_report_data(struct iio_dev *iio,
+				  struct m4ped_driver_data *dd)
 {
-	int err = 0;
-	struct iio_dev *iio = handle;
-	struct m4ped_driver_data *dd = iio_priv(iio);
-	int size = 0;
+	int err = 0, size = 0;
 
-	mutex_lock(&(dd->mutex));
+	/*input validations */
+	if ((iio == NULL) || (dd == NULL)) {
+		m4ped_err("%s: invalid inputs passed in\n", __func__);
+		return -EINVAL;
+	}
 
 	size = m4sensorhub_reg_getsize(dd->m4, M4SH_REG_PEDOMETER_ACTIVITY);
 	err = m4sensorhub_reg_read(dd->m4, M4SH_REG_PEDOMETER_ACTIVITY,
 		(char *)&(dd->iiodat.ped_activity));
 	if (err < 0) {
 		m4ped_err("%s: Failed to read ped_activity data.\n", __func__);
-		goto m4ped_isr_fail;
+		goto m4ped_read_fail;
 	} else if (err != size) {
 		m4ped_err("%s: Read %d bytes instead of %d for %s.\n",
 			  __func__, err, size, "ped_activity");
 		err = -EBADE;
-		goto m4ped_isr_fail;
+		goto m4ped_read_fail;
 	}
 
 	size = m4sensorhub_reg_getsize(dd->m4,
@@ -79,12 +80,12 @@ static void m4ped_isr(enum m4sensorhub_irqs int_event, void *handle)
 	if (err < 0) {
 		m4ped_err("%s: Failed to read total_distance data.\n",
 			  __func__);
-		goto m4ped_isr_fail;
+		goto m4ped_read_fail;
 	} else if (err != size) {
 		m4ped_err("%s: Read %d bytes instead of %d for %s.\n",
 			  __func__, err, size, "total_distance");
 		err = -EBADE;
-		goto m4ped_isr_fail;
+		goto m4ped_read_fail;
 	}
 
 	size = m4sensorhub_reg_getsize(dd->m4, M4SH_REG_PEDOMETER_TOTALSTEPS);
@@ -92,12 +93,12 @@ static void m4ped_isr(enum m4sensorhub_irqs int_event, void *handle)
 		(char *)&(dd->iiodat.total_steps));
 	if (err < 0) {
 		m4ped_err("%s: Failed to read total_steps data.\n", __func__);
-		goto m4ped_isr_fail;
+		goto m4ped_read_fail;
 	} else if (err != size) {
 		m4ped_err("%s: Read %d bytes instead of %d for %s.\n",
 			  __func__, err, size, "total_steps");
 		err = -EBADE;
-		goto m4ped_isr_fail;
+		goto m4ped_read_fail;
 	}
 
 	size = m4sensorhub_reg_getsize(dd->m4,
@@ -106,12 +107,12 @@ static void m4ped_isr(enum m4sensorhub_irqs int_event, void *handle)
 		(char *)&(dd->iiodat.current_speed));
 	if (err < 0) {
 		m4ped_err("%s: Failed to read current_speed data.\n", __func__);
-		goto m4ped_isr_fail;
+		goto m4ped_read_fail;
 	} else if (err != size) {
 		m4ped_err("%s: Read %d bytes instead of %d for %s.\n",
 			  __func__, err, size, "current_speed");
 		err = -EBADE;
-		goto m4ped_isr_fail;
+		goto m4ped_read_fail;
 	}
 
 	size = m4sensorhub_reg_getsize(dd->m4,
@@ -121,12 +122,12 @@ static void m4ped_isr(enum m4sensorhub_irqs int_event, void *handle)
 	if (err < 0) {
 		m4ped_err("%s: Failed to read floors_climbed data.\n",
 			  __func__);
-		goto m4ped_isr_fail;
+		goto m4ped_read_fail;
 	} else if (err != size) {
 		m4ped_err("%s: Read %d bytes instead of %d for %s.\n",
 			  __func__, err, size, "floors_climbed");
 		err = -EBADE;
-		goto m4ped_isr_fail;
+		goto m4ped_read_fail;
 	}
 
 	size = m4sensorhub_reg_getsize(dd->m4, M4SH_REG_METS_CALORIES);
@@ -134,23 +135,34 @@ static void m4ped_isr(enum m4sensorhub_irqs int_event, void *handle)
 		(char *)&(dd->iiodat.calories));
 	if (err < 0) {
 		m4ped_err("%s: Failed to read calories data.\n", __func__);
-		goto m4ped_isr_fail;
+		goto m4ped_read_fail;
 	} else if (err != size) {
 		m4ped_err("%s: Read %d bytes instead of %d for %s.\n",
 			  __func__, err, size, "calories");
 		err = -EBADE;
-		goto m4ped_isr_fail;
+		goto m4ped_read_fail;
 	}
 
 	dd->iiodat.timestamp = iio_get_time_ns();
 	iio_push_to_buffers(iio, (unsigned char *)&(dd->iiodat));
 
-m4ped_isr_fail:
+m4ped_read_fail:
 	if (err < 0)
 		m4ped_err("%s: Failed with error code %d.\n", __func__, err);
 
-	mutex_unlock(&(dd->mutex));
+	return err;
+}
 
+static void m4ped_isr(enum m4sensorhub_irqs int_event, void *handle)
+{
+	int err = 0;
+	struct iio_dev *iio = handle;
+	struct m4ped_driver_data *dd = iio_priv(iio);
+	mutex_lock(&(dd->mutex));
+	err = m4ped_read_report_data(iio, dd);
+	if (err < 0)
+		m4ped_err("%s: Failed with error code %d.\n", __func__, err);
+	mutex_unlock(&(dd->mutex));
 	return;
 }
 
@@ -185,6 +197,16 @@ static int m4ped_set_samplerate(struct iio_dev *iio, int16_t rate)
 			}
 
 			dd->status = dd->status | (1 << M4PED_IRQ_ENABLED_BIT);
+			/* When an app registers, there is no data reported
+			unless the user starts walking. But the application
+			would like to have atleast one set of data sent
+			immediately following the register */
+			err = m4ped_read_report_data(iio, dd);
+			if (err < 0) {
+				m4ped_err("%s: Failed to report pedo data\n",
+					  __func__);
+				goto m4ped_set_samplerate_fail;
+			}
 		}
 	} else {
 		/* Disable the IRQ if necessary */
