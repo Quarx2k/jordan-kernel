@@ -19,3 +19,7 @@
 	>;
 
 };
+
+&spi_flash {
+	m25p,m4sensorhub_cb;
+};
