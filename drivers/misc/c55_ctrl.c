@@ -35,15 +35,8 @@ struct c55_ctrl_data {
 	struct wake_lock wake_lock;
 	struct regulator *reg_vddc;
 	struct regulator *reg_vddldo;
-	struct pinctrl *pctrl;
-	struct pinctrl_state *states[C55_MODE_MAX];
 	int c55_mode;
 	struct mutex ctrl_mutex;	/* mutex to handle critical area */
-};
-
-const char *c55_pin_state_labels[C55_MODE_MAX] = {
-	"off",
-	"on"
 };
 
 #define NUM_GPIOS 3
@@ -153,7 +146,6 @@ static ssize_t c55_ctrl_enable(struct device *dev,
 	mutex_lock(&cdata->ctrl_mutex);
 
 	if (mode == C55_ON) {
-		pinctrl_select_state(cdata->pctrl, cdata->states[mode]);
 		if (cdata->reg_vddc && regulator_enable(cdata->reg_vddc))
 			dev_err(dev, "regulator_enable failed for vddc\n");
 		if (cdata->reg_vddldo && regulator_enable(cdata->reg_vddldo))
@@ -163,7 +155,6 @@ static ssize_t c55_ctrl_enable(struct device *dev,
 			regulator_disable(cdata->reg_vddldo);
 		if (cdata->reg_vddc)
 			regulator_disable(cdata->reg_vddc);
-		pinctrl_select_state(cdata->pctrl, cdata->states[mode]);
 	}
 
 	cdata->c55_mode = mode;
@@ -176,37 +167,6 @@ static ssize_t c55_ctrl_enable(struct device *dev,
 }
 
 static DEVICE_ATTR(enable, S_IWUSR, NULL, c55_ctrl_enable);
-
-static int c55_ctrl_pin_setup(struct device *dev, struct c55_ctrl_data *cdata)
-{
-	int i, ret = 0;
-
-	cdata->pctrl = devm_pinctrl_get(dev);
-	if (IS_ERR(cdata->pctrl)) {
-		ret = PTR_ERR(cdata->pctrl);
-		dev_dbg(dev, "no pinctrl handle\n");
-	}
-
-	for (i = 0; !ret && (i < C55_MODE_MAX); i++) {
-		cdata->states[i] = pinctrl_lookup_state(cdata->pctrl,
-					c55_pin_state_labels[i]);
-		if (IS_ERR(cdata->states[i])) {
-			ret = PTR_ERR(cdata->states[i]);
-			dev_dbg(dev, "no %s pinctrl state\n",
-				c55_pin_state_labels[i]);
-		}
-	}
-
-	if (!ret) {
-		ret = pinctrl_select_state(cdata->pctrl,
-					cdata->states[C55_OFF]);
-		if (ret)
-			dev_dbg(dev, "failed to activate %s pinctrl state\n",
-				c55_pin_state_labels[C55_OFF]);
-	}
-
-	return ret;
-}
 
 static int  c55_ctrl_probe(struct platform_device *pdev)
 {
@@ -225,13 +185,6 @@ static int  c55_ctrl_probe(struct platform_device *pdev)
 	}
 
 	mutex_init(&cdata->ctrl_mutex);
-
-	ret = c55_ctrl_pin_setup(&pdev->dev, cdata);
-	if (ret) {
-		dev_err(&pdev->dev, "%s: c55_ctrl_pin_setup failed.\n",
-			__func__);
-		return ret;
-	}
 
 	cdata->int_gpio = -1;
 	ret = c55_ctrl_gpio_setup(cdata, &pdev->dev);
