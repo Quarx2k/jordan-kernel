@@ -31,6 +31,7 @@
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/partitions.h>
 #include <linux/of_platform.h>
+#include <linux/of_gpio.h>
 
 #include <linux/spi/spi.h>
 #include <linux/spi/flash.h>
@@ -81,6 +82,12 @@
 
 /****************************************************************************/
 
+enum {
+	M25P_OFF,
+	M25P_ON,
+	M25P_MODE_MAX
+};
+
 struct m25p {
 	struct spi_device	*spi;
 	struct mutex		lock;
@@ -90,12 +97,23 @@ struct m25p {
 	u8			erase_opcode;
 	u8			*command;
 	bool			fast_read;
+#ifdef CONFIG_M25PXX_M4SENSORHUB_CB
+	bool			m4sensorhub_cb;
+#endif
+	struct pinctrl		*pctrl;
+	struct pinctrl_state	*pctrl_states[M25P_MODE_MAX];
+	int			enable_gpio;
 };
 
 static inline struct m25p *mtd_to_m25p(struct mtd_info *mtd)
 {
 	return container_of(mtd, struct m25p, mtd);
 }
+
+const char *m25p_pin_state_labels[M25P_MODE_MAX] = {
+	"off",
+	"on"
+};
 
 /****************************************************************************/
 
@@ -659,6 +677,36 @@ err:	mutex_unlock(&flash->lock);
 	return res;
 }
 
+static int m25p80_get_device(struct mtd_info *mtd)
+{
+	struct m25p *flash = mtd_to_m25p(mtd);
+
+	if (!mtd->usecount) {
+		if (flash->pctrl)
+			pinctrl_select_state(flash->pctrl,
+					     flash->pctrl_states[M25P_ON]);
+		if (gpio_is_valid(flash->enable_gpio)) {
+			gpio_set_value(flash->enable_gpio, 1);
+			msleep(10);
+		}
+	}
+
+	return 0;
+}
+
+static void m25p80_put_device(struct mtd_info *mtd)
+{
+	struct m25p *flash = mtd_to_m25p(mtd);
+
+	if (!mtd->usecount) {
+		if (gpio_is_valid(flash->enable_gpio))
+			gpio_set_value(flash->enable_gpio, 0);
+		if (flash->pctrl)
+			pinctrl_select_state(flash->pctrl,
+					     flash->pctrl_states[M25P_OFF]);
+	}
+}
+
 /****************************************************************************/
 
 /*
@@ -898,6 +946,41 @@ static const struct spi_device_id *jedec_probe(struct spi_device *spi)
 	return ERR_PTR(-ENODEV);
 }
 
+static int m25p_pin_setup(struct device *dev, struct m25p *flash)
+{
+	int i, ret = 0;
+
+	flash->pctrl = devm_pinctrl_get(dev);
+	if (IS_ERR(flash->pctrl)) {
+		ret = PTR_ERR(flash->pctrl);
+		flash->pctrl = NULL;
+		dev_warn(dev, "no pinctrl handle\n");
+		return ret;
+	}
+
+	for (i = 0; !ret && (i < M25P_MODE_MAX); i++) {
+		flash->pctrl_states[i] = pinctrl_lookup_state(flash->pctrl,
+					m25p_pin_state_labels[i]);
+		if (IS_ERR(flash->pctrl_states[i])) {
+			ret = PTR_ERR(flash->pctrl_states[i]);
+			devm_pinctrl_put(flash->pctrl);
+			flash->pctrl = NULL;
+			dev_warn(dev, "no %s pinctrl state\n",
+				 m25p_pin_state_labels[i]);
+			return ret;
+		}
+	}
+
+	if (!ret) {
+		ret = pinctrl_select_state(flash->pctrl,
+					flash->pctrl_states[M25P_ON]);
+		if (ret)
+			dev_warn(dev, "failed to activate %s pinctrl state\n",
+				 m25p_pin_state_labels[M25P_ON]);
+	}
+
+	return ret;
+}
 
 /*
  * board specific setup should have ensured the SPI clock used here
@@ -908,16 +991,11 @@ static int m25p_init(struct spi_device *spi)
 {
 	const struct spi_device_id	*id = spi_get_device_id(spi);
 	struct flash_platform_data	*data;
-	struct m25p			*flash;
+	struct m25p			*flash = dev_get_drvdata(&spi->dev);
 	struct flash_info		*info;
 	unsigned			i;
 	struct mtd_part_parser_data	ppdata;
 	struct device_node __maybe_unused *np = spi->dev.of_node;
-
-#ifdef CONFIG_MTD_OF_PARTS
-	if (!of_device_is_available(np))
-		return -ENODEV;
-#endif
 
 	/* Platform data helps sort out which chip type we have, as
 	 * well as how this board partitions it.  If we don't have
@@ -964,20 +1042,6 @@ static int m25p_init(struct spi_device *spi)
 		}
 	}
 
-	flash = kzalloc(sizeof *flash, GFP_KERNEL);
-	if (!flash)
-		return -ENOMEM;
-	flash->command = kmalloc(MAX_CMD_SIZE + (flash->fast_read ? 1 : 0),
-					GFP_KERNEL);
-	if (!flash->command) {
-		kfree(flash);
-		return -ENOMEM;
-	}
-
-	flash->spi = spi;
-	mutex_init(&flash->lock);
-	dev_set_drvdata(&spi->dev, flash);
-
 	/*
 	 * Atmel, SST and Intel/Numonyx serial flash tend to power
 	 * up with the software protection bits set
@@ -1001,6 +1065,8 @@ static int m25p_init(struct spi_device *spi)
 	flash->mtd.size = info->sector_size * info->n_sectors;
 	flash->mtd._erase = m25p80_erase;
 	flash->mtd._read = m25p80_read;
+	flash->mtd._get_device = m25p80_get_device;
+	flash->mtd._put_device = m25p80_put_device;
 
 	/* flash protection support for STmicro chips */
 	if (JEDEC_MFR(info->jedec_id) == CFI_MFR_ST) {
@@ -1031,16 +1097,6 @@ static int m25p_init(struct spi_device *spi)
 	flash->page_size = info->page_size;
 	flash->mtd.writebufsize = flash->page_size;
 
-	flash->fast_read = false;
-#ifdef CONFIG_OF
-	if (np && of_property_read_bool(np, "m25p,fast-read"))
-		flash->fast_read = true;
-#endif
-
-#ifdef CONFIG_M25PXX_USE_FAST_READ
-	flash->fast_read = true;
-#endif
-
 	if (info->addr_width)
 		flash->addr_width = info->addr_width;
 	else {
@@ -1051,6 +1107,13 @@ static int m25p_init(struct spi_device *spi)
 		} else
 			flash->addr_width = 3;
 	}
+
+	if (gpio_is_valid(flash->enable_gpio))
+		gpio_set_value(flash->enable_gpio, 0);
+
+	if (flash->pctrl)
+		pinctrl_select_state(flash->pctrl,
+				     flash->pctrl_states[M25P_OFF]);
 
 	dev_info(&spi->dev, "%s (%lld Kbytes)\n", id->name,
 			(long long)flash->mtd.size >> 10);
@@ -1091,14 +1154,68 @@ static int m25p_finish_init(struct init_calldata *p_arg)
 static int m25p_probe(struct spi_device *spi)
 {
 	int err;
+	struct m25p *flash;
+	struct device_node __maybe_unused *np = spi->dev.of_node;
+
+#ifdef CONFIG_MTD_OF_PARTS
+	if (!of_device_is_available(np))
+		return -ENODEV;
+#endif
+	flash = devm_kzalloc(&spi->dev, sizeof(*flash), GFP_KERNEL);
+	if (!flash)
+		return -ENOMEM;
+
+#ifdef CONFIG_M25PXX_USE_FAST_READ
+	flash->fast_read = true;
+#endif
+
+#ifdef CONFIG_OF
+	if (np && of_property_read_bool(np, "m25p,fast-read"))
+		flash->fast_read = true;
+#endif
+
+	flash->command = devm_kzalloc(&spi->dev, MAX_CMD_SIZE +
+						(flash->fast_read ? 1 : 0),
+						GFP_KERNEL);
+	if (!flash->command)
+		return -ENOMEM;
+
+	err = m25p_pin_setup(&spi->dev, flash);
+	if (err)
+		dev_warn(&spi->dev, "%s: c55_ctrl_pin_setup failed.\n",
+			 __func__);
+
+#ifdef CONFIG_OF
+	flash->enable_gpio = of_get_gpio(spi->dev.of_node, 0);
+	if (!gpio_is_valid(flash->enable_gpio)) {
+		dev_warn(&spi->dev, "%s: of_get_gpio failed: %d\n", __func__,
+			 flash->enable_gpio);
+	} else {
+		gpio_request(flash->enable_gpio, "m25p_enable");
+		msleep(10);
+	}
+#else
+	flash->enable_gpio = -1;
+#endif
+
+	flash->spi = spi;
+	mutex_init(&flash->lock);
+	dev_set_drvdata(&spi->dev, flash);
 
 #ifdef CONFIG_M25PXX_M4SENSORHUB_CB
-	err = m4sensorhub_register_initcall(m25p_finish_init, spi);
-#else
-	err = m25p_init(spi);
+	flash->m4sensorhub_cb = true;
+#ifdef CONFIG_OF
+	if (!np || !of_property_read_bool(np, "m25p,m4sensorhub_cb"))
+		flash->m4sensorhub_cb = false;
 #endif
+	if (flash->m4sensorhub_cb)
+		err = m4sensorhub_register_initcall(m25p_finish_init, spi);
+	else
+#endif
+		err = m25p_init(spi);
+
 	if (err)
-		dev_err(&spi->dev, "can't register init with m4\n");
+		dev_err(&spi->dev, "init failed.\n");
 
 	return err;
 }
@@ -1110,13 +1227,10 @@ static int m25p_remove(struct spi_device *spi)
 
 	/* Clean up MTD stuff. */
 	status = mtd_device_unregister(&flash->mtd);
-	if (status == 0) {
-		kfree(flash->command);
-		kfree(flash);
-	}
 
 #ifdef CONFIG_M25PXX_M4SENSORHUB_CB
-	m4sensorhub_unregister_initcall(m25p_finish_init);
+	if (flash->m4sensorhub_cb)
+		m4sensorhub_unregister_initcall(m25p_finish_init);
 #endif
 	return 0;
 }
