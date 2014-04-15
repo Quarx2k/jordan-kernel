@@ -209,6 +209,15 @@
 			ti,vp = <&vp_core>;
 		};
 	};
+
+	gpio-charger {
+		compatible = "gpio-charger";
+		pinctrl-names = "default";
+		pinctrl-0 = <&charge_startb_pin>;	/* gpio-176 pin */
+		gpio = <&gpio6 16 0>;			/* gpio-176 */
+		charger-type = <8>;			/* POWER_SUPPLY_TYPE_WIRELESS */
+		charger-name = "wireless";
+	};
 };
 
 &vc {
@@ -619,6 +628,11 @@
 		>;
 	};
 
+	charge_startb_pin: pinmax_charge_startb_pin {
+		pinctrl-single,pins = <
+			0x1a2 0x104     /* MCSPI1_CS2, MODE4 | INPUT */
+		>;
+	};
 };
 
 &omap3_pmx_wkup{
