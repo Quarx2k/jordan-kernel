@@ -217,6 +217,7 @@
 		gpio = <&gpio6 16 0>;			/* gpio-176 */
 		charger-type = <8>;			/* POWER_SUPPLY_TYPE_WIRELESS */
 		charger-name = "wireless";
+		supplied_to = "max170xx_battery";
 	};
 };
 
