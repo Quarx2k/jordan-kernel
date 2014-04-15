@@ -94,6 +94,9 @@
  */
 
 /* Register offsets appearing on both OMAP2 and OMAP3 */
+#define INTC_PENDING_IRQ0				0x0098
+#define INTC_PENDING_IRQ1				0x00b8
+#define INTC_PENDING_IRQ2				0x00d8
 
 #define OMAP2_RM_RSTCTRL				0x0050
 #define OMAP2_RM_RSTTIME				0x0054

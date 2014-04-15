@@ -50,6 +50,7 @@
 #include "sdrc.h"
 #include "sram.h"
 #include "control.h"
+#include "pm-debug-regs.h"
 
 /* pm34xx errata defined in pm.h */
 u16 pm34xx_errata;
@@ -71,6 +72,7 @@ void (*omap3_do_wfi_sram)(void);
 
 static struct powerdomain *mpu_pwrdm, *neon_pwrdm;
 static struct powerdomain *core_pwrdm, *per_pwrdm;
+static struct powerdomain *dss_pwrdm;
 
 static void omap3_core_save_context(void)
 {
@@ -295,7 +297,6 @@ void omap_sram_idle(void)
 	}
 
 	omap3_intc_prepare_idle();
-
 	/*
 	 * On EMU/HS devices ROM code restores a SRDC value
 	 * from scratchpad which has automatic self refresh on timeout
@@ -308,6 +309,9 @@ void omap_sram_idle(void)
 	    core_next_state == PWRDM_POWER_OFF)
 		sdrc_pwr = sdrc_read_reg(SDRC_POWER);
 
+	if (suspend_debug)
+		pm_dbg_regs_save(1);
+
 	/*
 	 * omap3_arm_context is the location where some ARM context
 	 * get saved. The rest is placed on the stack, and restored
@@ -319,6 +323,9 @@ void omap_sram_idle(void)
 		cpu_suspend(save_state, omap34xx_do_sram_idle);
 	else
 		omap34xx_do_sram_idle(save_state);
+
+	if (suspend_debug)
+		pm_dbg_regs_save(2);
 
 	/* Restore normal SDRC POWER settings */
 	if (cpu_is_omap3430() && omap_rev() >= OMAP3430_REV_ES3_0 &&
@@ -396,10 +403,14 @@ restore:
 		}
 		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->saved_state);
 	}
-	if (ret)
+	if (ret) {
 		pr_err("Could not enter target state in pm_suspend\n");
-	else
+		pm_dbg_regs_dump(1);
+		pm_dbg_regs_dump(2);
+	} else
 		pr_info("Successfully put all powerdomains to target state\n");
+
+	pm_dbg_show_wakeup_source();
 
 	suspend_debug = false;
 	return ret;
@@ -653,6 +664,7 @@ static void __init pm_errata_configure(void)
 		pm34xx_errata |= PM_RTA_ERRATUM_i608;
 		/* Enable the l2 cache toggling in sleep logic */
 		enable_omap3630_toggle_l2_on_restore();
+
 		if (omap_rev() < OMAP3630_REV_ES1_2)
 			pm34xx_errata |= (PM_SDRC_WAKEUP_ERRATUM_i583 |
 					  PM_PER_MEMORIES_ERRATUM_i582);
@@ -713,6 +725,7 @@ int __init omap3_pm_init(void)
 	neon_pwrdm = pwrdm_lookup("neon_pwrdm");
 	per_pwrdm = pwrdm_lookup("per_pwrdm");
 	core_pwrdm = pwrdm_lookup("core_pwrdm");
+	dss_pwrdm = pwrdm_lookup("dss_pwrdm");
 
 	neon_clkdm = clkdm_lookup("neon_clkdm");
 	mpu_clkdm = clkdm_lookup("mpu_clkdm");

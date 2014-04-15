@@ -36,6 +36,7 @@
 #include "cm2xxx_3xxx.h"
 #include "prm2xxx_3xxx.h"
 #include "pm.h"
+#include "pm-debug-regs.h"
 
 u32 enable_off_mode;
 
@@ -273,6 +274,9 @@ static int __init pm_dbg_init(void)
 
 	(void) debugfs_create_file("enable_off_mode", S_IRUGO | S_IWUSR, d,
 				   &enable_off_mode, &pm_dbg_option_fops);
+
+	pm_dbg_regs_init(d);
+
 	pm_dbg_init_done = 1;
 
 	return 0;
