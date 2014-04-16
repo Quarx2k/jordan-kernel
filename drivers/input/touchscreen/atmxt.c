@@ -1075,6 +1075,10 @@ static int atmxt_register_inputs(struct atmxt_driver_data *dd,
 	input_set_drvdata(dd->in_dev, dd);
 	set_bit(INPUT_PROP_DIRECT, dd->in_dev->propbit);
 
+	/* Need for palm detection */
+	set_bit(KEY_SLEEP, dd->in_dev->keybit);
+	set_bit(EV_KEY, dd->in_dev->evbit);
+
 	set_bit(EV_ABS, dd->in_dev->evbit);
 	for (i = 0; i < rsize; i += 10) {
 		if (((rdat[i+1] << 8) | rdat[i+0]) != ATMXT_ABS_RESERVED) {
@@ -2707,12 +2711,18 @@ static int atmxt_message_handler42(struct atmxt_driver_data *dd,
 	}
 
 	if (msg[1] & 0x01) {
-		printk(KERN_ERR "%s: Touch suppression is active.\n",
+		atmxt_dbg(dd, ATMXT_DBG3,
+			 "%s: Touch suppression is active.\n",
 			__func__);
+		input_report_key(dd->in_dev, KEY_SLEEP, 1);
 	} else {
-		printk(KERN_INFO "%s: Touch suppression is disabled.\n",
+		atmxt_dbg(dd, ATMXT_DBG3,
+			 "%s: Touch suppression is disabled.\n",
 			__func__);
+		input_report_key(dd->in_dev, KEY_SLEEP, 0);
 	}
+
+	input_sync(dd->in_dev);
 
 atmxt_message_handler42_fail:
 	return err;
