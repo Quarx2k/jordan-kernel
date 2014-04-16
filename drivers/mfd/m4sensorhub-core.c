@@ -556,7 +556,7 @@ static ssize_t m4sensorhub_get_firmware_version(struct device *dev,
 				m4sensorhub_misc_data.fw_version : 0xFFFF);
 }
 
-static DEVICE_ATTR(firmware_version, S_IRUSR,
+static DEVICE_ATTR(firmware_version, S_IRUGO,
 				m4sensorhub_get_firmware_version, NULL);
 
 static struct attribute *m4sensorhub_control_attributes[] = {
