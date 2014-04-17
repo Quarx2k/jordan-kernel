@@ -19,7 +19,7 @@
  *
  */
 
-#define pr_fmt(fmt) "(stll) :" fmt
+#define pr_fmt(fmt) "(stll): " fmt
 #include <linux/skbuff.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
@@ -31,7 +31,7 @@ static void send_ll_cmd(struct st_data_s *st_data,
 	unsigned char cmd)
 {
 
-	pr_debug("%s: writing %x", __func__, cmd);
+	pr_debug("%s: writing %x\n", __func__, cmd);
 	st_int_write(st_data, &cmd, 1);
 	return;
 }
@@ -41,11 +41,11 @@ static void ll_device_want_to_sleep(struct st_data_s *st_data)
 	struct kim_data_s	*kim_data;
 	struct ti_st_plat_data	*pdata;
 
-	pr_debug("%s", __func__);
+	pr_debug("%s\n", __func__);
 	/* sanity check */
 	if (st_data->ll_state != ST_LL_AWAKE)
 		pr_err("ERR hcill: ST_LL_GO_TO_SLEEP_IND"
-			  "in state %ld", st_data->ll_state);
+			  "in state %ld\n", st_data->ll_state);
 
 	send_ll_cmd(st_data, LL_SLEEP_ACK);
 	/* update state */
@@ -70,17 +70,17 @@ static void ll_device_want_to_wakeup(struct st_data_s *st_data)
 		break;
 	case ST_LL_ASLEEP_TO_AWAKE:
 		/* duplicate wake_ind */
-		pr_err("duplicate wake_ind while waiting for Wake ack");
+		pr_err("duplicate wake_ind while waiting for Wake ack\n");
 		send_ll_cmd(st_data, LL_WAKE_UP_ACK);
 		break;
 	case ST_LL_AWAKE:
 		/* duplicate wake_ind */
-		pr_err("duplicate wake_ind already AWAKE");
+		pr_err("duplicate wake_ind already AWAKE\n");
 		send_ll_cmd(st_data, LL_WAKE_UP_ACK);
 		break;
 	case ST_LL_AWAKE_TO_ASLEEP:
 		/* duplicate wake_ind */
-		pr_err("duplicate wake_ind");
+		pr_err("duplicate wake_ind\n");
 		break;
 	}
 	/* update state */
@@ -123,14 +123,14 @@ void st_ll_wakeup(struct st_data_s *ll)
 		ll->ll_state = ST_LL_ASLEEP_TO_AWAKE;
 	} else {
 		/* don't send the duplicate wake_indication */
-		pr_err(" Chip already AWAKE ");
+		pr_err("Chip already AWAKE\n");
 	}
 }
 
 /* called when ST Core wants the state */
 unsigned long st_ll_getstate(struct st_data_s *ll)
 {
-	pr_debug(" returning state %ld", ll->ll_state);
+	pr_debug("returning state %ld\n", ll->ll_state);
 	return ll->ll_state;
 }
 
@@ -140,22 +140,22 @@ unsigned long st_ll_sleep_state(struct st_data_s *st_data,
 {
 	switch (cmd) {
 	case LL_SLEEP_IND:	/* sleep ind */
-		pr_debug("sleep indication recvd");
+		pr_debug("sleep indication recvd\n");
 		ll_device_want_to_sleep(st_data);
 		break;
 	case LL_SLEEP_ACK:	/* sleep ack */
-		pr_err("sleep ack rcvd: host shouldn't");
+		pr_err("sleep ack rcvd: host shouldn't\n");
 		break;
 	case LL_WAKE_UP_IND:	/* wake ind */
-		pr_debug("wake indication recvd");
+		pr_debug("wake indication recvd\n");
 		ll_device_want_to_wakeup(st_data);
 		break;
 	case LL_WAKE_UP_ACK:	/* wake ack */
-		pr_debug("wake ack rcvd");
+		pr_debug("wake ack rcvd\n");
 		st_data->ll_state = ST_LL_AWAKE;
 		break;
 	default:
-		pr_err(" unknown input/state ");
+		pr_err("unknown input/state\n");
 		return -EINVAL;
 	}
 	return 0;

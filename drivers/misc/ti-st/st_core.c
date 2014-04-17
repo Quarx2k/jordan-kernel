@@ -104,7 +104,7 @@ int st_int_write(struct st_data_s *st_gdata,
  */
 static void st_send_frame(unsigned char chnl_id, struct st_data_s *st_gdata)
 {
-	pr_debug(" %s(prot:%d) ", __func__, chnl_id);
+	pr_debug("%s(prot:%d)\n", __func__, chnl_id);
 
 	if (unlikely
 	    (st_gdata == NULL || st_gdata->rx_skb == NULL
@@ -124,12 +124,12 @@ static void st_send_frame(unsigned char chnl_id, struct st_data_s *st_gdata)
 			(st_gdata->list[chnl_id]->recv
 			(st_gdata->list[chnl_id]->priv_data, st_gdata->rx_skb)
 			     != 0)) {
-			pr_err(" proto stack %d's ->recv failed\n", chnl_id);
+			pr_err("proto stack %d's ->recv failed\n", chnl_id);
 			kfree_skb(st_gdata->rx_skb);
 			return;
 		}
 	} else {
-		pr_err(" proto stack %d's ->recv null\n", chnl_id);
+		pr_err("proto stack %d's ->recv null\n", chnl_id);
 		kfree_skb(st_gdata->rx_skb);
 	}
 	return;
@@ -145,7 +145,7 @@ static void st_send_frame(unsigned char chnl_id, struct st_data_s *st_gdata)
 static void st_reg_complete(struct st_data_s *st_gdata, char err)
 {
 	unsigned char i = 0;
-	pr_info(" %s\n", __func__);
+	pr_info("%s\n", __func__);
 	for (i = 0; i < ST_MAX_CHANNELS; i++) {
 		if (likely(st_gdata != NULL &&
 			st_gdata->is_registered[i] == true &&
@@ -249,7 +249,7 @@ void st_int_recv(void *disc_data,
 	ptr = (char *)data;
 	/* tty_receive sent null ? */
 	if (unlikely(ptr == NULL) || (st_gdata == NULL)) {
-		pr_err(" received null from TTY\n");
+		pr_err("received null from TTY\n");
 		return;
 	}
 
@@ -545,7 +545,7 @@ long st_register(struct st_proto_s *new_proto)
 	spin_lock_irqsave(&st_gdata->lock, flags);
 
 	if (test_bit(ST_REG_IN_PROGRESS, &st_gdata->st_state)) {
-		pr_info(" ST_REG_IN_PROGRESS:%d\n", new_proto->chnl_id);
+		pr_info("ST_REG_IN_PROGRESS:%d\n", new_proto->chnl_id);
 		/* fw download in progress */
 
 		add_channel_to_table(st_gdata, new_proto);
@@ -556,7 +556,7 @@ long st_register(struct st_proto_s *new_proto)
 		spin_unlock_irqrestore(&st_gdata->lock, flags);
 		return -EINPROGRESS;
 	} else if (st_gdata->protos_registered == ST_EMPTY) {
-		pr_info(" chnl_id list empty :%d\n", new_proto->chnl_id);
+		pr_info("chnl_id list empty :%d\n", new_proto->chnl_id);
 		set_bit(ST_REG_IN_PROGRESS, &st_gdata->st_state);
 		st_recv = st_kim_recv;
 
@@ -574,7 +574,7 @@ long st_register(struct st_proto_s *new_proto)
 			clear_bit(ST_REG_IN_PROGRESS, &st_gdata->st_state);
 			if ((st_gdata->protos_registered != ST_EMPTY) &&
 			    (test_bit(ST_REG_PENDING, &st_gdata->st_state))) {
-				pr_err(" KIM failure complete callback\n");
+				pr_err("KIM failure complete callback\n");
 				st_reg_complete(st_gdata, err);
 				clear_bit(ST_REG_PENDING, &st_gdata->st_state);
 			}
@@ -591,7 +591,7 @@ long st_register(struct st_proto_s *new_proto)
 		 */
 		if ((st_gdata->protos_registered != ST_EMPTY) &&
 		    (test_bit(ST_REG_PENDING, &st_gdata->st_state))) {
-			pr_debug(" call reg complete callback\n");
+			pr_debug("call reg complete callback\n");
 			st_reg_complete(st_gdata, 0);
 		}
 		clear_bit(ST_REG_PENDING, &st_gdata->st_state);
@@ -600,8 +600,8 @@ long st_register(struct st_proto_s *new_proto)
 		 * since the above check is old
 		 */
 		if (st_gdata->is_registered[new_proto->chnl_id] == true) {
-			pr_err(" proto %d already registered\n",
-				   new_proto->chnl_id);
+			pr_err("proto %d already registered\n",
+			       new_proto->chnl_id);
 			spin_unlock_irqrestore(&st_gdata->lock, flags);
 			return -EALREADY;
 		}
@@ -639,14 +639,14 @@ long st_unregister(struct st_proto_s *proto)
 
 	st_kim_ref(&st_gdata, 0);
 	if (!st_gdata || proto->chnl_id >= ST_MAX_CHANNELS) {
-		pr_err(" chnl_id %d not supported\n", proto->chnl_id);
+		pr_err("chnl_id %d not supported\n", proto->chnl_id);
 		return -EPROTONOSUPPORT;
 	}
 
 	spin_lock_irqsave(&st_gdata->lock, flags);
 
 	if (st_gdata->is_registered[proto->chnl_id] == false) {
-		pr_err(" chnl_id %d not registered\n", proto->chnl_id);
+		pr_err("chnl_id %d not registered\n", proto->chnl_id);
 		spin_unlock_irqrestore(&st_gdata->lock, flags);
 		return -EPROTONOSUPPORT;
 	}
@@ -661,7 +661,7 @@ long st_unregister(struct st_proto_s *proto)
 
 	if ((st_gdata->protos_registered == ST_EMPTY) &&
 	    (!test_bit(ST_REG_PENDING, &st_gdata->st_state))) {
-		pr_info(" all chnl_ids unregistered\n");
+		pr_info("all chnl_ids unregistered\n");
 
 		/* stop traffic on tty */
 		if (st_gdata->tty) {
@@ -850,7 +850,7 @@ int st_core_init(struct st_data_s **core_data)
 			   N_TI_WL, err);
 		return err;
 	}
-	pr_debug("registered n_shared line discipline");
+	pr_debug("registered n_shared line discipline\n");
 
 	st_gdata = kzalloc(sizeof(struct st_data_s), GFP_KERNEL);
 	if (!st_gdata) {
