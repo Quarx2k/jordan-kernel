@@ -218,6 +218,7 @@
 		charger-type = <8>;			/* POWER_SUPPLY_TYPE_WIRELESS */
 		charger-name = "wireless";
 		supplied_to = "max170xx_battery";
+		switch-name = "dock";
 	};
 };
 
