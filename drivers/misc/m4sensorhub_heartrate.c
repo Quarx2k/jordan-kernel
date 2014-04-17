@@ -34,6 +34,7 @@
 #include <linux/iio/buffer.h>
 #include <linux/iio/kfifo_buf.h>
 #include <linux/iio/m4sensorhub/m4sensorhub_heartrate.h>
+#include <linux/delay.h>
 
 #define m4hrt_err(format, args...)  KDEBUG(M4SH_ERROR, format, ## args)
 
@@ -47,6 +48,8 @@ struct m4hrt_driver_data {
 	struct m4sensorhub_heartrate_iio_data   iiodat;
 	int16_t         samplerate;
 	uint16_t        status;
+
+	uint8_t         dbg_addr;
 };
 
 
@@ -211,9 +214,172 @@ static ssize_t m4hrt_iiodata_show(struct device *dev,
 }
 static IIO_DEVICE_ATTR(iiodata, S_IRUGO, m4hrt_iiodata_show, NULL, 0);
 
+/* To set the desired address, "echo 0xHH > regaddr" (sets variable only). */
+static ssize_t m4hrt_regaddr_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct iio_dev *iio = platform_get_drvdata(pdev);
+	struct m4hrt_driver_data *dd = iio_priv(iio);
+	ssize_t size = 0;
+
+	mutex_lock(&(dd->mutex));
+	size = snprintf(buf, PAGE_SIZE, "%s0x%02X\n",
+		"addr: ", dd->dbg_addr);
+	mutex_unlock(&(dd->mutex));
+	return size;
+}
+static ssize_t m4hrt_regaddr_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	int err = 0;
+	struct platform_device *pdev = to_platform_device(dev);
+	struct iio_dev *iio = platform_get_drvdata(pdev);
+	struct m4hrt_driver_data *dd = iio_priv(iio);
+	unsigned int value = 0;
+
+	mutex_lock(&(dd->mutex));
+
+	err = kstrtouint(buf, 16, &value);
+	if (err < 0) {
+		m4hrt_err("%s: Failed to convert value.\n", __func__);
+		goto m4hrt_regaddr_store_exit;
+	}
+
+	if (value > 255) {
+		m4hrt_err("%s: Invalid register address %d passed.\n",
+			  __func__, value);
+		err = -EINVAL;
+		goto m4hrt_regaddr_store_exit;
+	}
+
+	dd->dbg_addr = value;
+
+m4hrt_regaddr_store_exit:
+	if (err < 0) {
+		m4hrt_err("%s: Failed with error code %d.\n", __func__, err);
+		size = err;
+	}
+
+	mutex_unlock(&(dd->mutex));
+
+	return size;
+}
+static IIO_DEVICE_ATTR(regaddr, S_IRUSR | S_IWUSR,
+		m4hrt_regaddr_show, m4hrt_regaddr_store, 0);
+
+/* To read data, "cat regdata" after setting regaddr above. */
+static ssize_t m4hrt_regdata_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	int err = 0;
+	struct platform_device *pdev = to_platform_device(dev);
+	struct iio_dev *iio = platform_get_drvdata(pdev);
+	struct m4hrt_driver_data *dd = iio_priv(iio);
+	ssize_t size = 0;
+	uint8_t data[3] = {0x00, 0x00, 0x00};
+	uint8_t cmd = 0x01; /* Read data */
+
+	mutex_lock(&(dd->mutex));
+
+	err = m4sensorhub_reg_write(dd->m4, M4SH_REG_HEARTRATESENSOR_REGADDR,
+		(char *)&(dd->dbg_addr), m4sh_no_mask);
+	if (err < 0) {
+		m4hrt_err("%s: Failed to write register address.\n", __func__);
+		goto m4hrt_regdata_show_exit;
+	}
+
+	err = m4sensorhub_reg_write(dd->m4, M4SH_REG_HEARTRATESENSOR_REGRWCMD,
+		(char *)&cmd, m4sh_no_mask);
+	if (err < 0) {
+		m4hrt_err("%s: Failed to write register command.\n", __func__);
+		goto m4hrt_regdata_show_exit;
+	}
+
+	msleep(1); /* Give M4 time to read the data */
+
+	err = m4sensorhub_reg_read_n(dd->m4, M4SH_REG_HEARTRATESENSOR_REGVALUE,
+		(char *)&(data[0]), ARRAY_SIZE(data));
+	if (err < 0) {
+		m4hrt_err("%s: Failed to read register data.\n", __func__);
+		goto m4hrt_regdata_show_exit;
+	}
+
+	size = snprintf(buf, PAGE_SIZE, "%s\n0x%02X\n0x%02X\n0x%02X\n",
+		"data (3 bytes): ", data[0], data[1], data[2]);
+
+m4hrt_regdata_show_exit:
+	if (err < 0) {
+		m4hrt_err("%s: Failed with error code %d.\n", __func__, err);
+		size = err;
+	}
+
+	mutex_unlock(&(dd->mutex));
+
+	return size;
+}
+/* To write data, "echo 0xHHHHHH > regdata" after setting regaddr above. */
+static ssize_t m4hrt_regdata_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	int err = 0;
+	struct platform_device *pdev = to_platform_device(dev);
+	struct iio_dev *iio = platform_get_drvdata(pdev);
+	struct m4hrt_driver_data *dd = iio_priv(iio);
+	unsigned int value = 0;
+	uint8_t cmd = 0x00; /* Write data */
+
+	mutex_lock(&(dd->mutex));
+
+	err = kstrtouint(buf, 16, &value);
+	if (err < 0) {
+		m4hrt_err("%s: Failed to convert value.\n", __func__);
+		goto m4hrt_regdata_store_exit;
+	} else if (value > 0x00FFFFFF) { /* Keep only three bytes */
+		value = value & 0x00FFFFFF;
+		m4hrt_err("%s: Clipping data to write only 0x%06X...\n",
+			  __func__, value);
+	}
+
+	err = m4sensorhub_reg_write(dd->m4, M4SH_REG_HEARTRATESENSOR_REGADDR,
+		(char *)&(dd->dbg_addr), m4sh_no_mask);
+	if (err < 0) {
+		m4hrt_err("%s: Failed to write register address.\n", __func__);
+		goto m4hrt_regdata_store_exit;
+	}
+
+	err = m4sensorhub_reg_write(dd->m4, M4SH_REG_HEARTRATESENSOR_REGVALUE,
+		(char *)&value, m4sh_no_mask);
+	if (err < 0) {
+		m4hrt_err("%s: Failed to write register data.\n", __func__);
+		goto m4hrt_regdata_store_exit;
+	}
+
+	err = m4sensorhub_reg_write(dd->m4, M4SH_REG_HEARTRATESENSOR_REGRWCMD,
+		(char *)&cmd, m4sh_no_mask);
+	if (err < 0) {
+		m4hrt_err("%s: Failed to write register command.\n", __func__);
+		goto m4hrt_regdata_store_exit;
+	}
+
+m4hrt_regdata_store_exit:
+	if (err < 0) {
+		m4hrt_err("%s: Failed with error code %d.\n", __func__, err);
+		size = err;
+	}
+
+	mutex_unlock(&(dd->mutex));
+
+	return size;
+}
+static IIO_DEVICE_ATTR(regdata, S_IRUSR | S_IWUSR,
+		m4hrt_regdata_show, m4hrt_regdata_store, 0);
+
 static struct attribute *m4hrt_iio_attributes[] = {
 	&iio_dev_attr_setrate.dev_attr.attr,
 	&iio_dev_attr_iiodata.dev_attr.attr,
+	&iio_dev_attr_regaddr.dev_attr.attr,
+	&iio_dev_attr_regdata.dev_attr.attr,
 	NULL,
 };
 
