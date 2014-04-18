@@ -58,7 +58,7 @@ static void m4pas_isr(enum m4sensorhub_irqs int_event, void *handle)
 	int size = 0;
 	uint32_t passive_timestamp[M4PAS_NUM_PASSIVE_BUFFERS];
 	uint32_t steps[M4PAS_NUM_PASSIVE_BUFFERS];
-	uint32_t mets[M4PAS_NUM_PASSIVE_BUFFERS];
+	uint32_t calories[M4PAS_NUM_PASSIVE_BUFFERS];
 	uint32_t floors_climbed[M4PAS_NUM_PASSIVE_BUFFERS];
 	int i = 0;
 
@@ -91,15 +91,15 @@ static void m4pas_isr(enum m4sensorhub_irqs int_event, void *handle)
 		goto m4pas_isr_fail;
 	}
 
-	size = m4sensorhub_reg_getsize(dd->m4, M4SH_REG_PASSIVE_METS);
-	err = m4sensorhub_reg_read(dd->m4, M4SH_REG_PASSIVE_METS,
-		(char *)&(mets));
+	size = m4sensorhub_reg_getsize(dd->m4, M4SH_REG_PASSIVE_CALORIES);
+	err = m4sensorhub_reg_read(dd->m4, M4SH_REG_PASSIVE_CALORIES,
+		(char *)&(calories));
 	if (err < 0) {
-		m4pas_err("%s: Failed to read mets data.\n", __func__);
+		m4pas_err("%s: Failed to read calories data.\n", __func__);
 		goto m4pas_isr_fail;
 	} else if (err != size) {
 		m4pas_err("%s: Read %d bytes instead of %d for %s.\n",
-			  __func__, err, size, "mets");
+			  __func__, err, size, "calories");
 		err = -EBADE;
 		goto m4pas_isr_fail;
 	}
@@ -121,7 +121,7 @@ static void m4pas_isr(enum m4sensorhub_irqs int_event, void *handle)
 	for (i = 0; i < M4PAS_NUM_PASSIVE_BUFFERS; i++) {
 		dd->iiodat[i].passive_timestamp = passive_timestamp[i];
 		dd->iiodat[i].steps = steps[i];
-		dd->iiodat[i].mets = mets[i];
+		dd->iiodat[i].calories = calories[i];
 		dd->iiodat[i].floors_climbed = floors_climbed[i];
 		dd->iiodat[i].timestamp = iio_get_time_ns();
 		iio_push_to_buffers(iio, (unsigned char *)&(dd->iiodat[i]));
@@ -250,7 +250,7 @@ static ssize_t m4pas_iiodata_show(struct device *dev,
 			buf, "Buffer ", i,
 			"passive_timestamp: ", dd->iiodat[i].passive_timestamp,
 			"steps: ", dd->iiodat[i].steps,
-			"mets: ", dd->iiodat[i].mets,
+			"calories: ", dd->iiodat[i].calories,
 			"floors_climbed: ", dd->iiodat[i].floors_climbed);
 	}
 	mutex_unlock(&(dd->mutex));
