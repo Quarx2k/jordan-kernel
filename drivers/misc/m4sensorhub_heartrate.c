@@ -282,14 +282,14 @@ static ssize_t m4hrt_regdata_show(struct device *dev,
 
 	mutex_lock(&(dd->mutex));
 
-	err = m4sensorhub_reg_write(dd->m4, M4SH_REG_HEARTRATESENSOR_REGADDR,
+	err = m4sensorhub_reg_write(dd->m4, M4SH_REG_HRSENSOR_REGADDR,
 		(char *)&(dd->dbg_addr), m4sh_no_mask);
 	if (err < 0) {
 		m4hrt_err("%s: Failed to write register address.\n", __func__);
 		goto m4hrt_regdata_show_exit;
 	}
 
-	err = m4sensorhub_reg_write(dd->m4, M4SH_REG_HEARTRATESENSOR_REGRWCMD,
+	err = m4sensorhub_reg_write(dd->m4, M4SH_REG_HRSENSOR_REGRWCMD,
 		(char *)&cmd, m4sh_no_mask);
 	if (err < 0) {
 		m4hrt_err("%s: Failed to write register command.\n", __func__);
@@ -298,7 +298,7 @@ static ssize_t m4hrt_regdata_show(struct device *dev,
 
 	msleep(1); /* Give M4 time to read the data */
 
-	err = m4sensorhub_reg_read_n(dd->m4, M4SH_REG_HEARTRATESENSOR_REGVALUE,
+	err = m4sensorhub_reg_read_n(dd->m4, M4SH_REG_HRSENSOR_REGVALUE,
 		(char *)&(data[0]), ARRAY_SIZE(data));
 	if (err < 0) {
 		m4hrt_err("%s: Failed to read register data.\n", __func__);
@@ -341,21 +341,21 @@ static ssize_t m4hrt_regdata_store(struct device *dev,
 			  __func__, value);
 	}
 
-	err = m4sensorhub_reg_write(dd->m4, M4SH_REG_HEARTRATESENSOR_REGADDR,
+	err = m4sensorhub_reg_write(dd->m4, M4SH_REG_HRSENSOR_REGADDR,
 		(char *)&(dd->dbg_addr), m4sh_no_mask);
 	if (err < 0) {
 		m4hrt_err("%s: Failed to write register address.\n", __func__);
 		goto m4hrt_regdata_store_exit;
 	}
 
-	err = m4sensorhub_reg_write(dd->m4, M4SH_REG_HEARTRATESENSOR_REGVALUE,
+	err = m4sensorhub_reg_write(dd->m4, M4SH_REG_HRSENSOR_REGVALUE,
 		(char *)&value, m4sh_no_mask);
 	if (err < 0) {
 		m4hrt_err("%s: Failed to write register data.\n", __func__);
 		goto m4hrt_regdata_store_exit;
 	}
 
-	err = m4sensorhub_reg_write(dd->m4, M4SH_REG_HEARTRATESENSOR_REGRWCMD,
+	err = m4sensorhub_reg_write(dd->m4, M4SH_REG_HRSENSOR_REGRWCMD,
 		(char *)&cmd, m4sh_no_mask);
 	if (err < 0) {
 		m4hrt_err("%s: Failed to write register command.\n", __func__);
