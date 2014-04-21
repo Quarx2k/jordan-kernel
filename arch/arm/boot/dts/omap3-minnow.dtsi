@@ -649,6 +649,32 @@
 	};
 };
 
+/* leave gpio bank interface clocks on during suspend
+ * to avoid race condition in gpio_irq_handler */
+&gpio1 {
+	ti,no_idle_on_suspend;
+};
+
+&gpio2 {
+	ti,no_idle_on_suspend;
+};
+
+&gpio3 {
+	ti,no_idle_on_suspend;
+};
+
+&gpio4 {
+	ti,no_idle_on_suspend;
+};
+
+&gpio5 {
+	ti,no_idle_on_suspend;
+};
+
+&gpio6 {
+	ti,no_idle_on_suspend;
+};
+
 /* external */
 &mmc1 {
 	status = "disabled";
