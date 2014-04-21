@@ -10,15 +10,12 @@
 /include/ "omap3-minnow.dtsi"
 
 / {
-	mmi,revision = "p1";
+	mmi,revision = "p2";
 	mmi,hwrev = <
-		0x04   /* Minnow P1B portable */
-		0x05   /* Minnow P2A wing */
-		0x06   /* Minnow P2A portable */
+		0x07   /* Minnow P2-5 portable (Rev A) */
 	>;
 
 	Display@0 {
-		/* place holder for P1B display support */
 		gpio_vio_en = <&gpio2 10 0>;    /* VDDIO gpio-42 */
 	};
 
