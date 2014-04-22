@@ -520,8 +520,8 @@
 		pinctrl-single,pins = <
 			0x05a 0x004	/* GPMC_A9, MODE4 | OUTPUT */
 			0x08e 0x104	/* GPMC_CLK, MODE4 | INPUT */
-			0x0a0 0x007	/* GPMC_WAIT2, MODE7 (UART4_TX) */
-			0x0a2 0x007	/* GPMC_WAIT3, MODE7 (UART4_RX) */
+			0x0a0 0x002	/* GPMC_WAIT2, MODE2 | OUTPUT */
+			0x0a2 0x102	/* GPMC_WAIT3, MODE2 | INPUT */
 			0x0ac 0x001	/* DSS_DATA0, MODE1 | OUTPUT */
 			0x0ae 0x001	/* DSS_DATA1, MODE1 | OUTPUT */
 			0x0b0 0x001	/* DSS_DATA2, MODE1 | OUTPUT */
@@ -711,9 +711,4 @@
 
 &uart2 {
 	flags = <0x00200000>;
-};
-
-/* Temporarily disable uart4 */
-&uart4 {
-	status = "disabled";
 };
