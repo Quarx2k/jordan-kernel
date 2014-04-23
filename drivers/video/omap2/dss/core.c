@@ -216,6 +216,7 @@ static int omap_dss_pm_notif(struct notifier_block *b, unsigned long v, void *d)
 	DSSDBG("pm notif %lu\n", v);
 
 	switch (v) {
+#if !defined(CONFIG_HAS_AMBIENTMODE)
 	case PM_SUSPEND_PREPARE:
 		DSSDBG("suspending displays\n");
 		return dss_suspend_all_devices();
@@ -223,7 +224,7 @@ static int omap_dss_pm_notif(struct notifier_block *b, unsigned long v, void *d)
 	case PM_POST_SUSPEND:
 		DSSDBG("resuming displays\n");
 		return dss_resume_all_devices();
-
+#endif
 	default:
 		return 0;
 	}

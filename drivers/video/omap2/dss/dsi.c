@@ -4570,6 +4570,22 @@ static void dsi_display_uninit_dsi(struct platform_device *dsidev,
 	dsi_pll_uninit(dsidev, disconnect_lanes);
 }
 
+static int dsi_soft_reset(struct platform_device *dsidev)
+{
+	int i = 5;
+	/* enable DSI soft reset */
+	REG_FLD_MOD(dsidev, DSI_SYSCONFIG, 1, 1, 1);
+	/* waiting for DSI soft reset done*/
+	while (REG_GET(dsidev, DSI_SYSSTATUS, 0, 0) == 0) {
+		if (!i--) {
+			DSSERR("DSI soft reset failed!\n");
+			return -ENODEV;
+		}
+		udelay(1);
+	}
+	return 0;
+}
+
 int omapdss_dsi_display_enable(struct omap_dss_device *dssdev)
 {
 	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
@@ -4594,10 +4610,7 @@ int omapdss_dsi_display_enable(struct omap_dss_device *dssdev)
 
 	dsi_enable_pll_clock(dsidev, 1);
 
-#ifndef CONFIG_OMAP2_DSS_RESET
-	dsi_vc_enable(dsidev, 0, 0);
-	dsi_vc_enable(dsidev, 1, 0);
-#endif
+	dsi_soft_reset(dsidev);
 
 	_dsi_initialize_irq(dsidev);
 

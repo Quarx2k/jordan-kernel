@@ -187,10 +187,11 @@ static struct early_suspend early_suspend_data = {
     .suspend = lm3535_early_suspend,
     .resume = lm3535_late_resume,
 };
-
 #endif
+#if defined(CONFIG_HAS_EARLYSUSPEND) || !defined(CONFIG_HAS_AMBIENTMODE)
 static int lm3535_suspend (struct i2c_client *client, pm_message_t mesg);
 static int lm3535_resume (struct i2c_client *client);
+#endif
 #endif
 
 static void (*lm3535_set_options_f)(uint8_t *buf, unsigned ramp) = 
@@ -235,7 +236,7 @@ static struct i2c_driver lm3535_driver =
     .id_table = lm3535_id,
     .probe = lm3535_probe,
     .remove  = lm3535_remove,
-#ifndef CONFIG_HAS_EARLYSUSPEND
+#if !defined(CONFIG_HAS_EARLYSUSPEND) && !defined(CONFIG_HAS_AMBIENTMODE)
     .suspend    = lm3535_suspend,
     .resume     = lm3535_resume,
 #endif
@@ -499,14 +500,12 @@ static void lm3535_brightness_set (struct led_classdev *led_cdev,
 
     bright_zone = atomic_read (&lm3535_data.bright_zone);
     mutex_lock (&lm3535_mutex);
-    if (value == -1) { // Special case for ALS adjustment
-        value = led_cdev->brightness;
-    }
-
-    if ((value > 0) && (value <= 5))
-        value = 0; /* Special case for G2 */
-    if ((value > 5) && (value <= 10))
-        value = 1; /* Special dim case for G2 */
+    if (value == -1)
+        value = led_cdev->brightness; /* Special case for ALS adjustment */
+    else if ((value > 0) && (value < 5))
+        value = 0; /* Special case for turn off */
+    else if ((value >= 5) && (value < 10))
+        value = 1; /* Special case for dim */
 
     if ((value == 0) && (!lm3535_data.enabled)) {
         /* If LED already disabled, we don't need to do anything */
@@ -1321,6 +1320,7 @@ static int lm3535_remove (struct i2c_client *client)
     return 0;
 }
 
+#if defined(CONFIG_HAS_EARLYSUSPEND) || !defined(CONFIG_HAS_AMBIENTMODE)
 static int lm3535_suspend (struct i2c_client *client, pm_message_t mesg)
 {
     printk_suspend ("%s: called with pm message %d\n", 
@@ -1363,6 +1363,7 @@ static int lm3535_resume (struct i2c_client *client)
 
     return 0;
 }
+#endif
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void lm3535_early_suspend (struct early_suspend *h)
