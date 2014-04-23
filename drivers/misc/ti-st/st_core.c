@@ -27,8 +27,13 @@
 
 #include <linux/seq_file.h>
 #include <linux/skbuff.h>
+#include <linux/wakelock.h>
 
 #include <linux/ti_wilink_st.h>
+
+#define ST_WAKE_LOCK_TIMEOUT_MS    150
+
+static struct wake_lock st_wk_lock_timeout;
 
 extern void st_kim_recv(void *, const unsigned char *, long);
 void st_int_recv(void *, const unsigned char *, long);
@@ -798,6 +803,8 @@ static void st_tty_receive(struct tty_struct *tty, const unsigned char *data,
 	 * to KIM for validation
 	 */
 	st_recv(tty->disc_data, data, count);
+	wake_lock_timeout(&st_wk_lock_timeout,
+			  msecs_to_jiffies(ST_WAKE_LOCK_TIMEOUT_MS));
 	pr_debug("done %s\n", __func__);
 }
 
@@ -844,6 +851,7 @@ int st_core_init(struct st_data_s **core_data)
 	struct st_data_s *st_gdata;
 	long err;
 
+	wake_lock_init(&st_wk_lock_timeout, WAKE_LOCK_SUSPEND, "st_wake_lock");
 	err = tty_register_ldisc(N_TI_WL, &st_ldisc_ops);
 	if (err) {
 		pr_err("error registering %d line discipline %ld\n",
@@ -905,6 +913,7 @@ void st_core_exit(struct st_data_s *st_gdata)
 		/* free the global data pointer */
 		kfree(st_gdata);
 	}
+	wake_lock_destroy(&st_wk_lock_timeout);
 }
 
 
