@@ -35,8 +35,13 @@
 #include <linux/of_gpio.h>
 #include <linux/module.h>
 #include <linux/clk.h>
+#include <linux/power_supply.h>
 
 static bool factory_override;
+
+static enum power_supply_property tusb_psy_properties[] = {
+	POWER_SUPPLY_PROP_ONLINE,
+};
 
 struct tusb_usb {
 	struct usb_phy		phy;
@@ -49,7 +54,24 @@ struct tusb_usb {
 	struct gpio *gpio_list;
 	struct clk *clk_in;
 	bool clk_in_en;
+	struct power_supply psy;
 };
+
+static int tusb_get_property(struct power_supply *psy,
+		enum power_supply_property psp, union power_supply_propval *val)
+{
+	struct tusb_usb *tusb = container_of(psy, struct tusb_usb, psy);
+
+	switch (psp) {
+	case POWER_SUPPLY_PROP_ONLINE:
+		val->intval = gpio_get_value(tusb->irq_gpio);
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
 
 static int tusb_set_suspend(struct usb_phy *x, int suspend)
 {
@@ -119,6 +141,8 @@ static void tusb_usb_work_func(struct work_struct *work)
 			USB_EVENT_NONE, NULL);
 		tusb->phy.last_event = USB_EVENT_NONE;
 	}
+
+	power_supply_changed(&tusb->psy);
 
 	/* Output GPIOs are driven based on the vbus_state input
 	   and the factory_override flag:
@@ -228,6 +252,7 @@ static int  tusb_usb_probe(struct platform_device *pdev)
 	struct tusb_usb	*tusb;
 	struct usb_otg	*otg;
 	struct device_node *np;
+	struct power_supply *psy;
 	int i, ret, irqnum = -1;
 
 	np = pdev->dev.of_node;
@@ -298,6 +323,18 @@ static int  tusb_usb_probe(struct platform_device *pdev)
 		goto remove_file;
 	}
 
+	psy = &tusb->psy;
+	psy->name = "ac";
+	psy->type = POWER_SUPPLY_TYPE_MAINS;
+	psy->properties = tusb_psy_properties;
+	psy->num_properties = ARRAY_SIZE(tusb_psy_properties);
+	psy->get_property = tusb_get_property;
+	ret = power_supply_register(&pdev->dev, psy);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "unable to register power supply\n");
+		goto remove_phy;
+	}
+
 	for (i = 0; i < tusb->num_gpios; i++) {
 		if (!strcmp(tusb->gpio_list[i].label, "tusb-irq")) {
 			tusb->irq_gpio = tusb->gpio_list[i].gpio;
@@ -310,7 +347,7 @@ static int  tusb_usb_probe(struct platform_device *pdev)
 					"tsub-irq", tusb);
 			if (ret) {
 				dev_err(&pdev->dev, "failed to get irq\n");
-				goto remove_phy;
+				goto unregister_power_supply;
 			}
 		}
 	}
@@ -337,6 +374,8 @@ static int  tusb_usb_probe(struct platform_device *pdev)
 free_irq:
 	free_irq(irqnum, tusb);
 	cancel_work_sync(&tusb->work);
+unregister_power_supply:
+	power_supply_unregister(psy);
 remove_phy:
 	usb_remove_phy(&tusb->phy);
 remove_file:
@@ -358,6 +397,7 @@ static int tusb_usb_remove(struct platform_device *pdev)
 
 	free_irq(irqnum, tusb);
 	cancel_work_sync(&tusb->work);
+	power_supply_unregister(&tusb->psy);
 	usb_remove_phy(&tusb->phy);
 	device_remove_file(&pdev->dev, &(dev_attr_factory_override.attr));
 	destroy_workqueue(tusb->workqueue);
