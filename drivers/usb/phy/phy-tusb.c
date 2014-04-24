@@ -395,17 +395,7 @@ static struct platform_driver tusb_usb_driver = {
 	.id_table = tusb_usb_platform_id_table,
 };
 
-static int __init tusb_usb_init(void)
-{
-	return platform_driver_register(&tusb_usb_driver);
-}
-subsys_initcall(tusb_usb_init);
-
-static void __exit tusb_usb_exit(void)
-{
-	platform_driver_unregister(&tusb_usb_driver);
-}
-module_exit(tusb_usb_exit);
+module_platform_driver(tusb_usb_driver);
 
 MODULE_ALIAS("platform:tusb_usb stub");
 MODULE_DESCRIPTION("TUSB transceiver driver");
