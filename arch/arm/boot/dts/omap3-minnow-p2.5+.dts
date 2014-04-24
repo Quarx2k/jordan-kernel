@@ -20,3 +20,10 @@
 	};
 
 };
+
+&i2c2{
+	m4sensorhub@39 {
+		mot,fw-filename = "m4sensorhub-p2_5_minnow.bin";
+	};
+};
+
