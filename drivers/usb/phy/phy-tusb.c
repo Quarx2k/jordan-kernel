@@ -254,51 +254,27 @@ static int  tusb_usb_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	for (i = 0; i < tusb->num_gpios; i++) {
-		if (!strcmp(tusb->gpio_list[i].label, "tusb-irq")) {
-			tusb->irq_gpio = tusb->gpio_list[i].gpio;
-			irqnum = gpio_to_irq(tusb->irq_gpio);
-			ret = request_irq(irqnum,
-					tusb_usb_isr,
-					IRQF_DISABLED |
-					IRQF_TRIGGER_RISING |
-					IRQF_TRIGGER_FALLING,
-					"tsub-irq", tusb);
-			if (ret) {
-				dev_err(&pdev->dev, "failed to get irq\n");
-				goto free_gpios;
-			}
-		}
-	}
-
 	otg = devm_kzalloc(&pdev->dev, sizeof(*otg), GFP_KERNEL);
 	if (!otg) {
 		dev_err(&pdev->dev, "unable to allocate memory for tusb OTG\n");
 		ret = -ENOMEM;
-		goto free_irq;
+		goto free_gpios;
 	}
 
 	wake_lock_init(&tusb->wake_lock, WAKE_LOCK_SUSPEND, "tusb");
 
 	tusb->workqueue = create_workqueue("tusb");
-	INIT_WORK(&tusb->work, tusb_usb_work_func);
-
-	if (irqnum >= 0) {
-		ret = enable_irq_wake(irqnum);
-		if (ret) {
-			dev_err(&pdev->dev, "unable to enable irq wake\n");
-			ret = -EINVAL;
-			goto cancel_work;
-		}
-	} else {
-		dev_err(&pdev->dev, "no IRQ configured\n");
-		goto cancel_work;
+	if (!tusb->workqueue) {
+		dev_err(&pdev->dev, "unable to create workqueue\n");
+		ret = -ENOMEM;
+		goto destroy_wakelock;
 	}
+	INIT_WORK(&tusb->work, tusb_usb_work_func);
 
 	ret = device_create_file(&pdev->dev, &(dev_attr_factory_override.attr));
 	if (ret != 0) {
 		dev_err(&pdev->dev, "sysfs file creation failed.\n");
-		goto disable_irq;
+		goto remove_workqueue;
 	}
 
 	tusb->dev		= &pdev->dev;
@@ -316,7 +292,40 @@ static int  tusb_usb_probe(struct platform_device *pdev)
 	otg->start_srp		= tusb_usb_start_srp;
 	otg->phy		= &tusb->phy;
 
-	usb_add_phy_dev(&tusb->phy);
+	ret = usb_add_phy_dev(&tusb->phy);
+	if (ret != 0) {
+		dev_err(&pdev->dev, "declaring USB phy failed.\n");
+		goto remove_file;
+	}
+
+	for (i = 0; i < tusb->num_gpios; i++) {
+		if (!strcmp(tusb->gpio_list[i].label, "tusb-irq")) {
+			tusb->irq_gpio = tusb->gpio_list[i].gpio;
+			irqnum = gpio_to_irq(tusb->irq_gpio);
+			ret = request_irq(irqnum,
+					tusb_usb_isr,
+					IRQF_DISABLED |
+					IRQF_TRIGGER_RISING |
+					IRQF_TRIGGER_FALLING,
+					"tsub-irq", tusb);
+			if (ret) {
+				dev_err(&pdev->dev, "failed to get irq\n");
+				goto remove_phy;
+			}
+		}
+	}
+
+	if (irqnum >= 0) {
+		ret = enable_irq_wake(irqnum);
+		if (ret) {
+			dev_err(&pdev->dev, "unable to enable irq wake\n");
+			ret = -EINVAL;
+			goto free_irq;
+		}
+	} else {
+		dev_err(&pdev->dev, "no IRQ configured\n");
+		goto remove_phy;
+	}
 
 	platform_set_drvdata(pdev, tusb);
 
@@ -325,14 +334,17 @@ static int  tusb_usb_probe(struct platform_device *pdev)
 
 	return 0;
 
-disable_irq:
-	disable_irq_wake(irqnum);
-cancel_work:
-	cancel_work_sync(&tusb->work);
-	destroy_workqueue(tusb->workqueue);
-	wake_lock_destroy(&tusb->wake_lock);
 free_irq:
 	free_irq(irqnum, tusb);
+	cancel_work_sync(&tusb->work);
+remove_phy:
+	usb_remove_phy(&tusb->phy);
+remove_file:
+	device_remove_file(&pdev->dev, &(dev_attr_factory_override.attr));
+remove_workqueue:
+	destroy_workqueue(tusb->workqueue);
+destroy_wakelock:
+	wake_lock_destroy(&tusb->wake_lock);
 free_gpios:
 	gpio_free_array(tusb->gpio_list, tusb->num_gpios);
 
@@ -344,16 +356,15 @@ static int tusb_usb_remove(struct platform_device *pdev)
 	struct tusb_usb	*tusb = platform_get_drvdata(pdev);
 	int irqnum = gpio_to_irq(tusb->irq_gpio);
 
-	device_remove_file(&pdev->dev, &(dev_attr_factory_override.attr));
-	disable_irq_wake(irqnum);
-	cancel_work_sync(&tusb->work);
-	destroy_workqueue(tusb->workqueue);
-
-	if (wake_lock_active(&tusb->wake_lock))
-		wake_unlock(&tusb->wake_lock);
-	wake_lock_destroy(&tusb->wake_lock);
 	free_irq(irqnum, tusb);
+	cancel_work_sync(&tusb->work);
+	usb_remove_phy(&tusb->phy);
+	device_remove_file(&pdev->dev, &(dev_attr_factory_override.attr));
+	destroy_workqueue(tusb->workqueue);
+	wake_lock_destroy(&tusb->wake_lock);
 	gpio_free_array(tusb->gpio_list, tusb->num_gpios);
+
+	platform_set_drvdata(pdev, NULL);
 
 	return 0;
 }
