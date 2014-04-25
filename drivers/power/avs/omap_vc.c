@@ -31,6 +31,7 @@
 #include <linux/err.h>
 #include <linux/clk.h>
 #include "omap_vc.h"
+#include "omap_prm_voltsetup.h"
 
 #define DRIVER_NAME	"omap-vc"
 
@@ -466,6 +467,14 @@ int omap_vc_channel_set_on_voltage(struct omap_vc_channel_info *info, u32 uv)
 		ret = regmap_update_bits(regmap,
 					 ch_regs->command_val_reg_offset,
 					 ch_regs->command_val_on_mask, val);
+	}
+	if (ret)
+		goto fail_reg;
+
+	ret = omap_prm_voltsetup(dev, pmic, uv);
+	if (ret) {
+		dev_err(dev, "Unable to set voltsetup parameters %d\n", ret);
+		goto out;
 	}
 
 fail_reg:

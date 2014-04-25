@@ -1,0 +1,37 @@
+PRM Voltage setup driver for Texas Instruments OMAP SoCs
+It is helper driver for voltage controller and allows to customize voltage
+setup time, PMIC voltage control hardware interface and clock source timing.
+
+Required Properties:
+- compatible: Should be :
+  "ti,omap3-glbl-prm" - for OMAP3 family of devices
+- reg: Address and length of the register set for the device. It contains
+  the information of registers in the same order as described by reg-names
+- reg-names: Should contain the reg names
+- "base-address" contains base address of PRM global registers
+- sys_clk: name of system clock (SYS_CLK)
+- clksetup_time: TCXO stabilization time in micro seconds
+
+Optional Properties:
+- autoextclkmode: allows to control the external clock request (CLKREQ) and
+  the oscillator. Values are used according with PRM_CLKSRC_CTRL register
+  description in OMAP TRM.
+- sys_off_mode: bool value selects the mode used to send OFF command. If present
+  (true) sys_off_mode pin will be used, otherwise (false) I2C will be used.
+- auto_off: bool vlaue enables/disables send OFF command over I2C. Applicable if
+  sys_off_mode is false;
+- auto_retention: bool vlaue enables/disables send RETENTION command over I2C.
+- auto_sleep: bool vlaue enables/disables send SLEEP command over I2C.
+
+Example:
+glbl_prm: glbl_prm@48307250 {
+	compatible = "ti,omap3-glbl-prm";
+	reg = <0x48307250 0x60>;
+	reg-names = "base-address";
+	sys_off_mode;
+	auto_retention;
+	autoextclkmode = <2>;
+	clksetup_time = <1000>;
+	sys_clk = "osc_sys_ck";
+};
+
