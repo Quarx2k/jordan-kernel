@@ -170,6 +170,7 @@ static const struct {
 	[M4SH_REG_EMG_SAMPLERATE]            = {M4SH_TYPE_EMG, 0x2, 2},
 	[M4SH_REG_EMG_SIGNALS]               = {M4SH_TYPE_EMG, 0x4, 326},
 	[M4SH_REG_HEARTRATE_HEARTRATE]       = {M4SH_TYPE_HEARTRATE, 0x0, 2},
+	[M4SH_REG_HEARTRATE_CONFIDENCE]      = {M4SH_TYPE_HEARTRATE, 0x2, 1},
 	[M4SH_REG_HRSENSOR_VERSION]          = {M4SH_TYPE_HRSENSOR, 0x0, 1},
 	[M4SH_REG_HRSENSOR_DUMMY]            = {M4SH_TYPE_HRSENSOR, 0x1, 1},
 	[M4SH_REG_HRSENSOR_SAMPLERATE]       = {M4SH_TYPE_HRSENSOR, 0x2, 2},
@@ -205,7 +206,7 @@ static const unsigned int bank_size_tbl[M4SH_TYPE__NUM] = {
 	[M4SH_TYPE_GESTURE]                  = 10,
 	[M4SH_TYPE_PASSIVE]                  = 192,
 	[M4SH_TYPE_EMG]                      = 330,
-	[M4SH_TYPE_HEARTRATE]                = 2,
+	[M4SH_TYPE_HEARTRATE]                = 3,
 	[M4SH_TYPE_HRSENSOR]                 = 13,
 	[M4SH_TYPE_LIGHTSENSOR]              = 6,
 };
