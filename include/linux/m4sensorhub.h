@@ -222,6 +222,7 @@ int m4sensorhub_register_initcall(int(*initfunc)(struct init_calldata *),
 void m4sensorhub_unregister_initcall(
 		int(*initfunc)(struct init_calldata *));
 
+int m4sensorhub_irq_disable_all(struct m4sensorhub_data *m4sensorhub);
 
 #endif /* __KERNEL__ */
 #endif  /* __M4SENSORHUB_H__ */

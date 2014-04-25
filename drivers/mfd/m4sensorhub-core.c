@@ -559,12 +559,28 @@ static ssize_t m4sensorhub_get_firmware_version(struct device *dev,
 static DEVICE_ATTR(firmware_version, S_IRUGO,
 				m4sensorhub_get_firmware_version, NULL);
 
+static ssize_t m4sensorhub_disable_interrupts(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int ret;
+
+	ret = m4sensorhub_irq_disable_all(&m4sensorhub_misc_data);
+	if (ret < 0) {
+		KDEBUG(M4SH_ERROR, "Unable to disable all m4 interrupts\n");
+		return ret;
+	}
+	return count;
+}
+static DEVICE_ATTR(disable_interrupts, S_IWUSR, NULL,
+			m4sensorhub_disable_interrupts);
+
 static struct attribute *m4sensorhub_control_attributes[] = {
 	&dev_attr_tcmd.attr,
 	&dev_attr_log_level.attr,
 	&dev_attr_debug_level.attr,
 	&dev_attr_firmware_version.attr,
 	&dev_attr_download_status.attr,
+	&dev_attr_disable_interrupts.attr,
 	NULL
 };
 

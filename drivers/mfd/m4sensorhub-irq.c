@@ -46,7 +46,6 @@
 /* --------------- Global Declarations -------------- */
 
 /* ------------ Local Function Prototypes ----------- */
-static int m4sensorhub_irq_disable_all(struct m4sensorhub_data *m4sensorhub);
 static unsigned short get_enable_reg(enum m4sensorhub_irqs event);
 static void irq_work_func(struct work_struct *work);
 #ifdef CONFIG_DEBUG_FS
@@ -543,7 +542,7 @@ static unsigned short get_enable_reg(enum m4sensorhub_irqs event)
 	return ret;
 }
 
-static int m4sensorhub_irq_disable_all(struct m4sensorhub_data *m4sensorhub)
+int m4sensorhub_irq_disable_all(struct m4sensorhub_data *m4sensorhub)
 {
 	int i;
 
@@ -558,6 +557,7 @@ static int m4sensorhub_irq_disable_all(struct m4sensorhub_data *m4sensorhub)
 	}
 	return 0;
 }
+EXPORT_SYMBOL_GPL(m4sensorhub_irq_disable_all);
 
 static void irq_work_func(struct work_struct *work)
 {
