@@ -524,8 +524,18 @@
 			ram-bits = <12>;
 		};
 
+		glbl_prm: glbl_prm@48307250 {
+			compatible = "ti,omap3-glbl-prm";
+			reg = <0x48307250 0x60>;
+			reg-names = "base-address";
+			sys_off_mode;
+			auto_retention;
+			autoextclkmode = <2>;
+			clksetup_time = <1000>;
+			sys_clk = "osc_sys_ck";
+		};
+
 		vc: vc@48307220 {
-			status = "disabled";
 			compatible = "ti,omap3-vc";
 			reg = <0x48307220 0x24>;
 			reg-names = "base-address";
@@ -542,7 +552,6 @@
 		};
 
 		vp_mpu: vp@483072b0 {
-			status = "disabled";
 			compatible = "ti,omap3-vp";
 
 			reg = <0x483072b0 0x18>, <0x48306818 0x4>;
@@ -557,7 +566,6 @@
 		};
 
 		vp_core: vp@483072d0 {
-			status = "disabled";
 			compatible = "ti,omap3-vp";
 
 			reg = <0x483072d0 0x18>, <0x48306818 0x4>;

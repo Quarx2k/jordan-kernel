@@ -219,7 +219,6 @@
 };
 
 &vc {
-	status = "ok";
 	ti,i2c-high-speed;
 	ti,i2c-pad-load = <3>;
 	vc_mpu{
@@ -229,13 +228,6 @@
 	vc_core{
 		ti,use-master-slave-addr;
 	};
-};
-&vp_mpu {
-	status = "ok";
-};
-
-&vp_core {
-	status = "ok";
 };
 
 &i2c1 {
