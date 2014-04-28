@@ -3543,7 +3543,7 @@ static struct omap_clk omap3xxx_clks[] = {
 	CLK("cpufreq-cpu0.0", NULL,	&dpll1_ck),
 	CLK("48307220.vc", NULL,	&osc_sys_ck),
 	CLK("483072b0.vp", NULL,	&osc_sys_ck),
-	CLK("4a307b40.vp", NULL,	&osc_sys_ck),
+	CLK("483072d0.vp", NULL,	&osc_sys_ck),
 };
 
 static const char *enable_init_clks[] = {
