@@ -690,6 +690,7 @@
 	bus-width = <4>;
 	vmmc-supply = <&vmmc>;
 	wl_host_wake_gpio = <10>;
+	status = "disabled";
 };
 
 &usb_otg_hs {
