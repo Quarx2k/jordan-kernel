@@ -687,7 +687,7 @@ static int m25p80_get_device(struct mtd_info *mtd)
 					     flash->pctrl_states[M25P_ON]);
 		if (gpio_is_valid(flash->enable_gpio)) {
 			gpio_set_value(flash->enable_gpio, 1);
-			msleep(10);
+			msleep(20);
 		}
 	}
 
@@ -1192,7 +1192,7 @@ static int m25p_probe(struct spi_device *spi)
 			 flash->enable_gpio);
 	} else {
 		gpio_request(flash->enable_gpio, "m25p_enable");
-		msleep(10);
+		msleep(20);
 	}
 #else
 	flash->enable_gpio = -1;
