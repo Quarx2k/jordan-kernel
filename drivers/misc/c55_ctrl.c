@@ -15,6 +15,7 @@
 #include <linux/gpio.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
+#include <linux/m4sensorhub.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/regulator/consumer.h>
@@ -31,7 +32,8 @@ enum {
 };
 
 struct c55_ctrl_data {
-	int int_gpio;
+	int c55_ap_int_gpio;
+	int ap_c55_int_gpio;
 	struct wake_lock wake_lock;
 	struct regulator *reg_vddc;
 	struct regulator *reg_vddldo;
@@ -39,11 +41,10 @@ struct c55_ctrl_data {
 	struct mutex ctrl_mutex;	/* mutex to handle critical area */
 };
 
-#define NUM_GPIOS 3
+#define NUM_GPIOS 2
 
 const char *gpio_labels[NUM_GPIOS] = {
 	"gpio_ap_int",
-	"gpio_reset",
 	"gpio_c55_int"
 };
 
@@ -51,10 +52,11 @@ static irqreturn_t c55_ctrl_isr(int irq, void *data)
 {
 	struct c55_ctrl_data *cdata = data;
 
-	pr_debug("%s: value=%d\n", __func__, gpio_get_value(cdata->int_gpio));
+	pr_debug("%s: value=%d\n", __func__,
+		 gpio_get_value(cdata->c55_ap_int_gpio));
 
 	/* Interrupt is active low */
-	if (gpio_get_value(cdata->int_gpio) == 0)
+	if (gpio_get_value(cdata->c55_ap_int_gpio) == 0)
 		wake_lock(&cdata->wake_lock);
 	else
 		wake_unlock(&cdata->wake_lock);
@@ -68,7 +70,7 @@ static void c55_ctrl_int_setup(struct c55_ctrl_data *cdata, int gpio)
 	int irq = __gpio_to_irq(gpio);
 	unsigned int flags = 0;
 
-	if (cdata->int_gpio >= 0) {
+	if (cdata->c55_ap_int_gpio >= 0) {
 		/* Interrupt already registered */
 		return;
 	}
@@ -85,7 +87,7 @@ static void c55_ctrl_int_setup(struct c55_ctrl_data *cdata, int gpio)
 	}
 
 	enable_irq_wake(irq);
-	cdata->int_gpio = gpio;
+	cdata->c55_ap_int_gpio = gpio;
 }
 
 static int c55_ctrl_gpio_setup(struct c55_ctrl_data *cdata, struct device *dev)
@@ -116,6 +118,7 @@ static int c55_ctrl_gpio_setup(struct c55_ctrl_data *cdata, struct device *dev)
 			gpio_direction_input(gpio);
 			c55_ctrl_int_setup(cdata, gpio);
 		} else {
+			cdata->ap_c55_int_gpio = gpio;
 			if ((flags & GPIOF_OUT_INIT_HIGH) == GPIOF_OUT_INIT_HIGH)
 				gpio_direction_output(gpio, 1);
 			else
@@ -130,6 +133,7 @@ static ssize_t c55_ctrl_enable(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct c55_ctrl_data *cdata = dev_get_drvdata(dev);
+	struct m4sensorhub_data *m4sensorhub = m4sensorhub_client_get_drvdata();
 	int mode;
 
 	if (kstrtoint(buf, 10, &mode) < 0)
@@ -140,35 +144,60 @@ static ssize_t c55_ctrl_enable(struct device *dev,
 		return -EINVAL;
 	}
 
+	if (m4sensorhub->mode != NORMALMODE) {
+		dev_err(dev, "M4 not ready, Unable to set screen status\n");
+		return -EINVAL;
+	}
+
 	if (mode == cdata->c55_mode)
 		return count;
 
 	mutex_lock(&cdata->ctrl_mutex);
 
 	if (mode == C55_ON) {
-		if (cdata->reg_vddc && regulator_enable(cdata->reg_vddc))
-			dev_err(dev, "regulator_enable failed for vddc\n");
-		if (cdata->reg_vddldo && regulator_enable(cdata->reg_vddldo))
-			dev_err(dev, "regulator_enable failed for vddldo\n");
+		gpio_set_value(cdata->ap_c55_int_gpio, 1);
+
+		if (m4sensorhub_reg_write_1byte
+		    (m4sensorhub, M4SH_REG_USERSETTINGS_SCREENSTATUS, 0x01, 0xFF
+		    ) != 1) {
+			dev_err(dev, "Unable to set screen status to 0x01\n");
+			mutex_unlock(&cdata->ctrl_mutex);
+			return -EINVAL;
+		}
+
+		enable_irq_wake(__gpio_to_irq(cdata->c55_ap_int_gpio));
 	} else {
-		if (cdata->reg_vddldo)
-			regulator_disable(cdata->reg_vddldo);
-		if (cdata->reg_vddc)
-			regulator_disable(cdata->reg_vddc);
+		/* Disable C55->AP IRQ when turning off C55 */
+		disable_irq_wake(__gpio_to_irq(cdata->c55_ap_int_gpio));
+
+		if (m4sensorhub_reg_write_1byte
+		    (m4sensorhub, M4SH_REG_USERSETTINGS_SCREENSTATUS, 0x00, 0xFF
+				) != 1) {
+			dev_err(dev, "Unable to set screen status to 0x00\n");
+			mutex_unlock(&cdata->ctrl_mutex);
+			return -EINVAL;
+		}
+
+		/* AP->C55 interrupt needs to be set low when C55 is off
+		 * for current drain reasons */
+		gpio_set_value(cdata->ap_c55_int_gpio, 0);
+
+		/* Unlock wake lock in case it is active */
+		wake_unlock(&cdata->wake_lock);
 	}
 
 	cdata->c55_mode = mode;
 
 	mutex_unlock(&cdata->ctrl_mutex);
 
-	dev_info(dev, "%s: power = %d\n", __func__, mode);
+	dev_info(dev, "%s: enable = %d\n", __func__, mode);
 
 	return count;
 }
 
-static DEVICE_ATTR(enable, S_IWUSR, NULL, c55_ctrl_enable);
+static DEVICE_ATTR(enable, S_IWUSR | S_IWGRP, NULL, c55_ctrl_enable);
 
-static int  c55_ctrl_probe(struct platform_device *pdev)
+static int c55_ctrl_probe(struct platform_device *pdev)
 {
 	struct c55_ctrl_data *cdata;
 	int ret;
@@ -186,7 +215,8 @@ static int  c55_ctrl_probe(struct platform_device *pdev)
 
 	mutex_init(&cdata->ctrl_mutex);
 
-	cdata->int_gpio = -1;
+	cdata->c55_ap_int_gpio = -1;
+	cdata->ap_c55_int_gpio = -1;
 	ret = c55_ctrl_gpio_setup(cdata, &pdev->dev);
 
 	if (ret) {
@@ -197,10 +227,14 @@ static int  c55_ctrl_probe(struct platform_device *pdev)
 	cdata->reg_vddc = devm_regulator_get(&pdev->dev, "vddc");
 	if (IS_ERR(cdata->reg_vddc))
 		cdata->reg_vddc = NULL;
+	else if (regulator_enable(cdata->reg_vddc))
+		dev_err(&pdev->dev, "regulator_enable failed for vddc\n");
 
 	cdata->reg_vddldo = devm_regulator_get(&pdev->dev, "vddldo");
 	if (IS_ERR(cdata->reg_vddldo))
 		cdata->reg_vddldo = NULL;
+	else if (regulator_enable(cdata->reg_vddldo))
+		dev_err(&pdev->dev, "regulator_enable failed for vddldo\n");
 
 	cdata->c55_mode = C55_OFF;
 
@@ -217,7 +251,7 @@ static int  c55_ctrl_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int  c55_ctrl_remove(struct platform_device *pdev)
+static int c55_ctrl_remove(struct platform_device *pdev)
 {
 	device_remove_file(&pdev->dev, &dev_attr_enable);
 	return 0;

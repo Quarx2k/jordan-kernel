@@ -710,29 +710,17 @@ static int __exit m4sensorhub_remove(struct i2c_client *client)
 #ifdef CONFIG_PM
 static int m4sensorhub_suspend(struct i2c_client *client, pm_message_t mesg)
 {
-	int err = 0;
 	KDEBUG(M4SH_INFO, "%s\n", __func__);
 	m4sensorhub_irq_pm_dbg_suspend();
-	if (m4sensorhub_reg_write_1byte(
-			&m4sensorhub_misc_data,
-			M4SH_REG_USERSETTINGS_SCREENSTATUS, 0x00, 0xFF
-			) != 1)
-		KDEBUG(M4SH_ERROR, "Unable to set screen status to 0x00\n");
-	return err;
+	return 0;
 }
 
 static int m4sensorhub_resume(struct i2c_client *client)
 {
 
-	int err = 0;
 	KDEBUG(M4SH_INFO, "%s\n", __func__);
 	m4sensorhub_irq_pm_dbg_resume();
-	if (m4sensorhub_reg_write_1byte(
-			&m4sensorhub_misc_data,
-			M4SH_REG_USERSETTINGS_SCREENSTATUS, 0x01, 0xFF
-			) != 1)
-		KDEBUG(M4SH_ERROR, "Unable to set screen status to 0x01\n");
-	return err;
+	return 0;
 }
 #endif /* CONFIG_PM */
 

@@ -94,7 +94,6 @@
 		compatible = "ti,c55-ctrl";
 		reg = <0 0>;
 		gpios = <&gpio3 12 1>, /* IRQ   gpio_ap_int gpio-076 */
-			<&gpio3 16 0>, /*  gpio_reset gpio-80*/
 			<&gpio3 17 2>; /* gpio_c55_int gpio-81*/
 		vddc-supply = <&ldo9_reg>;
 		vddldo-supply = <&ldo3_reg>;
@@ -524,10 +523,9 @@
 			0x0b0 0x001	/* DSS_DATA2, MODE1 | OUTPUT */
 			0x0b2 0x001	/* DSS_DATA3, MODE1 | OUTPUT */
 			0x0b8 0x104	/* DSS_DATA6, MODE4 | INPUT */
-			0x0c0 0x004	/* DSS_DATA10, MODE4 | OUTPUT */
 			0x0c2 0x004	/* DSS_DATA11, MODE4 | OUTPUT */
 			0x0c6 0x004	/* DSS_DATA13, MODE4 | OUTPUT */
-			0x0dc 0x004	/* CAM_HS, MODE7 | OUTPUT */
+			0x0dc 0x004	/* CAM_HS, MODE4 | OUTPUT */
 			0x0ea 0x004	/* MUXCAM_D2, MODE4 | OUTPUT */
 			0x0e4 0x004	/* CAM_FLD, MODE4 | OUTPUT */
 			0x0e6 0x11c	/* CAM_D0, MODE4 | INPUT_PULLUP */
@@ -591,13 +589,13 @@
 
 	wdi_phy_gpio_mode: pinmux_wdi_phy_gpio_mode {
 		pinctrl-single,pins = <
-			0x142 0x004 /* MCBSP_FSX | OUTPUT */
+			0x142 0x004 /* MCBSP3_FSX | OUTPUT */
 		>;
 	};
 
 	wdi_phy_safe_mode: pinmux_wdi_phy_safe_mode {
 		pinctrl-single,pins = <
-			0x142 0x10F /* MCBSP_FSX | INPUT | PULLDOWN */
+			0x142 0x10F /* MCBSP3_FSX | INPUT | PULLDOWN */
 		>;
 	};
 
