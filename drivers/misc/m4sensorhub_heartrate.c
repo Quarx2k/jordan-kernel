@@ -531,7 +531,6 @@ static int m4hrt_probe(struct platform_device *pdev)
 	return 0;
 
 m4hrt_probe_fail:
-	mutex_destroy(&(dd->mutex));
 	m4hrt_remove_iiodev(iio); /* iio and dd are freed here */
 m4hrt_probe_fail_noiio:
 	m4hrt_err("%s: Probe failed with error code %d.\n", __func__, err);
@@ -559,7 +558,6 @@ static int __exit m4hrt_remove(struct platform_device *pdev)
 	m4sensorhub_irq_unregister(dd->m4,
 				   M4SH_IRQ_HRSENSOR_DATA_READY);
 	m4sensorhub_unregister_initcall(m4hrt_driver_init);
-	mutex_destroy(&(dd->mutex));
 	m4hrt_remove_iiodev(iio);  /* dd is freed here */
 
 m4hrt_remove_exit:

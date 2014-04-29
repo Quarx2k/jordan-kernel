@@ -381,7 +381,6 @@ static int m4ges_probe(struct platform_device *pdev)
 	return 0;
 
 m4ges_probe_fail:
-	mutex_destroy(&(dd->mutex));
 	m4ges_remove_iiodev(iio); /* iio and dd are freed here */
 m4ges_probe_fail_noiio:
 	m4ges_err("%s: Probe failed with error code %d.\n", __func__, err);
@@ -409,7 +408,6 @@ static int __exit m4ges_remove(struct platform_device *pdev)
 	m4sensorhub_irq_unregister(dd->m4,
 				   M4SH_IRQ_GESTURE_DETECTED);
 	m4sensorhub_unregister_initcall(m4ges_driver_init);
-	mutex_destroy(&(dd->mutex));
 	m4ges_remove_iiodev(iio);  /* dd is freed here */
 
 m4ges_remove_exit:

@@ -412,7 +412,6 @@ static int m4pas_probe(struct platform_device *pdev)
 	return 0;
 
 m4pas_probe_fail:
-	mutex_destroy(&(dd->mutex));
 	m4pas_remove_iiodev(iio); /* iio and dd are freed here */
 m4pas_probe_fail_noiio:
 	m4pas_err("%s: Probe failed with error code %d.\n", __func__, err);
@@ -440,7 +439,6 @@ static int __exit m4pas_remove(struct platform_device *pdev)
 	m4sensorhub_irq_unregister(dd->m4,
 				   M4SH_IRQ_PASSIVE_BUFFER_FULL);
 	m4sensorhub_unregister_initcall(m4pas_driver_init);
-	mutex_destroy(&(dd->mutex));
 	m4pas_remove_iiodev(iio);  /* dd is freed here */
 
 m4pas_remove_exit:

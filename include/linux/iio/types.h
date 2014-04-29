@@ -33,6 +33,7 @@ enum iio_chan_type {
 	IIO_PEDOMETER,
 	IIO_PASSIVE,
 	IIO_GESTURE,
+	IIO_FUSION,
 };
 
 enum iio_modifier {

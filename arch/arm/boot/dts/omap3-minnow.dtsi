@@ -176,7 +176,9 @@
                 heartratesensor {
                         compatible = "mot,m4heartrate";
                 };
-
+		fusion {
+			compatible = "mot,m4fusion";
+		};
 	};
 
 	sound {

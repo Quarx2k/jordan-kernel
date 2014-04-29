@@ -476,7 +476,6 @@ static int m4ped_probe(struct platform_device *pdev)
 	return 0;
 
 m4ped_probe_fail:
-	mutex_destroy(&(dd->mutex));
 	m4ped_remove_iiodev(iio); /* iio and dd are freed here */
 m4ped_probe_fail_noiio:
 	m4ped_err("%s: Probe failed with error code %d.\n", __func__, err);
@@ -508,7 +507,6 @@ static int __exit m4ped_remove(struct platform_device *pdev)
 	m4sensorhub_irq_unregister(dd->m4,
 				   M4SH_IRQ_ACTIVITY_CHANGE);
 	m4sensorhub_unregister_initcall(m4ped_driver_init);
-	mutex_destroy(&(dd->mutex));
 	m4ped_remove_iiodev(iio);  /* dd is freed here */
 
 m4ped_remove_exit:
