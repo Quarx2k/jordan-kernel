@@ -85,9 +85,16 @@ static int dss_suspend_device(struct device *dev, void *data)
 		return 0;
 	}
 
+#if defined(CONFIG_HAS_AMBIENTMODE)
+	if (dssdev->driver->suspend) {
+		dssdev->activate_after_resume = false;
+		return dssdev->driver->suspend(dssdev);
+	}
+#else
 	dssdev->driver->disable(dssdev);
 
 	dssdev->activate_after_resume = true;
+#endif
 
 	return 0;
 }

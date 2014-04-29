@@ -33,6 +33,7 @@
 #include <linux/mutex.h>
 #include <linux/regulator/consumer.h>
 #include <linux/clk.h>
+#include <linux/wakelock.h>
 
 #include <video/omapdss.h>
 #include <video/omap-panel-data.h>
@@ -372,7 +373,8 @@ static int minnow_panel_update(struct omap_dss_device *dssdev,
 
 
 struct minnow_panel_data {
-	struct mutex lock; /* mutex */
+	struct mutex lock;		/* mutex */
+	struct wake_lock wake_lock;	/* wake_lock */
 
 	struct backlight_device *bldev;
 
@@ -934,7 +936,7 @@ static int minnow_panel_enter_ulps(struct omap_dss_device *dssdev)
 	omapdss_dsi_display_disable(dssdev, false, true);
 
 	mpd->ulps_enabled = true;
-	dev_info(&dssdev->dev, "entered ULPS mode\n");
+	dev_dbg(&dssdev->dev, "entered ULPS mode\n");
 
 	return 0;
 
@@ -978,7 +980,7 @@ static int minnow_panel_exit_ulps(struct omap_dss_device *dssdev)
 
 	mpd->ulps_enabled = false;
 
-	dev_info(&dssdev->dev, "exited ULPS mode\n");
+	dev_dbg(&dssdev->dev, "exited ULPS mode\n");
 
 	return 0;
 
@@ -1913,6 +1915,7 @@ static int minnow_panel_probe(struct omap_dss_device *dssdev)
 	if (mpd->id_panel == MINNOW_PANEL_CM_BRIDGE_320X320)
 		dss_debugfs_create_file("panel_regs", minnow_panel_dump_regs);
 #endif
+	wake_lock_init(&mpd->wake_lock, WAKE_LOCK_SUSPEND, "minnow-panel");
 
 	return 0;
 
@@ -2180,11 +2183,31 @@ static void minnow_panel_disable(struct omap_dss_device *dssdev)
 	mutex_unlock(&mpd->lock);
 }
 
+#if defined(CONFIG_HAS_AMBIENTMODE)
+static int minnow_panel_suspend(struct omap_dss_device *dssdev)
+{
+	struct minnow_panel_data *mpd = dev_get_drvdata(&dssdev->dev);
+	dev_dbg(&dssdev->dev, "%s: current state = %d, wake_lock:%d\n",
+		__func__, dssdev->state, wake_lock_active(&mpd->wake_lock));
+
+	mutex_lock(&mpd->lock);
+	if (mpd->enabled) {
+		dsi_bus_lock(dssdev);
+		minnow_panel_enter_ulps(dssdev);
+		dsi_bus_unlock(dssdev);
+	}
+	mutex_unlock(&mpd->lock);
+	return 0;
+}
+#endif
+
 static void minnow_panel_framedone_cb(int err, void *data)
 {
 	struct omap_dss_device *dssdev = data;
+	struct minnow_panel_data *mpd = dev_get_drvdata(&dssdev->dev);
 	dev_dbg(&dssdev->dev, "framedone, err %d\n", err);
 	dsi_bus_unlock(dssdev);
+	wake_unlock(&mpd->wake_lock);
 }
 
 static irqreturn_t minnow_panel_te_isr(int irq, void *data)
@@ -2229,17 +2252,15 @@ static int minnow_panel_update(struct omap_dss_device *dssdev,
 	struct minnow_panel_data *mpd = dev_get_drvdata(&dssdev->dev);
 	int r = 0;
 
-	/* for video mode, do not need manual update */
-	if (mpd->dsi_config.mode == OMAP_DSS_DSI_VIDEO_MODE)
-		return r;
+	/* if driver is disabled ot it's video mode, do not manual update */
+	mutex_lock(&mpd->lock);
+	if (!mpd->enabled || (mpd->dsi_config.mode == OMAP_DSS_DSI_VIDEO_MODE))
+		goto err_ret;
 
 	dev_dbg(&dssdev->dev, "update %d, %d, %d x %d\n", x, y, w, h);
 
-	mutex_lock(&mpd->lock);
+	wake_lock(&mpd->wake_lock);
 	dsi_bus_lock(dssdev);
-
-	if (!mpd->enabled)
-		goto err;
 
 	r = minnow_panel_wake_up(dssdev);
 	if (r)
@@ -2263,11 +2284,15 @@ static int minnow_panel_update(struct omap_dss_device *dssdev,
 			goto err;
 	}
 
-	/* note: no bus_unlock here. unlock is in framedone_cb */
+	/* note: no dsi_bus_unlock and wake_unlock here.
+	 * unlock is in framedone_cb
+	 */
 	mutex_unlock(&mpd->lock);
 	return 0;
 err:
 	dsi_bus_unlock(dssdev);
+	wake_unlock(&mpd->wake_lock);
+err_ret:
 	mutex_unlock(&mpd->lock);
 	return r;
 }
@@ -2533,6 +2558,9 @@ static struct omap_dss_driver minnow_panel_driver = {
 
 	.enable		= minnow_panel_enable,
 	.disable	= minnow_panel_disable,
+#if defined(CONFIG_HAS_AMBIENTMODE)
+	.suspend	= minnow_panel_suspend,
+#endif
 
 	.update		= minnow_panel_update,
 	.sync		= minnow_panel_sync,
