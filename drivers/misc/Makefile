@@ -67,4 +67,5 @@ obj-$(CONFIG_VIB_GPIO)          += vib-gpio.o
 obj-$(CONFIG_C55_CTRL)          += c55_ctrl.o
 obj-$(CONFIG_MMI_FACTORY)       += mmi-factory.o
 obj-$(CONFIG_MOT_UTAG)          += utag/
+obj-$(CONFIG_BQ5105X_CTRL)      += bq5105x_ctrl.o
 
