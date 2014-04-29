@@ -103,6 +103,7 @@ struct m25p {
 	struct pinctrl		*pctrl;
 	struct pinctrl_state	*pctrl_states[M25P_MODE_MAX];
 	int			enable_gpio;
+	enum of_gpio_flags	enable_gpio_flags;
 };
 
 static inline struct m25p *mtd_to_m25p(struct mtd_info *mtd)
@@ -687,7 +688,7 @@ static int m25p80_get_device(struct mtd_info *mtd)
 					     flash->pctrl_states[M25P_ON]);
 		if (gpio_is_valid(flash->enable_gpio)) {
 			gpio_set_value(flash->enable_gpio, 1);
-			msleep(20);
+			msleep(10);
 		}
 	}
 
@@ -1186,13 +1187,15 @@ static int m25p_probe(struct spi_device *spi)
 			 __func__);
 
 #ifdef CONFIG_OF
-	flash->enable_gpio = of_get_gpio(spi->dev.of_node, 0);
+	flash->enable_gpio = of_get_gpio_flags(spi->dev.of_node, 0,
+		&(flash->enable_gpio_flags));
 	if (!gpio_is_valid(flash->enable_gpio)) {
 		dev_warn(&spi->dev, "%s: of_get_gpio failed: %d\n", __func__,
 			 flash->enable_gpio);
 	} else {
-		gpio_request(flash->enable_gpio, "m25p_enable");
-		msleep(20);
+		gpio_request_one(flash->enable_gpio, flash->enable_gpio_flags,
+				 "m25p_enable");
+		msleep(10);
 	}
 #else
 	flash->enable_gpio = -1;

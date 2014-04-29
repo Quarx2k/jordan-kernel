@@ -13,6 +13,7 @@
 	mmi,revision = "p1";
 	mmi,hwrev = <
 		0x04   /* Minnow P1B portable */
+		0x05   /* Minnow P2A wing */
 		0x06   /* Minnow P2A portable */
 	>;
 

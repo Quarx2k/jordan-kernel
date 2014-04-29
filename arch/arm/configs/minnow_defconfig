@@ -455,7 +455,7 @@ CONFIG_ALIGNMENT_TRAP=y
 #
 CONFIG_USE_OF=y
 CONFIG_BUILD_ARM_APPENDED_DTB_IMAGE=y
-CONFIG_BUILD_ARM_APPENDED_DTB_IMAGE_NAMES="omap3-minnow-p0-p1a omap3-minnow-p1b-p2.4 omap3-minnow-p2a-wing omap3-minnow-p2.5+"
+CONFIG_BUILD_ARM_APPENDED_DTB_IMAGE_NAMES="omap3-minnow-p0-p1a omap3-minnow-p1b-p2.4 omap3-minnow-p2.5+"
 
 CONFIG_ATAGS=y
 # CONFIG_DEPRECATED_PARAM_STRUCT is not set
