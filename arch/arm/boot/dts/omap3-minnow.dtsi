@@ -342,6 +342,8 @@
 		register-init-data = <
 			0x26 0x49 /* I2C_SPI_CFG: AVS ADDR = 0x13,
 					DCDC1, DCDC4 is AVS ctrl */
+			0x29 0x90 /* SET_OFF1: LDO5 off in sleep mode
+			                       LDO8 off in sleep mode */
 			0x2d 0x88 /* DISCHARGE1: Enable LDO4, LDO8 */
 		>;
 
@@ -434,6 +436,7 @@
 				regulator-name = "LDO5";
 				regulator-min-microvolt = <2800000>;
 				regulator-max-microvolt = <2800000>;
+				regulator-always-on;
 			};
 
 			ldo6_reg: regulator@9 {
