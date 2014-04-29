@@ -216,6 +216,15 @@
 		supplied_to = "max170xx_battery";
 		switch-name = "dock";
 	};
+
+	bq5105x-ctrl {
+		reg = <0 0>;
+		compatible = "ti,bq5105x-control";
+		gpios = <&gpio1 22 0x0>, /* gpio-22  GPIOF_DIR_OUT|GPIOF_INIT_LOW */
+			<&gpio3 14 0x0>; /* gpio-72  GPIOF_DIR_OUT|GPIOF_INIT_LOW */
+		gpio-names = "charge_reduce",
+			     "charge_terminate";
+	};
 };
 
 &vc {
@@ -518,6 +527,7 @@
 			0x0b0 0x001	/* DSS_DATA2, MODE1 | OUTPUT */
 			0x0b2 0x001	/* DSS_DATA3, MODE1 | OUTPUT */
 			0x0b8 0x104	/* DSS_DATA6, MODE4 | INPUT */
+			0x0bc 0x004	/* DSS_DATA8, MODE4 | OUTPUT */
 			0x0c2 0x004	/* DSS_DATA11, MODE4 | OUTPUT */
 			0x0c6 0x004	/* DSS_DATA13, MODE4 | OUTPUT */
 			0x0dc 0x004	/* CAM_HS, MODE4 | OUTPUT */
