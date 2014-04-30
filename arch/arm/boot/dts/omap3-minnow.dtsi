@@ -633,6 +633,7 @@
 
 	wkup_pins: pinmux_wakeup_pins {
 		pinctrl-single,pins = <
+			0x006 0x008     /* SYS_CLKREQ, MODE0 | PULLDOWN */
 			0x01a 0x10c     /* SYS_CLKOUT1, MODE4 | INPUT_PULLDOWN */
 			0x05a 0x004     /* GPIO_129, MODE4 | OUTPUT */
 		>;
