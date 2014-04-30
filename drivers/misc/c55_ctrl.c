@@ -86,7 +86,6 @@ static void c55_ctrl_int_setup(struct c55_ctrl_data *cdata, int gpio)
 		return;
 	}
 
-	enable_irq_wake(irq);
 	cdata->c55_ap_int_gpio = gpio;
 }
 
@@ -165,10 +164,10 @@ static ssize_t c55_ctrl_enable(struct device *dev,
 			return -EINVAL;
 		}
 
-		enable_irq_wake(__gpio_to_irq(cdata->c55_ap_int_gpio));
+		enable_irq(__gpio_to_irq(cdata->c55_ap_int_gpio));
 	} else {
 		/* Disable C55->AP IRQ when turning off C55 */
-		disable_irq_wake(__gpio_to_irq(cdata->c55_ap_int_gpio));
+		disable_irq_nosync(__gpio_to_irq(cdata->c55_ap_int_gpio));
 
 		if (m4sensorhub_reg_write_1byte
 		    (m4sensorhub, M4SH_REG_USERSETTINGS_SCREENSTATUS, 0x00, 0xFF
