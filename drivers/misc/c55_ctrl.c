@@ -34,6 +34,7 @@ enum {
 struct c55_ctrl_data {
 	int c55_ap_int_gpio;
 	int ap_c55_int_gpio;
+	int c55_ap_int_enabled;
 	struct wake_lock wake_lock;
 	struct regulator *reg_vddc;
 	struct regulator *reg_vddldo;
@@ -79,6 +80,7 @@ static void c55_ctrl_int_setup(struct c55_ctrl_data *cdata, int gpio)
 	flags |= IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING;
 	flags |= IRQF_SHARED;
 
+	cdata->c55_ap_int_enabled = 1;
 	ret = request_threaded_irq(irq, c55_ctrl_isr, NULL,
 				   flags, "c55_ctrl", cdata);
 	if (ret) {
@@ -164,10 +166,17 @@ static ssize_t c55_ctrl_enable(struct device *dev,
 			return -EINVAL;
 		}
 
-		enable_irq(__gpio_to_irq(cdata->c55_ap_int_gpio));
+		if (!cdata->c55_ap_int_enabled) {
+			cdata->c55_ap_int_enabled = 1;
+			enable_irq(__gpio_to_irq(cdata->c55_ap_int_gpio));
+		}
 	} else {
 		/* Disable C55->AP IRQ when turning off C55 */
-		disable_irq_nosync(__gpio_to_irq(cdata->c55_ap_int_gpio));
+		if (cdata->c55_ap_int_enabled) {
+			disable_irq_nosync(
+				__gpio_to_irq(cdata->c55_ap_int_gpio));
+			cdata->c55_ap_int_enabled = 0;
+		}
 
 		if (m4sensorhub_reg_write_1byte
 		    (m4sensorhub, M4SH_REG_USERSETTINGS_SCREENSTATUS, 0x00, 0xFF
