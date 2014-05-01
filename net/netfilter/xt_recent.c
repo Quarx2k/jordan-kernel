@@ -482,7 +482,8 @@ static ssize_t recent_old_proc_write(struct file *file,
 	if (copy_from_user(buf, input, size))
 		return -EFAULT;
 
-	c = skip_spaces(c);
+	while (isspace(*c))
+		c++;
 
 	if (size - (c - buf) < 5)
 		return c - buf;
