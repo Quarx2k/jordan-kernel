@@ -35,19 +35,6 @@
 # include <linux/efi.h>
 #endif
 
-static inline unsigned long size_inside_page(unsigned long start,
-					     unsigned long size)
-{
-	unsigned long sz;
-
-	if (-start & (PAGE_SIZE - 1))
-		sz = -start & (PAGE_SIZE - 1);
-	else
-		sz = PAGE_SIZE;
-
-	return min_t(unsigned long, sz, size);
-}
-
 /*
  * Architectures vary in how they handle caching for addresses
  * outside of main memory.
@@ -57,7 +44,7 @@ static inline int uncached_access(struct file *file, unsigned long addr)
 {
 #if defined(CONFIG_IA64)
 	/*
-	 * On ia64, we ignore O_DSYNC because we cannot tolerate memory attribute aliases.
+	 * On ia64, we ignore O_SYNC because we cannot tolerate memory attribute aliases.
 	 */
 	return !(efi_mem_attributes(addr) & EFI_MEMORY_WB);
 #elif defined(CONFIG_MIPS)
@@ -70,9 +57,9 @@ static inline int uncached_access(struct file *file, unsigned long addr)
 #else
 	/*
 	 * Accessing memory above the top the kernel knows about or through a file pointer
-	 * that was marked O_DSYNC will be done non-cached.
+	 * that was marked O_SYNC will be done non-cached.
 	 */
-	if (file->f_flags & O_DSYNC)
+	if (file->f_flags & O_SYNC)
 		return 1;
 	return addr >= __pa(high_memory);
 #endif
@@ -93,7 +80,6 @@ static inline int valid_mmap_phys_addr_range(unsigned long pfn, size_t size)
 }
 #endif
 
-#if defined(CONFIG_DEVMEM) || defined(CONFIG_DEVKMEM)
 #ifdef CONFIG_STRICT_DEVMEM
 static inline int range_is_allowed(unsigned long pfn, unsigned long size)
 {
@@ -119,9 +105,7 @@ static inline int range_is_allowed(unsigned long pfn, unsigned long size)
 	return 1;
 }
 #endif
-#endif
 
-#ifdef CONFIG_DEVMEM
 void __attribute__((weak)) unxlate_dev_mem_ptr(unsigned long phys, void *addr)
 {
 }
@@ -270,9 +254,6 @@ static ssize_t write_mem(struct file * file, const char __user * buf,
 	*ppos += written;
 	return written;
 }
-#endif	/* CONFIG_DEVMEM */
-
-#if defined(CONFIG_DEVMEM) || defined(CONFIG_DEVKMEM)
 
 int __attribute__((weak)) phys_mem_access_prot_allowed(struct file *file,
 	unsigned long pfn, unsigned long size, pgprot_t *vma_prot)
@@ -359,7 +340,6 @@ static int mmap_mem(struct file * file, struct vm_area_struct * vma)
 	}
 	return 0;
 }
-#endif	/* CONFIG_DEVMEM */
 
 #ifdef CONFIG_DEVKMEM
 static int mmap_kmem(struct file * file, struct vm_area_struct * vma)
@@ -428,7 +408,6 @@ static ssize_t read_kmem(struct file *file, char __user *buf,
 	unsigned long p = *ppos;
 	ssize_t low_count, read, sz;
 	char * kbuf; /* k-addr because vread() takes vmlist_lock rwlock */
-	int err = 0;
 
 	read = 0;
 	if (p < (unsigned long) high_memory) {
@@ -451,7 +430,15 @@ static ssize_t read_kmem(struct file *file, char __user *buf,
 		}
 #endif
 		while (low_count > 0) {
-			sz = size_inside_page(p, low_count);
+			/*
+			 * Handle first page in case it's not aligned
+			 */
+			if (-p & (PAGE_SIZE - 1))
+				sz = -p & (PAGE_SIZE - 1);
+			else
+				sz = PAGE_SIZE;
+
+			sz = min_t(unsigned long, sz, low_count);
 
 			/*
 			 * On ia64 if a page has been mapped somewhere as
@@ -475,18 +462,16 @@ static ssize_t read_kmem(struct file *file, char __user *buf,
 		if (!kbuf)
 			return -ENOMEM;
 		while (count > 0) {
-			int len = size_inside_page(p, count);
+			int len = count;
 
-			if (!is_vmalloc_or_module_addr((void *)p)) {
-				err = -ENXIO;
-				break;
-			}
+			if (len > PAGE_SIZE)
+				len = PAGE_SIZE;
 			len = vread(kbuf, (char *)p, len);
 			if (!len)
 				break;
 			if (copy_to_user(buf, kbuf, len)) {
-				err = -EFAULT;
-				break;
+				free_page((unsigned long)kbuf);
+				return -EFAULT;
 			}
 			count -= len;
 			buf += len;
@@ -495,8 +480,8 @@ static ssize_t read_kmem(struct file *file, char __user *buf,
 		}
 		free_page((unsigned long)kbuf);
 	}
-	*ppos = p;
-	return read ? read : err;
+ 	*ppos = p;
+ 	return read;
 }
 
 
@@ -525,8 +510,15 @@ do_write_kmem(void *p, unsigned long realp, const char __user * buf,
 
 	while (count > 0) {
 		char *ptr;
+		/*
+		 * Handle first page in case it's not aligned
+		 */
+		if (-realp & (PAGE_SIZE - 1))
+			sz = -realp & (PAGE_SIZE - 1);
+		else
+			sz = PAGE_SIZE;
 
-		sz = size_inside_page(realp, count);
+		sz = min_t(unsigned long, sz, count);
 
 		/*
 		 * On ia64 if a page has been mapped somewhere as
@@ -565,7 +557,6 @@ static ssize_t write_kmem(struct file * file, const char __user * buf,
 	ssize_t virtr = 0;
 	ssize_t written;
 	char * kbuf; /* k-addr because vwrite() takes vmlist_lock rwlock */
-	int err = 0;
 
 	if (p < (unsigned long) high_memory) {
 
@@ -587,20 +578,20 @@ static ssize_t write_kmem(struct file * file, const char __user * buf,
 		if (!kbuf)
 			return wrote ? wrote : -ENOMEM;
 		while (count > 0) {
-			int len = size_inside_page(p, count);
+			int len = count;
 
-			if (!is_vmalloc_or_module_addr((void *)p)) {
-				err = -ENXIO;
-				break;
-			}
+			if (len > PAGE_SIZE)
+				len = PAGE_SIZE;
 			if (len) {
 				written = copy_from_user(kbuf, buf, len);
 				if (written) {
-					err = -EFAULT;
-					break;
+					if (wrote + virtr)
+						break;
+					free_page((unsigned long)kbuf);
+					return -EFAULT;
 				}
 			}
-			vwrite(kbuf, (char *)p, len);
+			len = vwrite(kbuf, (char *)p, len);
 			count -= len;
 			buf += len;
 			virtr += len;
@@ -609,8 +600,8 @@ static ssize_t write_kmem(struct file * file, const char __user * buf,
 		free_page((unsigned long)kbuf);
 	}
 
-	*ppos = p;
-	return virtr + wrote ? : err;
+ 	*ppos = p;
+ 	return virtr + wrote;
 }
 #endif
 
@@ -739,8 +730,6 @@ static loff_t null_lseek(struct file * file, loff_t offset, int orig)
 	return file->f_pos = 0;
 }
 
-#if defined(CONFIG_DEVMEM) || defined(CONFIG_DEVKMEM) || defined(CONFIG_DEVPORT)
-
 /*
  * The memory devices use the full 32/64 bits of the offset, and so we cannot
  * check against negative addresses: they are ok. The return value is weird,
@@ -772,14 +761,10 @@ static loff_t memory_lseek(struct file * file, loff_t offset, int orig)
 	return ret;
 }
 
-#endif
-
-#if defined(CONFIG_DEVMEM) || defined(CONFIG_DEVKMEM) || defined(CONFIG_DEVPORT)
 static int open_port(struct inode * inode, struct file * filp)
 {
 	return capable(CAP_SYS_RAWIO) ? 0 : -EPERM;
 }
-#endif
 
 #define zero_lseek	null_lseek
 #define full_lseek      null_lseek
@@ -789,7 +774,6 @@ static int open_port(struct inode * inode, struct file * filp)
 #define open_kmem	open_mem
 #define open_oldmem	open_mem
 
-#ifdef CONFIG_DEVMEM
 static const struct file_operations mem_fops = {
 	.llseek		= memory_lseek,
 	.read		= read_mem,
@@ -798,7 +782,6 @@ static const struct file_operations mem_fops = {
 	.open		= open_mem,
 	.get_unmapped_area = get_unmapped_area_mem,
 };
-#endif
 
 #ifdef CONFIG_DEVKMEM
 static const struct file_operations kmem_fops = {
@@ -887,9 +870,7 @@ static const struct memdev {
 	const struct file_operations *fops;
 	struct backing_dev_info *dev_info;
 } devlist[] = {
-#ifdef CONFIG_DEVMEM
 	 [1] = { "mem", 0, &mem_fops, &directly_mappable_cdev_bdi },
-#endif
 #ifdef CONFIG_DEVKMEM
 	 [2] = { "kmem", 0, &kmem_fops, &directly_mappable_cdev_bdi },
 #endif
