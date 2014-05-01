@@ -11,7 +11,6 @@
 #include <linux/ftrace.h>
 #include <linux/string.h>
 #include <linux/module.h>
-#include <linux/marker.h>
 #include <linux/mutex.h>
 #include <linux/ctype.h>
 #include <linux/list.h>
@@ -75,10 +74,6 @@ static int module_trace_bprintk_format_notify(struct notifier_block *self,
 		unsigned long val, void *data)
 {
 	struct module *mod = data;
-
-	if (data == NULL)
-		return 0;
-
 	if (mod->num_trace_bprintk_fmt) {
 		const char **start = mod->trace_bprintk_fmt_start;
 		const char **end = start + mod->num_trace_bprintk_fmt;
