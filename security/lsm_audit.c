@@ -354,10 +354,6 @@ static void dump_common_audit_data(struct audit_buffer *ab,
 		}
 		break;
 #endif
-	case LSM_AUDIT_DATA_KMOD:
-		audit_log_format(ab, " kmod=");
-		audit_log_untrustedstring(ab, a->u.kmod_name);
-		break;
 	} /* switch (a->type) */
 }
 

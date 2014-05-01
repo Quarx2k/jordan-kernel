@@ -868,8 +868,3 @@
 #define PEER__RECV                                0x00000001UL
 #define KERNEL_SERVICE__USE_AS_OVERRIDE           0x00000001UL
 #define KERNEL_SERVICE__CREATE_FILES_AS           0x00000002UL
-#define BINDER__IMPERSONATE                       0x00000001UL
-#define BINDER__CALL                              0x00000002UL
-#define BINDER__SET_CONTEXT_MGR                   0x00000004UL
-#define BINDER__TRANSFER			  0x00000008UL
-#define BINDER__RECEIVE				  0x00000010UL

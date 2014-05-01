@@ -53,7 +53,6 @@
 #define SECCLASS_PEER                                    68
 #define SECCLASS_CAPABILITY2                             69
 #define SECCLASS_KERNEL_SERVICE                          74
-#define SECCLASS_BINDER  				 82
 #define SECCLASS_TUN_SOCKET                              75
 
 /*
