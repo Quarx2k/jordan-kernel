@@ -88,7 +88,7 @@ static inline u16 desc_abs_number(port_t *port, u16 desc, int transmit)
 }
 
 
-static inline u16 hd_desc_offset(port_t *port, u16 desc, int transmit)
+static inline u16 desc_offset(port_t *port, u16 desc, int transmit)
 {
 	/* Descriptor offset always fits in 16 bits */
 	return desc_abs_number(port, desc, transmit) * sizeof(pkt_desc);
@@ -99,7 +99,7 @@ static inline pkt_desc __iomem *desc_address(port_t *port, u16 desc,
 					     int transmit)
 {
 	return (pkt_desc __iomem *)(port->card->rambase +
-				    hd_desc_offset(port, desc, transmit));
+				    desc_offset(port, desc, transmit));
 }
 
 
@@ -144,7 +144,7 @@ static void sca_init_port(port_t *port)
 
 		for (i = 0; i < buffs; i++) {
 			pkt_desc __iomem *desc = desc_address(port, i, transmit);
-			u16 chain_off = hd_desc_offset(port, i + 1, transmit);
+			u16 chain_off = desc_offset(port, i + 1, transmit);
 			u32 buff_off = buffer_offset(port, i, transmit);
 
 			writel(chain_off, &desc->cp);
@@ -163,11 +163,11 @@ static void sca_init_port(port_t *port)
 	sca_out(DCR_ABORT, DCR_TX(port->chan), card);
 
 	/* current desc addr */
-	sca_outl(hd_desc_offset(port, 0, 0), dmac_rx + CDAL, card);
-	sca_outl(hd_desc_offset(port, card->tx_ring_buffers - 1, 0),
+	sca_outl(desc_offset(port, 0, 0), dmac_rx + CDAL, card);
+	sca_outl(desc_offset(port, card->tx_ring_buffers - 1, 0),
 		 dmac_rx + EDAL, card);
-	sca_outl(hd_desc_offset(port, 0, 1), dmac_tx + CDAL, card);
-	sca_outl(hd_desc_offset(port, 0, 1), dmac_tx + EDAL, card);
+	sca_outl(desc_offset(port, 0, 1), dmac_tx + CDAL, card);
+	sca_outl(desc_offset(port, 0, 1), dmac_tx + EDAL, card);
 
 	/* clear frame end interrupt counter */
 	sca_out(DCR_CLEAR_EOF, DCR_RX(port->chan), card);
@@ -250,7 +250,7 @@ static inline int sca_rx_done(port_t *port, int budget)
 		dev->stats.rx_over_errors++;
 
 	while (received < budget) {
-		u32 desc_off = hd_desc_offset(port, port->rxin, 0);
+		u32 desc_off = desc_offset(port, port->rxin, 0);
 		pkt_desc __iomem *desc;
 		u32 cda = sca_inl(dmac + CDAL, card);
 
@@ -589,7 +589,7 @@ static netdev_tx_t sca_xmit(struct sk_buff *skb, struct net_device *dev)
 	dev->trans_start = jiffies;
 
 	port->txin = (port->txin + 1) % card->tx_ring_buffers;
-	sca_outl(hd_desc_offset(port, port->txin, 1),
+	sca_outl(desc_offset(port, port->txin, 1),
 		 get_dmac_tx(port) + EDAL, card);
 
 	sca_out(DSR_DE, DSR_TX(port->chan), card); /* Enable TX DMA */

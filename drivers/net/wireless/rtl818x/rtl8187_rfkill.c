@@ -25,10 +25,10 @@ static bool rtl8187_is_radio_enabled(struct rtl8187_priv *priv)
 	u8 gpio;
 
 	gpio = rtl818x_ioread8(priv, &priv->map->GPIO0);
-	rtl818x_iowrite8(priv, &priv->map->GPIO0, gpio & ~priv->rfkill_mask);
+	rtl818x_iowrite8(priv, &priv->map->GPIO0, gpio & ~0x02);
 	gpio = rtl818x_ioread8(priv, &priv->map->GPIO1);
 
-	return gpio & priv->rfkill_mask;
+	return gpio & 0x02;
 }
 
 void rtl8187_rfkill_init(struct ieee80211_hw *hw)

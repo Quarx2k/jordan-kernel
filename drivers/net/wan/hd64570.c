@@ -105,7 +105,7 @@ static inline u16 desc_abs_number(port_t *port, u16 desc, int transmit)
 }
 
 
-static inline u16 hd_desc_offset(port_t *port, u16 desc, int transmit)
+static inline u16 desc_offset(port_t *port, u16 desc, int transmit)
 {
 	/* Descriptor offset always fits in 16 bits */
 	return desc_abs_number(port, desc, transmit) * sizeof(pkt_desc);
@@ -117,10 +117,10 @@ static inline pkt_desc __iomem *desc_address(port_t *port, u16 desc,
 {
 #ifdef PAGE0_ALWAYS_MAPPED
 	return (pkt_desc __iomem *)(win0base(port_to_card(port))
-				    + hd_desc_offset(port, desc, transmit));
+				    + desc_offset(port, desc, transmit));
 #else
 	return (pkt_desc __iomem *)(winbase(port_to_card(port))
-				    + hd_desc_offset(port, desc, transmit));
+				    + desc_offset(port, desc, transmit));
 #endif
 }
 
@@ -170,7 +170,7 @@ static void sca_init_port(port_t *port)
 
 		for (i = 0; i < buffs; i++) {
 			pkt_desc __iomem *desc = desc_address(port, i, transmit);
-			u16 chain_off = hd_desc_offset(port, i + 1, transmit);
+			u16 chain_off = desc_offset(port, i + 1, transmit);
 			u32 buff_off = buffer_offset(port, i, transmit);
 
 			writew(chain_off, &desc->cp);
@@ -188,12 +188,12 @@ static void sca_init_port(port_t *port)
 
 		/* current desc addr */
 		sca_out(0, dmac + CPB, card); /* pointer base */
-		sca_outw(hd_desc_offset(port, 0, transmit), dmac + CDAL, card);
+		sca_outw(desc_offset(port, 0, transmit), dmac + CDAL, card);
 		if (!transmit)
-			sca_outw(hd_desc_offset(port, buffs - 1, transmit),
+			sca_outw(desc_offset(port, buffs - 1, transmit),
 				 dmac + EDAL, card);
 		else
-			sca_outw(hd_desc_offset(port, 0, transmit), dmac + EDAL,
+			sca_outw(desc_offset(port, 0, transmit), dmac + EDAL,
 				 card);
 
 		/* clear frame end interrupt counter */
@@ -306,7 +306,7 @@ static inline void sca_rx_intr(port_t *port)
 		dev->stats.rx_over_errors++;
 
 	while (1) {
-		u32 desc_off = hd_desc_offset(port, port->rxin, 0);
+		u32 desc_off = desc_offset(port, port->rxin, 0);
 		pkt_desc __iomem *desc;
 		u32 cda = sca_inw(dmac + CDAL, card);
 
@@ -360,7 +360,7 @@ static inline void sca_tx_intr(port_t *port)
 	while (1) {
 		pkt_desc __iomem *desc;
 
-		u32 desc_off = hd_desc_offset(port, port->txlast, 1);
+		u32 desc_off = desc_offset(port, port->txlast, 1);
 		u32 cda = sca_inw(dmac + CDAL, card);
 		if ((cda >= desc_off) && (cda < desc_off + sizeof(pkt_desc)))
 			break;	/* Transmitter is/will_be sending this frame */
@@ -662,7 +662,7 @@ static netdev_tx_t sca_xmit(struct sk_buff *skb, struct net_device *dev)
 	dev->trans_start = jiffies;
 
 	port->txin = next_desc(port, port->txin, 1);
-	sca_outw(hd_desc_offset(port, port->txin, 1),
+	sca_outw(desc_offset(port, port->txin, 1),
 		 get_dmac_tx(port) + EDAL, card);
 
 	sca_out(DSR_DE, DSR_TX(phy_node(port)), card); /* Enable TX DMA */

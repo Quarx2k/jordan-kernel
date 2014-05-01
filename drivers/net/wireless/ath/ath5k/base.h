@@ -193,7 +193,7 @@ struct ath5k_softc {
 	struct ath5k_txq	*cabq;		/* content after beacon */
 
 	int 			power_level;	/* Requested tx power in dbm */
-	bool			assoc;		/* associate state */
+	bool			assoc;		/* assocate state */
 	bool			enable_beacon;	/* true if beacons are on */
 };
 
