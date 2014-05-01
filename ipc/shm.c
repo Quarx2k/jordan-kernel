@@ -40,7 +40,6 @@
 #include <linux/mount.h>
 #include <linux/ipc_namespace.h>
 #include <linux/ima.h>
-#include <trace/ipc.h>
 
 #include <asm/uaccess.h>
 
@@ -57,8 +56,6 @@ struct shm_file_data {
 
 static const struct file_operations shm_file_operations;
 static const struct vm_operations_struct shm_vm_ops;
-
-DEFINE_TRACE(ipc_shm_create);
 
 #define shm_ids(ns)	((ns)->ids[IPC_SHM_IDS])
 
@@ -104,7 +101,6 @@ static void do_shm_rmid(struct ipc_namespace *ns, struct kern_ipc_perm *ipcp)
 void shm_exit_ns(struct ipc_namespace *ns)
 {
 	free_ipcs(ns, &shm_ids(ns), do_shm_rmid);
-	idr_destroy(&ns->ids[IPC_SHM_IDS].ipcs_idr);
 }
 #endif
 
@@ -294,27 +290,27 @@ static unsigned long shm_get_unmapped_area(struct file *file,
 	unsigned long flags)
 {
 	struct shm_file_data *sfd = shm_file_data(file);
-	return sfd->file->f_op->get_unmapped_area(sfd->file, addr, len,
-						pgoff, flags);
+	return get_unmapped_area(sfd->file, addr, len, pgoff, flags);
+}
+
+int is_file_shm_hugepages(struct file *file)
+{
+	int ret = 0;
+
+	if (file->f_op == &shm_file_operations) {
+		struct shm_file_data *sfd;
+		sfd = shm_file_data(file);
+		ret = is_file_hugepages(sfd->file);
+	}
+	return ret;
 }
 
 static const struct file_operations shm_file_operations = {
 	.mmap		= shm_mmap,
 	.fsync		= shm_fsync,
 	.release	= shm_release,
-};
-
-static const struct file_operations shm_file_operations_huge = {
-	.mmap		= shm_mmap,
-	.fsync		= shm_fsync,
-	.release	= shm_release,
 	.get_unmapped_area	= shm_get_unmapped_area,
 };
-
-int is_file_shm_hugepages(struct file *file)
-{
-	return file->f_op == &shm_file_operations_huge;
-}
 
 static const struct vm_operations_struct shm_vm_ops = {
 	.open	= shm_open,	/* callback for a new vm-area open */
@@ -454,7 +450,6 @@ SYSCALL_DEFINE3(shmget, key_t, key, size_t, size, int, shmflg)
 	struct ipc_namespace *ns;
 	struct ipc_ops shm_ops;
 	struct ipc_params shm_params;
-	long err;
 
 	ns = current->nsproxy->ipc_ns;
 
@@ -466,9 +461,7 @@ SYSCALL_DEFINE3(shmget, key_t, key, size_t, size, int, shmflg)
 	shm_params.flg = shmflg;
 	shm_params.u.size = size;
 
-	err = ipcget(ns, &shm_ids(ns), &shm_ops, &shm_params);
-	trace_ipc_shm_create(err, shmflg);
-	return err;
+	return ipcget(ns, &shm_ids(ns), &shm_ops, &shm_params);
 }
 
 static inline unsigned long copy_shmid_to_user(void __user *buf, struct shmid64_ds *in, int version)
@@ -896,10 +889,7 @@ long do_shmat(int shmid, char __user *shmaddr, int shmflg, ulong *raddr)
 	if (!sfd)
 		goto out_put_dentry;
 
-	file = alloc_file(path.mnt, path.dentry, f_mode,
-			is_file_hugepages(shp->shm_file) ?
-				&shm_file_operations_huge :
-				&shm_file_operations);
+	file = alloc_file(path.mnt, path.dentry, f_mode, &shm_file_operations);
 	if (!file)
 		goto out_free;
 	ima_counts_get(file);
