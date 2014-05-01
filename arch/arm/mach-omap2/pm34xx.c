@@ -175,6 +175,15 @@ static int prcm_clear_mod_irqs(s16 module, u8 regs, u32 ignore_bits)
 			wkst = omap2_prm_read_mod_reg(module, wkst_off);
 			wkst &= ~ignore_bits;
 			c++;
+
+			/* Better to panic than to fade away */
+			if (c > 1000) {
+				pr_emerg("FATAL: Unable to clear wkst "
+					"wkst = 0x%08x module = 0x%04x "
+					"regs = 0x%02x\n",
+					wkst, module, regs);
+				BUG();
+			}
 		}
 		omap2_cm_write_mod_reg(iclk, module, iclk_off);
 		omap2_cm_write_mod_reg(fclk, module, fclk_off);
