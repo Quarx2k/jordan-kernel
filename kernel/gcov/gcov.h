@@ -21,10 +21,9 @@
  * gcc and need to be kept as close to the original definition as possible to
  * remain compatible.
  */
-#define GCOV_COUNTERS		10
+#define GCOV_COUNTERS		5
 #define GCOV_DATA_MAGIC		((unsigned int) 0x67636461)
 #define GCOV_TAG_FUNCTION	((unsigned int) 0x01000000)
-#define GCOV_TAG_FUNCTION_LENGTH 3
 #define GCOV_TAG_COUNTER_BASE	((unsigned int) 0x01a10000)
 #define GCOV_TAG_FOR_COUNTER(count)					\
 	(GCOV_TAG_COUNTER_BASE + ((unsigned int) (count) << 17))
@@ -34,29 +33,6 @@ typedef long gcov_type;
 #else
 typedef long long gcov_type;
 #endif
-
-/*
- * Source module info. The data structure is used in both runtime and
- * profile-use phase.
- */
-struct gcov_module_info {
-	unsigned int ident;
-/*
- * This is overloaded to mean two things:
- * (1) means FDO/LIPO in instrumented binary.
- * (2) means IS_PRIMARY in persistent file or memory copy used in profile-use.
- */
-	unsigned int is_primary;
-	unsigned int is_exported;
-	unsigned int lang;
-	char *da_filename;
-	char *source_filename;
-	unsigned int num_quote_paths;
-	unsigned int num_bracket_paths;
-	unsigned int num_cpp_defines;
-	char *string_array[1];
-};
-
 
 /**
  * struct gcov_fn_info - profiling meta data per function
@@ -69,9 +45,7 @@ struct gcov_module_info {
  */
 struct gcov_fn_info {
 	unsigned int ident;
-	unsigned int lineno_checksum;
-	unsigned int cfg_checksum; /* function cfg checksum */
-	const char     *name;         /* name of the function */
+	unsigned int checksum;
 	unsigned int n_ctrs[0];
 };
 
@@ -106,11 +80,9 @@ struct gcov_ctr_info {
  */
 struct gcov_info {
 	unsigned int			version;
-	struct gcov_module_info *mod_info;
 	struct gcov_info		*next;
 	unsigned int			stamp;
 	const char			*filename;
-	unsigned int eof_pos;
 	unsigned int			n_functions;
 	const struct gcov_fn_info	*functions;
 	unsigned int			ctr_mask;
