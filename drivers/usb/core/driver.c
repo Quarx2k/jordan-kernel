@@ -1475,10 +1475,6 @@ static int usb_autopm_do_interface(struct usb_interface *intf,
 	else {
 		udev->auto_pm = 1;
 		atomic_add(inc_usage_cnt, &intf->pm_usage_cnt);
-#ifdef CONFIG_MACH_MAPPHONE
-		if (atomic_read(&intf->pm_usage_cnt) < 0)
-			atomic_set(&intf->pm_usage_cnt, 0);
-#endif
 		udev->last_busy = jiffies;
 		if (inc_usage_cnt >= 0 &&
 				atomic_read(&intf->pm_usage_cnt) > 0) {

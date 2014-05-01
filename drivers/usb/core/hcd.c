@@ -38,7 +38,7 @@
 #include <asm/unaligned.h>
 #include <linux/platform_device.h>
 #include <linux/workqueue.h>
-#include <plat/board-mapphone.h>
+
 #include <linux/usb.h>
 
 #include "usb.h"
@@ -1902,12 +1902,6 @@ irqreturn_t usb_hcd_irq (int irq, void *__hcd)
 	if (unlikely(hcd->state == HC_STATE_HALT ||
 		     !test_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags))) {
 		rc = IRQ_NONE;
-#ifdef CONFIG_MACH_MAPPHONE
-		if (!is_cdma_phone()) {
-			clear_ehci_intr(hcd);
-			rc = IRQ_HANDLED;
-		}
-#endif
 	} else if (hcd->driver->irq(hcd) == IRQ_NONE) {
 		rc = IRQ_NONE;
 	} else {
