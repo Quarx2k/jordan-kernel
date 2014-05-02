@@ -40,6 +40,9 @@
 #include <linux/moduleparam.h>
 #include <linux/io.h>
 #include <linux/slab.h>
+#ifdef CONFIG_OMAP_WATCHDOG_AUTOPET
+#include <linux/timer.h>
+#endif
 #include <linux/pm_runtime.h>
 #include <linux/platform_data/omap-wd-timer.h>
 
@@ -61,7 +64,11 @@ struct omap_wdt_dev {
 	struct resource *mem;
 	int		wdt_trgr_pattern;
 	struct mutex	lock;		/* to avoid races with PM */
+#ifdef CONFIG_OMAP_WATCHDOG_AUTOPET
+	struct timer_list autopet_timer;
+#endif
 };
+#define TIMER_AUTOPET_FREQ(timeout) (HZ * (timeout / 4))
 
 static void omap_wdt_reload(struct omap_wdt_dev *wdev)
 {
@@ -203,6 +210,51 @@ static const struct watchdog_ops omap_wdt_ops = {
 	.set_timeout	= omap_wdt_set_timeout,
 };
 
+#ifdef CONFIG_OMAP_WATCHDOG_AUTOPET
+static inline void autopet_stop(struct watchdog_device *wdog)
+{
+	struct omap_wdt_dev *wdev = watchdog_get_drvdata(wdog);
+
+	del_timer(&wdev->autopet_timer);
+}
+
+static inline void autopet_start(struct watchdog_device *wdog)
+{
+	struct omap_wdt_dev *wdev = watchdog_get_drvdata(wdog);
+
+	mod_timer(&wdev->autopet_timer, jiffies +
+		TIMER_AUTOPET_FREQ(wdog->timeout));
+}
+
+static void autopet_handler(unsigned long data)
+{
+	struct watchdog_device *wdog = (struct watchdog_device *)data;
+
+	pr_debug("PET\n");
+	omap_wdt_ping(wdog);
+	autopet_start(wdog);
+}
+
+static void autopet_init(struct watchdog_device *wdog)
+{
+	struct omap_wdt_dev *wdev = watchdog_get_drvdata(wdog);
+
+	setup_timer(&wdev->autopet_timer, autopet_handler,
+		    (unsigned long) wdog);
+
+	omap_wdt_start(wdog);
+	omap_wdt_ping(wdog);
+	autopet_start(wdog);
+
+	pr_info("Watchdog auto-pet enabled at %d sec intervals\n",
+		TIMER_AUTOPET_FREQ(wdog->timeout));
+}
+#else
+static inline void autopet_init(struct watchdog_device *wdog) {}
+static inline void autopet_stop(struct omap_wdt_dev *wdev) {}
+static inline void autopet_start(struct omap_wdt_dev *wdev) {}
+#endif
+
 static int omap_wdt_probe(struct platform_device *pdev)
 {
 	struct omap_wd_timer_platform_data *pdata = pdev->dev.platform_data;
@@ -278,6 +330,7 @@ static int omap_wdt_probe(struct platform_device *pdev)
 		__raw_readl(wdev->base + OMAP_WATCHDOG_REV) & 0xFF,
 		omap_wdt->timeout);
 
+	autopet_init(omap_wdt);
 	pm_runtime_put_sync(wdev->dev);
 
 	return 0;
@@ -290,6 +343,7 @@ static void omap_wdt_shutdown(struct platform_device *pdev)
 
 	mutex_lock(&wdev->lock);
 	if (wdev->omap_wdt_users) {
+		autopet_stop(wdog);
 		omap_wdt_disable(wdev);
 		pm_runtime_put_sync(wdev->dev);
 	}
@@ -319,9 +373,10 @@ static int omap_wdt_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	struct watchdog_device *wdog = platform_get_drvdata(pdev);
 	struct omap_wdt_dev *wdev = watchdog_get_drvdata(wdog);
-
+	pr_debug("suspending\n");
 	mutex_lock(&wdev->lock);
 	if (wdev->omap_wdt_users) {
+		autopet_stop(wdog);
 		omap_wdt_disable(wdev);
 		pm_runtime_put_sync(wdev->dev);
 	}
@@ -335,11 +390,13 @@ static int omap_wdt_resume(struct platform_device *pdev)
 	struct watchdog_device *wdog = platform_get_drvdata(pdev);
 	struct omap_wdt_dev *wdev = watchdog_get_drvdata(wdog);
 
+	pr_debug("resuming\n");
 	mutex_lock(&wdev->lock);
 	if (wdev->omap_wdt_users) {
 		pm_runtime_get_sync(wdev->dev);
 		omap_wdt_enable(wdev);
 		omap_wdt_reload(wdev);
+		autopet_start(wdog);
 	}
 	mutex_unlock(&wdev->lock);
 
