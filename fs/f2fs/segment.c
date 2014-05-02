@@ -197,6 +197,33 @@ void f2fs_balance_fs_bg(struct f2fs_sb_info *sbi)
 		f2fs_sync_fs(sbi->sb, true);
 }
 
+struct __submit_bio_ret {
+	struct completion event;
+	int error;
+};
+
+static void __submit_bio_wait_endio(struct bio *bio, int error)
+{
+	struct __submit_bio_ret *ret = bio->bi_private;
+
+	ret->error = error;
+	complete(&ret->event);
+}
+
+static int __submit_bio_wait(int rw, struct bio *bio)
+{
+	struct __submit_bio_ret ret;
+
+	rw |= REQ_SYNC;
+	init_completion(&ret.event);
+	bio->bi_private = &ret;
+	bio->bi_end_io = __submit_bio_wait_endio;
+	submit_bio(rw, bio);
+	wait_for_completion(&ret.event);
+
+	return ret.error;
+}
+
 static int issue_flush_thread(void *data)
 {
 	struct f2fs_sb_info *sbi = data;
@@ -219,7 +246,7 @@ repeat:
 		int ret;
 
 		bio->bi_bdev = sbi->sb->s_bdev;
-		ret = submit_bio_wait(WRITE_FLUSH, bio);
+		ret = __submit_bio_wait(WRITE_FLUSH, bio);
 
 		for (cmd = fcc->dispatch_list; cmd; cmd = next) {
 			cmd->ret = ret;
@@ -1172,7 +1199,7 @@ static inline bool is_merged_page(struct f2fs_sb_info *sbi,
 	if (!io->bio)
 		goto out;
 
-	bio_for_each_segment_all(bvec, io->bio, i) {
+	__bio_for_each_segment(bvec, io->bio, i, 0) {
 		if (page == bvec->bv_page) {
 			up_read(&io->io_rwsem);
 			return true;

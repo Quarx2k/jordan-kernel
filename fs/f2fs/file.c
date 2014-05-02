@@ -20,6 +20,7 @@
 #include <linux/uaccess.h>
 #include <linux/mount.h>
 #include <linux/pagevec.h>
+#include <linux/dcache.h>
 
 #include "f2fs.h"
 #include "node.h"
@@ -39,7 +40,7 @@ static int f2fs_vm_page_mkwrite(struct vm_area_struct *vma,
 
 	f2fs_balance_fs(sbi);
 
-	sb_start_pagefault(inode->i_sb);
+	vfs_check_frozen(inode->i_sb, SB_FREEZE_WRITE);
 
 	/* block allocation */
 	f2fs_lock_op(sbi);
@@ -79,15 +80,12 @@ mapped:
 	/* fill the page */
 	f2fs_wait_on_page_writeback(page, DATA);
 out:
-	sb_end_pagefault(inode->i_sb);
 	return block_page_mkwrite_return(err);
 }
 
 static const struct vm_operations_struct f2fs_file_vm_ops = {
 	.fault		= filemap_fault,
-	.map_pages	= filemap_map_pages,
 	.page_mkwrite	= f2fs_vm_page_mkwrite,
-	.remap_pages	= generic_file_remap_pages,
 };
 
 static int get_parent_ino(struct inode *inode, nid_t *pino)
@@ -95,7 +93,17 @@ static int get_parent_ino(struct inode *inode, nid_t *pino)
 	struct dentry *dentry;
 
 	inode = igrab(inode);
-	dentry = d_find_any_alias(inode);
+
+	/* Alex - the following is equivalent to: dentry = d_find_any_alias(inode); */
+	dentry = NULL;
+	spin_lock(&inode->i_lock);
+	if (!list_empty(&inode->i_dentry)) {
+		dentry = list_first_entry(&inode->i_dentry,
+					  struct dentry, d_alias);
+		dget(dentry);
+	}
+	spin_unlock(&inode->i_lock);
+
 	iput(inode);
 	if (!dentry)
 		return 0;
@@ -110,7 +118,7 @@ static int get_parent_ino(struct inode *inode, nid_t *pino)
 	return 1;
 }
 
-int f2fs_sync_file(struct file *file, loff_t start, loff_t end, int datasync)
+int f2fs_sync_file(struct file *file, int datasync)
 {
 	struct inode *inode = file->f_mapping->host;
 	struct f2fs_inode_info *fi = F2FS_I(inode);
@@ -127,11 +135,6 @@ int f2fs_sync_file(struct file *file, loff_t start, loff_t end, int datasync)
 		return 0;
 
 	trace_f2fs_sync_file_enter(inode);
-	ret = filemap_write_and_wait_range(inode->i_mapping, start, end);
-	if (ret) {
-		trace_f2fs_sync_file_exit(inode, need_cp, datasync, ret);
-		return ret;
-	}
 
 	/* guarantee free sections for fsync */
 	f2fs_balance_fs(sbi);
@@ -229,6 +232,25 @@ static bool __found_offset(block_t blkaddr, pgoff_t dirty, pgoff_t pgofs,
 	return false;
 }
 
+static inline int unsigned_offsets(struct file *file)
+{
+	return file->f_mode & FMODE_UNSIGNED_OFFSET;
+}
+
+static loff_t vfs_setpos(struct file *file, loff_t offset, loff_t maxsize)
+{
+	if (offset < 0 && !unsigned_offsets(file))
+		return -EINVAL;
+	if (offset > maxsize)
+		return -EINVAL;
+
+	if (offset != file->f_pos) {
+		file->f_pos = offset;
+		file->f_version = 0;
+	}
+	return offset;
+}
+
 static loff_t f2fs_seek_block(struct file *file, loff_t offset, int whence)
 {
 	struct inode *inode = file->f_mapping->host;
@@ -312,7 +334,7 @@ static loff_t f2fs_llseek(struct file *file, loff_t offset, int whence)
 	case SEEK_CUR:
 	case SEEK_END:
 		return generic_file_llseek_size(file, offset, whence,
-						maxbytes, i_size_read(inode));
+						maxbytes);
 	case SEEK_DATA:
 	case SEEK_HOLE:
 		return f2fs_seek_block(file, offset, whence);
@@ -518,7 +540,7 @@ int f2fs_setattr(struct dentry *dentry, struct iattr *attr)
 	__setattr_copy(inode, attr);
 
 	if (attr->ia_valid & ATTR_MODE) {
-		err = posix_acl_chmod(inode, get_inode_mode(inode));
+		err = f2fs_acl_chmod(inode);
 		if (err || is_inode_flag_set(fi, FI_ACL_MODE)) {
 			inode->i_mode = fi->i_acl_mode;
 			clear_inode_flag(fi, FI_ACL_MODE);
@@ -532,8 +554,7 @@ int f2fs_setattr(struct dentry *dentry, struct iattr *attr)
 const struct inode_operations f2fs_file_inode_operations = {
 	.getattr	= f2fs_getattr,
 	.setattr	= f2fs_setattr,
-	.get_acl	= f2fs_get_acl,
-	.set_acl	= f2fs_set_acl,
+	.check_acl	= f2fs_check_acl,
 #ifdef CONFIG_F2FS_FS_XATTR
 	.setxattr	= generic_setxattr,
 	.getxattr	= generic_getxattr,
@@ -742,7 +763,7 @@ long f2fs_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	{
 		unsigned int oldflags;
 
-		ret = mnt_want_write_file(filp);
+		ret = mnt_want_write(filp->f_path.mnt);
 		if (ret)
 			return ret;
 
@@ -779,7 +800,7 @@ long f2fs_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		inode->i_ctime = CURRENT_TIME;
 		mark_inode_dirty(inode);
 out:
-		mnt_drop_write_file(filp);
+		mnt_drop_write(filp->f_path.mnt);
 		return ret;
 	}
 	default:

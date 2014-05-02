@@ -22,7 +22,7 @@
 
 #ifdef CONFIG_F2FS_CHECK_FS
 #define f2fs_bug_on(condition)	BUG_ON(condition)
-#define f2fs_down_write(x, y)	down_write_nest_lock(x, y)
+#define f2fs_down_write(x, y)	down_write(x)
 #else
 #define f2fs_bug_on(condition)
 #define f2fs_down_write(x, y)	down_write(x)
@@ -31,6 +31,7 @@
 /*
  * For mount options
  */
+#define F2FS_SUPER_MAGIC	0xF2F52010	/* F2FS Magic Number */
 #define F2FS_MOUNT_BG_GC		0x00000001
 #define F2FS_MOUNT_DISABLE_ROLL_FORWARD	0x00000002
 #define F2FS_MOUNT_DISCARD		0x00000004
@@ -1090,7 +1091,7 @@ static inline void f2fs_stop_checkpoint(struct f2fs_sb_info *sbi)
 /*
  * file.c
  */
-int f2fs_sync_file(struct file *, loff_t, loff_t, int);
+int f2fs_sync_file(struct file *, int);
 void truncate_data_blocks(struct dnode_of_data *);
 int truncate_blocks(struct inode *, u64);
 void f2fs_truncate(struct inode *);
