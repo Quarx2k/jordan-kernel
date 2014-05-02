@@ -121,12 +121,6 @@
 		reg = <0 0>;
 	};
 
-	/* Temporary enable factory-cable in device-tree
-	 * Should remove it when boot-reason is implemented in boot-loader
-	 */
-	chosen {
-		mmi,factory-cable;
-	};
 	factory_support {
 		compatible = "mmi,factory-support";
 
