@@ -25,8 +25,6 @@
  */
 unsigned long omap_cpcap_vsel_to_uv(unsigned char vsel)
 {
-	if (vsel > 0x44)
-		vsel = 0x44;
 	return (((vsel * 125) + 6000)) * 100;
 }
 
@@ -39,11 +37,6 @@ unsigned long omap_cpcap_vsel_to_uv(unsigned char vsel)
  */
 unsigned char omap_cpcap_uv_to_vsel(unsigned long uv)
 {
-	if (uv < 600000)
-		uv = 600000;
-	else if (uv > 1450000)
-		uv = 1450000;
-//	printk("Uv:%d, Set vsel: %d\n",uv,DIV_ROUND_UP(uv - 600000, 12500));
 	return DIV_ROUND_UP(uv - 600000, 12500);
 }
 
@@ -111,13 +104,10 @@ static __initdata struct omap_pmic_map cpcap_map[] = {
 	{	.name = NULL, .pmic_data = NULL},
 };
 
-static __initdata struct omap_pmic_description cpcap_desc = {
-	.pmic_lp_tshut = 500,	/* T-OFF */
-	.pmic_lp_tstart = 500,	/* T-ON */
-};
-
 int __init omap_cpcap_init(void)
 {
+	struct omap_pmic_description *cpcap_desc = NULL;
+
 	printk(" __init omap_cpcap_init(void)\n");
-	return omap_pmic_register_data(cpcap_map, &cpcap_desc);
+	return omap_pmic_register_data(cpcap_map, cpcap_desc);
 }
