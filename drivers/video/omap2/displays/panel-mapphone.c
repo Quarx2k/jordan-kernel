@@ -24,7 +24,7 @@
 #include "../dss/dss.h"
 
 /* Define this Macro for factory board level test only */
-/* #define DEBUG 1 */
+#define DEBUG 1
 /*
  * NOTE: DEBUG may be defined in dss.h already
  * (when CONFIG_OMAP2_DSS_DEBUG_SUPPORT is enabled).
@@ -33,7 +33,7 @@
 /* Display Control Hook */
 extern u8 display_brightness(void);
 
-static unsigned int panel_debug;
+static unsigned int panel_debug = 1;
 #define DBG(format, ...) \
 	if (panel_debug) \
 		printk(KERN_DEBUG "mapphone-panel: " format, ## __VA_ARGS__); \
@@ -140,7 +140,7 @@ static unsigned int panel_debug;
 #define MOT_DISP_LVDS_MIPI_VM_1007_1280_800	0x001a0004
 /*TODO: ESD */
 /*ESD spec require 10s, select 8s */
-#define MAPPHONE_ESD_CHECK_PERIOD   msecs_to_jiffies(8000)
+#define MAPPHONE_ESD_CHECK_PERIOD   msecs_to_jiffies(16000)
 #define MOT_DSIP_MIPI_CM_430_540_960_AMOLED_BL_MAX 255
 
 /* LVDS Panel EDID Manufacture ID Registers */
@@ -369,7 +369,7 @@ static void mapphone_esd_work(struct work_struct *work)
 	mutex_lock(&mp_data->lock);
 
 	if (!mp_data->enabled) {
-		DBG("%s: ignoring because display is disabled\n", __func__);
+		printk("%s: ignoring because display is disabled\n", __func__);
 		mutex_unlock(&mp_data->lock);
 		return;
 	}
@@ -381,16 +381,21 @@ static void mapphone_esd_work(struct work_struct *work)
 			&power_mode, 1);
 	if (r != 1) {
 		dev_err(&dssdev->dev, "Failed to get power mode, r = %d\n", r);
-		goto err;
+		dsi_from_dss_runtime_put(dssdev);
+		dsi_bus_unlock(dssdev);
+		mutex_unlock(&mp_data->lock);
+		return;
+		//goto err;
 	}
 
 #ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
-	if (atomic_read(&panel_data->state) == PANEL_ON)
+	if (atomic_read(&panel_data->state) == PANEL_ON) {
 		/* REG_DPM_STEP_UP_CIRCUIT | REG_DPM_DISPLAY_STATUS | REG_DPM_NORMAL_MODE | REG_DPM_WAKE_MODE */
 		expected_mode = 0x9c;
-	else
+	} else {
 		/* REG_DPM_STEP_UP_CIRCUIT | REG_DPM_NORMAL_MODE | REG_DPM_WAKE_MODE */
 		expected_mode = 0x98;
+	}
 
 	DBG("ESD Check - read mode = 0x%02x, expected = 0x%02x\n", power_mode,
 		expected_mode);
@@ -472,10 +477,10 @@ static void mapphone_framedone_cb(int err, void *data)
 	struct omap_dss_device *dssdev = data;
 	struct mapphone_data *mp_data = dev_get_drvdata(&dssdev->dev);
 
-	DBG("%s()\n", __func__);
+//	DBG("%s()\n", __func__);
 
 	/* Turn on display when framedone */
-//	mapphone_panel_display_on(dssdev);
+	mapphone_panel_display_on(dssdev);
 
 #ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	dsi_from_dss_runtime_put(dssdev);
@@ -497,7 +502,7 @@ static int mapphone_set_update_window(struct omap_dss_device *dssdev,
 	u16 y1 = y;
 	u16 y2 = y + h - 1;
 
-	DBG("Setting update window %d %d %d %d\n", x1, x2, y1, y2);
+	//DBG("Setting update window %d %d %d %d\n", x1, x2, y1, y2);
 
 	/*
 	 * set page, column address cmd using dsi_vc_dcs_write()
@@ -542,11 +547,11 @@ static int mapphone_panel_update(struct omap_dss_device *dssdev,
 {
 	struct mapphone_data *mp_data = dev_get_drvdata(&dssdev->dev);
 	struct mapphone_dsi_panel_data *panel_data = get_panel_data(dssdev);
-	int r, rr = 0;
+	int r;
 
 	WARN_ON(dssdev != mp_data->dssdev);
 
-	DBG("update %d, %d, %d x %d\n", x, y, w, h);
+	//DBG("update %d, %d, %d x %d\n", x, y, w, h);
 
 	mutex_lock(&mp_data->lock);
 	dsi_bus_lock(dssdev);
@@ -554,11 +559,11 @@ static int mapphone_panel_update(struct omap_dss_device *dssdev,
 
 	if (!mp_data->enabled) {
 		DBG("Got update for disabled panel\n");
-		r = 0;
+		r = -ENODEV;
 		goto err;
 	}
 
-	DBG("starting to prepare update...\n");
+	//DBG("starting to prepare update...\n");
 
 	r = omap_dsi_prepare_update(dssdev, &x, &y, &w, &h, true);
 	if (r)
@@ -566,10 +571,9 @@ static int mapphone_panel_update(struct omap_dss_device *dssdev,
 
 	if (dssdev->phy.dsi.type == OMAP_DSS_DSI_TYPE_CMD_MODE) {
 		/* Only command mode can do partial update */
-		rr = mapphone_set_update_window(dssdev, x, y, w, h);
-		if (rr)
-			dev_err(&dssdev->dev,
-				"mapphone_set_update_window failed:%d\n", rr);
+		r = mapphone_set_update_window(dssdev, x, y, w, h);
+		if (r)
+			goto err;
 	}
 
 	if (mp_data->te_enabled && panel_data->use_ext_te &&
@@ -593,13 +597,13 @@ static int mapphone_panel_update(struct omap_dss_device *dssdev,
 		if (r)
 			goto err;
 
-		DBG("Update successfully triggered\n");
+		//DBG("Update successfully triggered\n");
 	}
 
 	/* note: no bus_unlock here. unlock is in framedone_cb */
 	mutex_unlock(&mp_data->lock);
 
-	return rr;
+	return 0;
 err:
 	dsi_from_dss_runtime_put(dssdev);
 	dsi_bus_unlock(dssdev);
@@ -1563,6 +1567,7 @@ static void mapphone_panel_remove(struct omap_dss_device *dssdev)
 
 	cancel_delayed_work(&mp_data->esd_work);
 	destroy_workqueue(mp_data->esd_wq);
+
 	if (mp_data->force_update)
 		destroy_workqueue(mp_data->te_wq);
 	/* reset, to be sure that the panel is in a valid state */
@@ -1589,7 +1594,7 @@ static int mapphone_panel_lp_cmd_wrt_sync(struct omap_dss_device *dssdev,
 {
 	int i, ret;
 	u8 data[7] = {0};
-
+	printk("start %s\n",__func__);
 	for (i = 0; i < DCS_CMD_RETRY_MAX; i++) {
 		if (dcs_cmd == true) {
 			ret = dsi_vc_dcs_write(dssdev, dsi_vc_cmd,
@@ -1653,7 +1658,7 @@ static int mapphone_panel_lp_cmd_wrt_sync(struct omap_dss_device *dssdev,
 				chk_mask, data[0]);
 		ret = -1;
 	}
-
+	printk("end %s: %d\n",__func__,ret);
 	return ret;
 }
 
@@ -1854,6 +1859,7 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 	/* turn off mcs register acces protection */
 	data[0] = EDISCO_CMD_SET_MCS;
 	data[1] = EDISCO_CMD_MCS_OFF;
+	printk("%s: 1\n",__func__);
 	ret = mapphone_panel_lp_cmd_wrt_sync(dssdev,
 						false, EDISCO_SHORT_WRITE_1,
 						data, 2,
@@ -1863,13 +1869,12 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 		printk(KERN_ERR "failed to send SET_MCS OFF\n");
 
 
-	msleep(10);
-
 	/* enable lane setting and test registers*/
 	data[0] = 0xef;
 	data[1] = 0x01;
 	data[2] = 0x01;
 	data[3] = 0x00;
+	printk("%s: 2\n",__func__);
 	ret = dsi_vc_write(dssdev, dsi_vc_cmd, EDISCO_LONG_WRITE, data, 4);
 	DBG("/* enable lane setting and test registers: %d*/\n", ret);
 	/* 2nd param 61 = 1 line; 63 = 2 lanes */
@@ -1881,6 +1886,7 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 	if (dssdev->panel.panel_id == MOT_DISP_MIPI_CM_480_854) {
 		/* Reading lane_config and it will return
 		* 0x63 or 2-lanes, 0x60 for 1-lane (1st source displ only)*/
+		printk("%s: 3\n",__func__);
 		ret = mapphone_panel_lp_cmd_wrt_sync(dssdev,
 					true, 0x00,
 					data, 4,
@@ -1890,6 +1896,7 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 	} else {
 		/* Reading lane_config and it will return
 		* 0x1 for 2-lanes, 0x0 for 1-lane (2nd source displ only)*/
+		printk("%s: 3_1\n",__func__);
 		ret = mapphone_panel_lp_cmd_wrt_sync(dssdev,
 					true, 0x00,
 					data, 4,
@@ -1901,12 +1908,12 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 	if (ret)
 		printk(KERN_ERR "failed to send LANE_CONFIG\n");
 
-	msleep(10);
 
 	/* Forcing display inversion off for hardware issue
 	 * on some phones (observed inverted color, ~1% of powerups fail)
 	 */
 	data[0] = EDISCO_CMD_SET_INVERSION_OFF;
+	printk("%s: 4\n",__func__);
 	ret = mapphone_panel_lp_cmd_wrt_sync(dssdev,
 				true, 0,
 				data, 1,
@@ -1915,11 +1922,11 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 	if (ret)
 		printk(KERN_ERR "failed to send EDISCO_CMD_SET_INVERSION_OFF \n");
 
-	msleep(10);
 
 	/* 2nd param 0 = WVGA; 1 = WQVGA */
 	data[0] = EDISCO_CMD_SET_DISPLAY_MODE;
 	data[1] = 0x00;
+	printk("%s: 5\n",__func__);
 	ret = mapphone_panel_lp_cmd_wrt_sync(dssdev,
 					true, 0x00,
 					data, 2,
@@ -1930,8 +1937,6 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 	if (ret)
 		printk(KERN_ERR "failed to send SET_DISPLAY_MODE\n");
 
-	msleep(10);
-
 	/* Set dynamic backlight control and PWM; D[7:4] = PWM_DIV[3:0];*/
 	/* D[3]=0 (PWM OFF);
 	 * D[2]=0 (auto BL control OFF for 1st source display only);
@@ -1939,16 +1944,11 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 	 * D[0]=0 (Enhanced Image Correction OFF) */
 	data[0] = EDISCO_CMD_SET_BCKLGHT_PWM;
 	/* AUO displays require a different setting */
-	if (dssdev->panel.panel_id == MOT_DISP_MIPI_CM_370_480_854) {
-		printk("AUO displays require a different setting: 0x09\n");
-		data[1] = display_brightness();
-		printk("Set display to :%u\n", display_brightness());
-	} else {
-		printk("AUO displays require a different setting: 0x09: 0x1f\n");
-		data[1] = display_brightness();
-		printk("Set display to :%u\n", display_brightness());
-	}
-
+	if (dssdev->panel.panel_id == MOT_DISP_MIPI_CM_370_480_854)
+		data[1] = 0x09;
+	else
+		data[1] = 0x1f;
+	printk("%s: 6\n",__func__);
 	ret = mapphone_panel_lp_cmd_wrt_sync(dssdev,
 					true, 0x00,
 					data, 2,
@@ -1959,11 +1959,10 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 	if (ret)
 		printk(KERN_ERR "failed to send CABC/PWM\n");
 
-	msleep(10);
-
 	/* turn on mcs register acces protection */
 	data[0] = EDISCO_CMD_SET_MCS;
 	data[1] = EDISCO_CMD_MCS_ON;
+	printk("%s: 7\n",__func__);
 	ret = mapphone_panel_lp_cmd_wrt_sync(dssdev,
 						false, EDISCO_SHORT_WRITE_1,
 						data, 2,
@@ -1972,9 +1971,9 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 	if (ret)
 		printk(KERN_ERR "failed to send SET_MCS ON\n");
 
-	msleep(10);
 
 	data[0] = EDISCO_CMD_EXIT_SLEEP_MODE;
+	printk("%s: 8\n",__func__);
 	ret = mapphone_panel_lp_cmd_wrt_sync(dssdev,
 			true, 0x0,
 			data, 1,
@@ -1986,10 +1985,8 @@ static int dsi_mipi_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 		goto error;
 	}
 
-	msleep(200);
-
 	printk(KERN_INFO "done EDISCO CTRL ENABLE\n");
-
+	msleep(200);
 	return 0;
 error:
 	return -EINVAL;
@@ -2003,6 +2000,7 @@ static int dsi_mipi_430_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 
 	/* Exit sleep mode */
 	data[0] = EDISCO_CMD_EXIT_SLEEP_MODE;
+	printk("%s: 1\n",__func__);
 	ret = mapphone_panel_lp_cmd_wrt_sync(dssdev,
 			true, 0x0,
 			data, 1,
@@ -2019,6 +2017,7 @@ static int dsi_mipi_430_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 	/* turn off mcs register acces protection */
 	data[0] = EDISCO_CMD_SET_MCS;
 	data[1] = 0x00;
+	printk("%s: 2\n",__func__);
 	ret = mapphone_panel_lp_cmd_wrt_sync(dssdev,
 				false, EDISCO_SHORT_WRITE_1,
 				data, 2,
@@ -2031,6 +2030,7 @@ static int dsi_mipi_430_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 	/* Enable 2 data lanes */
 	data[0] = EDISCO_CMD_DATA_LANE_CONFIG;
 	data[1] = EDISCO_CMD_DATA_LANE_TWO;
+	printk("%s: 3\n",__func__);
 	ret = mapphone_panel_lp_cmd_wrt_sync(dssdev,
 			false, EDISCO_SHORT_WRITE_1,
 			data, 2,
@@ -2039,8 +2039,6 @@ static int dsi_mipi_430_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 	if (ret)
 		printk(KERN_ERR"failed to send DATA_LANE_CONFIG\n");
 
-	msleep(10);
-
 	/* Set dynamic backlight control and PWM; D[7:4] = PWM_DIV[3:0];*/
 	/* D[3]=0 (PWM OFF);
 	 * D[2]=0 ;
@@ -2048,6 +2046,7 @@ static int dsi_mipi_430_cm_480_854_panel_enable(struct omap_dss_device *dssdev)
 	 * D[0]=0 (Enhanced Image Correction OFF) */
 	data[0] = EDISCO_CMD_SET_BCKLGHT_PWM;
 	data[1] = 0xd9;
+	printk("%s: 4\n",__func__);
 	ret = mapphone_panel_lp_cmd_wrt_sync(dssdev,
 				true, 0x00,
 				data, 2,
@@ -3950,6 +3949,20 @@ static int mapphone_panel_power_on(struct omap_dss_device *dssdev)
 		goto err0;
 	}
 
+//#ifdef CONFIG_PANEL_MAPPHONE_SKIP_FIRSTBOOT
+	static bool skip_first_boot = false;
+//#else
+//	static bool skip_first_boot = false;
+//#endif
+
+	if ((skip_first_boot || !first_boot) && !dssdev->phy.dsi.d2l_use_ulps) {
+		if (dssdev->platform_enable) {
+			ret = dssdev->platform_enable(dssdev);
+			if (ret)
+				goto err0;
+		}
+	}
+
 #ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
 	if (first_boot) {
 		/*
@@ -3980,15 +3993,9 @@ static int mapphone_panel_power_on(struct omap_dss_device *dssdev)
 	}
 #endif
 
-	if (!first_boot && !dssdev->phy.dsi.d2l_use_ulps) {
-		if (dssdev->platform_enable) {
-			ret = dssdev->platform_enable(dssdev);
-			if (ret)
-				goto err0;
-		}
-	}
-
 	mapphone_hw_reset(dssdev);
+
+	msleep(100);
 
 	omapdss_dsi_vc_enable_hs(dssdev, dsi_vc_cmd, false);
 
@@ -4082,12 +4089,7 @@ static int mapphone_panel_power_on(struct omap_dss_device *dssdev)
 	mp_data->enabled = true;
 	mp_data->som_enabled = false;
 
-	/*moved this out of interrupt*/
-	mapphone_panel_display_on(dssdev);
-
 	omapdss_dsi_vc_enable_hs(dssdev, dsi_vc_cmd, true);
-
-
 
 	if (dssdev->phy.dsi.type == OMAP_DSS_DSI_TYPE_VIDEO_MODE) {
 		if (!dssdev->skip_init)
@@ -4127,7 +4129,6 @@ err0:
 	dsi_from_dss_runtime_put(dssdev);
 	return ret;
 }
-
 static void set_vc_channels(struct omap_dss_device *dssdev)
 {
 	if ((dsi_vc_cmd == 0) && (dsi_vc_video == 0)) {
@@ -4186,9 +4187,11 @@ static int mapphone_panel_start(struct omap_dss_device *dssdev)
 		dssdev->state = OMAP_DSS_DISPLAY_DISABLED;
 	} else {
 		dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
+
 		if (panel_data->use_esd_check)
 			queue_delayed_work(mp_data->esd_wq, &mp_data->esd_work,
 				MAPPHONE_ESD_CHECK_PERIOD);
+
 	}
 
 	return r;

@@ -23,9 +23,9 @@
 #ifndef __OMAP2_DSS_H
 #define __OMAP2_DSS_H
 
-#ifdef CONFIG_OMAP2_DSS_DEBUG_SUPPORT
+//#ifdef CONFIG_OMAP2_DSS_DEBUG_SUPPORT
 #define DEBUG
-#endif
+//#endif
 
 #ifdef DEBUG
 extern unsigned int dss_debug;
