@@ -97,6 +97,9 @@
 			<&gpio3 17 2>; /* gpio_c55_int gpio-81*/
 		vddc-supply = <&ldo9_reg>;
 		vddldo-supply = <&ldo3_reg>;
+		pinctrl-names = "off", "on";
+		pinctrl-0 = <&c55_pins_off>;
+		pinctrl-1 = <&c55_pins_on>;
 	};
 
 	vib-gpio {
@@ -528,7 +531,6 @@
 			0x0ae 0x001	/* DSS_DATA1, MODE1 | OUTPUT */
 			0x0b0 0x001	/* DSS_DATA2, MODE1 | OUTPUT */
 			0x0b2 0x001	/* DSS_DATA3, MODE1 | OUTPUT */
-			0x0b8 0x104	/* DSS_DATA6, MODE4 | INPUT */
 			0x0bc 0x004	/* DSS_DATA8, MODE4 | OUTPUT */
 			0x0c2 0x004	/* DSS_DATA11, MODE4 | OUTPUT */
 			0x0c6 0x004	/* DSS_DATA13, MODE4 | OUTPUT */
@@ -537,19 +539,11 @@
 			0x0e4 0x004	/* CAM_FLD, MODE4 | OUTPUT */
 			0x0e6 0x11c	/* CAM_D0, MODE4 | INPUT_PULLUP */
 			0x122 0x004	/* SIM_CLK, MODE4 | OUTPUT */
-			0x124 0x104	/* SIM_PWRCTRL, MODE4 | INPUT */
+			0x124 0x00f	/* SIM_PWRCTRL, MODE7 | PULLDOWN */
 			0x144 0x100	/* UART2_CTS, MODE0  | OUTPUT */
 			0x146 0x000	/* UART2_RTS, MODE0 | OUTPUT */
 			0x148 0x000	/* UART2_TX, MODE0 | INPUT */
 			0x14a 0x100	/* UART2_RX, MODE0 | INPUT */
-			0x14c 0x000	/* UART1_TX, MODE0 | OUTPUT */
-			0x14e 0x000	/* UART1_RTS, MODE0 | OUTPUT */
-			0x150 0x100	/* UART1_CTS, MODE0 | INPUT */
-			0x152 0x100	/* UART1_RX, MODE0 | INPUT */
-			0x154 0x100	/* MCBSP4_CLKX, MODE0 | INPUT */
-			0x156 0x100	/* MCBSP4_DR, MODE0 | INPUT */
-			0x158 0x000	/* MCBSP4_DX, MODE0 | OUTPUT */
-			0x15a 0x118	/* MCBSP4_FSX,MODE0 | INPUT_PULLUP */
 			0x168 0x104	/* MCBSP1_CLKX, MODE4 | INPUT */
 			0x16c 0x004	/* UART3_RTS_SD, MODE4 | OUTPUT */
 			0x16e 0x118	/* UART3_RX, MODEO | INPUT_PULLUP */
@@ -620,11 +614,45 @@
 
 	spi_flash_pins_off: pinmux_m25p_pins_off {
 		pinctrl-single,pins = <
-			0x0ca 0x107	/* DSS_DATA15, MODE7 (SAFE) | INPUT */
-			0x1a6 0x107	/* MCSPI2_CLK, MODE7 (SAFE) | INPUT */
-			0x1a8 0x107	/* MCSPI2_SIMO, MODE7 (SAFE) | INPUT */
-			0x1aa 0x107	/* MCSPI2_SOMI, MODE7 (SAFE) | INPUT */
-			0x1ac 0x107	/* MCSPI2_CS0, MODE7 (SAFE) | INPUT */
+			0x0ca 0x007	/* DSS_DATA15, MODE7 */
+			0x1a6 0x007	/* MCSPI2_CLK, MODE7 */
+			0x1a8 0x007	/* MCSPI2_SIMO, MODE7 */
+			0x1aa 0x007	/* MCSPI2_SOMI, MODE7 */
+			0x1ac 0x007	/* MCSPI2_CS0, MODE7 */
+		>;
+	};
+
+	c55_pins_off: pinmux_c55_pins_off {
+		pinctrl-single,pins = <
+			0x0b8 0x00f	/* DSS_DATA6, MODE7 | PULLDOWN */
+			0x110 0x00f	/* MCBSP2_DR, MODE7 | PULLDOWN */
+			0x10c 0x00f	/* MCBSP2_FSX, MODE7 | PULLDOWN */
+			0x10e 0x00f	/* MCBSP2_CLKX, MODE7 | PULLDOWN */
+			0x14c 0x00f	/* UART1_TX, MODE7 | PULLDOWN */
+			0x14e 0x00f	/* UART1_RTS, MODE7 | PULLDOWN */
+			0x150 0x00f	/* UART1_CTS, MODE7 | PULLDOWN */
+			0x152 0x00f	/* UART1_RX, MODE7 | PULLDOWN */
+			0x154 0x00f	/* MCBSP4_CLKX, MODE7 | PULLDOWN */
+			0x156 0x00f	/* MCBSP4_DR, MODE7 | PULLDOWN */
+			0x158 0x00f	/* MCBSP4_DX, MODE7 | PULLDOWN */
+			0x15a 0x00f	/* MCBSP4_FSX, MODE7 | PULLDOWN */
+		>;
+	};
+
+	c55_pins_on: pinmux_c55_pins_on {
+		pinctrl-single,pins = <
+			0x0b8 0x104	/* DSS_DATA6, MODE4 | INPUT */
+			0x110 0x007	/* MCBSP2_DR, MODE7 */
+			0x10c 0x007	/* MCBSP2_FSX, MODE7 */
+			0x10e 0x007	/* MCBSP2_CLKX, MODE7 */
+			0x14c 0x000	/* UART1_TX, MODE0 | OUTPUT */
+			0x14e 0x000	/* UART1_RTS, MODE0 | OUTPUT */
+			0x150 0x118	/* UART1_CTS, MODE0 | INPUT | PULLUP */
+			0x152 0x118	/* UART1_RX, MODE0 | INPUT | PULLUP */
+			0x154 0x108	/* MCBSP4_CLKX, MODE0 | INPUT | PULLDOWN */
+			0x156 0x108	/* MCBSP4_DR, MODE0 | INPUT | PULLDOWN */
+			0x158 0x000	/* MCBSP4_DX, MODE0 | OUTPUT */
+			0x15a 0x108	/* MCBSP4_FSX, MODE0 | INPUT | PULLDOWN */
 		>;
 	};
 
