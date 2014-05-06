@@ -43,7 +43,7 @@
 #define CPCAP_BATT_IRQ_ADCDONE 0x08
 #define CPCAP_BATT_IRQ_MACRO   0x10
 
-#define USE_OWN_CALCULATE_METHOD
+//#define USE_OWN_CALCULATE_METHOD
 
 #ifdef USE_OWN_CALCULATE_METHOD
 static u32 battery_old_cap = -1;
