@@ -894,7 +894,7 @@ static struct i2c_board_info __initdata
 		.platform_data = &mapphone_mt9p012_platform_data,
 	},
 #endif
-#if defined(CONFIG_VIDEO_CAM_ISE)
+#ifdef CONFIG_VIDEO_CAM_ISE
 	{
 		I2C_BOARD_INFO("camise", CAMISE_I2C_ADDR),
 		.platform_data = &mapphone_camise_platform_data,
