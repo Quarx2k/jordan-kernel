@@ -1420,7 +1420,7 @@ int i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 				break;
 		}
 		i2c_unlock_adapter(adap);
-
+		printk("%s: %d\n",__func__,ret);
 		return ret;
 	} else {
 		dev_dbg(&adap->dev, "I2C level transfers not supported\n");
@@ -1837,6 +1837,7 @@ s32 i2c_smbus_read_word_data(const struct i2c_client *client, u8 command)
 	status = i2c_smbus_xfer(client->adapter, client->addr, client->flags,
 				I2C_SMBUS_READ, command,
 				I2C_SMBUS_WORD_DATA, &data);
+	printk("%s: status %d\n",__func__,status);
 	return (status < 0) ? status : data.word;
 }
 EXPORT_SYMBOL(i2c_smbus_read_word_data);
