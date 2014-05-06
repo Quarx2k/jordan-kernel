@@ -1487,6 +1487,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_uart1_slaves[] = {
 
 static struct omap_hwmod omap3xxx_uart1_hwmod = {
 	.name		= "uart1",
+	.flags		= HWMOD_SWSUP_SIDLE,
 	.mpu_irqs	= uart1_mpu_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(uart1_mpu_irqs),
 	.sdma_reqs	= uart1_sdma_reqs,
@@ -1561,6 +1562,9 @@ static struct omap_hwmod_ocp_if *omap3xxx_uart3_slaves[] = {
 
 static struct omap_hwmod omap3xxx_uart3_hwmod = {
 	.name		= "uart3",
+#ifdef CONFIG_DEBUG_LL
+	.flags		= (HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET),
+#endif
 	.mpu_irqs	= uart3_mpu_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(uart3_mpu_irqs),
 	.sdma_reqs	= uart3_sdma_reqs,
@@ -4090,7 +4094,9 @@ static __initdata struct omap_hwmod *omap3xxx_hwmods[] = {
 	&omap3xxx_wd_timer2_hwmod,
 	&omap3xxx_uart1_hwmod,
 	&omap3xxx_uart2_hwmod,
+#ifdef CONFIG_DEBUG_LL
 	&omap3xxx_uart3_hwmod,
+#endif
 	&omap3xxx_uart4_hwmod,
 	/* dss class */
 	&omap3430es1_dss_core_hwmod,
