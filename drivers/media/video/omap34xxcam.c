@@ -1840,7 +1840,7 @@ static int omap34xxcam_open(struct file *file)
 			goto out_isp_get;
 		}
 		cam->isp = isp;
-		if (omap34xxcam_slave_power_set(vdev, V4L2_POWER_ON,
+		if (omap34xxcam_slave_power_set(vdev, V4L2_POWER_STANDBY,
 						OMAP34XXCAM_SLAVE_POWER_ALL)) {
 			dev_err(&vdev->vfd->dev, "can't power up slaves\n");
 			rval = -EBUSY;
@@ -1928,8 +1928,8 @@ static int omap34xxcam_release(struct file *file)
 		isp_stop(isp);
 		videobuf_streamoff(&ofh->vbq);
 		isp_unset_callback(isp, CBK_CATCHALL);
-//		omap34xxcam_slave_power_set(vdev, V4L2_POWER_STANDBY,
-//					    OMAP34XXCAM_SLAVE_POWER_ALL);
+		omap34xxcam_slave_power_set(vdev, V4L2_POWER_STANDBY,
+					    OMAP34XXCAM_SLAVE_POWER_ALL);
 		vdev->cam->streaming = NULL;
 	}
 
@@ -2108,7 +2108,7 @@ static int omap34xxcam_device_register(struct v4l2_int_device *s)
 		}
 		vdev->cam->isp = isp;
 	}
-#ifdef CONFIG_VIDEO_MT9P012
+#ifdef CONFIG_MACH_OMAP_MAPPHONE
         rval = omap34xxcam_slave_power_set(vdev, V4L2_POWER_ON,
                                            1 << hwc.dev_type);
 #else
