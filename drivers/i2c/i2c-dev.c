@@ -303,7 +303,6 @@ static noinline int i2cdev_ioctl_rdrw(struct i2c_client *client,
 	}
 	kfree(data_ptrs);
 	kfree(rdwr_pa);
-	printk("%s: %d\n",__func__,res);
 	return res;
 }
 
@@ -438,7 +437,6 @@ static long i2cdev_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		return put_user(funcs, (unsigned long __user *)arg);
 
 	case I2C_RDWR:
-		printk("%s: call i2cdev_ioctl_rdrw\n",__func__);
 		return i2cdev_ioctl_rdrw(client, arg);
 
 	case I2C_SMBUS:
