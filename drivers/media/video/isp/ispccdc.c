@@ -921,6 +921,7 @@ static int ispccdc_config_datapath(struct isp_ccdc_device *isp_ccdc,
 		return -EINVAL;
 	};
 
+	memset(&syncif, 0, sizeof(struct ispccdc_syncif));
 	isp_reg_writel(dev, syn_mode, OMAP3_ISP_IOMEM_CCDC,
 		       ISPCCDC_SYN_MODE);
 
@@ -956,7 +957,7 @@ static int ispccdc_config_datapath(struct isp_ccdc_device *isp_ccdc,
 		syncif.fldstat = 0;
 		syncif.hdpol = 0;
 		syncif.ipmod = YUV16;
-		syncif.vdpol = 1;
+		syncif.vdpol = 0;
 		syncif.bt_r656_en = 0;
 		ispccdc_config_imgattr(isp_ccdc, 0);
 		ispccdc_config_sync_if(isp_ccdc, syncif);

@@ -682,18 +682,18 @@ EXPORT_SYMBOL(isp_set_xclk);
 static void isp_power_settings(struct device *dev, int idle)
 {
 	if (idle) {
-		isp_reg_writel(dev,
-			       (ISP_SYSCONFIG_MIDLEMODE_SMARTSTANDBY <<
+		isp_reg_writel(dev, (ISP_SYSCONFIG_AUTOIDLE |
+			       ISP_SYSCONFIG_MIDLEMODE_SMARTSTANDBY <<
 				ISP_SYSCONFIG_MIDLEMODE_SHIFT),
 			       OMAP3_ISP_IOMEM_MAIN, ISP_SYSCONFIG);
 		if (omap_rev() == OMAP3430_REV_ES1_0) {
-			isp_reg_writel(dev, ISPCSI1_AUTOIDLE |
-				       (ISPCSI1_MIDLEMODE_SMARTSTANDBY <<
+			isp_reg_writel(dev, (ISPCSI1_AUTOIDLE |
+				       ISPCSI1_MIDLEMODE_SMARTSTANDBY <<
 					ISPCSI1_MIDLEMODE_SHIFT),
 				       OMAP3_ISP_IOMEM_CSI2A,
 				       ISP_CSIA_SYSCONFIG);
-			isp_reg_writel(dev, ISPCSI1_AUTOIDLE |
-				       (ISPCSI1_MIDLEMODE_SMARTSTANDBY <<
+			isp_reg_writel(dev, (ISPCSI1_AUTOIDLE |
+				       ISPCSI1_MIDLEMODE_SMARTSTANDBY <<
 					ISPCSI1_MIDLEMODE_SHIFT),
 				       OMAP3_ISP_IOMEM_CCP2,
 				       ISP_CSIB_SYSCONFIG);
@@ -702,8 +702,8 @@ static void isp_power_settings(struct device *dev, int idle)
 			       ISP_CTRL);
 
 	} else {
-		isp_reg_writel(dev,
-			       (ISP_SYSCONFIG_MIDLEMODE_FORCESTANDBY <<
+		isp_reg_writel(dev, (ISP_SYSCONFIG_AUTOIDLE |
+			       ISP_SYSCONFIG_MIDLEMODE_FORCESTANDBY <<
 				ISP_SYSCONFIG_MIDLEMODE_SHIFT),
 			       OMAP3_ISP_IOMEM_MAIN, ISP_SYSCONFIG);
 		if (omap_rev() == OMAP3430_REV_ES1_0) {
