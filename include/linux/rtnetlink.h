@@ -755,6 +755,9 @@ extern void rtnl_unlock(void);
 extern int rtnl_trylock(void);
 extern int rtnl_is_locked(void);
 
+// Shortcut taken from backport-include/linux/rtnetlink.h
+static inline int lockdep_rtnl_is_held(void) { return 1; }
+
 extern void rtnetlink_init(void);
 extern void __rtnl_unlock(void);
 
