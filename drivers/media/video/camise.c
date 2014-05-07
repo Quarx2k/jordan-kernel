@@ -494,6 +494,7 @@ static int camise_detect(struct v4l2_int_device *s)
  *
  * Sets devices power state to requrested state, if possible.
  */
+
 static int ioctl_s_power(struct v4l2_int_device *s, enum v4l2_power on)
 {
 	struct camise_sensor *sensor = s->priv;
@@ -501,10 +502,11 @@ static int ioctl_s_power(struct v4l2_int_device *s, enum v4l2_power on)
 	int rval = 0;
 
 	if (sensor->state == SENSOR_DETECTED) {
-		pr_info(CAMISE_DRIVER_NAME " Sensor in detected mode\n");
-		if (on == V4L2_POWER_ON &&
-			current_power_state == V4L2_POWER_OFF)
+		printk("Powering %s camise\n", (on ? "on" : "off"));
+		if (on == V4L2_POWER_ON && current_power_state == V4L2_POWER_OFF) {
+			rval = sensor->pdata->power_set(s, V4L2_POWER_ON);
 			sensor->pdata->if_config(s);
+		}
 		current_power_state = on;
 		return rval;
 	}

@@ -1840,7 +1840,7 @@ static int omap34xxcam_open(struct file *file)
 			goto out_isp_get;
 		}
 		cam->isp = isp;
-		if (omap34xxcam_slave_power_set(vdev, V4L2_POWER_STANDBY,
+		if (omap34xxcam_slave_power_set(vdev, V4L2_POWER_ON,
 						OMAP34XXCAM_SLAVE_POWER_ALL)) {
 			dev_err(&vdev->vfd->dev, "can't power up slaves\n");
 			rval = -EBUSY;
