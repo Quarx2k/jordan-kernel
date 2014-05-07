@@ -32,7 +32,9 @@
 #include <media/v4l2-dev.h>
 #include <asm/cacheflush.h>
 
+
 #include "isp.h"
+#include "ispreg.h"
 #include <linux/omap_previewer.h>
 
 #define OMAP_PREV_NAME		"omap-previewer"

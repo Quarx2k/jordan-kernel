@@ -21,6 +21,7 @@
 #include <linux/delay.h>
 
 #include "isp.h"
+#include "ispreg.h"
 #ifdef CONFIG_VIDEO_OMAP34XX_ISP_DEBUG_FS
 #include "ispcsi1_dfs.h"
 #endif

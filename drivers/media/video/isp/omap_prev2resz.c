@@ -24,6 +24,7 @@
 #include <linux/slab.h>
 #include <plat/omap-pm.h>
 #include "isp.h"
+#include "ispreg.h"
 #include <linux/omap_prev2resz.h>
 
 #define OMAP_PREV2RESZ_NAME	"omap-prev2resz"

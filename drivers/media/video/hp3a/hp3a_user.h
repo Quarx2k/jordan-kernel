@@ -1,0 +1,50 @@
+/*
+ * drivers/media/video/hp3a/hp3a_user.h
+ *
+ * User accessible ioctl definition.
+ *
+ * Copyright (C) 2008-2009 Hewlett-Packard Co..
+ *
+ * Contributors:
+ *		Tanvir Islam <tanvir.islam@hp.com>
+ *
+ * This package is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * THIS PACKAGE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
+ * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+ */
+
+#ifndef	__HP3A_USER_H_INCLUDED
+#define	__HP3A_USER_H_INCLUDED
+
+#define OMAP3_HP3A_MAGIC	'R'
+#define OMAP3_HP3A_IOCTL_BASE	0xF
+#define HP3A_S_V4L2_DEV_INDEX	_IOW(OMAP3_HP3A_MAGIC, OMAP3_HP3A_IOCTL_BASE+0, int)
+#define HP3A_S_SENSOR_PARAM	_IOW(OMAP3_HP3A_MAGIC, OMAP3_HP3A_IOCTL_BASE+1, struct hp3a_sensor_param)
+#define HP3A_S_HARDPIPE_PARAM	_IOW(OMAP3_HP3A_MAGIC, OMAP3_HP3A_IOCTL_BASE+2, struct hp3a_hardpipe_param)
+#define HP3A_REQBUF		_IOW(OMAP3_HP3A_MAGIC, OMAP3_HP3A_IOCTL_BASE+3, struct hp3a_request_bufffers)
+#define HP3A_INSTALL_BUF	_IOW(OMAP3_HP3A_MAGIC, OMAP3_HP3A_IOCTL_BASE+4, struct hp3a_buffer)
+#define HP3A_UNINSTALL_BUF	_IOW(OMAP3_HP3A_MAGIC, OMAP3_HP3A_IOCTL_BASE+5, int)
+#define HP3A_QBUF_HISTQ		_IOW(OMAP3_HP3A_MAGIC, OMAP3_HP3A_IOCTL_BASE+6, int)
+#define HP3A_QBUF_AFQ		_IOW(OMAP3_HP3A_MAGIC, OMAP3_HP3A_IOCTL_BASE+7, int)
+#define HP3A_QBUF_RAWQ		_IOW(OMAP3_HP3A_MAGIC, OMAP3_HP3A_IOCTL_BASE+8, int)
+#define HP3A_FLUSH_HISTQ	_IO(OMAP3_HP3A_MAGIC, OMAP3_HP3A_IOCTL_BASE+9)
+#define HP3A_FLUSH_AFQ		_IO(OMAP3_HP3A_MAGIC, OMAP3_HP3A_IOCTL_BASE+10)
+#define HP3A_FLUSH_RAWQ		_IO(OMAP3_HP3A_MAGIC, OMAP3_HP3A_IOCTL_BASE+11)
+#define HP3A_CONFIG_HIST	_IOW(OMAP3_HP3A_MAGIC, OMAP3_HP3A_IOCTL_BASE+12, struct hp3a_histogram_config)
+#define HP3A_CONFIG_AF		_IOW(OMAP3_HP3A_MAGIC, OMAP3_HP3A_IOCTL_BASE+13, struct hp3a_af_config)
+#define HP3A_CONFIG_RAW		_IOWR(OMAP3_HP3A_MAGIC, OMAP3_HP3A_IOCTL_BASE+14, struct hp3a_raw_config)
+#define HP3A_G_STATISTICS	_IOWR(OMAP3_HP3A_MAGIC, OMAP3_HP3A_IOCTL_BASE+16, struct hp3a_statistics)
+#define HP3A_READ_ISP_REGS	_IOWR(OMAP3_HP3A_MAGIC, OMAP3_HP3A_IOCTL_BASE+17, struct hp3a_reg_page)
+#define HP3A_READ_ISP_REG	_IOWR(OMAP3_HP3A_MAGIC, OMAP3_HP3A_IOCTL_BASE+18, struct hp3a_reg)
+
+#define HP3A_REG_8BIT		0x01
+#define HP3A_REG_16BIT		0x02
+#define HP3A_REG_32BIT		0x04
+#define HP3A_REG_TOK_TERM	0xFF
+#define HP3A_REG_TOK_DELAY	0x10
+
+#endif	/* __HP3A_USER_H_INCLUDED */

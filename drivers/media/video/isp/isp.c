@@ -39,9 +39,13 @@
 #include "isp.h"
 #include "ispreg.h"
 #include "ispccdc.h"
-#include "isph3a.h"
-#include "isphist.h"
-#include "isp_af.h"
+#if defined(CONFIG_VIDEO_OMAP3_HP3A)
+ #include "../hp3a/hp3a.h"
+#else
+ #include "isph3a.h"
+ #include "isphist.h"
+ #include "isp_af.h"
+#endif
 #include "isppreview.h"
 #include "ispresizer.h"
 #include "ispcsi2.h"
@@ -1091,6 +1095,9 @@ static irqreturn_t isp_isr(int irq, void *_pdev)
 	}
 
 	if (irqstatus & PREV_DONE) {
+#ifdef CONFIG_VIDEO_OMAP3_HP3A
+               hp3a_frame_done();
+#endif
 		if (irqdis->isp_callbk[CBK_PREV_DONE])
 			irqdis->isp_callbk[CBK_PREV_DONE](
 				PREV_DONE,
@@ -2860,6 +2867,9 @@ int isp_put(void)
 			isp_save_ctx(&pdev->dev);
 			if (isp->revision <= ISP_REVISION_2_0)
 				isp_tmp_buf_free(&pdev->dev);
+#if defined(CONFIG_VIDEO_OMAP3_HP3A)
+			hp3a_hw_enabled(0);
+#endif
 			isp_release_resources(&pdev->dev);
 			isp_disable_clocks(&pdev->dev);
 		}
@@ -3178,7 +3188,10 @@ static int isp_probe(struct platform_device *pdev)
 	isp_get();
 	isp_power_settings(&pdev->dev, 1);
 	isp_put();
-
+#if !defined(CONFIG_VIDEO_OMAP3_HP3A)
+	isph3a_notify(1);
+	isp_af_notify(1);
+#endif
 	return 0;
 
 out_iommu_get:

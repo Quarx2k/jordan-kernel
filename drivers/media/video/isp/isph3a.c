@@ -22,6 +22,7 @@
 #include <linux/uaccess.h>
 
 #include "isp.h"
+#include "ispreg.h"
 #ifdef CONFIG_VIDEO_OMAP34XX_ISP_DEBUG_FS
 #include "isph3a_dfs.h"
 #endif

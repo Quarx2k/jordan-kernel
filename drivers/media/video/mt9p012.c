@@ -23,6 +23,7 @@
 #include "mt9p012_regs.h"
 
 #include "omap34xxcam.h"
+#include "hplens.h"
 
 #define DRIVER_NAME  "mt9p012"
 
@@ -951,7 +952,7 @@ static int mt9p012_read_reg(struct i2c_client *client, u16 data_length,
 	int err;
 	struct i2c_msg msg[1];
 	unsigned char data[4];
-	printk("Enter to %s\n",__func__);
+
 	if (!client->adapter)
 		return -ENODEV;
 	if (data_length != MT9P012_8BIT && data_length != MT9P012_16BIT
@@ -963,6 +964,9 @@ static int mt9p012_read_reg(struct i2c_client *client, u16 data_length,
 	msg->len = 2;
 	msg->buf = data;
 
+#if defined(CONFIG_VIDEO_OMAP3_HPLENS)
+	hplens_lock();
+#endif
 	/* high byte goes out first */
 	data[0] = (u8) (reg >> 8);;
 	data[1] = (u8) (reg & 0xff);
@@ -989,6 +993,9 @@ static int mt9p012_read_reg(struct i2c_client *client, u16 data_length,
 				(data[1] << 16) + (data[0] << 24);
 		err = 0;
 	}
+#if defined(CONFIG_VIDEO_OMAP3_HPLENS)
+	hplens_unlock();
+#endif
 	v4l_dbg(1, debug, client, "read from offset 0x%x error %d", reg, err);
 	return err;
 }
@@ -1010,7 +1017,7 @@ static int mt9p012_write_reg(struct i2c_client *client, u16 data_length,
 	unsigned char data[6];
 	int retry = 0;
 	struct mt9p012_sensor *sensor;
-	printk("Enter to %s\n",__func__);
+
 	if (!client->adapter)
 		return -ENODEV;
 
@@ -1020,6 +1027,9 @@ static int mt9p012_write_reg(struct i2c_client *client, u16 data_length,
 					&& data_length != MT9P012_32BIT)
 		return -EINVAL;
 
+#if defined(CONFIG_VIDEO_OMAP3_HPLENS)
+	hplens_lock();
+#endif
 	msg->addr = client->addr;
 	msg->flags = 0;
 	msg->len = 2 + data_length;
@@ -1044,6 +1054,7 @@ static int mt9p012_write_reg(struct i2c_client *client, u16 data_length,
 	do {
 		err = i2c_transfer(client->adapter, msg, 1);
 		if (err >= 0) {
+			hplens_unlock();
 			v4l_dbg(1, debug, client,
 				"wrote 0x%x to offset 0x%x error %d",
 				val, reg, err);
@@ -1053,6 +1064,9 @@ static int mt9p012_write_reg(struct i2c_client *client, u16 data_length,
 		msleep(3);
 	} while (retry <= MT9P012_I2C_RETRY_COUNT);
 
+#if defined(CONFIG_VIDEO_OMAP3_HPLENS)
+	hplens_unlock();
+#endif
 	return err;
 }
 
@@ -1069,7 +1083,7 @@ static int mt9p012_write_regs(struct i2c_client *client,
 {
 	int err;
 	const struct mt9p012_reg *next = reglist;
-	printk("Enter to %s\n",__func__);
+
 	for (; next->length != MT9P012_TOK_TERM; next++) {
 		if (next->length == MT9P012_TOK_DELAY) {
 			mdelay(next->val);
@@ -1117,7 +1131,7 @@ static enum mt9p012_image_size mt9p012_calc_size(unsigned int width,
 {
 	enum mt9p012_image_size isize;
 	unsigned long pixels = width * height;
-	printk("Enter to %s\n",__func__);
+
 	for (isize = MT9P012_BIN4XSCALE; isize <= MT9P012_FIVE_MP; isize++) {
 		if (mt9p012_sizes[isize].height *
 				mt9p012_sizes[isize].width >= pixels) {
@@ -1141,7 +1155,7 @@ static enum mt9p012_image_size mt9p012_calc_size(unsigned int width,
 static enum mt9p012_image_size mt9p012_find_isize(unsigned int width)
 {
 	enum mt9p012_image_size isize;
-	printk("Enter to %s\n",__func__);
+
 	for (isize = MT9P012_BIN4XSCALE; isize <= MT9P012_FIVE_MP; isize++) {
 		if (mt9p012_sizes[isize].width >= width)
 			break;
@@ -1154,7 +1168,7 @@ static enum
 mt9p012_frame_type mt9p012_find_iframe(enum mt9p012_image_size isize)
 {
 	enum mt9p012_frame_type iframe = 0;
-	printk("Enter to %s\n",__func__);
+
 	if (isize == MT9P012_BIN4XSCALE)
 		iframe = MT9P012_FRAME_216_30FPS;
 
@@ -1192,7 +1206,7 @@ static int mt9p012_set_exposure_time(u32 exp_time, struct v4l2_int_device *s,
 	struct i2c_client *client = to_i2c_client(sensor->dev);
 	struct mt9p012_sensor_settings *ss =
 		&sensor_settings[sensor->current_iframe];
-	printk("Enter to %s\n",__func__);
+
 	if (exp_time < sensor->min_exposure_time) {
 		dev_err(&client->dev, "Exposure time %d us too low.\n",
 			exp_time);
@@ -1229,7 +1243,7 @@ static int mt9p012_set_exposure_time(u32 exp_time, struct v4l2_int_device *s,
 
 		ss->exposure.coarse_int_tm = coarse_int_time;
 
-		dev_info(&client->dev, "set_exp: expT=%dus " \
+		dev_dbg(&client->dev, "set_exp: expT=%dus " \
 			"coarse_int_time=%d\n", \
 			exp_time, coarse_int_time);
 	}
@@ -1268,7 +1282,7 @@ static int mt9p012_set_gain(u16 gain, struct v4l2_int_device *s,
 	struct i2c_client *client = to_i2c_client(sensor->dev);
 	struct mt9p012_sensor_settings *ss =
 		&sensor_settings[sensor->current_iframe];
-	printk("Enter to %s\n",__func__);
+
 	if (gain < sensor->min_linear_gain) {
 		dev_err(&client->dev, "Gain=%d out of legal range.\n",
 			gain);
@@ -1334,7 +1348,7 @@ static int mt9p012_set_gain(u16 gain, struct v4l2_int_device *s,
 			REG_MANUF_GAIN_GLOBAL, reg_gain);
 		ss->exposure.analog_gain = reg_gain;
 
-		dev_info(&client->dev, "set_gain: lineargain=%d " \
+		dev_dbg(&client->dev, "set_gain: lineargain=%d " \
 			"reg_gain=0x%x sensor_ver=0x%x\n", \
 			gain, reg_gain, sensor->ver);
 	}
@@ -1365,8 +1379,8 @@ int mt9p012_set_flash_next_frame(struct mt9p012_flash_params *flash_params,
 	struct mt9p012_sensor *sensor = s->priv;
 	struct i2c_client *c = to_i2c_client(sensor->dev);
 	u16 data;
-	printk("Enter to %s\n",__func__);
-	dev_info(&c->dev, "set_flash_next_frame: time=%dusec, " \
+
+	dev_dbg(&c->dev, "set_flash_next_frame: time=%dusec, " \
 		"flash_type=%d, shutter_type=%d, power=%d\n",
 		flash_params->flash_time, flash_params->flash_type,
 		flash_params->shutter_type, sensor->power_on);
@@ -1404,7 +1418,7 @@ static int mt9p012_set_orientation(enum mt9p012_orientation val,
 	u8 orient;
 	struct mt9p012_sensor *sensor = s->priv;
 	struct i2c_client *client = to_i2c_client(sensor->dev);
-	printk("Enter to %s\n",__func__);
+
 	if (!sensor->power_on)
 		goto end;
 
@@ -1444,7 +1458,7 @@ static int mt9p012_init_exposure_params(struct v4l2_int_device *s,
 {
 	int i = 0;
 	struct mt9p012_sensor *sensor = s->priv;
-	printk("Enter to %s\n",__func__);
+
 	/* flag current exp_time & gain values as invalid */
 	sensor_settings[iframe].exposure.analog_gain = 0;
 	sensor_settings[iframe].exposure.coarse_int_tm = 0;
@@ -1473,7 +1487,7 @@ static int mt9p012_calibration_adjust(int val, struct v4l2_int_device *s,
 	struct mt9p012_sensor *sensor = s->priv;
 	struct i2c_client *client = to_i2c_client(sensor->dev);
 	struct vcontrol *lvc_gain;
-	printk("Enter to %s\n",__func__);
+
 	if (val != 1)
 		return 0;
 
@@ -1481,7 +1495,7 @@ static int mt9p012_calibration_adjust(int val, struct v4l2_int_device *s,
 		/* adj 0x308E to match calibration setting */
 		err = mt9p012_write_reg(client, MT9P012_16BIT,
 					REG_RESERVED_MFR_308E, 0xE060);
-		dev_info(&client->dev, "mt9p013_cal_adj:setting " \
+		dev_dbg(&client->dev, "mt9p013_cal_adj:setting " \
 			"0x308E=0xE060\n");
 	}
 
@@ -1498,7 +1512,7 @@ static int mt9p012_calibration_adjust(int val, struct v4l2_int_device *s,
 		sensor->min_linear_gain = MT9P012_MIN_LINEAR_GAIN_CAL_ADJ;
 		lvc_gain = &sensor->video_control[err];
 		lvc_gain->qc.minimum = MT9P012_MIN_LINEAR_GAIN_CAL_ADJ;
-		dev_info(&client->dev, "mt9p013:setting min gain=%d\n",
+		dev_dbg(&client->dev, "mt9p013:setting min gain=%d\n",
 			MT9P012_MIN_LINEAR_GAIN_CAL_ADJ);
 	}
 
@@ -1523,7 +1537,7 @@ static int mt9p012_set_framerate(struct v4l2_int_device *s,
 	struct i2c_client *client = to_i2c_client(sensor->dev);
 	struct mt9p012_sensor_settings *ss;
 	struct vcontrol *lvc = NULL;
-	printk("Enter to %s\n",__func__);
+
 	ss = &sensor_settings[iframe];
 
 	/* calc desired line_time (usec's (q8)) */
@@ -1589,7 +1603,7 @@ static unsigned long mt9p012_calc_xclk(struct i2c_client *c)
 {
 	struct mt9p012_sensor *sensor = i2c_get_clientdata(c);
 	struct v4l2_fract *timeperframe = &sensor->timeperframe;
-	printk("Enter to %s\n",__func__);
+
 	if (timeperframe->numerator == 0 ||
 	    timeperframe->denominator == 0) {
 		/* supply a default nominal_timeperframe */
@@ -1618,7 +1632,7 @@ static int mt9p012_set_lens_correction(struct mt9p012_lsc_params *lsc,
 	int err = 0, i;
 	struct mt9p012_sensor *sensor = s->priv;
 	struct i2c_client *c = to_i2c_client(sensor->dev);
-	printk("Enter to %s\n",__func__);
+
 	if (sensor->power_on) {
 		if (lsc->enable_lens_correction) {
 			/* Lock VDD1 to MAX for 720p mode */
@@ -1642,7 +1656,7 @@ static int mt9p012_set_lens_correction(struct mt9p012_lsc_params *lsc,
 					REG_SC_ENABLE, 0x8000);
 			}
 
-			dev_info(&c->dev, "Lens correction enabled.\n");
+			dev_dbg(&c->dev, "Lens correction enabled.\n");
 
 		} else {  /* disable lens correction */
 			err |= mt9p012_write_reg(c, MT9P012_16BIT,
@@ -1676,7 +1690,7 @@ static int mt9p012_param_handler(u32 ctrlval,
 		u32 val;
 	} sensor_reg;
 	int i;
-	printk("Enter to %s\n",__func__);
+
 	if (!ctrlval)
 		return -EINVAL;
 
@@ -1767,7 +1781,7 @@ static int mt9p012_param_handler(u32 ctrlval,
 				sizeof(struct mt9p012_sensor_regif)) == 0) {
 				err =  mt9p012_read_reg(c, sensor_reg.len,
 					sensor_reg.addr, &sensor_reg.val);
-				dev_info(&c->dev, "SENSOR_REG_REQ IOCTL read-" \
+				dev_dbg(&c->dev, "SENSOR_REG_REQ IOCTL read-" \
 					"%d: 0x%x=0x%x\n", sensor_reg.len,
 					sensor_reg.addr, sensor_reg.val);
 			}
@@ -1847,7 +1861,7 @@ static int mt9p012_param_handler(u32 ctrlval,
 				(struct mt9p012_sensor_regif *)camctl.data_out,
 				sizeof(struct mt9p012_sensor_regif)) == 0) {
 
-				dev_info(&c->dev, "SENSOR_REG_REQ IOCTL write-" \
+				dev_dbg(&c->dev, "SENSOR_REG_REQ IOCTL write-" \
 					"%d: 0x%x=0x%x\n", sensor_reg.len,
 					sensor_reg.addr, sensor_reg.val);
 
@@ -1905,7 +1919,7 @@ static int mt9p012_param_handler(u32 ctrlval,
 				(struct mt9p012_lsc_params *)camctl.data_out,
 				sizeof(struct mt9p012_lsc_params));
 			err = mt9p012_set_lens_correction(&(sensor->lsc), s);
-			dev_info(&c->dev, "LENS CORRECTION IOCTL write-"
+			dev_dbg(&c->dev, "LENS CORRECTION IOCTL write-"
 					"enable=%d, size=%d\n",
 					sensor->lsc.enable_lens_correction,
 					sensor->lsc.num_elements);
@@ -1962,7 +1976,7 @@ int mt9p012_configure_frame(struct v4l2_int_device *s,
 	struct i2c_client *client = to_i2c_client(sensor->dev);
 	u16 data;
 	int err = 0;
-	printk("Enter to %s\n",__func__);
+
 	 /* hold */
 	err |= mt9p012_write_reg(client, MT9P012_8BIT, REG_GROUPED_PAR_HOLD,
 			0x01);
@@ -2058,7 +2072,7 @@ int mt9p012_update_clocks(struct v4l2_int_device *s, u32 xclk,
 			  enum mt9p012_frame_type iframe)
 {
 	struct mt9p012_sensor *sensor = s->priv;
-	printk("Enter to %s\n",__func__);
+
 	sensor->x_clk = xclk;
 
 	sensor->pll_clk =
@@ -2073,7 +2087,7 @@ int mt9p012_update_clocks(struct v4l2_int_device *s, u32 xclk,
 			(sensor_settings[iframe].clk.op_pix_clk_div *
 			sensor_settings[iframe].clk.op_sys_clk_div);
 
-	dev_info(sensor->dev, "MT9P012: xclk=%u, pll_clk=%u, "
+	dev_dbg(sensor->dev, "MT9P012: xclk=%u, pll_clk=%u, "
 		  "vt_pix_clk=%u, op_pix_clk=%u\n", xclk, sensor->pll_clk,
 		  sensor->vt_pix_clk, sensor->op_pix_clk);
 
@@ -2102,7 +2116,7 @@ static int mt9p012_configure(struct v4l2_int_device *s)
 	int err;
 	u32 xclk;
 	int i;
-	printk("Enter to %s\n",__func__);
+
 	isize = mt9p012_find_isize(pix->width);
 
 	/* common register initialization */
@@ -2290,7 +2304,7 @@ static int ioctl_queryctrl(struct v4l2_int_device *s, struct v4l2_queryctrl *qc)
 {
 	struct mt9p012_sensor *sensor = s->priv;
 	int i;
-	printk("Enter to %s\n",__func__);
+
 	i = find_vctrl(sensor, qc->id);
 	if (i == -EINVAL)
 		qc->flags = V4L2_CTRL_FLAG_DISABLED;
@@ -2318,7 +2332,7 @@ static int ioctl_g_ctrl(struct v4l2_int_device *s, struct v4l2_control *vc)
 		&sensor_settings[sensor->current_iframe];  */
 	struct vcontrol *lvc;
 	int i;
-	printk("Enter to %s\n",__func__);
+
 	i = find_vctrl(sensor, vc->id);
 	if (i < 0)
 		return -EINVAL;
@@ -2351,7 +2365,7 @@ static int ioctl_s_ctrl(struct v4l2_int_device *s, struct v4l2_control *vc)
 	struct vcontrol *lvc;
 	int err = -EINVAL;
 	int i;
-	printk("Enter to %s\n",__func__);
+
 	i = find_vctrl(sensor, vc->id);
 	if (i < 0)
 		return -EINVAL;
@@ -2387,7 +2401,7 @@ static int ioctl_enum_fmt_cap(struct v4l2_int_device *s,
 {
 	int index = fmt->index;
 	enum v4l2_buf_type type = fmt->type;
-	printk("Enter to %s\n",__func__);
+
 	memset(fmt, 0, sizeof(*fmt));
 	fmt->index = index;
 	fmt->type = type;
@@ -2425,7 +2439,7 @@ static int ioctl_try_fmt_cap(struct v4l2_int_device *s, struct v4l2_format *f)
 	struct v4l2_pix_format *pix = &f->fmt.pix;
 	struct mt9p012_sensor *sensor = s->priv;
 	struct v4l2_pix_format *pix2 = &sensor->pix;
-	printk("Enter to %s\n",__func__);
+
 	isize = mt9p012_calc_size(pix->width, pix->height);
 
 	pix->width = mt9p012_sizes[isize].width;
@@ -2443,21 +2457,14 @@ static int ioctl_try_fmt_cap(struct v4l2_int_device *s, struct v4l2_format *f)
 	pix->priv = 0;
 	switch (pix->pixelformat) {
 	case V4L2_PIX_FMT_YUYV:
-		printk("%s: Pixel format: V4L2_PIX_FMT_YUYV\n",__func__);
 	case V4L2_PIX_FMT_UYVY:
-		printk("%s: Pixel format: V4L2_PIX_FMT_UYVY\n",__func__);
 		pix->colorspace = V4L2_COLORSPACE_JPEG;
 		break;
 	case V4L2_PIX_FMT_RGB565:
-		printk("%s: Pixel format: V4L2_PIX_FMT_RGB565\n",__func__);
 	case V4L2_PIX_FMT_RGB565X:
-		printk("%s: Pixel format: V4L2_PIX_FMT_RGB565X\n",__func__);
 	case V4L2_PIX_FMT_RGB555:
-		printk("%s: Pixel format: V4L2_PIX_FMT_RGB555\n",__func__);
 	case V4L2_PIX_FMT_SGRBG10:
-		printk("%s: Pixel format: V4L2_PIX_FMT_SGRBG10\n",__func__);
 	case V4L2_PIX_FMT_RGB555X:
-		printk("%s: Pixel format: V4L2_PIX_FMT_RGB555X\n",__func__);
 	default:
 		pix->colorspace = V4L2_COLORSPACE_SRGB;
 		break;
@@ -2480,7 +2487,7 @@ static int ioctl_s_fmt_cap(struct v4l2_int_device *s, struct v4l2_format *f)
 	struct mt9p012_sensor *sensor = s->priv;
 	struct v4l2_pix_format *pix = &f->fmt.pix;
 	int rval;
-	printk("Enter to %s\n",__func__);
+
 	rval = ioctl_try_fmt_cap(s, f);
 	if (!rval)
 		sensor->pix = *pix;
@@ -2499,7 +2506,6 @@ static int ioctl_s_fmt_cap(struct v4l2_int_device *s, struct v4l2_format *f)
 static int ioctl_g_fmt_cap(struct v4l2_int_device *s, struct v4l2_format *f)
 {
 	struct mt9p012_sensor *sensor = s->priv;
-	printk("Enter to %s\n",__func__);
 	f->fmt.pix = sensor->pix;
 
 	return 0;
@@ -2516,7 +2522,7 @@ static int ioctl_g_parm(struct v4l2_int_device *s, struct v4l2_streamparm *a)
 {
 	struct mt9p012_sensor *sensor = s->priv;
 	struct v4l2_captureparm *cparm = &a->parm.capture;
-	printk("Enter to %s\n",__func__);
+
 	if (a->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
 		return -EINVAL;
 
@@ -2542,7 +2548,7 @@ static int ioctl_s_parm(struct v4l2_int_device *s, struct v4l2_streamparm *a)
 	struct mt9p012_sensor *sensor = s->priv;
 	struct i2c_client *client = to_i2c_client(sensor->dev);
 	struct v4l2_fract *timeperframe = &a->parm.capture.timeperframe;
-	printk("Enter to %s\n",__func__);
+
 	sensor->timeperframe = *timeperframe;
 
 	if (sensor->power_on) {
@@ -2567,7 +2573,7 @@ static int ioctl_s_parm(struct v4l2_int_device *s, struct v4l2_streamparm *a)
 static int ioctl_g_priv(struct v4l2_int_device *s, void *p)
 {
 	struct mt9p012_sensor *sensor = s->priv;
-	printk("Enter to %s\n",__func__);
+
 	if (sensor->pdata->priv_data_set)
 		return sensor->pdata->priv_data_set(s, p);
 	else
@@ -2608,7 +2614,7 @@ static int ioctl_dev_init(struct v4l2_int_device *s)
 	struct mt9p012_sensor *sensor = s->priv;
 	struct i2c_client *client = to_i2c_client(sensor->dev);
 	int err;
-	printk("Enter to %s\n",__func__);
+
 	err = mt9p012_detect(client);
 	if (err < 0) {
 		dev_err(&client->dev, "Unable to detect sensor\n");
@@ -2617,7 +2623,7 @@ static int ioctl_dev_init(struct v4l2_int_device *s)
 	}
 	sensor->detected = 1;
 	sensor->ver = err;
-	dev_info(&client->dev, "Chip version 0x%02x detected\n", sensor->ver);
+	dev_dbg(&client->dev, "Chip version 0x%02x detected\n", sensor->ver);
 
 	return 0;
 }
@@ -2633,7 +2639,7 @@ static int ioctl_enum_framesizes(struct v4l2_int_device *s,
 				 struct v4l2_frmsizeenum *frms)
 {
 	int ifmt;
-	printk("Enter to %s\n",__func__);
+
 	for (ifmt = 0; ifmt < NUM_CAPTURE_FORMATS; ifmt++) {
 		if (frms->pixel_format == mt9p012_formats[ifmt].pixelformat)
 			break;
@@ -2668,7 +2674,7 @@ static int ioctl_enum_frameintervals(struct v4l2_int_device *s,
 	struct mt9p012_sensor *sensor = s->priv;
 	u16 use_min_readout = 0;
 	struct private_vcontrol *pvc = NULL;
-	printk("Enter to %s\n",__func__);
+
 	i = find_vctrl_private(USE_MIN_SIZE_READOUT);
 	if (i >= 0) {
 		pvc = &video_control_private[i];
@@ -2733,7 +2739,7 @@ static int ioctl_s_power(struct v4l2_int_device *s, enum v4l2_power new_power)
 	struct mt9p012_sensor *sensor = s->priv;
 	struct i2c_client *c = to_i2c_client(sensor->dev);
 	int rval = 0;
-	printk("Enter to %s\n",__func__);
+
 	switch (new_power) {
 	case V4L2_POWER_ON:
 		rval = sensor->pdata->power_set(s, V4L2_POWER_ON);
@@ -2746,13 +2752,10 @@ static int ioctl_s_power(struct v4l2_int_device *s, enum v4l2_power new_power)
 			rval = ioctl_dev_init(s);
 			if (rval)
 				goto err_on;
-/*
-		if (sensor->pdata->get_config_flags()
-				& MT9P012_MIRROR_MODE_FLAG)
-			overwrite_with_mirror_settings();
-*/
+		//if (sensor->pdata->get_config_flags()
+		//		& MT9P012_MIRROR_MODE_FLAG)
+		//	overwrite_with_mirror_settings();
 		}
-
 		break;
 	case V4L2_POWER_OFF:
 err_on:
@@ -2867,8 +2870,8 @@ static int mt9p012_probe(struct i2c_client *client,
 
 	sensor->pdata->power_set = pdata->power_set;
 	sensor->pdata->priv_data_set = pdata->priv_data_set;
-	//sensor->pdata->lock_cpufreq = pdata->lock_cpufreq;   /* 720p mode */
-	//sensor->pdata->get_config_flags = pdata->get_config_flags;
+//	sensor->pdata->lock_cpufreq = pdata->lock_cpufreq;   /* 720p mode */
+//	sensor->pdata->get_config_flags = pdata->get_config_flags;
 
 	/* Set sensor default values */
 	sensor->timeperframe.numerator = 1;

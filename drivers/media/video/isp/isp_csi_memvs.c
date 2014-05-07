@@ -23,6 +23,7 @@
 #include "../omap34xxcam.h"
 #include "isp.h"
 #include "isp_csi.h"
+#include "ispreg.h"
 
 #define PHY_ADDRESS_ALIGN		32
 

@@ -42,7 +42,7 @@ struct isp_pipeline;
 #include "isp_af.h"
 #include "isphist.h"
 #include "ispccdc.h"
-#include "ispreg.h"
+//#include "ispreg.h"
 #include "isph3a.h"
 #include "ispresizer.h"
 #include "isppreview.h"
@@ -133,6 +133,7 @@ enum isp_callback_type {
 	CBK_MMU_ERR,
 	CBK_HIST_DONE,
 	CBK_HS_VS,
+	CBK_H3A_AF_DONE,
 	CBK_LSC_ISR,
 	CBK_CATCHALL,
 	CBK_CSIA,

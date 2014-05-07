@@ -21,12 +21,15 @@
 #include <linux/isl29030.h>
 #include <linux/bu52014hfv.h>
 #include <linux/vib-gpio.h>
-
+#ifdef CONFIG_VIDEO_MT9P012
 #include <media/mt9p012.h>
+#endif
 #ifdef CONFIG_VIDEO_CAM_ISE
 #include <media/camise.h>
 #endif
-
+#ifdef CONFIG_VIDEO_OMAP3_HPLENS
+#include <../drivers/media/video/hplens.h>
+#endif
 #define MAPPHONE_LM_3530_INT_GPIO	92
 #define MAPPHONE_AKM8973_INT_GPIO	175
 #define MAPPHONE_AKM8973_RESET_GPIO	28
@@ -41,6 +44,10 @@ extern struct mt9p012_platform_data mapphone_mt9p012_platform_data;
 #ifdef CONFIG_VIDEO_CAM_ISE
 extern struct camise_platform_data mapphone_camise_platform_data;
 #endif
+#ifdef CONFIG_VIDEO_OMAP3_HPLENS
+extern struct hplens_platform_data mapphone_hplens_platform_data;
+#endif
+
 static struct i2c_board_info __initdata
 	mapphone_i2c_bus1_board_info[I2C_BUS_MAX_DEVICES];
 static struct i2c_board_info __initdata
@@ -888,6 +895,13 @@ static struct i2c_board_info __initdata
 		I2C_BOARD_INFO("lm3554_led", 0x53),
 		.platform_data = &mapphone_camera_flash_3554,
 	},
+
+#ifdef CONFIG_VIDEO_OMAP3_HPLENS
+	{
+		I2C_BOARD_INFO("HP_GEN_LENS", 0x04),
+		.platform_data = &mapphone_hplens_platform_data,
+	},
+#endif
 #ifdef CONFIG_VIDEO_MT9P012
 	{
 		I2C_BOARD_INFO("mt9p012", 0x36),

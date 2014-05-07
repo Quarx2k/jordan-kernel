@@ -171,6 +171,8 @@ obj-$(CONFIG_VIDEO_SH_MOBILE_CEU)	+= sh_mobile_ceu_camera.o
 obj-$(CONFIG_VIDEO_OMAP1)		+= omap1_camera.o
 obj-$(CONFIG_VIDEO_MT9P012)		+= mt9p012.o
 obj-$(CONFIG_VIDEO_CAM_ISE)             += camise.o camera_misc.o
+obj-$(CONFIG_VIDEO_OMAP3_HP3A) += hp3a/
+obj-$(CONFIG_VIDEO_OMAP3_HPLENS) += hplens.o
 
 obj-$(CONFIG_VIDEO_SAMSUNG_S5P_FIMC) 	+= s5p-fimc/
 

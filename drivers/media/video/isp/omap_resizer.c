@@ -44,7 +44,7 @@
 
 #define OMAP_RESIZER_NAME		"omap-resizer"
 
-static DECLARE_MUTEX(rsz_hardware_mutex);
+static DEFINE_SEMAPHORE(rsz_hardware_mutex);
 
 enum rsz_config {
 	STATE_NOTDEFINED,	/* Resizer driver not configured */

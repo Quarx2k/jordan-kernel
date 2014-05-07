@@ -29,7 +29,9 @@
 #include <linux/of_fdt.h>
 #include <linux/of.h>
 #include <mach/board-mapphone.h>
-
+#ifdef CONFIG_VIDEO_OMAP3_HPLENS
+#include <../drivers/media/video/hplens.h>
+#endif
 #ifdef CONFIG_VIDEO_MT9P012
 #include <media/mt9p012.h>
 #define MT9P012_XCLK_48MHZ		48000000
@@ -37,6 +39,9 @@
 #ifdef CONFIG_VIDEO_CAM_ISE
 #include <media/camise.h>
 #define CAMISE_XCLK_24MHZ		24000000
+#endif
+#ifdef CONFIG_VIDEO_OMAP3_HPLENS
+#include <../drivers/media/video/hplens.h>
 #endif
 #define CAM_MAX_REGS		5
 #define CAM_MAX_REG_NAME_LEN	8
@@ -51,6 +56,32 @@ void __init mapphone_camera_init(void)
 	cam_standby_gpio = get_gpio_by_name("gpio_cam_pwdn");
 	cam_reset_gpio = get_gpio_by_name("gpio_cam_reset");
 }
+
+#ifdef CONFIG_VIDEO_OMAP3_HPLENS
+static int hplens_power_set(enum v4l2_power power)
+{
+	(void)power;
+
+	return 0;
+}
+
+static int hplens_set_prv_data(void *priv)
+{
+	struct omap34xxcam_hw_config *hwc = priv;
+
+	hwc->dev_index = 0;
+	hwc->dev_minor = 0;
+	hwc->dev_type = OMAP34XXCAM_SLAVE_LENS;
+
+	return 0;
+}
+
+struct hplens_platform_data mapphone_hplens_platform_data = {
+	.power_set = hplens_power_set,
+	.priv_data_set = hplens_set_prv_data,
+};
+#endif
+
 #ifdef CONFIG_VIDEO_MT9P012
 static struct omap34xxcam_sensor_config cam_hwc = {
     .sensor_isp = 0,

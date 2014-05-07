@@ -124,6 +124,8 @@ config VIDEO_IR_I2C
 
 	  In doubt, say Y.
 
+source "drivers/media/video/hp3a/Kconfig"
+
 #
 # Encoder / Decoder module configuration
 #
@@ -505,6 +507,12 @@ config VIDEO_TCM825X
 	---help---
 	  This is a driver for the Toshiba TCM825x VGA camera sensor.
 	  It is used for example in Nokia N800.
+
+config VIDEO_OMAP3_HPLENS
+	tristate "HP generic lens driver"
+	depends on I2C && VIDEO_V4L2
+	---help---
+	  This is a Video4Linux2 generic lens driver.
 
 config VIDEO_IMX046
 	tristate "Sony IMX046 sensor driver (8MP)"
