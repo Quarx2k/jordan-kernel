@@ -713,6 +713,8 @@ static int f2fs_read_data_page(struct file *file, struct page *page)
 	struct inode *inode = page->mapping->host;
 	int ret;
 
+	trace_f2fs_readpage(page, DATA);
+
 	/* If the file has inline data, try to read it directlly */
 	if (f2fs_has_inline_data(inode))
 		ret = f2fs_read_inline_data(inode, page);
@@ -788,6 +790,8 @@ static int f2fs_write_data_page(struct page *page,
 		.rw = (wbc->sync_mode == WB_SYNC_ALL) ? WRITE_SYNC : WRITE,
 	};
 
+	trace_f2fs_writepage(page, DATA);
+
 	if (page->index < end_index)
 		goto write;
 
@@ -858,6 +862,8 @@ static int f2fs_write_data_pages(struct address_space *mapping,
 	int ret;
 	long diff;
 
+	trace_f2fs_writepages(mapping->host, wbc, DATA);
+
 	/* deal with chardevs and other special file */
 	if (!mapping->a_ops->writepage)
 		return 0;
@@ -899,6 +905,8 @@ static int f2fs_write_begin(struct file *file, struct address_space *mapping,
 	pgoff_t index = ((unsigned long long) pos) >> PAGE_CACHE_SHIFT;
 	struct dnode_of_data dn;
 	int err = 0;
+
+	trace_f2fs_write_begin(inode, pos, len, flags);
 
 	f2fs_balance_fs(sbi);
 repeat:
@@ -986,6 +994,8 @@ static int f2fs_write_end(struct file *file,
 			struct page *page, void *fsdata)
 {
 	struct inode *inode = page->mapping->host;
+
+	trace_f2fs_write_end(inode, pos, len, copied);
 
 	SetPageUptodate(page);
 	set_page_dirty(page);
