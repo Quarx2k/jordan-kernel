@@ -164,7 +164,7 @@ static int split(char *string, char **index_array, char pattern,
  * build to gurantee no parts have the same name
  */
 #define MMCPARTS_STR_LEN 512
-static void __init mmcpart_setup(char **arg)
+static int __init mmcpart_setup(char *arg)
 {
 	int host_num;
 	int part_num;
@@ -182,7 +182,7 @@ static void __init mmcpart_setup(char **arg)
 
 	memset(mmcparts_str, 0, MMCPARTS_STR_LEN);
 	memset(mmcpart_table, 0, sizeof(mmcpart_table));
-	strncpy(mmcparts_str, *arg, MMCPARTS_STR_LEN - 1);
+	strncpy(mmcparts_str, arg, MMCPARTS_STR_LEN - 1);
 	split(mmcparts_str, mmcparts_str_trim, ' ', 1);
 	host_num = split(mmcparts_str_trim[0], subhost_index, ';',
 		MAX_MMC_HOST);
@@ -215,6 +215,8 @@ static void __init mmcpart_setup(char **arg)
 				subpartname_index[1], BDEVNAME_SIZE - 1);
 		}
 	}
+
+        return 0;
 }
 early_param("mmcparts", mmcpart_setup);
 
