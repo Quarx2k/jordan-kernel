@@ -660,6 +660,8 @@ void set_dpll3_volt_freq(bool dpll3_restore)
 	if (!dpll3_m2_ck || !voltdm)
 		return;
 
+	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
+
 	if (!dpll3_restore) {
 		/* Step 1, reduce DPLL3 to OPP50 */
 		dpll3_save_rate = clk_get_rate(dpll3_m2_ck);
@@ -684,9 +686,8 @@ void set_dpll3_volt_freq(bool dpll3_restore)
 		vdd2_save_vdata = omap_voltage_get_curr_vdata(voltdm);
 		/* vdd2 already at OPP100 ? */
 		if (vdd2_save_vdata->volt_nominal !=
-					voltdm->vdd->volt_data[1].volt_nominal)
-			omap_vp_forceupdate_scale(voltdm,
-						&(voltdm->vdd->volt_data[1]));
+					vdd->volt_data[1].volt_nominal)
+			omap_vp_forceupdate_scale(voltdm, &(vdd->volt_data[1]));
 		else
 			vdd2_save_vdata = NULL;
 	} else {

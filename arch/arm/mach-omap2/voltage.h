@@ -288,6 +288,7 @@ struct omap_vdd_dep_info {
 struct omap_vdd_info {
 	struct omap_volt_data *volt_data;
 	struct omap_vdd_dep_info *dep_vdd_info;
+	struct voltagedomain voltdm;
 };
 
 void omap_voltage_get_volttable(struct voltagedomain *voltdm,
