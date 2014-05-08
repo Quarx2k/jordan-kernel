@@ -3265,6 +3265,12 @@ static ssize_t atmxt_drv_interactivemode_store(struct device *dev,
 
 	mutex_lock(dd->mutex);
 
+	if (!dd->data || !dd->addr) {
+		pr_err("%s: failed, data/addr is NULL.\n", __func__);
+		err = -ENODEV;
+		goto error;
+	}
+
 	if (value == 1) {
 		/* interactive mode, lets bump up rate*/
 		err = atmxt_i2c_write(dd,
