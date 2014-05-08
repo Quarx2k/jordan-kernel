@@ -211,8 +211,11 @@ struct omap_gpio_platform_data {
 };
 
 extern void omap2_gpio_prepare_for_idle(int off_mode);
-extern void omap2_gpio_resume_after_idle(bool in_suspend);
+extern void omap2_gpio_resume_after_idle(bool in_suspend, int off_mode);
 extern void omap_set_gpio_debounce(int gpio, int enable);
 extern void omap_set_gpio_debounce_time(int gpio, int enable);
+
+extern void omap_clr_soft_irq(int irq);
+extern void omap_set_soft_irq(int irq);
 
 #endif
