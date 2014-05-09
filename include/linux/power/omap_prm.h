@@ -16,19 +16,24 @@
  * 02111-1307, USA
  */
 
-#ifndef _POWER_OMAP_PRM_VOLTSETUP_H
-#define _POWER_OMAP_PRM_VOLTSETUP_H
-
-struct omap_pmic;
+#ifndef _POWER_OMAP_PRM_H
+#define _POWER_OMAP_PRM_H
 
 #if IS_ENABLED(CONFIG_POWER_TI_HARDWARE_VOLTAGE_CONTROL)
-int omap_prm_voltsetup(struct device *dev, struct omap_pmic *pmic, u32 uv);
+void omap_pm_enable_off_mode(void);
+void omap_pm_disable_off_mode(void);
+bool omap_pm_get_off_mode(void);
 #else
-static inline int omap_prm_voltsetup(struct device *dev, struct omap_pmic *pmic,
-				u32 uv)
+static inline void omap_pm_enable_off_mode(void)
 {
-	return -ENODEV;
+}
+static inline void omap_pm_disable_off_mode(void)
+{
+}
+static inline bool omap_pm_get_off_mode(void)
+{
+	return false;
 }
 #endif
 
-#endif				/* _POWER_OMAP_PRM_VOLTSETUP_H */
+#endif				/* _POWER_OMAP_PRM_H */
