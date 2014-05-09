@@ -120,7 +120,7 @@ static const struct {
 	[M4SH_REG_USERSETTINGS_SCREENSTATUS] = {M4SH_TYPE_USERSETTINGS, 0x6, 1},
 	[M4SH_REG_USERSETTINGS_RTCRESET]     = {M4SH_TYPE_USERSETTINGS, 0x7, 1},
 	[M4SH_REG_POWER_VERSION]             = {M4SH_TYPE_POWER, 0x0, 1},
-	[M4SH_REG_POWER_DUMMY]               = {M4SH_TYPE_POWER, 0x1, 1},
+	[M4SH_REG_POWER_ENABLE]              = {M4SH_TYPE_POWER, 0x1, 1},
 	[M4SH_REG_POWER_STILLMODETIMEOUT]    = {M4SH_TYPE_POWER, 0x2, 2},
 	[M4SH_REG_POWER_MOTIONDURATION]      = {M4SH_TYPE_POWER, 0x4, 1},
 	[M4SH_REG_POWER_MOTIONTHRESHOLD]     = {M4SH_TYPE_POWER, 0x5, 1},
@@ -187,6 +187,7 @@ static const struct {
 	[M4SH_REG_LIGHTSENSOR_DUMMY]         = {M4SH_TYPE_LIGHTSENSOR, 0x1, 1},
 	[M4SH_REG_LIGHTSENSOR_SAMPLERATE]    = {M4SH_TYPE_LIGHTSENSOR, 0x2, 2},
 	[M4SH_REG_LIGHTSENSOR_SIGNAL]        = {M4SH_TYPE_LIGHTSENSOR, 0x4, 2},
+	[M4SH_REG_DEBUG_CMD]                 = {M4SH_TYPE_DEBUG, 0x0, 1},
 };
 
 static const unsigned int bank_size_tbl[M4SH_TYPE__NUM] = {
@@ -214,5 +215,6 @@ static const unsigned int bank_size_tbl[M4SH_TYPE__NUM] = {
 	[M4SH_TYPE_HEARTRATE]                = 11,
 	[M4SH_TYPE_HRSENSOR]                 = 13,
 	[M4SH_TYPE_LIGHTSENSOR]              = 6,
+	[M4SH_TYPE_DEBUG]                    = 1,
 };
 #endif /*__M4SENSORHUB_MEM_INTERNAL_H__ */

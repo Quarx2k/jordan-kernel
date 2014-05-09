@@ -605,6 +605,85 @@ static ssize_t m4sensorhub_disable_interrupts(struct device *dev,
 static DEVICE_ATTR(disable_interrupts, S_IWUSR, NULL,
 			m4sensorhub_disable_interrupts);
 
+/*
+This sysfs is to be used only to disable power management. It
+cannot be used to enable power management
+*/
+static ssize_t m4sensorhub_disable_powermanagement(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	char enable = 0;
+
+	return m4sensorhub_reg_write_1byte(&m4sensorhub_misc_data,
+		M4SH_REG_POWER_ENABLE, enable, 0xFF);
+}
+static DEVICE_ATTR(disable_powermanagement, S_IWUSR, NULL,
+		m4sensorhub_disable_powermanagement);
+
+/*
+This sysfs can be used to read/write m4 registers
+This is provided to help in debugging m4 issues
+Example to read an m4 register interrupt enable1( bank = 0x02, regaddr = 0x0B)
+echo R 0x02 0x0B 0x01 > raw_i2c
+R -- indicates read transaction
+0x02 -- reg bank address
+0x0B -- register address
+0x01 -- number of bytes to be read
+The result of the read will be printed out in kernel logs
+
+To write to a m4 regiser interrupt enable1( bank = 0x02, regaddr = 0x0B)
+echo W 0x02 0x0B 0xFF > raw_i2c
+W -- indicates write transaction
+0x02 -- reg bank address
+0x0b -- register addr
+0xFF -- data to be written to this address
+Note:
+Write trasactions have a limitation to be able to write only 1 byte
+*/
+static ssize_t m4sensorhub_raw_i2c(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	unsigned char buffer[20];
+	unsigned int bank, addr, len;
+	unsigned char operation;
+	int ret, i;
+
+	sscanf(buf, "%c 0x%x 0x%x 0x%x", &operation, &bank, &addr, &len);
+	if (operation == 'R') {
+		KDEBUG(M4SH_INFO, "Reading %d bytes from bank 0x%x add 0x%x\n",
+		       len, bank, addr);
+		buffer[0] = (bank & 0xFF);
+		buffer[1] = (addr & 0xFF);
+		ret = m4sensorhub_i2c_write_read(&m4sensorhub_misc_data,
+						 buffer, 2, len);
+		if (ret != len)
+			KDEBUG(M4SH_ERROR, "Failed to read from bank 0x%x \
+			       addr 0x%x", bank, addr);
+		else {
+			for (i = 0; i < len; i++)
+				KDEBUG(M4SH_INFO, "0x%x ",
+				       (unsigned char)buffer[i]);
+			KDEBUG(M4SH_INFO, "\n");
+		}
+	} else if (operation == 'W') {
+		KDEBUG(M4SH_INFO, "Writing 0x%x to bank 0x%x addr 0x%x\n",
+		       len, bank, addr);
+		buffer[0] = (bank & 0xFF);
+		buffer[1] = (addr & 0xFF);
+		buffer[2] = (len & 0xFF);
+		ret = m4sensorhub_i2c_write_read(&m4sensorhub_misc_data,
+						 buffer, 3, 0);
+		if (ret != 1)
+			KDEBUG(M4SH_ERROR, "Failed to write 0x%x from bank \
+			       0x%x addr 0x%x", len, bank, addr);
+	} else {
+		KDEBUG(M4SH_ERROR, "Unknown operation = %c", operation);
+	}
+
+	return count;
+}
+static DEVICE_ATTR(raw_i2c, S_IWUSR, NULL, m4sensorhub_raw_i2c);
+
 static struct attribute *m4sensorhub_control_attributes[] = {
 	&dev_attr_tcmd.attr,
 	&dev_attr_log_level.attr,
@@ -612,6 +691,8 @@ static struct attribute *m4sensorhub_control_attributes[] = {
 	&dev_attr_firmware_version.attr,
 	&dev_attr_download_status.attr,
 	&dev_attr_disable_interrupts.attr,
+	&dev_attr_disable_powermanagement.attr,
+	&dev_attr_raw_i2c.attr,
 	NULL
 };
 
