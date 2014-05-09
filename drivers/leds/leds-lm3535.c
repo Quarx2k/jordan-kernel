@@ -386,7 +386,7 @@ static int lm3535_write_reg (unsigned reg, uint8_t value, const char *caller)
 }
 
 /* ALS Coefficients */
-static long als_z0[] =          {-48, 22225, -616209, 587754883};
+static long als_z0[] =          {70, -37000, 7092000, 519860000};
 module_param_array(als_z0, long, NULL, 0644);
 
 static long als_z1[] =          {24, -14596, 3987380, 659307205};
