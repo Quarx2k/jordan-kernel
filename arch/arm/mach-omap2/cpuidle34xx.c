@@ -131,7 +131,7 @@ static int omap3_enter_idle(struct cpuidle_device *dev,
 		cpu_pm_enter();
 
 	/* Execute ARM wfi */
-	omap_sram_idle();
+	omap_sram_idle(false);
 
 	/*
 	 * Call idle CPU PM enter notifier chain to restore
