@@ -601,7 +601,10 @@ static void apanic_mmc_memdump(void)
 			!memdump_ctx.mmc_memdump_ops->panic_probe)
 		return;
 
+#ifdef CONFIG_OMAP_WATCHDOG_CONTROL
 	memdump_wdt_disable();
+#endif
+
 	if (memdump_ctx.mmc_memdump_ops->panic_probe(memdump_ctx.memdump_hd,
 			memdump_ctx.mmc_memdump_ops->type)) {
 		printk(KERN_ERR "apanic: full memeory dump backing device"
