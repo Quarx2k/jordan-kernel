@@ -97,8 +97,8 @@ static int m4hrt_set_samplerate(struct iio_dev *iio, int16_t rate)
 		goto m4hrt_set_samplerate_irq_check;
 
 	size = m4sensorhub_reg_getsize(dd->m4,
-		M4SH_REG_HRSENSOR_SAMPLERATE);
-	err = m4sensorhub_reg_write(dd->m4, M4SH_REG_HRSENSOR_SAMPLERATE,
+		M4SH_REG_HEARTRATE_APSAMPLERATE);
+	err = m4sensorhub_reg_write(dd->m4, M4SH_REG_HEARTRATE_APSAMPLERATE,
 		(char *)&rate, m4sh_no_mask);
 	if (err < 0) {
 		m4hrt_err("%s: Failed to set sample rate.\n", __func__);
@@ -116,7 +116,7 @@ m4hrt_set_samplerate_irq_check:
 		/* Enable the IRQ if necessary */
 		if (!(dd->status & (1 << M4HRT_IRQ_ENABLED_BIT))) {
 			err = m4sensorhub_irq_enable(dd->m4,
-				M4SH_IRQ_HRSENSOR_DATA_READY);
+				M4SH_IRQ_HEARTRATE_DATA_READY);
 			if (err < 0) {
 				m4hrt_err("%s: Failed to enable irq.\n",
 					  __func__);
@@ -128,7 +128,7 @@ m4hrt_set_samplerate_irq_check:
 		/* Disable the IRQ if necessary */
 		if (dd->status & (1 << M4HRT_IRQ_ENABLED_BIT)) {
 			err = m4sensorhub_irq_disable(dd->m4,
-				M4SH_IRQ_HRSENSOR_DATA_READY);
+				M4SH_IRQ_HEARTRATE_DATA_READY);
 			if (err < 0) {
 				m4hrt_err("%s: Failed to disable irq.\n",
 					  __func__);
@@ -482,7 +482,7 @@ static int m4hrt_driver_init(struct init_calldata *p_arg)
 	}
 
 	err = m4sensorhub_irq_register(dd->m4,
-		M4SH_IRQ_HRSENSOR_DATA_READY, m4hrt_isr, iio);
+		M4SH_IRQ_HEARTRATE_DATA_READY, m4hrt_isr, iio);
 	if (err < 0) {
 		m4hrt_err("%s: Failed to register M4 IRQ.\n", __func__);
 		goto m4hrt_driver_init_fail;
@@ -552,11 +552,11 @@ static int __exit m4hrt_remove(struct platform_device *pdev)
 	mutex_lock(&(dd->mutex));
 	if (dd->status & (1 << M4HRT_IRQ_ENABLED_BIT)) {
 		m4sensorhub_irq_disable(dd->m4,
-					M4SH_IRQ_HRSENSOR_DATA_READY);
+					M4SH_IRQ_HEARTRATE_DATA_READY);
 		dd->status = dd->status & ~(1 << M4HRT_IRQ_ENABLED_BIT);
 	}
 	m4sensorhub_irq_unregister(dd->m4,
-				   M4SH_IRQ_HRSENSOR_DATA_READY);
+				   M4SH_IRQ_HEARTRATE_DATA_READY);
 	m4sensorhub_unregister_initcall(m4hrt_driver_init);
 	m4hrt_remove_iiodev(iio);  /* dd is freed here */
 

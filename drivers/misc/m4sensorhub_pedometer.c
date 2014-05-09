@@ -74,8 +74,8 @@ static int m4ped_read_report_data(struct iio_dev *iio,
 	}
 
 	size = m4sensorhub_reg_getsize(dd->m4,
-		M4SH_REG_PEDOMETER_TOTATDISTANCE);
-	err = m4sensorhub_reg_read(dd->m4, M4SH_REG_PEDOMETER_TOTATDISTANCE,
+		M4SH_REG_PEDOMETER_TOTALDISTANCE);
+	err = m4sensorhub_reg_read(dd->m4, M4SH_REG_PEDOMETER_TOTALDISTANCE,
 		(char *)&(dd->iiodat.total_distance));
 	if (err < 0) {
 		m4ped_err("%s: Failed to read total_distance data.\n",
@@ -115,17 +115,16 @@ static int m4ped_read_report_data(struct iio_dev *iio,
 		goto m4ped_read_fail;
 	}
 
-	size = m4sensorhub_reg_getsize(dd->m4,
-		M4SH_REG_PEDOMETER_FLOORSCLIMBED);
-	err = m4sensorhub_reg_read(dd->m4, M4SH_REG_PEDOMETER_FLOORSCLIMBED,
-		(char *)&(dd->iiodat.floors_climbed));
+	size = m4sensorhub_reg_getsize(dd->m4, M4SH_REG_METS_HEALTHYMINUTES);
+	err = m4sensorhub_reg_read(dd->m4, M4SH_REG_METS_HEALTHYMINUTES,
+		(char *)&(dd->iiodat.healthy_minutes));
 	if (err < 0) {
-		m4ped_err("%s: Failed to read floors_climbed data.\n",
+		m4ped_err("%s: Failed to read healthy_minutes data.\n",
 			  __func__);
 		goto m4ped_read_fail;
 	} else if (err != size) {
 		m4ped_err("%s: Read %d bytes instead of %d for %s.\n",
-			  __func__, err, size, "floors_climbed");
+			  __func__, err, size, "healthy_minutes");
 		err = -EBADE;
 		goto m4ped_read_fail;
 	}
@@ -301,12 +300,12 @@ static ssize_t m4ped_iiodata_show(struct device *dev,
 
 	mutex_lock(&(dd->mutex));
 	size = snprintf(buf, PAGE_SIZE,
-		"%s%hhu\n%s%u\n%s%hu\n%s%u\n%s%hu\n%s%u\n",
+		"%s%hhu\n%s%u\n%s%u\n%s%hu\n%s%u\n%s%u\n",
 		"ped_activity: ", dd->iiodat.ped_activity,
 		"total_distance: ", dd->iiodat.total_distance,
 		"total_steps: ", dd->iiodat.total_steps,
 		"current_speed: ", dd->iiodat.current_speed,
-		"floors_climbed: ", dd->iiodat.floors_climbed,
+		"healthy_minutes: ", dd->iiodat.healthy_minutes,
 		"calories: ", dd->iiodat.calories);
 	mutex_unlock(&(dd->mutex));
 	return size;

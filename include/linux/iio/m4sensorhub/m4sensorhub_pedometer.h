@@ -26,9 +26,9 @@
 struct m4sensorhub_pedometer_iio_data {
 	uint8_t         ped_activity;
 	uint32_t        total_distance;
-	uint16_t        total_steps;
-	uint32_t        current_speed;
-	uint16_t        floors_climbed;
+	uint32_t        total_steps;
+	uint16_t        current_speed;
+	uint32_t        healthy_minutes;
 	uint32_t        calories;
 	long long       timestamp;
 } __packed;

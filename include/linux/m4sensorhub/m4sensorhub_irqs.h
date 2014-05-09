@@ -81,6 +81,9 @@ enum m4sensorhub_irqs {
 	/* INT2 0x02 : AP-RTC alarm expired */
 	M4SH_IRQ_AP_ALARM_EXPIRED,
 
+	/* INT2 0x04 : HR data ready */
+	M4SH_IRQ_HEARTRATE_DATA_READY,
+
 	/* Number of allocated interrupts */
 	M4SH_IRQ__NUM
 };

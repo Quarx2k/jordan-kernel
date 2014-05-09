@@ -25,9 +25,11 @@
 
 struct m4sensorhub_passive_iio_data {
 	uint32_t        passive_timestamp;
-	uint32_t        steps;
-	uint32_t        calories;
-	uint32_t        floors_climbed;
+	uint16_t        steps;
+	uint16_t        calories;
+	uint16_t        heartrate;
+	uint8_t         hrconfidence;
+	uint8_t         healthy_minutes;
 	long long       timestamp;
 } __packed;
 

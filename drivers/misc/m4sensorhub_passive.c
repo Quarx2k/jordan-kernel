@@ -57,9 +57,11 @@ static void m4pas_isr(enum m4sensorhub_irqs int_event, void *handle)
 	struct m4pas_driver_data *dd = iio_priv(iio);
 	int size = 0;
 	uint32_t passive_timestamp[M4PAS_NUM_PASSIVE_BUFFERS];
-	uint32_t steps[M4PAS_NUM_PASSIVE_BUFFERS];
-	uint32_t calories[M4PAS_NUM_PASSIVE_BUFFERS];
-	uint32_t floors_climbed[M4PAS_NUM_PASSIVE_BUFFERS];
+	uint16_t steps[M4PAS_NUM_PASSIVE_BUFFERS];
+	uint16_t calories[M4PAS_NUM_PASSIVE_BUFFERS];
+	uint16_t heartrate[M4PAS_NUM_PASSIVE_BUFFERS];
+	uint8_t hrconfidence[M4PAS_NUM_PASSIVE_BUFFERS];
+	uint8_t healthy_minutes[M4PAS_NUM_PASSIVE_BUFFERS];
 	int i = 0;
 
 	mutex_lock(&(dd->mutex));
@@ -104,16 +106,44 @@ static void m4pas_isr(enum m4sensorhub_irqs int_event, void *handle)
 		goto m4pas_isr_fail;
 	}
 
-	size = m4sensorhub_reg_getsize(dd->m4, M4SH_REG_PASSIVE_FLOORSCLIMBED);
-	err = m4sensorhub_reg_read(dd->m4, M4SH_REG_PASSIVE_FLOORSCLIMBED,
-		(char *)&(floors_climbed));
+	size = m4sensorhub_reg_getsize(dd->m4, M4SH_REG_PASSIVE_HEARTRATE);
+	err = m4sensorhub_reg_read(dd->m4, M4SH_REG_PASSIVE_HEARTRATE,
+		(char *)&(heartrate));
 	if (err < 0) {
-		m4pas_err("%s: Failed to read floors_climbed data.\n",
+		m4pas_err("%s: Failed to read heartrate data.\n",
 			  __func__);
 		goto m4pas_isr_fail;
 	} else if (err != size) {
 		m4pas_err("%s: Read %d bytes instead of %d for %s.\n",
-			  __func__, err, size, "floors_climbed");
+			  __func__, err, size, "heartrate");
+		err = -EBADE;
+		goto m4pas_isr_fail;
+	}
+
+	size = m4sensorhub_reg_getsize(dd->m4, M4SH_REG_PASSIVE_HRCONFIDENCE);
+	err = m4sensorhub_reg_read(dd->m4, M4SH_REG_PASSIVE_HRCONFIDENCE,
+		(char *)&(hrconfidence));
+	if (err < 0) {
+		m4pas_err("%s: Failed to read hrconfidence data.\n",
+			  __func__);
+		goto m4pas_isr_fail;
+	} else if (err != size) {
+		m4pas_err("%s: Read %d bytes instead of %d for %s.\n",
+			  __func__, err, size, "hrconfidence");
+		err = -EBADE;
+		goto m4pas_isr_fail;
+	}
+
+	size = m4sensorhub_reg_getsize(dd->m4, M4SH_REG_PASSIVE_HEALTHYMINUTES);
+	err = m4sensorhub_reg_read(dd->m4, M4SH_REG_PASSIVE_HEALTHYMINUTES,
+		(char *)&(healthy_minutes));
+	if (err < 0) {
+		m4pas_err("%s: Failed to read healthy_minutes data.\n",
+			  __func__);
+		goto m4pas_isr_fail;
+	} else if (err != size) {
+		m4pas_err("%s: Read %d bytes instead of %d for %s.\n",
+			  __func__, err, size, "healthy_minutes");
 		err = -EBADE;
 		goto m4pas_isr_fail;
 	}
@@ -122,10 +152,18 @@ static void m4pas_isr(enum m4sensorhub_irqs int_event, void *handle)
 		dd->iiodat[i].passive_timestamp = passive_timestamp[i];
 		dd->iiodat[i].steps = steps[i];
 		dd->iiodat[i].calories = calories[i];
-		dd->iiodat[i].floors_climbed = floors_climbed[i];
+		dd->iiodat[i].heartrate = heartrate[i];
+		dd->iiodat[i].hrconfidence = hrconfidence[i];
+		dd->iiodat[i].healthy_minutes = healthy_minutes[i];
 		dd->iiodat[i].timestamp = iio_get_time_ns();
-		iio_push_to_buffers(iio, (unsigned char *)&(dd->iiodat[i]));
 	}
+
+	/*
+	 * For some reason, IIO knows we are sending an array,
+	 * so all M4PAS_NUM_PASSIVE_BUFFERS indicies will be sent
+	 * in this one call (it does not need to go in the for-loop).
+	 */
+	iio_push_to_buffers(iio, (unsigned char *)&(dd->iiodat[0]));
 
 m4pas_isr_fail:
 	if (err < 0)
@@ -246,12 +284,14 @@ static ssize_t m4pas_iiodata_show(struct device *dev,
 	buf[0] = '\0';  /* Start with NULL terminator for concatenation */;
 	for (i = 0; i < M4PAS_NUM_PASSIVE_BUFFERS; i++) {
 		size = snprintf(buf, PAGE_SIZE,
-			"%s%s%d\n%s%u\n%s%u\n%s%u\n%s%u\n",
+			"%s%s%d\n%s%u\n%s%hu\n%s%hu\n%s%hu\n%s%hhu\n%s%hhu\n",
 			buf, "Buffer ", i,
 			"passive_timestamp: ", dd->iiodat[i].passive_timestamp,
 			"steps: ", dd->iiodat[i].steps,
 			"calories: ", dd->iiodat[i].calories,
-			"floors_climbed: ", dd->iiodat[i].floors_climbed);
+			"heartrate: ", dd->iiodat[i].heartrate,
+			"hrconfidence: ", dd->iiodat[i].hrconfidence,
+			"healthy_minutes: ", dd->iiodat[i].healthy_minutes);
 	}
 	mutex_unlock(&(dd->mutex));
 	return size;
