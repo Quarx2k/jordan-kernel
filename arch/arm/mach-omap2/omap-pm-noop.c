@@ -25,7 +25,6 @@
 #include "omap_device.h"
 #include "omap-pm.h"
 
-static bool off_mode_enabled;
 static int dummy_context_loss_counter;
 
 /*
@@ -281,28 +280,6 @@ unsigned long omap_pm_cpu_get_freq(void)
 	return 0;
 }
 
-/**
- * omap_pm_enable_off_mode - notify OMAP PM that off-mode is enabled
- *
- * Intended for use only by OMAP PM core code to notify this layer
- * that off mode has been enabled.
- */
-void omap_pm_enable_off_mode(void)
-{
-	off_mode_enabled = true;
-}
-
-/**
- * omap_pm_disable_off_mode - notify OMAP PM that off-mode is disabled
- *
- * Intended for use only by OMAP PM core code to notify this layer
- * that off mode has been disabled.
- */
-void omap_pm_disable_off_mode(void)
-{
-	off_mode_enabled = false;
-}
-
 /*
  * Device context loss tracking
  */
@@ -320,12 +297,14 @@ int omap_pm_get_dev_context_loss_count(struct device *dev)
 	if (dev->pm_domain == &omap_device_pm_domain) {
 		count = omap_device_get_context_loss_count(pdev);
 	} else {
-		WARN_ONCE(off_mode_enabled, "omap_pm: using dummy context loss counter; device %s should be converted to omap_device",
+		WARN_ONCE(omap_pm_get_off_mode(),
+			"omap_pm: using dummy context loss counter; device %s "
+			"should be converted to omap_device",
 			  dev_name(dev));
 
 		count = dummy_context_loss_counter;
 
-		if (off_mode_enabled) {
+		if (omap_pm_get_off_mode()) {
 			count++;
 			/*
 			 * Context loss count has to be a non-negative value.

@@ -18,6 +18,7 @@
 #include <linux/cpufreq.h>
 #include <linux/clk.h>
 #include <linux/opp.h>
+#include <linux/power/omap_prm.h>
 
 /*
  * agent_id values for use with omap_pm_set_min_bus_tput():
@@ -345,8 +346,5 @@ unsigned long omap_pm_cpu_get_freq(void);
  * or negative value upon error.
  */
 int omap_pm_get_dev_context_loss_count(struct device *dev);
-
-void omap_pm_enable_off_mode(void);
-void omap_pm_disable_off_mode(void);
 
 #endif

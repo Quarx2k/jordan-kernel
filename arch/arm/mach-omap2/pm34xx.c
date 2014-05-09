@@ -39,6 +39,7 @@
 
 #include "clockdomain.h"
 #include "powerdomain.h"
+#include "omap-pm.h"
 #include "soc.h"
 #include "common.h"
 #include "cm3xxx.h"
@@ -51,6 +52,7 @@
 #include "sram.h"
 #include "control.h"
 #include "pm-debug-regs.h"
+#include "iomap.h"
 
 /* pm34xx errata defined in pm.h */
 u16 pm34xx_errata;
@@ -293,7 +295,8 @@ void omap_sram_idle(void)
 
 	/* PER */
 	if (per_next_state < PWRDM_POWER_ON) {
-		per_going_off = (per_next_state == PWRDM_POWER_OFF) ? 1 : 0;
+		per_going_off = (per_next_state == PWRDM_POWER_OFF) ?
+			OFF_MODE : 0;
 		omap2_gpio_prepare_for_idle(per_going_off);
 	}
 
@@ -302,6 +305,9 @@ void omap_sram_idle(void)
 		if (core_next_state == PWRDM_POWER_OFF) {
 			omap3_core_save_context();
 			omap3_cm_save_context();
+
+			omap2_prm_set_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK,
+						   WKUP_MOD, PM_WKEN);
 		}
 	}
 
@@ -352,10 +358,10 @@ void omap_sram_idle(void)
 			omap3_sram_restore_context();
 			omap2_sms_restore_context();
 		}
-		if (core_next_state == PWRDM_POWER_OFF)
-			omap2_prm_clear_mod_reg_bits(OMAP3430_AUTO_OFF_MASK,
-					       OMAP3430_GR_MOD,
-					       OMAP3_PRM_VOLTCTRL_OFFSET);
+		if (core_next_state == PWRDM_POWER_OFF) {
+			omap2_prm_clear_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK,
+						     WKUP_MOD, PM_WKEN);
+		}
 	}
 	omap3_intc_resume_idle();
 
@@ -675,8 +681,10 @@ static void __init pm_errata_configure(void)
 		enable_omap3630_toggle_l2_on_restore();
 
 		if (omap_rev() < OMAP3630_REV_ES1_2)
-			pm34xx_errata |= (PM_SDRC_WAKEUP_ERRATUM_i583 |
-					  PM_PER_MEMORIES_ERRATUM_i582);
+			pm34xx_errata |= PM_PER_MEMORIES_ERRATUM_i582;
+#ifndef CONFIG_DISABLE_OMAP_ERRATA_i583
+			pm34xx_errata |= PM_SDRC_WAKEUP_ERRATUM_i583;
+#endif
 	} else if (cpu_is_omap34xx()) {
 		pm34xx_errata |= PM_PER_MEMORIES_ERRATUM_i582;
 	}
@@ -744,6 +752,9 @@ int __init omap3_pm_init(void)
 #ifdef CONFIG_SUSPEND
 	omap_pm_suspend = omap3_pm_suspend;
 #endif
+
+	if (omap_pm_get_off_mode())
+		omap3_pm_off_mode_enable(true);
 
 	arm_pm_idle = omap3_pm_idle;
 	omap3_idle_init();
