@@ -356,7 +356,7 @@
 
 &mcspi1 {
 
-	tps65912 {
+tps65912_0: tps65912 {
 
 		compatible = "ti,tps65912";
 		reg = <0>; /* CS 0 */
@@ -371,6 +371,10 @@
 			0x29 0x10 /* SET_OFF1: LDO5 */
 			0x2A 0x24 /* SET_OFF2: DCDC1, DCDC4 */
 			0x2d 0x88 /* DISCHARGE1: Enable LDO4, LDO8 */
+			0x19 0x64 /* LDO4_OP: b6 = 1 : give AVS register the on/off control, b0-5:1.8V */
+			0x1A 0x24 /* LDO4_AVS b7 = 0 : disables the reg, b0-5:1.8V */
+			0x1B 0x3f /* LDO4_LIMIT b0-5: ANY */
+			0x62 0x00 /* LOADSWITCH: Disable load switch at all times*/
 		>;
 
 		tps_irq_gpio = <0>;
@@ -453,7 +457,6 @@
 				regulator-name = "LDO4";
 				regulator-min-microvolt = <1800000>;
 				regulator-max-microvolt = <1800000>;
-				regulator-always-on;
 			};
 
 			ldo5_reg: regulator@8 {

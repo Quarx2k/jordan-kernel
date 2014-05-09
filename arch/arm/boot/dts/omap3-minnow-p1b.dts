@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Motorola Mobility LLC
+ * Copyright (C) 2014 Motorola Mobility LLC
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -10,18 +10,15 @@
 /include/ "omap3-minnow.dtsi"
 
 / {
-	mmi,revision = "p0";
+	mmi,revision = "p1";
 	mmi,hwrev = <
-		0x00   /* Minnow P0 wingboard */
-		0x01   /* Minnow P0 portable */
-		0x03   /* Minnow P1A portable */
-		0x02   /* Minnow P1A CLK distributor test portable */
+		0x04   /* Minnow P1B portable */
 	>;
 
-};
+	Display@0 {
+		gpio_vio_en = <&gpio2 10 0>;    /* VDDIO gpio-42 */
+	};
 
-&spi_flash {
-	m25p,m4sensorhub_cb;
 };
 
 &i2c1 {

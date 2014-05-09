@@ -12,7 +12,6 @@
 / {
 	mmi,revision = "p1";
 	mmi,hwrev = <
-		0x04   /* Minnow P1B portable */
 		0x05   /* Minnow P2A wing */
 		0x06   /* Minnow P2A portable */
 	>;
@@ -20,7 +19,6 @@
 	Display@0 {
 		gpio_vio_en = <&gpio2 10 0>;    /* VDDIO gpio-42 */
 	};
-
 };
 
 &i2c1 {
