@@ -701,6 +701,10 @@
 
 &gpio2 {
 	ti,no_idle_on_suspend;
+
+	/* wakeup from off via m4sensor on this bank */
+	offmode-wkup-isr = <0x08000000>;  /* 27 */
+	offmode-wkup-pad = <0x008e>;  /* CONTROL_PADCONF_GPMC_NCS7[31:16] */
 };
 
 &gpio3 {
@@ -709,6 +713,10 @@
 
 &gpio4 {
 	ti,no_idle_on_suspend;
+
+	/* wakeup from off via touch on this bank */
+	offmode-wkup-isr = <0x00000008>; /* 3 */
+	offmode-wkup-pad = <0x00e6>; /* CONTROL_PADCONF_CAM_FLD[31:16] */
 };
 
 &gpio5 {
