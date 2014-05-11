@@ -126,11 +126,12 @@ enum isp_irqevents {
 };
 
 enum isp_callback_type {
-	CBK_CCDC_VD0,
+	CBK_CCDC_VD0 = 0,
 	CBK_CCDC_VD1,
 	CBK_PREV_DONE,
 	CBK_RESZ_DONE,
 	CBK_MMU_ERR,
+	CBK_H3A_AWB_DONE,
 	CBK_HIST_DONE,
 	CBK_HS_VS,
 	CBK_H3A_AF_DONE,
@@ -138,6 +139,7 @@ enum isp_callback_type {
 	CBK_CATCHALL,
 	CBK_CSIA,
 	CBK_CSIB,
+	CBK_SBL_OVF,
 	CBK_END,
 };
 

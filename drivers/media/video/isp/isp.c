@@ -550,32 +550,64 @@ int isp_set_callback(struct device *dev, enum isp_callback_type type,
 {
 	struct isp_device *isp = dev_get_drvdata(dev);
 	unsigned long irqflags = 0;
-
+	printk("0\n");
 	if (callback == NULL) {
 		DPRINTK_ISPCTRL("ISP_ERR : Null Callback\n");
 		return -EINVAL;
 	}
-
+	if (dev == NULL) {
+		printk("ISP_ERR : Null Device\n");
+		return -EINVAL;
+	}
+	printk("1\n");
 	spin_lock_irqsave(&isp->lock, irqflags);
+	printk("irq.isp_callbk: %d\n", type);
 	isp->irq.isp_callbk[type] = callback;
+	printk("3\n");
 	isp->irq.isp_callbk_arg1[type] = arg1;
+	printk("4\n");
 	isp->irq.isp_callbk_arg2[type] = arg2;
+	printk("5\n");
 	spin_unlock_irqrestore(&isp->lock, irqflags);
-
+	printk("6\n");
 	switch (type) {
+	case CBK_H3A_AWB_DONE:
+		printk("CBK_H3A_AWB_DONE\n");
+		isp_reg_writel(dev, IRQ0ENABLE_H3A_AWB_DONE_IRQ,
+			       OMAP3_ISP_IOMEM_MAIN, ISP_IRQ0STATUS);
+		isp_reg_or(dev, OMAP3_ISP_IOMEM_MAIN, ISP_IRQ0ENABLE,
+			   IRQ0ENABLE_H3A_AWB_DONE_IRQ);
+		break;
+	case CBK_H3A_AF_DONE:
+		printk("CBK_H3A_AF_DONE\n");
+		isp_reg_writel(dev, IRQ0ENABLE_H3A_AF_DONE_IRQ,
+			       OMAP3_ISP_IOMEM_MAIN, ISP_IRQ0STATUS);
+		isp_reg_or(dev, OMAP3_ISP_IOMEM_MAIN, ISP_IRQ0ENABLE,
+			   IRQ0ENABLE_H3A_AF_DONE_IRQ);
+		break;
+	case CBK_HIST_DONE:
+		printk("CBK_HIST_DONE\n");
+		isp_reg_writel(dev, IRQ0ENABLE_HIST_DONE_IRQ,
+			       OMAP3_ISP_IOMEM_MAIN, ISP_IRQ0STATUS);
+		isp_reg_or(dev, OMAP3_ISP_IOMEM_MAIN, ISP_IRQ0ENABLE,
+			   IRQ0ENABLE_HIST_DONE_IRQ);
+		break;
 	case CBK_PREV_DONE:
+		printk("CBK_PREV_DONE\n");
 		isp_reg_writel(dev, IRQ0ENABLE_PRV_DONE_IRQ,
 			       OMAP3_ISP_IOMEM_MAIN, ISP_IRQ0STATUS);
 		isp_reg_or(dev, OMAP3_ISP_IOMEM_MAIN, ISP_IRQ0ENABLE,
 			   IRQ0ENABLE_PRV_DONE_IRQ);
 		break;
 	case CBK_RESZ_DONE:
+		printk("CBK_RESZ_DONE\n");
 		isp_reg_writel(dev, IRQ0ENABLE_RSZ_DONE_IRQ,
 			       OMAP3_ISP_IOMEM_MAIN, ISP_IRQ0STATUS);
 		isp_reg_or(dev, OMAP3_ISP_IOMEM_MAIN, ISP_IRQ0ENABLE,
 			   IRQ0ENABLE_RSZ_DONE_IRQ);
 		break;
 	default:
+		printk("XXX\n");
 		break;
 	}
 
@@ -603,6 +635,30 @@ int isp_unset_callback(struct device *dev, enum isp_callback_type type)
 	spin_unlock_irqrestore(&isp->lock, irqflags);
 
 	switch (type) {
+	case CBK_H3A_AWB_DONE:
+		isp_reg_and(dev, OMAP3_ISP_IOMEM_MAIN, ISP_IRQ0ENABLE,
+			    ~IRQ0ENABLE_H3A_AWB_DONE_IRQ);
+		break;
+	case CBK_H3A_AF_DONE:
+		isp_reg_and(dev, OMAP3_ISP_IOMEM_MAIN, ISP_IRQ0ENABLE,
+			    ~IRQ0ENABLE_H3A_AF_DONE_IRQ);
+		break;
+	case CBK_HIST_DONE:
+		isp_reg_and(dev, OMAP3_ISP_IOMEM_MAIN, ISP_IRQ0ENABLE,
+			    ~IRQ0ENABLE_HIST_DONE_IRQ);
+		break;
+/*
+	case CBK_CSIA:
+		isp_csi2_irq_set(dev, 0);
+		break;
+
+	case CBK_CSIB:
+		isp_reg_writel(dev, IRQ0ENABLE_CSIB_IRQ, OMAP3_ISP_IOMEM_MAIN,
+			       ISP_IRQ0STATUS);
+		isp_reg_or(dev, OMAP3_ISP_IOMEM_MAIN, ISP_IRQ0ENABLE,
+			   IRQ0ENABLE_CSIB_IRQ);
+		break;
+*/
 	case CBK_PREV_DONE:
 		isp_reg_and(dev, OMAP3_ISP_IOMEM_MAIN, ISP_IRQ0ENABLE,
 			    ~IRQ0ENABLE_PRV_DONE_IRQ);
@@ -1173,6 +1229,11 @@ static irqreturn_t isp_isr(int irq, void *_pdev)
 	}
 
 	if (irqstatus & H3A_AF_DONE) {
+		if (irqdis->isp_callbk[CBK_H3A_AF_DONE])
+			irqdis->isp_callbk[CBK_H3A_AF_DONE](
+				H3A_AF_DONE,
+				irqdis->isp_callbk_arg1[CBK_H3A_AF_DONE],
+				irqdis->isp_callbk_arg2[CBK_H3A_AF_DONE]);
 		isp_af_enable(&isp->isp_af, 0);
 		/* If it's busy we can't process this buffer anymore */
 		if (!isp_af_busy(&isp->isp_af)) {
@@ -1189,6 +1250,12 @@ static irqreturn_t isp_isr(int irq, void *_pdev)
 	}
 
 	if (irqstatus & HIST_DONE) {
+		if (irqdis->isp_callbk[CBK_HIST_DONE])
+			irqdis->isp_callbk[CBK_HIST_DONE](
+				HIST_DONE,
+				irqdis->isp_callbk_arg1[CBK_HIST_DONE],
+				irqdis->isp_callbk_arg2[CBK_HIST_DONE]);
+
 		isp_hist_enable(&isp->isp_hist, 0);
 		/* If it's busy we can't process this buffer anymore */
 		if (!isp_hist_busy(&isp->isp_hist)) {
@@ -1228,7 +1295,7 @@ out_ignore_buff:
 
 out_stopping_isp:
 	isp_flush(dev);
-#if 1
+#if 0
 	{
 		static const struct {
 			int num;
@@ -2820,10 +2887,14 @@ struct device *isp_get(void)
 		if (ret_err)
 			goto out_err;
 		/* We don't want to restore context before saving it! */
-		if (has_context)
+		if (has_context) {
 			isp_restore_ctx(&pdev->dev);
-		else
+		} else {
 			has_context = 1;
+		}
+#if defined(CONFIG_VIDEO_OMAP3_HP3A)
+		//hp3a_hw_enabled(1);
+#endif
 		/* HACK: Allow multiple opens meanwhile a better solution is
 		 *       found for the case of different devices sharing ISP
 		 *       settings. */
