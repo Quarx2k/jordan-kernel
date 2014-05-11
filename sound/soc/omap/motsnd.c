@@ -57,7 +57,7 @@
 
 #include "../../../arch/arm/mach-omap2/clock.h"
 
-#define MOTSND_DEBUG
+#undef MOTSND_DEBUG
 #ifdef MOTSND_DEBUG
 #define MOTSND_DEBUG_LOG(args...) printk(KERN_INFO "ALSA MOTSND:" args)
 #else
