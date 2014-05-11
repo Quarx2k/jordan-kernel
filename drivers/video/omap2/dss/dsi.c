@@ -723,14 +723,16 @@ static irqreturn_t omap_dsi_irq_handler(int irq, void *arg)
 
 	irqstatus = dsi_read_reg(dsidev, DSI_IRQSTATUS);
 
-	//if (irqstatus & DSI_VC_IRQ_PACKET_SENT)
-	//	complete(&dsi->packet_sent_completion);
 
 	/* IRQ is not for us */
 	if (!irqstatus) {
 		spin_unlock(&dsi->irq_lock);
 		return IRQ_NONE;
 	}
+
+
+	if (irqstatus & DSI_VC_IRQ_PACKET_SENT)
+		complete(&dsi->packet_sent_completion);
 
 	dsi_write_reg(dsidev, DSI_IRQSTATUS, irqstatus & ~DSI_IRQ_CHANNEL_MASK);
 	/* flush posted write */
