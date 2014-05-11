@@ -316,6 +316,8 @@ struct dsi_data {
 
 	struct delayed_work framedone_timeout_work;
 
+	struct completion packet_sent_completion;
+
 #ifdef DSI_CATCH_MISSING_TE
 	struct timer_list te_timer;
 #endif
@@ -720,6 +722,9 @@ static irqreturn_t omap_dsi_irq_handler(int irq, void *arg)
 	spin_lock(&dsi->irq_lock);
 
 	irqstatus = dsi_read_reg(dsidev, DSI_IRQSTATUS);
+
+	//if (irqstatus & DSI_VC_IRQ_PACKET_SENT)
+	//	complete(&dsi->packet_sent_completion);
 
 	/* IRQ is not for us */
 	if (!irqstatus) {
@@ -3197,11 +3202,14 @@ static int dsi_vc_send_short(struct platform_device *dsidev, int channel,
 		return -EINVAL;
 	}
 
+	INIT_COMPLETION(dsi->packet_sent_completion);
 	data_id = data_type | dsi->vc[channel].vc_id << 6;
 
 	r = (data_id << 0) | (data << 8) | (ecc << 24);
 
 	dsi_write_reg(dsidev, DSI_VC_SHORT_PACKET_HEADER(channel), r);
+
+	wait_for_completion_timeout(&dsi->packet_sent_completion, msecs_to_jiffies(10));
 
 	return 0;
 }
@@ -4881,6 +4889,8 @@ int dsi_init_display(struct omap_dss_device *dssdev)
 	int dsi_module = dsi_get_dsidev_id(dsidev);
 
 	DSSDBG("DSI init\n");
+
+	init_completion(&dsi->packet_sent_completion);
 
 	if(dssdev->phy.dsi.type == OMAP_DSS_DSI_TYPE_CMD_MODE) {
 		dssdev->caps = OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE |
