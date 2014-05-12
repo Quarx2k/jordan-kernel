@@ -100,7 +100,6 @@
 			#size-cells = <0>;
 			pinctrl-single,register-width = <16>;
 			pinctrl-single,function-mask = <0x7f1f>;
-			#gpio-range-cells = <3>;
 		};
 
 		omap3_pmx_wkup: pinmux@0x48002a00 {
@@ -110,7 +109,6 @@
 			#size-cells = <0>;
 			pinctrl-single,register-width = <16>;
 			pinctrl-single,function-mask = <0x7f1f>;
-			#gpio-range-cells = <3>;
 		};
 
 		gpio1: gpio@48310000 {
@@ -134,12 +132,6 @@
 			#gpio-cells = <2>;
 			interrupt-controller;
 			#interrupt-cells = <2>;
-			/* for gpio 32 33 there is no pnctrl controller defined */
-			gpio-ranges = <&omap3_pmx_core 2 0x25 10>,
-					<&omap3_pmx_core 12 0x37 8>,
-					<&omap3_pmx_core 20 0x40 8>,
-					<&omap3_pmx_core 28 0x4B 3>,
-					<&omap3_pmx_core 31 0x4f 1>;
 		};
 
 		gpio3: gpio@49052000 {
@@ -151,7 +143,6 @@
 			#gpio-cells = <2>;
 			interrupt-controller;
 			#interrupt-cells = <2>;
-			gpio-ranges = <&omap3_pmx_core 0 0x50 32>;
 		};
 
 		gpio4: gpio@49054000 {
@@ -163,13 +154,6 @@
 			#gpio-cells = <2>;
 			interrupt-controller;
 			#interrupt-cells = <2>;
-			/*
-			* gpio 127 in wkup mux, whcih we can not use (see
-			* sorce code for comment)
-			*/
-			gpio-ranges = <&omap3_pmx_core 0 0x70 16>,
-					<&omap3_pmx_core 16 0x82 14>,
-					<&omap3_pmx_core 30 0x81 1>;
 		};
 
 		gpio5: gpio@49056000 {
@@ -181,11 +165,6 @@
 			#gpio-cells = <2>;
 			interrupt-controller;
 			#interrupt-cells = <2>;
-			/*
-			* gpio 128 129 in wkup mux, whcih we can not use (see
-			* sorce code for comment)
-			*/
-			gpio-ranges = <&omap3_pmx_core 2 0x94 30>;
 		};
 
 		gpio6: gpio@49058000 {
@@ -197,15 +176,6 @@
 			#gpio-cells = <2>;
 			interrupt-controller;
 			#interrupt-cells = <2>;
-			/* for gpio 187 there is no pnctrl controller defined */
-			gpio-ranges = <&omap3_pmx_core 0 0xb2 7>,
-					<&omap3_pmx_core 7 0x80 1>,
-					<&omap3_pmx_core 8 0xc7 1>,
-					<&omap3_pmx_core 9 0xc0 1>,
-					<&omap3_pmx_core 10 0xcb 13>,
-					<&omap3_pmx_core 23 0xc8 3>,
-					<&omap3_pmx_core 26 0xd9 1>,
-					<&omap3_pmx_core 28 0xc1 4>;
 		};
 
 		uart1: serial@4806a000 {
@@ -555,14 +525,14 @@
 		};
 
 		glbl_prm: glbl_prm@48307250 {
-			/*
-			* disabled by default. becasue two required
-			* values should be defined in board file
-			*/
-			status = "disabled";
 			compatible = "ti,omap3-glbl-prm";
 			reg = <0x48307250 0x60>;
 			reg-names = "base-address";
+			sys_off_mode;
+			auto_retention;
+			autoextclkmode = <2>;
+			clksetup_time = <1000>;
+			sys_clk = "osc_sys_ck";
 		};
 
 		vc: vc@48307220 {

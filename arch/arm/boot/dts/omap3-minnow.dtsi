@@ -239,17 +239,6 @@
 	};
 };
 
-&glbl_prm {
-	status = "ok";
-	sys_clk = "osc_sys_ck";
-	autoextclkmode = <2>;
-	sys_off_mode;
-	auto_off;
-	auto_retention;
-	offmodesetup_time = <25000>;
-	clksetup_time = <1000>;
-};
-
 &i2c1 {
 	clock-frequency = <400000>;
 
@@ -360,12 +349,10 @@
 		spi-cs-high;
 
 		register-init-data = <
-			0x25 0xF1 /* DEVCTRL2: enable SLEEP, INT push/pull
-					       2ms TSLOT, INT active high */
 			0x26 0x49 /* I2C_SPI_CFG: AVS ADDR = 0x13,
 					DCDC1, DCDC4 is AVS ctrl */
-			0x29 0x10 /* SET_OFF1: LDO5 */
-			0x2A 0x24 /* SET_OFF2: DCDC1, DCDC4 */
+			0x29 0x90 /* SET_OFF1: LDO5 off in sleep mode
+			                       LDO8 off in sleep mode */
 			0x2d 0x88 /* DISCHARGE1: Enable LDO4, LDO8 */
 		>;
 
@@ -532,9 +519,9 @@
 	board_pins: pinmux_board_pins {
 		pinctrl-single,pins = <
 			0x05a 0x004	/* GPMC_A9, MODE4 | OUTPUT */
-			0x08e 0x4104	/* GPMC_CLK, MODE4 | INPUT | OFFWAKEUP */
+			0x08e 0x104	/* GPMC_CLK, MODE4 | INPUT */
 			0x0a0 0x002	/* GPMC_WAIT2, MODE2 | OUTPUT */
-			0x0a2 0x4102	/* GPMC_WAIT3, MODE2 | INPUT | OFFWAKEUP */
+			0x0a2 0x102	/* GPMC_WAIT3, MODE2 | INPUT */
 			0x0ac 0x001	/* DSS_DATA0, MODE1 | OUTPUT */
 			0x0ae 0x001	/* DSS_DATA1, MODE1 | OUTPUT */
 			0x0b0 0x001	/* DSS_DATA2, MODE1 | OUTPUT */
@@ -546,18 +533,17 @@
 			0x0dc 0x004	/* CAM_HS, MODE4 | OUTPUT */
 			0x0ea 0x004	/* MUXCAM_D2, MODE4 | OUTPUT */
 			0x0e4 0x004	/* CAM_FLD, MODE4 | OUTPUT */
-			0x0e6 0x411c	/* CAM_D0, MODE4 | INPUT_PULLUP | OFFWAKEUP */
+			0x0e6 0x11c	/* CAM_D0, MODE4 | INPUT_PULLUP */
 			0x122 0x004	/* SIM_CLK, MODE4 | OUTPUT */
 			0x124 0x00f	/* SIM_PWRCTRL, MODE7 | PULLDOWN */
-			0x13e 0x00F     /* MCBSP3_DR, MODE7 | PULLDOWN */
-			0x144 0x4100	/* UART2_CTS, MODE0  | OUTPUT | OFFWAKEUP */
+			0x144 0x100	/* UART2_CTS, MODE0  | OUTPUT */
 			0x146 0x000	/* UART2_RTS, MODE0 | OUTPUT */
 			0x148 0x000	/* UART2_TX, MODE0 | OUTPUT */
 			0x14a 0x100	/* UART2_RX, MODE0 | INPUT */
 			0x168 0x104	/* MCBSP1_CLKX, MODE4 | INPUT */
-			0x16c 0x004	/* UART3_RTS, MODE4 | OUTPUT */
-			0x16e 0x4118    /* UART3_RX, MODEO | INPUT_PULLUP | OFFWAKEUP*/
-			0x170 0x000     /* UART3_TX, MODE0 | OUTPUT */
+			0x16c 0x004	/* UART3_RTS_SD, MODE4 | OUTPUT */
+			0x16e 0x118	/* UART3_RX, MODEO | INPUT_PULLUP */
+			0x170 0x000	/* UART3_TX, MODE0 | OUTPUT */
 			0x18e 0x118	/* I2C2_SCL, MODE0 | INPUT_PULLUP */
 			0x190 0x118	/* I2C2_SDA, MODE0 | INPUT_PULLUP */
 			0x192 0x118	/* I2C3_SCL, MODE0 | INPUT_PULLUP */
@@ -569,7 +555,7 @@
 			0x1a0 0x000	/* MCSPI1_CS1, MODE0 | OUTPUT */
 			0x1a4 0x004	/* MCSPI1_CS3, MODE4 | OUTPUT */
 			0x1ae 0x004	/* MCSPI2_CS1, MODE4 | OUTPUT */
-			0x1b0 0x4104	/* SYS_NIRQ, MODE4 | INPUT | OFFWAKEUP */
+			0x1b0 0x104	/* SYS_NIRQ, MODE4 | INPUT  */
 			0x1b2 0x004	/* SYS_CLKOUT2, MODE4 | OUTPUT  */
 			0x5a8 0x11a	/* ETK_CLK, MODE2 | INPUT_PULLUP */
 			0x5aa 0x11a	/* ETK_CTL, MODE2 | INPUT_PULLUP */
@@ -593,7 +579,7 @@
 
 	usb_phy_pins: pinmux_usb_phy_pins {
 		pinctrl-single,pins = <
-			0x140 0x4104     /* MCBSP3_CLKX, MODE4 (GPIO-142) | INPUT | OFFWAKEUP */
+			0x140 0x104     /* MCBSP3_CLKX, MODE4 (GPIO-142) | INPUT */
 			0x5ae 0x004     /* ETK_D1, MODE4 (GPIO_15) | OUTPUT */
 			0x5b0 0x004     /* ETK_D2, MODE4 (GPIO_16) | OUTPUT */
 			0x5c6 0x004     /* EDK_D13, MODE4 (GPIO_27) | OUTPUT */
@@ -668,13 +654,13 @@
 
 	cc_alert_pin: pinmax_cc_alert_pin {
 		pinctrl-single,pins = <
-			0x13c 0x411c	/* MCBSP3_DX, MODE4 | INPUT | INPUT_PULLUP | OFFWAKEUP */
+			0x13c 0x11c	/* MCBSP3_DX, MODE4 | INPUT | INPUT_PULLUP */
 		>;
 	};
 
 	charge_startb_pin: pinmax_charge_startb_pin {
 		pinctrl-single,pins = <
-			0x1a2 0x4104     /* MCSPI1_CS2, MODE4 | INPUT | OFFWAKEUP */
+			0x1a2 0x104     /* MCSPI1_CS2, MODE4 | INPUT */
 		>;
 	};
 };
@@ -686,7 +672,6 @@
 	wkup_pins: pinmux_wakeup_pins {
 		pinctrl-single,pins = <
 			0x006 0x008     /* SYS_CLKREQ, MODE0 | PULLDOWN */
-			0x018 0x000     /* SYS_OFF_MODE, MODE0 */
 			0x01a 0x10c     /* SYS_CLKOUT1, MODE4 | INPUT_PULLDOWN */
 			0x05a 0x004     /* GPIO_129, MODE4 | OUTPUT */
 		>;
