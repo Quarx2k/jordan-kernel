@@ -11,7 +11,7 @@
 # Copyright (C) 1995-2002 Russell King
 #
 
-ifneq ($(MACHINE),)
+ifneq ($(MACHINE),)  # Need check why ignored
 include $(srctree)/$(MACHINE)/Makefile.boot
 endif
 include $(srctree)/arch/arm/boot/dts/Makefile
@@ -20,9 +20,17 @@ include $(srctree)/arch/arm/boot/dts/Makefile
 #   ZRELADDR == virt_to_phys(PAGE_OFFSET + TEXT_OFFSET)
 #   PARAMS_PHYS must be within 4MB of ZRELADDR
 #   INITRD_PHYS must be in RAM
+
+
+ifndef CONFIG_MACH_OMAP_MAPPHONE
 ZRELADDR    := $(zreladdr-y)
 PARAMS_PHYS := $(params_phys-y)
 INITRD_PHYS := $(initrd_phys-y)
+else
+ZRELADDR       := 0x80c08000
+PARAMS_PHYS    := 0x80c00100
+INITRD_PHYS    := 0x81400000
+endif
 
 export ZRELADDR INITRD_PHYS PARAMS_PHYS
 

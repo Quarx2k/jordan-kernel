@@ -883,6 +883,11 @@ static int _disable_clocks(struct omap_hwmod *oh)
 
 	pr_debug("omap_hwmod: %s: disabling clocks\n", oh->name);
 
+#ifdef CONFIG_DEBUG_LL
+	if (oh->name == "uart3")
+		return 0;
+#endif
+
 	if (oh->_clk)
 		clk_disable(oh->_clk);
 
@@ -1973,7 +1978,10 @@ static int _reset(struct omap_hwmod *oh)
 	int i, r;
 
 	pr_debug("omap_hwmod: %s: resetting\n", oh->name);
-
+#ifdef CONFIG_DEBUG_LL
+	if (oh->name == "uart3")
+		return 0;
+#endif
 	if (oh->class->reset) {
 		r = oh->class->reset(oh);
 	} else {
@@ -2214,7 +2222,10 @@ static int _enable(struct omap_hwmod *oh)
 static int _idle(struct omap_hwmod *oh)
 {
 	pr_debug("omap_hwmod: %s: idling\n", oh->name);
-
+#ifdef CONFIG_DEBUG_LL
+	if (oh->name == "uart3")
+		return 0;
+#endif
 	if (oh->_state != _HWMOD_STATE_ENABLED) {
 		WARN(1, "omap_hwmod: %s: idle state can only be entered from enabled state\n",
 			oh->name);

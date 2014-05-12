@@ -525,6 +525,9 @@ static struct omap_hwmod omap3xxx_uart2_hwmod = {
 /* UART3 */
 static struct omap_hwmod omap3xxx_uart3_hwmod = {
 	.name		= "uart3",
+#ifdef CONFIG_DEBUG_LL
+	.flags		= (HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET),
+#endif
 	.mpu_irqs	= omap2_uart3_mpu_irqs,
 	.sdma_reqs	= omap2_uart3_sdma_reqs,
 	.main_clk	= "uart3_fck",
