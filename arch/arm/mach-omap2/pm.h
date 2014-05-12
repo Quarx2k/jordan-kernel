@@ -35,6 +35,7 @@ extern void omap3_pm_off_mode_enable(int);
 extern void omap_sram_idle(void);
 extern int omap_pm_clkdms_setup(struct clockdomain *clkdm, void *unused);
 extern int (*omap_pm_suspend)(void);
+extern int omap_cpcap_init(void);
 
 #if defined(CONFIG_PM_OPP)
 extern int omap3_opp_init(void);
