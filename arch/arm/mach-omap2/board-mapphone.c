@@ -357,7 +357,6 @@ static void __init omap_mapphone_init(void)
 	mapphone_usbhost_init();
 	mapphone_power_off_init();
 	mapphone_hsmmc_init();
-	omap_enable_smartreflex_on_init();
 	mapphone_create_board_props();
 	mapphone_gadget_init();
 	mapphone_sim_init();
