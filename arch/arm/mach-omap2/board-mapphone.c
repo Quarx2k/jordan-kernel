@@ -11,23 +11,29 @@
 #include <linux/platform_device.h>
 #include <linux/input.h>
 #include <linux/gpio.h>
-#include <linux/mtd/nand.h>
+#include <linux/clk.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 
 #include "common.h"
-#include "gpmc-smc91x.h"
 
-#include "board-zoom.h"
 
-#include "board-flash.h"
-#include "mux.h"
+
 #include "sdram-toshiba-hynix-numonyx.h"
-static void __init omap_sdp_init(void)
+static void __init omap_mapphone_init(void)
 {
+	struct clk *clkp;
+
 	omap2_sdrc_init(JEDEC_JESD209A_sdrc_params,
 				   JEDEC_JESD209A_sdrc_params);
+
+	/* Enable sad2d iclk */
+	clkp = clk_get(NULL, "sad2d_ick");
+	if (clkp) {
+             clk_enable(clkp);
+             printk("sad2d_ick enabled\n");
+	}
 }
 
 MACHINE_START(MAPPHONE, "mapphone_")
@@ -37,7 +43,7 @@ MACHINE_START(MAPPHONE, "mapphone_")
 	.init_early	= omap3630_init_early,
 	.init_irq	= omap3_init_irq,
 	.handle_irq	= omap3_intc_handle_irq,
-	.init_machine	= omap_sdp_init,
+	.init_machine	= omap_mapphone_init,
 	.init_late	= omap3630_init_late,
 	.init_time	= omap3_sync32k_timer_init,
 	.restart	= omap3xxx_restart,
