@@ -1012,7 +1012,7 @@ static IMG_VOID SGXDumpDebugReg (PVRSRV_SGXDEV_INFO	*psDevInfo,
 	ui32RegVal = OSReadHWReg(psDevInfo->pvRegsBaseKM, SGX_MP_CORE_SELECT(ui32RegAddr, ui32CoreNum));
 	PVR_LOG(("(P%u) %s%08X", ui32CoreNum, pszName, ui32RegVal));
 }
-
+#ifdef CONFIG_DSSCOMP_DEBUG_LOG
 void dsscomp_kdump(void);
 IMG_VOID SGXDumpDebugInfo (PVRSRV_SGXDEV_INFO	*psDevInfo,
 						   IMG_BOOL				bDumpSGXRegs)
@@ -1161,7 +1161,11 @@ IMG_VOID SGXDumpDebugInfo (PVRSRV_SGXDEV_INFO	*psDevInfo,
 	#endif
 
 }
-
+#else
+void dsscomp_kdump(void);
+IMG_VOID SGXDumpDebugInfo (PVRSRV_SGXDEV_INFO *psDevInfo, IMG_BOOL bDumpSGXRegs)
+{} 
+#endif
 
 #if defined(SYS_USING_INTERRUPTS) || defined(SUPPORT_HW_RECOVERY)
 static

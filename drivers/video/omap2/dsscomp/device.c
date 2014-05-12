@@ -610,7 +610,7 @@ static void __exit dsscomp_exit(void)
 	platform_device_unregister(&dsscomp_pdev);
 	platform_driver_unregister(&dsscomp_pdriver);
 }
-
+#ifdef CONFIG_DSSCOMP_DEBUG_LOG
 #define DUMP_CHUNK 256
 static char dump_buf[64 * 1024];
 void dsscomp_kdump(void)
@@ -638,7 +638,7 @@ void dsscomp_kdump(void)
 	}
 }
 EXPORT_SYMBOL(dsscomp_kdump);
-
+#endif
 MODULE_LICENSE("GPL v2");
 module_init(dsscomp_init);
 module_exit(dsscomp_exit);
