@@ -18,21 +18,10 @@ Optional Properties:
   description in OMAP TRM.
 - sys_off_mode: bool value selects the mode used to send OFF command. If present
   (true) sys_off_mode pin will be used, otherwise (false) I2C will be used.
-- auto_off: bool vlaue enables/disables OFF command over I2C and assertion
-  sys_off_mode signal.
-- auto_retention: bool vlaue enables/disables RETENTION command over I2C and
-  assertion CLQ_REQ signal.
-- offmodesetup_time: voltage setup time in micro seconds when the device exits
-  the off mode. It used only if sys_off_mode is true. If this value is not
-  defined, then time is calculated based on PMIC slew rate and voltage level
-  will be used. Claculated time is used also if value in device tree less then
-  calculated.
-- setup_time1: VDD1 voltage setup time in micro seconds when the device exits
-  the off mode. It used only if sys_off_mode is false. If this value is not
-  defined, then time is calculated based on PMIC slew rate and voltage level
-  will be used. Claculated time is used also if value in device tree less then
-  calculated.
-- setup_time2: same as above only for VDD2.
+- auto_off: bool vlaue enables/disables send OFF command over I2C. Applicable if
+  sys_off_mode is false;
+- auto_retention: bool vlaue enables/disables send RETENTION command over I2C.
+- auto_sleep: bool vlaue enables/disables send SLEEP command over I2C.
 
 Example:
 glbl_prm: glbl_prm@48307250 {
@@ -40,7 +29,6 @@ glbl_prm: glbl_prm@48307250 {
 	reg = <0x48307250 0x60>;
 	reg-names = "base-address";
 	sys_off_mode;
-	auto_off;
 	auto_retention;
 	autoextclkmode = <2>;
 	clksetup_time = <1000>;
