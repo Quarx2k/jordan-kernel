@@ -97,6 +97,8 @@ static int atmxt_save_data8(struct atmxt_driver_data *dd,
 		uint8_t *entry, uint8_t *reg);
 static int atmxt_save_data9(struct atmxt_driver_data *dd,
 		uint8_t *entry, uint8_t *reg);
+static int atmxt_save_data46(struct atmxt_driver_data *dd,
+		uint8_t *entry, uint8_t *reg);
 static void atmxt_compute_checksum(struct atmxt_driver_data *dd);
 static void atmxt_compute_partial_checksum(uint8_t *byte1, uint8_t *byte2,
 		uint8_t *low, uint8_t *mid, uint8_t *high);
@@ -2021,6 +2023,7 @@ static int atmxt_save_internal_data(struct atmxt_driver_data *dd)
 	bool chk_7 = false;
 	bool chk_8 = false;
 	bool chk_9 = false;
+	bool chk_46 = false;
 
 	for (i = 0; i < dd->info_blk->size; i += 6) {
 		switch (dd->info_blk->data[i+0]) {
@@ -2066,6 +2069,14 @@ static int atmxt_save_internal_data(struct atmxt_driver_data *dd)
 			usr_start_seen = true;
 			break;
 
+		case 46:
+			chk_46 = true;
+			err = atmxt_save_data46(dd, &(dd->info_blk->data[i+0]),
+				&(dd->nvm->data[nvm_iter]));
+			if (err < 0)
+				goto atmxt_save_internal_data_fail;
+			break;
+
 		default:
 			break;
 		}
@@ -2101,6 +2112,11 @@ static int atmxt_save_internal_data(struct atmxt_driver_data *dd)
 		err = -ENODATA;
 	}
 
+	if (!chk_46) {
+		pr_err("%s: Object 46 is missing.\n", __func__);
+		err = -ENODATA;
+	}
+
 atmxt_save_internal_data_fail:
 	return err;
 }
@@ -2131,12 +2147,12 @@ static int atmxt_save_data6(struct atmxt_driver_data *dd, uint8_t *entry)
 
 	dd->addr->nvm[0] = entry[1] + 1;
 	dd->addr->nvm[1] = entry[2];
-	if (dd->addr->nvm[0] < entry[1])
+	if (dd->addr->nvm[0] < entry[1]) /* Check for 16-bit addr overflow */
 		dd->addr->nvm[1]++;
 
 	dd->addr->cal[0] = entry[1] + 2;
 	dd->addr->cal[1] = entry[2];
-	if (dd->addr->cal[0] < entry[1])
+	if (dd->addr->cal[0] < entry[1]) /* Check for 16-bit addr overflow */
 		dd->addr->cal[1]++;
 
 atmxt_save_data6_fail:
@@ -2148,7 +2164,7 @@ static int atmxt_save_data7(struct atmxt_driver_data *dd,
 {
 	int err = 0;
 
-	if (entry[3] < 1) {
+	if (entry[3] < 3) {
 		printk(KERN_ERR "%s: Power object is too small.\n", __func__);
 		err = -ENODATA;
 		goto atmxt_save_data7_fail;
@@ -2158,6 +2174,8 @@ static int atmxt_save_data7(struct atmxt_driver_data *dd,
 	dd->addr->pwr[1] = entry[2];
 	dd->data->pwr[0] = reg[0];
 	dd->data->pwr[1] = reg[1];
+	dd->data->pwr[2] = reg[2];
+	dd->data->pwr[3] = reg[3];
 
 atmxt_save_data7_fail:
 	return err;
@@ -2177,7 +2195,7 @@ static int atmxt_save_data8(struct atmxt_driver_data *dd,
 
 	dd->addr->acq[0] = entry[1] + 4;
 	dd->addr->acq[1] = entry[2];
-	if (dd->addr->acq[0] < entry[1])
+	if (dd->addr->acq[0] < entry[1]) /* Check for 16-bit addr overflow */
 		dd->addr->acq[1]++;
 
 	dd->data->acq[0] = reg[4];
@@ -2227,6 +2245,29 @@ static int atmxt_save_data9(struct atmxt_driver_data *dd,
 	}
 
 atmxt_save_data9_fail:
+	return err;
+}
+
+static int atmxt_save_data46(struct atmxt_driver_data *dd,
+		uint8_t *entry, uint8_t *reg)
+{
+	int err = 0;
+
+	if (entry[3] < 3) {
+		pr_err("%s: Power object is too small.\n", __func__);
+		err = -ENODATA;
+		goto atmxt_save_data46_fail;
+	}
+
+	dd->addr->adx[0] = entry[1] + 2;
+	dd->addr->adx[1] = entry[2];
+	if (dd->addr->adx[0] < entry[1]) /* Check for 16-bit addr overflow */
+		dd->addr->adx[1]++;
+
+	dd->data->adx[0] = reg[2];
+	dd->data->adx[1] = reg[3];
+
+atmxt_save_data46_fail:
 	return err;
 }
 
@@ -3255,7 +3296,8 @@ static ssize_t atmxt_drv_interactivemode_store(struct device *dev,
 	unsigned long value = 0;
 	struct atmxt_driver_data *dd = dev_get_drvdata(dev);
 	int err;
-	uint8_t sleep_cmd[2] =  {0xFE, 0xFE};
+	uint8_t sleep_cmd[4] =  {0xFE, 0xFE, 0x19, 0x00};
+	uint8_t adx_cmd[2] =  {0x08, 0x08};
 
 	err = kstrtoul(buf, 10, &value);
 	if (err < 0) {
@@ -3268,17 +3310,24 @@ static ssize_t atmxt_drv_interactivemode_store(struct device *dev,
 	if (!dd->data || !dd->addr) {
 		pr_err("%s: failed, data/addr is NULL.\n", __func__);
 		err = -ENODEV;
-		goto error;
+		goto atmxt_drv_interactivemode_store_fail;
 	}
 
 	if (value == 1) {
 		/* interactive mode, lets bump up rate*/
 		err = atmxt_i2c_write(dd,
 			dd->addr->pwr[0], dd->addr->pwr[1],
-			&(dd->data->pwr[0]), 2);
+			&(dd->data->pwr[0]), 4);
 		if (err < 0) {
-			pr_err("%s: i2c write failed\n", __func__);
-			goto error;
+			pr_err("%s: Failed to wake IC.\n", __func__);
+			goto atmxt_drv_interactivemode_store_fail;
+		}
+		err = atmxt_i2c_write(dd,
+			dd->addr->adx[0], dd->addr->adx[1],
+			&(dd->data->adx[0]), 2);
+		if (err < 0) {
+			pr_err("%s: Failed to restore adx.\n", __func__);
+			goto atmxt_drv_interactivemode_store_fail;
 		}
 		atmxt_set_ic_state(dd, ATMXT_IC_ACTIVE);
 		err = size;
@@ -3286,11 +3335,17 @@ static ssize_t atmxt_drv_interactivemode_store(struct device *dev,
 		/* Non interactive mode, lets lower scan rate*/
 		err = atmxt_i2c_write(dd,
 			dd->addr->pwr[0], dd->addr->pwr[1],
-			&(sleep_cmd[0]), 2);
-
+			&(sleep_cmd[0]), 4);
 		if (err < 0) {
-			pr_err("%s: i2c write failed\n", __func__);
-			goto error;
+			pr_err("%s: Failed to reduce power.\n", __func__);
+			goto atmxt_drv_interactivemode_store_fail;
+		}
+		err = atmxt_i2c_write(dd,
+			dd->addr->adx[0], dd->addr->adx[1],
+			&(adx_cmd[0]), 2);
+		if (err < 0) {
+			pr_err("%s: Failed to reduce adx.\n", __func__);
+			goto atmxt_drv_interactivemode_store_fail;
 		}
 		atmxt_set_ic_state(dd, ATMXT_IC_SLEEP);
 		err = size;
@@ -3298,7 +3353,7 @@ static ssize_t atmxt_drv_interactivemode_store(struct device *dev,
 		err = -EINVAL;
 	}
 
-error:
+atmxt_drv_interactivemode_store_fail:
 	mutex_unlock(dd->mutex);
 	return err;
 }
@@ -3516,7 +3571,7 @@ static ssize_t atmxt_debug_ic_grpdata_show(struct device *dev,
 
 	addr_lo = entry[1] + dd->dbg->grp_off;
 	addr_hi = entry[2];
-	if (addr_lo < entry[1])
+	if (addr_lo < entry[1]) /* Check for 16-bit addr overflow */
 		addr_hi++;
 
 	err = atmxt_i2c_write(dd, addr_lo, addr_hi, NULL, 0);
@@ -3672,7 +3727,7 @@ static ssize_t atmxt_debug_ic_grpdata_store(struct device *dev,
 
 	addr_lo = entry[1] + dd->dbg->grp_off;
 	addr_hi = entry[2];
-	if (addr_lo < entry[1])
+	if (addr_lo < entry[1]) /* Check for 16-bit addr overflow */
 		addr_hi++;
 
 	err = atmxt_i2c_write(dd, addr_lo, addr_hi, data_out, data_size);

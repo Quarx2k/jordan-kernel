@@ -130,14 +130,16 @@ struct atmxt_addr {
 	uint8_t         nvm[2];
 	uint8_t         cal[2];
 	uint8_t         acq[2];
+	uint8_t         adx[2];
 } __packed;
 
 struct atmxt_data {
-	uint8_t         pwr[2];
+	uint8_t         pwr[4];
 	uint8_t         max_msg_size;
 	uint8_t         touch_id_offset;
 	bool            res[2];
 	uint8_t         acq[6];
+	uint8_t         adx[2];
 	unsigned long   timer;
 	uint8_t         last_stat;
 } __packed;
