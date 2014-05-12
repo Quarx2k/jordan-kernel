@@ -27,8 +27,6 @@
 #include <linux/io.h>
 #include <linux/platform_device.h>
 
-#define OFF_MODE	1
-
 #define OMAP1_MPUIO_BASE			0xfffb5000
 
 /*

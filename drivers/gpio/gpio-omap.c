@@ -27,9 +27,9 @@
 #include <linux/irqdomain.h>
 #include <linux/irqchip/chained_irq.h>
 #include <linux/gpio.h>
-#include <linux/of_gpio.h>
 #include <linux/platform_data/gpio-omap.h>
 
+#define OFF_MODE	1
 
 static LIST_HEAD(omap_gpio_list);
 
@@ -47,11 +47,7 @@ struct gpio_regs {
 	u32 debounce;
 	u32 debounce_en;
 };
-struct pad_context {
-	int pin_offs;
-	int gpio_n;
-	u32 cfg;
-};
+
 struct gpio_bank {
 	struct list_head node;
 	void __iomem *base;
@@ -79,8 +75,6 @@ struct gpio_bank {
 	int context_loss_count;
 	int power_mode;
 	bool workaround_enabled;
-	struct pad_context *pads_ctx;
-	void __iomem *pads_base;
 
 	void (*set_dataout)(struct gpio_bank *bank, int gpio, int enable);
 	int (*get_context_loss_count)(struct device *dev);
@@ -1090,125 +1084,6 @@ static void omap_gpio_chip_init(struct gpio_bank *bank)
 	irq_set_handler_data(bank->irq, bank);
 }
 
-static void omap_gpio_pad_ctx_save(struct gpio_bank *bank)
-{
-	int i;
-	unsigned long flags;
-	void __iomem *p_a;
-	void __iomem *reg;
-	u32 msk, v;
-	struct pad_context *ctx;
-
-	spin_lock_irqsave(&bank->lock, flags);
-	if (!bank->pads_ctx)
-		goto skip;
-
-	ctx = bank->pads_ctx;
-	for (i = 0; i < bank->chip.ngpio; i++, ctx++) {
-		if (ctx->gpio_n < 0)
-			break;
-		msk = 1 << ctx->gpio_n;
-		if (!(bank->context.oe & msk)) {
-			p_a = bank->pads_base + ctx->pin_offs;
-			reg = bank->base + bank->regs->direction;
-			/* save curr config */
-			ctx->cfg = __raw_readw(p_a);
-			/* enable PU or PD*/
-			if (bank->context.dataout & msk)
-				v = 0x11c;
-			else
-				v = 0x10c;
-			__raw_writew(v, p_a);
-			/* set GPIO as input */
-			__raw_writel(__raw_readl(reg) | msk, reg);
-			/* set to safe mode */
-			__raw_writew(v | 0x7, p_a);
-		}
-	}
-skip:
-	spin_unlock_irqrestore(&bank->lock, flags);
-}
-
-/* should be called after GPIO conext restored in locked context*/
-static void omap_gpio_pad_ctx_restore(struct gpio_bank *bank)
-{
-	int i;
-	struct pad_context *ctx = bank->pads_ctx;
-	if (!ctx)
-		return;
-	for (i = 0; i < bank->chip.ngpio; i++, ctx++) {
-		if (ctx->gpio_n < 0)
-			break;
-		if (!(bank->context.oe & (1 << ctx->gpio_n)))
-			__raw_writew(ctx->cfg, bank->pads_base + ctx->pin_offs);
-	}
-}
-static int __init omap_gpio_pad_ctx_init(struct gpio_bank *bank)
-{
-	struct gpio_pin_range *range, *tmp;
-	int i, cnt = 0;
-	struct pad_context *ctx;
-	static void __iomem *base __initdata;
-
-	if (!bank->loses_context)
-		return 0;
-
-	/*
-	* HACK: only one pad conf module should be used for all gpio
-	* modules which loosing context and hard coded value is for
-	* this pad conf module.	It is done to avoid rewriting all pin
-	* controls and define configuration for every pin in device
-	* tree to swtich from pinctrl-single to pinconf-single.
-	* Can not use mem mapping, this region maped by pinctrl.
-	* Extra protection is required to access this memory (disable
-	* irqs).
-	*/
-	if (!base) {
-		if (bank->pads_base)
-			return -EBUSY;
-		bank->pads_base = devm_ioremap(bank->dev, 0x48002030, 0x05cc);
-		if (!bank->pads_base) {
-			dev_err(bank->dev, "Could not ioremap 0x48002030\n");
-			return -ENOMEM;
-		}
-	} else {
-		bank->pads_base = base;
-	}
-
-	ctx = devm_kzalloc(bank->dev,	sizeof(struct pad_context) *
-		bank->chip.ngpio, GFP_KERNEL);
-	if (!ctx) {
-		dev_err(bank->dev, "Memory alloc for pad context failed\n");
-		return -ENOMEM;
-	}
-
-	bank->pads_ctx = ctx;
-	for (i = 0; i < bank->chip.ngpio; i++, ctx++)
-		ctx->gpio_n = -1;
-	ctx = bank->pads_ctx;
-	list_for_each_entry_safe(range, tmp, &bank->chip.pin_ranges, node) {
-		if (range->range.base < bank->chip.base ||
-			range->range.base + range->range.npins >
-			bank->chip.base + bank->chip.ngpio) {
-
-			dev_err(bank->dev, "Range base is out of limits for"
-				" this gpio chip\n");
-			continue;
-		}
-		cnt += range->range.npins;
-		if (cnt <= bank->chip.ngpio) {
-			for (i = 0; i < range->range.npins; i++, ctx++) {
-				ctx->gpio_n = range->range.base + i -
-					bank->chip.base;
-				ctx->pin_offs = (range->range.pin_base + i) * 2;
-			}
-		} else
-			dev_err(bank->dev, "Number of pins in range greater "
-			"than bank width\n");
-	}
-	return 0;
-}
-
 static const struct of_device_id omap_gpio_match[];
 
 static int omap_gpio_probe(struct platform_device *pdev)
@@ -1329,6 +1204,7 @@ static int omap_gpio_probe(struct platform_device *pdev)
 	omap_gpio_show_rev(bank);
 
 	pm_runtime_put(bank->dev);
+
 	list_add_tail(&bank->node, &omap_gpio_list);
 
 	return 0;
@@ -1457,11 +1333,6 @@ static int omap_gpio_runtime_resume(struct device *dev)
 		}
 	}
 
-	if (bank->power_mode == OFF_MODE) {
-		bank->power_mode = 0;
-		omap_gpio_pad_ctx_restore(bank);
-	}
-
 	if (!bank->workaround_enabled) {
 		spin_unlock_irqrestore(&bank->lock, flags);
 		return 0;
@@ -1535,9 +1406,6 @@ void omap2_gpio_prepare_for_idle(int pwr_mode)
 		bank->power_mode = pwr_mode;
 
 		pm_runtime_put_sync_suspend(bank->dev);
-
-		if (pwr_mode == OFF_MODE)
-			omap_gpio_pad_ctx_save(bank);
 	}
 }
 
@@ -1723,23 +1591,4 @@ static int __init omap_gpio_drv_reg(void)
 {
 	return platform_driver_register(&omap_gpio_driver);
 }
-postcore_initcall_sync(omap_gpio_drv_reg);
-
-/* delay off mode initialization until most of things done */
-static int __init omap_gpio_pad_off_ctx_init(void)
-{
-	struct gpio_bank *bank;
-
-	list_for_each_entry(bank, &omap_gpio_list, node) {
-		/*
-		* rescan ranges to protect if pinctrl drv was not ready when
-		* chip is added.
-		*/
-		of_node_put(bank->chip.of_node);
-		of_gpiochip_add(&bank->chip);
-		/* no error checking to finsh init and see erros in log only */
-		omap_gpio_pad_ctx_init(bank);
-	}
-	return 0;
-}
-late_initcall(omap_gpio_pad_off_ctx_init);
+postcore_initcall(omap_gpio_drv_reg);
