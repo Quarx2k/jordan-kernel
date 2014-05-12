@@ -22,16 +22,13 @@
 #ifndef OMAP_ISP_CCDC_H
 #define OMAP_ISP_CCDC_H
 
-#include <mach/isp_user.h>
+#include <plat/isp_user.h>
 
 #define is_isplsc_activated()		1
 
 /* Enumeration constants for CCDC input output format */
 enum ccdc_input {
-	CCDC_RAW_GRBG,
-	CCDC_RAW_RGGB,
-	CCDC_RAW_BGGR,
-	CCDC_RAW_GBRG,
+	CCDC_RAW,
 	CCDC_YUV_SYNC,
 	CCDC_YUV_BT,
 	CCDC_OTHERS
@@ -42,7 +39,8 @@ enum ccdc_output {
 	CCDC_YUV_MEM_RSZ,
 	CCDC_OTHERS_VP,
 	CCDC_OTHERS_MEM,
-	CCDC_OTHERS_VP_MEM
+	CCDC_OTHERS_VP_MEM,
+	CCDC_OTHERS_VP_MEM_LSC
 };
 
 /* Enumeration constants for the sync interface parameters */
@@ -58,13 +56,6 @@ enum datasize {
 	DAT12
 };
 
-/* Enumeration constants for Video Port */
-enum vp_bitshift {
-	BIT12_3 = 3,
-	BIT11_2 = 4,
-	BIT10_1 = 5,
-	BIT9_0 = 6
-};
 
 /**
  * struct ispccdc_syncif - Structure for Sync Interface between sensor and CCDC
@@ -140,100 +131,88 @@ struct ispccdc_refmt {
 	u32 fmtaddr7;
 };
 
-enum ispccdc_raw_fmt {
-	ISPCCDC_INPUT_FMT_GR_BG,
-	ISPCCDC_INPUT_FMT_RG_GB,
-	ISPCCDC_INPUT_FMT_BG_GR,
-	ISPCCDC_INPUT_FMT_GB_RG,
-};
+int ispccdc_request(void);
 
-/**
- * struct isp_ccdc_device - Structure for the CCDC module to store its own
- *			    information
- * @ccdc_inuse: Flag to determine if CCDC has been reserved or not (0 or 1).
- * @ccdcin_woffset: CCDC input horizontal offset.
- * @ccdcin_hoffset: CCDC input vertical offset.
- * @crop_w: Crop width.
- * @crop_h: Crop weight.
- * @vpout_en: Video port output enable.
- * @wen: Data write enable.
- * @exwen: External data write enable.
- * @refmt_en: Reformatter enable.
- * @ccdcslave: CCDC slave mode enable.
- * @syncif_ipmod: Image
- * @obclamp_en: Data input format.
- * @mutexlock: Mutex used to get access to the CCDC.
- * @wenlog: Write Enable logic to use against valid data signal.
- * @fpc_table_add_m: ISP MMU mapped address of the current used FPC table.
- * @fpc_table_add: Virtual address of the current used FPC table.
- * @update_lsc_config: Set when user changes lsc_config
- * @lsc_request_enable: Whether LSC is requested to be enabled
- * @lsc_config: LSC config set by user
- * @update_lsc_table: Set when user provides a new LSC table to lsc_table_new
- * @lsc_table_new: LSC table set by user, ISP address
- * @lsc_table_inuse: LSC table currently in use, ISP address
- * @shadow_update: non-zero when user is updating CCDC configuration
- * @lock: serializes shadow_update with interrupt handler
- */
-struct isp_ccdc_device {
-	u8 ccdc_inuse;
-	u32 ccdcin_woffset;
-	u32 ccdcin_hoffset;
-	u32 crop_w;
-	u32 crop_h;
-	u8 vpout_en;
-	u8 wen;
-	u8 exwen;
-	u8 refmt_en;
-	u8 ccdcslave;
-	u8 syncif_ipmod;
-	u8 obclamp_en;
-	struct mutex mutexlock; /* For checking/modifying ccdc_inuse */
-	u32 wenlog;
-	unsigned long fpc_table_add_m;
-	u32 *fpc_table_add;
-	enum ispccdc_raw_fmt raw_fmt_in;
+int ispccdc_free(void);
 
-	/* LSC related fields */
-	u8 lsc_delay_stop;
-	u8 lsc_enable;
-	u8 update_lsc_config;
-	u8 lsc_request_enable;
-	u8 lsc_request_user;
-	u8 lsc_defer_setup;
-	struct ispccdc_lsc_config lsc_config;
-	u8 update_lsc_table;
-	u32 lsc_table_new;
-	u32 lsc_table_inuse;
+int ispccdc_config_datapath(enum ccdc_input input, enum ccdc_output output);
 
-	int shadow_update;
-	spinlock_t lock;
-};
+void ispccdc_config_crop(u32 left, u32 top, u32 height, u32 width);
 
-int ispccdc_set_outaddr(struct isp_ccdc_device *isp_ccdc, u32 addr);
-void ispccdc_set_wenlog(struct isp_ccdc_device *isp_ccdc, u32 wenlog);
-int ispccdc_try_pipeline(struct isp_ccdc_device *isp_ccdc,
-			 struct isp_pipeline *pipe);
-int ispccdc_s_pipeline(struct isp_ccdc_device *isp_ccdc,
-		       struct isp_pipeline *pipe);
-void ispccdc_set_raw_offset(struct isp_ccdc_device *isp_ccdc,
-			    enum ispccdc_raw_fmt raw_fmt);
-void ispccdc_enable(struct isp_ccdc_device *isp_ccdc, u8 enable);
-int ispccdc_sbl_busy(void *_isp_ccdc);
-int ispccdc_busy(struct isp_ccdc_device *isp_ccdc);
-int ispccdc_is_enabled(struct isp_ccdc_device *isp_ccdc);
-void ispccdc_config_shadow_registers(struct isp_ccdc_device *isp_ccdc);
-int ispccdc_config(struct isp_ccdc_device *isp_ccdc,
-			     void *userspace_add);
-int ispccdc_config_vp_freq(struct isp_ccdc_device *isp_ccdc, u8 divider);
-int ispccdc_request(struct isp_ccdc_device *isp_ccdc);
-int ispccdc_free(struct isp_ccdc_device *isp_ccdc);
-void ispccdc_save_context(struct device *dev);
-void ispccdc_restore_context(struct device *dev);
-int ispccdc_enable_lsc(struct isp_ccdc_device *isp_ccdc, u8 enable);
-int ispccdc_lsc_delay_stop(struct isp_ccdc_device *isp_ccdc);
-void ispccdc_lsc_state_handler(struct isp_ccdc_device *isp_ccdc,
-			unsigned long status);
-void ispccdc_lsc_pref_comp_handler(struct isp_ccdc_device *isp_ccdc);
+void ispccdc_config_sync_if(struct ispccdc_syncif syncif);
+
+int ispccdc_config_black_clamp(struct ispccdc_bclamp bclamp);
+
+void ispccdc_enable_black_clamp(u8 enable);
+
+int ispccdc_config_fpc(struct ispccdc_fpc fpc);
+
+void ispccdc_enable_fpc(u8 enable);
+
+void ispccdc_config_black_comp(struct ispccdc_blcomp blcomp);
+
+void ispccdc_config_vp(struct ispccdc_vp vp);
+
+void ispccdc_enable_vp(u8 enable);
+
+void ispccdc_config_reformatter(struct ispccdc_refmt refmt);
+
+void ispccdc_enable_reformatter(u8 enable);
+
+void ispccdc_config_culling(struct ispccdc_culling culling);
+
+void ispccdc_enable_lpf(u8 enable);
+
+void ispccdc_config_alaw(enum alaw_ipwidth ipwidth);
+
+void ispccdc_enable_alaw(u8 enable);
+
+void ispccdc_enable_lsc(u8 enable);
+
+int ispccdc_lsc_busy(void);
+
+void ispccdc_config_imgattr(u32 colptn);
+
+void ispccdc_config_shadow_registers(void);
+
+void ispccdc_config_shadow_lsc(void);
+
+int ispccdc_try_size(u32 input_w, u32 input_h, u32 *output_w, u32 *output_h);
+
+int ispccdc_config_size(u32 input_w, u32 input_h, u32 output_w, u32 output_h);
+
+int ispccdc_config_outlineoffset(u32 offset, u8 oddeven, u8 numlines);
+
+int ispccdc_set_outaddr(u32 addr);
+
+void ispccdc_lsc_pref_comp_handler(void);
+
+void ispccdc_lsc_state_handler(unsigned long status);
+
+void ispccdc_enable(u8 enable);
+
+void ispccdc_suspend(void);
+
+void ispccdc_resume(void);
+
+int ispccdc_sbl_busy(void);
+
+int ispccdc_busy(void);
+
+void ispccdc_save_context(void);
+
+void ispccdc_restore_context(void);
+
+void ispccdc_print_status(void);
+
+int omap34xx_isp_ccdc_config(void *userspace_add);
+
+void ispccdc_set_wenlog(u32 wenlog);
+
+void ispccdc_set_dcsub(u32 dcsub);
+
+void ispccdc_set_raw_offset(enum ispccdc_raw_fmt);
+
+void ispccdc_request_lsc_enable(int enable);
 
 #endif		/* OMAP_ISP_CCDC_H */

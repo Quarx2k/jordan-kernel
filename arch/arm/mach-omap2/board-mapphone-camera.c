@@ -25,6 +25,8 @@
 #include <plat/omap-pm.h>
 #include <../drivers/media/video/omap34xxcam.h>
 #include <../drivers/media/video/isp/ispreg.h>
+#include <../drivers/media/video/isp/isp.h>
+#include <../drivers/media/video/isp/ispcsi2.h>
 #include "dt_path.h"
 #include <linux/of_fdt.h>
 #include <linux/of.h>
@@ -89,7 +91,7 @@ static struct omap34xxcam_sensor_config cam_hwc = {
     .ival_default    = { 1, 10 },
 };
  
-static int mt9p012_sensor_set_prv_data(struct v4l2_int_device *s, void *priv)
+static int mt9p012_sensor_set_prv_data(void *priv)
 {
     struct omap34xxcam_hw_config *hwc = priv;
 
@@ -102,32 +104,31 @@ static int mt9p012_sensor_set_prv_data(struct v4l2_int_device *s, void *priv)
 }
  
 static struct isp_interface_config mt9p012_if_config = {
-    .ccdc_par_ser	= ISP_PARLL,
-    .dataline_shift	= 0x1,
-    .hsvs_syncdetect	= ISPCTRL_SYNC_DETECT_VSRISE,
-    .strobe		= 0x0,
-    .prestrobe		= 0x0,
-    .shutter		= 0x0,
-    .wenlog		 = ISPCCDC_CFG_WENLOG_OR,
-    .wait_hs_vs		= 2,
-    .cam_mclk		= 144000000,
-    .u.par.par_bridge	= 0x0,
-    .u.par.par_clk_pol	= 0x0,
+	.ccdc_par_ser = ISP_PARLL,
+	.dataline_shift = 0x1,
+	.hsvs_syncdetect = ISPCTRL_SYNC_DETECT_VSRISE,
+	.strobe = 0x0,
+	.prestrobe = 0x0,
+	.shutter = 0x0,
+	.wenlog = ISPCCDC_CFG_WENLOG_OR,
+	.wait_bayer_frame = 0,
+	.wait_yuv_frame = 1,
+	.dcsub = 42,
+	.cam_mclk = 144000000,
+	.cam_mclk_src_div = 6,
+	.raw_fmt_in = ISPCCDC_INPUT_FMT_GR_BG,
+	.u.par.par_bridge = 0x0,
+	.u.par.par_clk_pol = 0x0,
 };
 
-static u32 mt9p012_sensor_set_xclk(struct v4l2_int_device *s, u32 xclkfreq)
+u32 mt9p012_sensor_set_xclk(u32 xclkfreq)
 {
-    struct omap34xxcam_videodev *vdev = s->u.slave->master->priv;
  
-    return isp_set_xclk(vdev->cam->isp, xclkfreq, OMAP34XXCAM_XCLK_A);
+    return isp_set_xclk(xclkfreq, OMAP34XXCAM_XCLK_A);
 }
 
-static int mt9p012_sensor_power_set(struct v4l2_int_device *s,
-				    enum v4l2_power power)
+static int mt9p012_sensor_power_set(struct device* dev, enum v4l2_power power)
 {
-	struct omap34xxcam_videodev *vdev = s->u.slave->master->priv;
-	struct isp_device *isp = dev_get_drvdata(vdev->cam->isp);
-
 	switch (power) {
 
 	case V4L2_POWER_OFF:
@@ -140,9 +141,10 @@ static int mt9p012_sensor_power_set(struct v4l2_int_device *s,
 			cam_reset_gpio = -1;
 		}
 
-
+		mt9p012_sensor_set_xclk(0);
+		msleep(1);
 		/* Release pm constraints */
-		omap_pm_set_min_bus_tput(vdev->cam->isp, OCP_INITIATOR_AGENT, 0);
+		//omap_pm_set_min_bus_tput(dev, OCP_INITIATOR_AGENT, 0);
 		//omap_pm_set_max_mpu_wakeup_lat(dev, -1);
 		/* mt9p012 autofocus module needs the standby
 		   put the standby to high after safe mode */
@@ -162,16 +164,16 @@ static int mt9p012_sensor_power_set(struct v4l2_int_device *s,
 
 			/* Set min throughput to:
 			 *  2592 x 1944 x 2bpp x 30fps x 3 L3 accesses */
-			omap_pm_set_min_bus_tput(vdev->cam->isp, OCP_INITIATOR_AGENT, 885735);
+			omap_pm_set_min_bus_tput(dev, OCP_INITIATOR_AGENT, 885735);
 			/* Hold a constraint to keep MPU in C1 */
 			//omap_pm_set_max_mpu_wakeup_lat(dev, MPU_LATENCY_C1);
 
 			/* Configure ISP */
-			isp_configure_interface(vdev->cam->isp, &mt9p012_if_config);
+			isp_configure_interface(&mt9p012_if_config);
 
 			msleep(5);
 		}
-		mt9p012_sensor_set_xclk(s, MT9P012_XCLK_48MHZ);
+		mt9p012_sensor_set_xclk(MT9P012_XCLK_48MHZ);
 		msleep(3);
 
 		if (mt9p012_previous_power == V4L2_POWER_OFF) {
@@ -212,9 +214,9 @@ static int mt9p012_sensor_power_set(struct v4l2_int_device *s,
 		/* stand by */
 
 		gpio_set_value(cam_standby_gpio, 1);
-		omap_pm_set_min_bus_tput(vdev->cam->isp, OCP_INITIATOR_AGENT, 0);
+		omap_pm_set_min_bus_tput(dev, OCP_INITIATOR_AGENT, 0);
 		if (mt9p012_previous_power == V4L2_POWER_ON)
-			isp_disable_mclk(isp);
+               		 mt9p012_sensor_set_xclk(0);
 
 		break;
 	}
@@ -226,8 +228,15 @@ static int mt9p012_sensor_power_set(struct v4l2_int_device *s,
 
 struct mt9p012_platform_data mapphone_mt9p012_platform_data = {
 	.power_set = mt9p012_sensor_power_set,
-	.priv_data_set  = mt9p012_sensor_set_prv_data,
-	.set_xclk = mt9p012_sensor_set_xclk,
+	.priv_data_set = mt9p012_sensor_set_prv_data,
+	//.lock_cpufreq = mapphone_lock_cpufreq,
+	//.get_config_flags = mapphone_get_config_flags,
+	.csi2_lane_count = isp_csi2_complexio_lanes_count,
+	.csi2_cfg_vp_out_ctrl = isp_csi2_ctrl_config_vp_out_ctrl,
+	.csi2_ctrl_update = isp_csi2_ctrl_update,
+	.csi2_cfg_virtual_id = isp_csi2_ctx_config_virtual_id,
+	.csi2_ctx_update = isp_csi2_ctx_update,
+	.csi2_calc_phy_cfg0  = isp_csi2_calc_phy_cfg0,
 };
 #endif
 
@@ -302,15 +311,13 @@ static int camise_sensor_set_prv_data(void *priv)
 	return 0;
 }
 
-static void camise_if_configure(struct v4l2_int_device *s)
+static void camise_if_configure(void)
 {
-	struct omap34xxcam_videodev *vdev = s->u.slave->master->priv;
-	isp_configure_interface(vdev->cam->isp, &camise_if_config);
-}
+	isp_configure_interface(&camise_if_config);
+} 
 
-static int camise_sensor_power_set(struct v4l2_int_device *s, enum v4l2_power power)
+static int camise_sensor_power_set(struct device* dev, enum v4l2_power power)
 {
-	struct omap34xxcam_videodev *vdev = s->u.slave->master->priv;
 	static enum v4l2_power previous_power = V4L2_POWER_OFF;
 	switch (power) {
 	case V4L2_POWER_OFF:
@@ -332,7 +339,7 @@ static int camise_sensor_power_set(struct v4l2_int_device *s, enum v4l2_power po
 			}
 
 			/* turn off ISP clock */
-			isp_set_xclk(vdev->cam->isp, 0, OMAP34XXCAM_XCLK_A);
+			isp_set_xclk(0, OMAP34XXCAM_XCLK_A);
 		}
 		break;
 
@@ -364,9 +371,9 @@ static int camise_sensor_power_set(struct v4l2_int_device *s, enum v4l2_power po
 			}
 
 			/* turn on ISP clock */
-			isp_set_xclk(vdev->cam->isp, CAMISE_XCLK_24MHZ, OMAP34XXCAM_XCLK_A);
+			isp_set_xclk(CAMISE_XCLK_24MHZ, OMAP34XXCAM_XCLK_A);
 			/* Power Up Sequence */
-			camise_if_configure(s);
+			camise_if_configure();
 			msleep(10);
 
 			if (cam_standby_gpio >= 0) {

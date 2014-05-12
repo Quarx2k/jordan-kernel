@@ -22,7 +22,7 @@
 #include <linux/device.h>
 #include <linux/delay.h>
 #include <linux/videodev2.h>
-//#include <plat/isp_user.h>
+#include <plat/isp_user.h>
 
 #include "hp3a.h"
 #include "hp3a_common.h"
@@ -159,7 +159,7 @@ int hp3a_config_af(struct hp3a_af_config *config, struct hp3a_fh *fh)
 
 	if (config->enable) {
 		/* Install AF callback. */
-		ret = isp_set_callback(device->dev, CBK_H3A_AF_DONE, hp3a_af_isr,
+		ret = isp_set_callback(CBK_H3A_AF_DONE, hp3a_af_isr,
 					(void *)NULL, (void *)NULL);
 		if (ret)
 			return ret;
@@ -317,7 +317,7 @@ int hp3a_config_af(struct hp3a_af_config *config, struct hp3a_fh *fh)
 		ret = 0;
 	} else {
 		spin_lock_irqsave(&g_tc.af_lock, irqflags);
-		isp_unset_callback(device->dev, CBK_H3A_AF_DONE);
+		isp_unset_callback(CBK_H3A_AF_DONE);
 		g_tc.af_hw_configured = 0;
 
 		if (g_tc.af_hw_enable == 1) {

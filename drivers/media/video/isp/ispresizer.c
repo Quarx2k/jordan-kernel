@@ -6,8 +6,8 @@
  * Copyright (C)2009 Texas Instruments, Inc.
  *
  * Contributors:
- *	Sameer Venkatraman <sameerv@ti.com>
- *	Mohit Jalori
+ * 	Sameer Venkatraman <sameerv@ti.com>
+ * 	Mohit Jalori
  *	Sergio Aguirre <saaguirre@ti.com>
  *
  * This package is free software; you can redistribute it and/or modify
@@ -20,644 +20,93 @@
  */
 
 #include <linux/module.h>
-#include <linux/device.h>
 
 #include "isp.h"
 #include "ispreg.h"
 #include "ispresizer.h"
-#ifdef CONFIG_VIDEO_OMAP34XX_ISP_DEBUG_FS
-#include "ispresizer_dfs.h"
-#endif
-
-/*
- * Resizer constants
- * "OMAP3430 TRM ES3.1"
- */
-#define MIN_IN_WIDTH			32
-#define MIN_IN_HEIGHT			32
-#define MAX_IN_WIDTH_MEMORY_MODE	4095
-
-#define MAX_IN_WIDTH_ONTHEFLY_MODE	1280
-#define MAX_IN_WIDTH_ONTHEFLY_MODE_ES2	4095
-#define MAX_IN_WIDTH_ONTHEFLY_MODE_ES3	4095
-#define MAX_IN_HEIGHT			4095
-#define MIN_RESIZE_VALUE		64
-#define MAX_RESIZE_VALUE		1024
-#define MID_RESIZE_VALUE		512
-#define MAX_SCALE_FACTOR		4
-
-/*
- * Constants for coarse input pointer calculations
- */
-#define CIP_4PHASE		16	/* in 1/8 pixel precision */
-#define CIP_7PHASE		32	/* in 1/4 pixel precision */
-
-/*
- * Resizer Use Constraints
- * "TRM ES3.1, table 12-46"
- */
-#define MIN_OUT_WIDTH			16
-#define MAX_4TAP_OUT_WIDTH		1280
-#define MAX_7TAP_OUT_WIDTH		640
-#define MAX_4TAP_OUT_WIDTH_ES2		3312
-#define MAX_7TAP_OUT_WIDTH_ES2		1650
-#define MAX_4TAP_OUT_WIDTH_ES3		4095
-#define MAX_7TAP_OUT_WIDTH_ES3		2048
-#define MIN_OUT_HEIGHT			2
-#define MAX_OUT_HEIGHT			4095
-
-#define DEFAULTSTPHASE			1
-#define RESIZECONSTANT			256
-#define TAP7				7
-#define TAP4				4
-
-#define OUT_WIDTH_ALIGN			2
-#define OUT_WIDTH_ALIGN_UP		16
-#define OUT_HEIGHT_ALIGN		2
-
-#define PHY_ADDRESS_ALIGN		32
 
 /* Default configuration of resizer,filter coefficients,yenh for camera isp */
+static struct isprsz_yenh ispreszdefaultyenh = {0, 0, 0, 0};
 static struct isprsz_coef ispreszdefcoef = {
-	/* For 8-phase 4-tap horizontal filter: */
-	{
-		0x0000, 0x0100, 0x0000, 0x0000, 0x03FA, 0x00F6, 0x0010, 0x0000,
-		0x03F9, 0x00DB, 0x002C, 0x0000, 0x03FB, 0x00B3, 0x0053, 0x03FF,
-		0x03FD, 0x0082, 0x0084, 0x03FD, 0x03FF, 0x0053, 0x00B3, 0x03FB,
-		0x0000, 0x002C, 0x00DB, 0x03F9, 0x0000, 0x0010, 0x00F6, 0x03FA
-	},
-	/* For 8-phase 4-tap vertical filter: */
-	{
-		0x0000, 0x0100, 0x0000, 0x0000, 0x03FA, 0x00F6, 0x0010, 0x0000,
-		0x03F9, 0x00DB, 0x002C, 0x0000, 0x03FB, 0x00B3, 0x0053, 0x03FF,
-		0x03FD, 0x0082, 0x0084, 0x03FD, 0x03FF, 0x0053, 0x00B3, 0x03FB,
-		0x0000, 0x002C, 0x00DB, 0x03F9, 0x0000, 0x0010, 0x00F6, 0x03FA
-	},
-	/* For 4-phase 7-tap horizontal filter: */
-	#define UNUSED 0
-	{
-		0x0004, 0x0023, 0x005A, 0x0058, 0x0023, 0x0004, 0x0000, UNUSED,
-		0x0002, 0x0018, 0x004d, 0x0060, 0x0031, 0x0008, 0x0000, UNUSED,
-		0x0001, 0x000f, 0x003f, 0x0062, 0x003f, 0x000f, 0x0001, UNUSED,
-		0x0000, 0x0008, 0x0031, 0x0060, 0x004d, 0x0018, 0x0002, UNUSED
-	},
-	/* For 4-phase 7-tap vertical filter: */
-	{
-		0x0004, 0x0023, 0x005A, 0x0058, 0x0023, 0x0004, 0x0000, UNUSED,
-		0x0002, 0x0018, 0x004d, 0x0060, 0x0031, 0x0008, 0x0000, UNUSED,
-		0x0001, 0x000f, 0x003f, 0x0062, 0x003f, 0x000f, 0x0001, UNUSED,
-		0x0000, 0x0008, 0x0031, 0x0060, 0x004d, 0x0018, 0x0002, UNUSED
-	}
-	#undef UNUSED
-};
-
-/**
- * ispresizer_set_coeffs - Setup default coefficents for polyphase filter.
- * @dst: Target registers map structure.
- * @coeffs: filter coefficients structure or NULL for default values
- * @h_ratio: Horizontal resizing value.
- * @v_ratio: Vertical resizing value.
- */
-void ispresizer_set_coeffs(struct device *dev, struct isprsz_coef *coeffs,
-			   unsigned h_ratio, unsigned v_ratio)
-{
-	const u16 *cf_ptr;
-	int ix;
-	u32 rval;
-
-	/* Init horizontal filter coefficients */
-	if (h_ratio > MID_RESIZE_VALUE) {
-		if (coeffs != NULL)
-			cf_ptr = coeffs->h_filter_coef_7tap;
-		else
-			cf_ptr = ispreszdefcoef.h_filter_coef_7tap;
-	} else {
-		if (coeffs != NULL)
-			cf_ptr = coeffs->h_filter_coef_4tap;
-		else
-			cf_ptr = ispreszdefcoef.h_filter_coef_4tap;
-	}
-
-	for (ix = ISPRSZ_HFILT10; ix <= ISPRSZ_HFILT3130; ix += sizeof(u32)) {
-		rval  = (*cf_ptr++ & ISPRSZ_HFILT_COEF0_MASK) <<
-			ISPRSZ_HFILT_COEF0_SHIFT;
-		rval |= (*cf_ptr++ & ISPRSZ_HFILT_COEF1_MASK) <<
-			ISPRSZ_HFILT_COEF1_SHIFT;
-		isp_reg_writel(dev, rval, OMAP3_ISP_IOMEM_RESZ, ix);
-	}
-
-	/* Init vertical filter coefficients */
-	if (v_ratio > MID_RESIZE_VALUE) {
-		if (coeffs != NULL)
-			cf_ptr = coeffs->v_filter_coef_7tap;
-		else
-			cf_ptr = ispreszdefcoef.v_filter_coef_7tap;
-	} else {
-		if (coeffs != NULL)
-			cf_ptr = coeffs->v_filter_coef_4tap;
-		else
-			cf_ptr = ispreszdefcoef.v_filter_coef_4tap;
-	}
-
-	for (ix = ISPRSZ_VFILT10; ix <= ISPRSZ_VFILT3130; ix += sizeof(u32)) {
-		rval  = (*cf_ptr++ & ISPRSZ_VFILT_COEF0_MASK) <<
-			ISPRSZ_VFILT_COEF0_SHIFT;
-		rval |= (*cf_ptr++ & ISPRSZ_VFILT_COEF1_MASK) <<
-			ISPRSZ_VFILT_COEF1_SHIFT;
-		isp_reg_writel(dev, rval, OMAP3_ISP_IOMEM_RESZ, ix);
-	}
-}
-
-/**
- * ispresizer_try_fmt - Try format.
- */
-static int ispresizer_try_fmt(struct isp_node *pipe, bool memory)
-{
-	s16 rsz;
-	u32 sph = DEFAULTSTPHASE;
-	int max_in_otf, max_out_4tap, max_out_7tap;
-
-	if (pipe->out.image.width < MIN_OUT_WIDTH)
-		return -EINVAL;
-	if (pipe->out.image.height < MIN_OUT_HEIGHT)
-		return -EINVAL;
-
-	pipe->out.image.height = min_t(u32, pipe->out.image.height,
-				       MAX_OUT_HEIGHT);
-
-	switch (omap_rev()) {
-	case OMAP3430_REV_ES1_0:
-		max_in_otf = MAX_IN_WIDTH_ONTHEFLY_MODE;
-		max_out_4tap = MAX_4TAP_OUT_WIDTH;
-		max_out_7tap = MAX_7TAP_OUT_WIDTH;
-		break;
-	case OMAP3630_REV_ES1_0:
-	case OMAP3630_REV_ES1_1:
-	case OMAP3630_REV_ES1_2:
-		max_in_otf = MAX_IN_WIDTH_ONTHEFLY_MODE_ES3;
-		max_out_4tap = MAX_4TAP_OUT_WIDTH_ES3;
-		max_out_7tap = MAX_7TAP_OUT_WIDTH_ES3;
-		break;
-	default:
-		max_in_otf = MAX_IN_WIDTH_ONTHEFLY_MODE_ES2;
-		max_out_4tap = MAX_4TAP_OUT_WIDTH_ES2;
-		max_out_7tap = MAX_7TAP_OUT_WIDTH_ES2;
-	}
-
-	if (pipe->in.image.width < MIN_IN_WIDTH)
-		return -EINVAL;
-
-	if (pipe->in.image.height < MIN_IN_HEIGHT)
-		return -EINVAL;
-
-	if (memory) {
-		if (pipe->in.image.width > MAX_IN_WIDTH_MEMORY_MODE)
-			return -EINVAL;
-	} else {
-		if (pipe->in.image.width > max_in_otf)
-			return -EINVAL;
-	}
-
-	/**
-	 * Calculate vertical ratio.
-	 *  See OMAP34XX Technical Refernce Manual.
-	 */
-	pipe->out.image.height = ALIGN(pipe->out.image.height,
-				       OUT_HEIGHT_ALIGN);
-
-	/* Set default crop, if not defined */
-	if (pipe->in.crop.height <= 0 || pipe->in.crop.top < 0 ||
-	    pipe->in.crop.height + pipe->in.crop.top > pipe->in.image.height) {
-		pipe->in.crop.height = pipe->in.image.height;
-		pipe->in.crop.top = 0;
-	}
-	/**
-	 * Calculate vertical ratio.
-	 *  See OMAP34XX Technical Refernce Manual.
-	 */
-	rsz = pipe->in.crop.height * RESIZECONSTANT / pipe->out.image.height;
-	if (rsz > MID_RESIZE_VALUE) {
-		if (pipe->out.image.width > max_out_7tap) {
-			pipe->out.image.width = max_out_7tap &
-						~(OUT_WIDTH_ALIGN - 1);
-			/* update output crop also */
-			pipe->out.crop.width = pipe->out.image.width;
-			pipe->out.crop.left = 0;
+		{
+			0,    256,  0,    0,
+			-12, 247, 23,   -2,
+			-18, 222, 58,   -6,
+			-19, 186, 100, -11,
+			-16, 144, 144, -16,
+			-11, 100, 186, -19,
+			-6,   58,   222, -18,
+			-2,   23,   247, -12,
+		},
+		{
+			0,    256,  0,    0,
+			-12, 247, 23,   -2,
+			-18, 222, 58,   -6,
+			-19, 186, 100, -11,
+			-16, 144, 144, -16,
+			-11, 100, 186, -19,
+			-6,   58,   222, -18,
+			-2,   23,   247, -12,
+		},
+		{
+			0,	64, 128, 64, 0, 0, 0,
+			-9,	39, 124, 92, 13, -3, 0,
+			-8,	24, 112, 112, 24, -8, 0,
+			-3, 13, 92, 124, 39, -9, 0,
+		},
+		{
+			0,	64, 128, 64, 0, 0, 0,
+			-9,	39, 124, 92, 13, -3, 0,
+			-8,	24, 112, 112, 24, -8, 0,
+			-3, 13, 92, 124, 39, -9, 0,
 		}
-		rsz = ((pipe->in.crop.height - TAP7)
-			* RESIZECONSTANT - sph * 64 - CIP_7PHASE)
-			/ (pipe->out.image.height - 1);
-	} else {
-		if (pipe->out.image.width > max_out_4tap) {
-			pipe->out.image.width = max_out_4tap &
-						~(OUT_WIDTH_ALIGN - 1);
-			/* update output crop also */
-			pipe->out.crop.width = pipe->out.image.width;
-			pipe->out.crop.left = 0;
-		}
-		rsz = ((pipe->in.crop.height - TAP4)
-			* RESIZECONSTANT - sph * 32 - CIP_4PHASE)
-			/ (pipe->out.image.height - 1);
-	}
-
-	/* To preserve range of vertical ratio */
-	if (rsz < MIN_RESIZE_VALUE || rsz > MAX_RESIZE_VALUE) {
-		rsz = clamp_t(s16, rsz, MIN_RESIZE_VALUE, MAX_RESIZE_VALUE);
-		pipe->out.image.height = pipe->in.crop.height *
-					 RESIZECONSTANT / rsz;
-		if (rsz == MIN_RESIZE_VALUE)
-			pipe->out.image.height &= ~(OUT_HEIGHT_ALIGN - 1);
-		else
-			pipe->out.image.height = ALIGN(pipe->out.image.height,
-						       OUT_HEIGHT_ALIGN);
-		/* update output crop also */
-		pipe->out.crop.height = pipe->out.image.height;
-		pipe->out.crop.top = 0;
-	}
-
-	/**
-	 * Calculate horizontal ratio.
-	 *  See OMAP34XX Technical Refernce Manual.
-	 */
-	rsz = pipe->in.crop.width * RESIZECONSTANT / pipe->out.image.width;
-	if (rsz > RESIZECONSTANT)
-		pipe->out.image.width = ALIGN(pipe->out.image.width,
-					      OUT_WIDTH_ALIGN);
-	else
-		pipe->out.image.width = ALIGN(pipe->out.image.width,
-					      OUT_WIDTH_ALIGN_UP);
-
-	/* Set default crop, if not defined */
-	if (pipe->in.crop.width <= 0 || pipe->in.crop.left < 0 ||
-	    pipe->in.crop.width + pipe->in.crop.left > pipe->in.image.width) {
-		pipe->in.crop.width = pipe->in.image.width;
-		pipe->in.crop.left = 0;
-	}
-
-	/**
-	 * Calculate horizontal ratio.
-	 *  See OMAP34XX Technical Refernce Manual.
-	 */
-	rsz = pipe->in.crop.width * RESIZECONSTANT / pipe->out.image.width;
-	if (rsz > MID_RESIZE_VALUE) {
-		rsz = ((pipe->in.crop.width - TAP7)
-			* RESIZECONSTANT - sph * 64 - CIP_7PHASE)
-			/ (pipe->out.image.width - 1);
-	} else {
-		rsz = ((pipe->in.crop.width - TAP4)
-			* RESIZECONSTANT - sph * 32 - CIP_4PHASE)
-			/ (pipe->out.image.width - 1);
-	}
-
-	/* To preserve range of horizontal ratio */
-	if (rsz < MIN_RESIZE_VALUE || rsz > MAX_RESIZE_VALUE) {
-		rsz = clamp_t(s16, rsz, MIN_RESIZE_VALUE, MAX_RESIZE_VALUE);
-		pipe->out.image.width = pipe->in.crop.width *
-					RESIZECONSTANT / rsz;
-		if (rsz == MIN_RESIZE_VALUE)
-			pipe->out.image.width &= ~(OUT_WIDTH_ALIGN_UP - 1);
-		else
-			pipe->out.image.width = ALIGN(pipe->out.image.width,
-						      OUT_WIDTH_ALIGN_UP);
-		/* update output crop also */
-		pipe->out.crop.width = pipe->out.image.width;
-		pipe->out.crop.left = 0;
-	}
-
-	return 0;
-}
+	};
 
 /**
- * ispresizer_try_ratio - Calculate resize values, input and output size.
+ * struct isp_res - Structure for the resizer module to store its information.
+ * @res_inuse: Indicates if resizer module has been reserved. 1 - Reserved,
+ *             0 - Freed.
+ * @h_startphase: Horizontal starting phase.
+ * @v_startphase: Vertical starting phase.
+ * @h_resz: Horizontal resizing value.
+ * @v_resz: Vertical resizing value.
+ * @outputwidth: Output Image Width in pixels.
+ * @outputheight: Output Image Height in pixels.
+ * @inputwidth: Input Image Width in pixels.
+ * @inputheight: Input Image Height in pixels.
+ * @algo: Algorithm select. 0 - Disable, 1 - [-1 2 -1]/2 high-pass filter,
+ *        2 - [-1 -2 6 -2 -1]/4 high-pass filter.
+ * @ipht_crop: Vertical start line for cropping.
+ * @ipwd_crop: Horizontal start pixel for cropping.
+ * @cropwidth: Crop Width.
+ * @cropheight: Crop Height.
+ * @resinput: Resizer input.
+ * @coeflist: Register configuration for Resizer.
+ * @ispres_mutex: Mutex for isp resizer.
  */
-static int ispresizer_try_ratio(struct device *dev, struct isp_node *pipe,
-				struct v4l2_rect *phy_rect,
-				u16 *h_ratio, u16 *v_ratio)
-{
-	u16 h_rsz, v_rsz;
-	u32 sph = DEFAULTSTPHASE;
-	struct v4l2_rect try_rect;
+static struct isp_res {
+	int pm_state;
+	u8 res_inuse;
+	u8 h_startphase;
+	u8 v_startphase;
+	u16 h_resz;
+	u16 v_resz;
+	u32 outputwidth;
+	u32 outputheight;
+	u32 inputwidth;
+	u32 inputheight;
+	u8 algo;
+	u32 ipht_crop;
+	u32 ipwd_crop;
+	u32 cropwidth;
+	u32 cropheight;
+	dma_addr_t tmp_buf;
+	enum ispresizer_input resinput;
+	struct isprsz_coef coeflist;
+	struct mutex ispres_mutex; /* For checking/modifying res_inuse */
+} ispres_obj;
 
-	/* Check range of requested vertical crop */
-	if (pipe->in.crop.height < MIN_IN_HEIGHT || pipe->in.crop.top < 0 ||
-	    pipe->in.crop.height + pipe->in.crop.top > pipe->in.image.height) {
-		dev_err(dev, "Vertical crop is out of range Crop: T=%d H=%d "
-			"Image: Height=%d\n", pipe->in.crop.top,
-			pipe->in.crop.height, pipe->in.image.height);
-		pipe->in.crop.height = pipe->in.image.height;
-		pipe->in.crop.top = 0;
-	}
-
-	/**
-	 * Calculate vertical ratio.
-	 *  See OMAP34XX Technical Refernce Manual.
-	 */
-	v_rsz = pipe->in.crop.height * RESIZECONSTANT / pipe->out.image.height;
-	if (v_rsz > MID_RESIZE_VALUE) {
-		v_rsz = ((pipe->in.crop.height - TAP7)
-			* RESIZECONSTANT - sph * 64 - CIP_7PHASE)
-			/ (pipe->out.image.height - 1);
-	} else {
-		v_rsz = ((pipe->in.crop.height - TAP4)
-			* RESIZECONSTANT - sph * 32 - CIP_4PHASE)
-			/ (pipe->out.image.height - 1);
-	}
-
-	if (v_rsz < MIN_RESIZE_VALUE || v_rsz > MAX_RESIZE_VALUE) {
-		dev_err(dev, "Vertical ratio is out of range: %d", v_rsz);
-		v_rsz = clamp_t(u16, v_rsz, MIN_RESIZE_VALUE, MAX_RESIZE_VALUE);
-		pipe->in.crop.height = pipe->out.image.height * v_rsz /
-				       RESIZECONSTANT;
-	}
-
-	/**
-	 * Recalculate input. See OMAP34XX TRM.
-	 *  4-phase, 7-tap mode
-	 *     ih = (64 * spv + (oh - 1) * vrsz + 32) >> 8 + 7
-	 *  8-phase, 4-tap mode
-	 *     ih = (32 * spv + (oh - 1) * vrsz + 16) >> 8 + 4
-	 */
-	if (v_rsz > MID_RESIZE_VALUE) {
-		try_rect.height = (64 * sph + (pipe->out.image.height - 1) *
-				   v_rsz + CIP_7PHASE) / RESIZECONSTANT + TAP7;
-	} else {
-		try_rect.height = (32 * sph + (pipe->out.image.height - 1) *
-				   v_rsz + CIP_4PHASE) / RESIZECONSTANT + TAP4;
-	}
-	/* First storing user requested offset */
-	try_rect.top = pipe->in.crop.top;
-	/* Compensation of image centering after resize */
-	try_rect.top += (pipe->in.crop.height - try_rect.height) / 2;
-	/* Validate range of physical dimension of crop */
-	try_rect.top = clamp_t(u16, try_rect.top, 0, pipe->in.image.height -
-			       pipe->in.crop.height);
-	pipe->in.crop.height = clamp_t(u16, pipe->in.crop.height, MIN_IN_HEIGHT,
-				       pipe->in.image.height);
-
-	/* Check range of requested horizontal crop */
-	if (pipe->in.crop.width < MIN_IN_WIDTH || pipe->in.crop.left < 0 ||
-	    pipe->in.crop.width + pipe->in.crop.left > pipe->in.image.width) {
-		dev_err(dev, "Horizontal crop is out of range Crop: L=%d W=%d "
-			"Image: Width=%d\n", pipe->in.crop.left,
-			pipe->in.crop.width, pipe->in.image.width);
-		pipe->in.crop.width = pipe->in.image.width;
-		pipe->in.crop.left = 0;
-	}
-
-	/**
-	 * Calculate horizontal ratio.
-	 *  See OMAP34XX Technical Refernce Manual.
-	 */
-	h_rsz = pipe->in.crop.width * RESIZECONSTANT / pipe->out.image.width;
-	if (h_rsz > MID_RESIZE_VALUE) {
-		h_rsz = ((pipe->in.crop.width - TAP7)
-			* RESIZECONSTANT - sph * 64 - CIP_7PHASE)
-			/ (pipe->out.image.width - 1);
-	} else {
-		h_rsz = ((pipe->in.crop.width - TAP4)
-			* RESIZECONSTANT - sph * 32 - CIP_4PHASE)
-			/ (pipe->out.image.width - 1);
-	}
-
-	if (h_rsz < MIN_RESIZE_VALUE || h_rsz > MAX_RESIZE_VALUE) {
-		dev_err(dev, "Horizontal ratio is out of range: %d", h_rsz);
-		h_rsz = clamp_t(u16, h_rsz, MIN_RESIZE_VALUE, MAX_RESIZE_VALUE);
-		pipe->in.crop.height = pipe->out.image.height * v_rsz /
-				       RESIZECONSTANT;
-	}
-
-	/**
-	 * Recalculate input. See OMAP34XX TRM.
-	 *  4-phase, 7-tap mode
-	 *     iw = (64 * sph + (ow - 1) * hrsz + 32) >> 8 + 7
-	 *  8-phase, 4-tap mode
-	 *     iw = (32 * sph + (ow - 1) * hrsz + 16) >> 8 + 7
-	 */
-	if (h_rsz > MID_RESIZE_VALUE) {
-		try_rect.width = (64 * sph + (pipe->out.image.width - 1) *
-				  h_rsz + CIP_7PHASE) / RESIZECONSTANT + TAP7;
-	} else {
-		try_rect.width = (32 * sph + (pipe->out.image.width - 1) *
-				  h_rsz + CIP_4PHASE) / RESIZECONSTANT + TAP4;
-	}
-	/* First storing user requested offset */
-	try_rect.left = pipe->in.crop.left;
-	/* Compensation of image centering after resize */
-	try_rect.left += (pipe->in.crop.width - try_rect.width) / 2;
-	/* Validate range of physical dimension of crop */
-	try_rect.left = clamp_t(u16, try_rect.left, 0, pipe->in.image.width -
-				pipe->in.crop.width);
-	pipe->in.crop.width = clamp_t(u16, pipe->in.crop.width, MIN_IN_WIDTH,
-				      pipe->in.image.width);
-
-	/* Storing parameters for engine crop */
-	*phy_rect = try_rect;
-	/* Storing calculated ratio parameters */
-	*v_ratio = v_rsz;
-	*h_ratio = h_rsz;
-
-	return 0;
-}
-
-/**
- * ispresizer_is_upscale - Return operation type up/down scale.
- *
- * Returns true for up-scale operation and false for down-scale.
- */
-bool ispresizer_is_upscale(struct isp_node *pipe)
-{
-	if (pipe->in.image.width * pipe->in.image.height <
-	    pipe->out.image.width * pipe->out.image.height)
-		return true;
-	else
-		return false;
-}
-
-/**
- * ispresizer_set_ratio - Setup horizontal and vertical resizing value
- * @dev: Device context.
- * @h_ratio: Horizontal ratio.
- * @v_ratio: Vertical ratio.
- *
- * Resizing range from 64 to 1024
- */
-static inline void ispresizer_set_ratio(struct device *dev, u16 h_ratio,
-					u16 v_ratio)
-{
-	u32 rgval;
-
-	rgval = isp_reg_readl(dev, OMAP3_ISP_IOMEM_RESZ, ISPRSZ_CNT) &
-			      ~(ISPRSZ_CNT_HRSZ_MASK | ISPRSZ_CNT_VRSZ_MASK);
-	rgval |= ((h_ratio - 1) << ISPRSZ_CNT_HRSZ_SHIFT)
-		  & ISPRSZ_CNT_HRSZ_MASK;
-	rgval |= ((v_ratio - 1) << ISPRSZ_CNT_VRSZ_SHIFT)
-		  & ISPRSZ_CNT_VRSZ_MASK;
-	isp_reg_writel(dev, rgval, OMAP3_ISP_IOMEM_RESZ, ISPRSZ_CNT);
-
-	dev_dbg(dev, "%s: Ratio: H=%d V=%d\n", __func__, h_ratio, v_ratio);
-}
-
-/**
- * ispresizer_set_start - Setup vertical and horizontal start position
- * @dev: Device context.
- * @left: Horizontal start position.
- * @top: Vertical start position.
- *
- * Vertical start line:
- *  This field makes sense only when the resizer obtains its input
- *  from the preview engine/CCDC
- *
- * Horizontal start pixel:
- *  Pixels are coded on 16 bits for YUV and 8 bits for color separate data.
- *  When the resizer gets its input from SDRAM, this field must be set
- *  to <= 15 for YUV 16-bit data and <= 31 for 8-bit color separate data
- */
-static inline void ispresizer_set_start(struct device *dev, u32 left, u32 top)
-{
-	u32 rgval;
-
-	rgval = (left << ISPRSZ_IN_START_HORZ_ST_SHIFT)
-		& ISPRSZ_IN_START_HORZ_ST_MASK;
-	rgval |= (top << ISPRSZ_IN_START_VERT_ST_SHIFT)
-		 & ISPRSZ_IN_START_VERT_ST_MASK;
-
-	isp_reg_writel(dev, rgval, OMAP3_ISP_IOMEM_RESZ, ISPRSZ_IN_START);
-
-	dev_dbg(dev, "%s: Start: H=%d V=%d\n", __func__, left, top);
-}
-
-/**
- * ispresizer_set_input_size - Setup the input size
- * @dev: Device context.
- * @width: The range is 0 to 4095 pixels
- * @height: The range is 0 to 4095 lines
- */
-static inline void ispresizer_set_input_size(struct device *dev, u32 width,
-					     u32 height)
-{
-	u32 rgval;
-
-	rgval = (width << ISPRSZ_IN_SIZE_HORZ_SHIFT)
-		& ISPRSZ_IN_SIZE_HORZ_MASK;
-	rgval |= (height << ISPRSZ_IN_SIZE_VERT_SHIFT)
-		 & ISPRSZ_IN_SIZE_VERT_MASK;
-
-	isp_reg_writel(dev, rgval, OMAP3_ISP_IOMEM_RESZ, ISPRSZ_IN_SIZE);
-
-	dev_dbg(dev, "%s: In size: W=%d H=%d\n", __func__, width, height);
-}
-
-/**
- * ispresizer_set_output_size - Setup the output height and width
- * @dev: Device context.
- * @width: Output width.
- * @height: Output height.
- *
- * Width :
- *  The value must be EVEN.
- *
- * Height:
- *  The number of bytes written to SDRAM must be
- *  a multiple of 16-bytes if the vertical resizing factor
- *  is greater than 1x (upsizing)
- */
-static inline void ispresizer_set_output_size(struct device *dev, u32 width,
-					      u32 height)
-{
-	u32 rgval;
-
-	rgval  = (width << ISPRSZ_OUT_SIZE_HORZ_SHIFT)
-		 & ISPRSZ_OUT_SIZE_HORZ_MASK;
-	rgval |= (height << ISPRSZ_OUT_SIZE_VERT_SHIFT)
-		 & ISPRSZ_OUT_SIZE_VERT_MASK;
-	isp_reg_writel(dev, rgval, OMAP3_ISP_IOMEM_RESZ, ISPRSZ_OUT_SIZE);
-
-	dev_dbg(dev, "%s: Out size: W=%d H=%d\n", __func__, width, height);
-}
-
-/**
- * ispresizer_set_source - Input source select
- * @isp_res: Device context.
- * @source: Input source type
- *
- * If this field is set to RSZ_OTFLY_YUV, the resizer input is fed from
- * Preview/CCDC engine, otherwise from memory.
- */
-static inline void ispresizer_set_source(struct isp_res_device *isp_res,
-					 enum resizer_input source)
-{
-	struct device *dev = to_device(isp_res);
-
-	if (source != RSZ_OTFLY_YUV)
-		isp_reg_or(dev, OMAP3_ISP_IOMEM_RESZ, ISPRSZ_CNT,
-			   ISPRSZ_CNT_INPSRC);
-	else
-		isp_reg_and(dev, OMAP3_ISP_IOMEM_RESZ, ISPRSZ_CNT,
-			    ~ISPRSZ_CNT_INPSRC);
-
-	dev_dbg(dev, "%s: In source: %u\n", __func__, source);
-}
-
-/**
- * ispresizer_set_intype - Input type select
- * @isp_res: Device context.
- * @type: Pixel format type.
- */
-static inline void ispresizer_set_intype(struct isp_res_device *isp_res,
-					 enum resizer_input type)
-{
-	struct device *dev = to_device(isp_res);
-
-	if (type == RSZ_MEM_COL8)
-		isp_reg_or(dev, OMAP3_ISP_IOMEM_RESZ, ISPRSZ_CNT,
-			   ISPRSZ_CNT_INPTYP);
-	else
-		isp_reg_and(dev, OMAP3_ISP_IOMEM_RESZ, ISPRSZ_CNT,
-			    ~ISPRSZ_CNT_INPTYP);
-
-	dev_dbg(dev, "%s: In type: %u\n", __func__, type);
-}
-
-/**
- * ispresizer_set_in_offset - Configures the read address line offset.
- * @offset: Line Offset for the input image.
- *
- * Returns 0 if successful, or -EINVAL if offset is not 32 bits aligned.
- **/
-static inline int ispresizer_set_in_offset(struct isp_res_device *isp_res,
-					   u32 offset)
-{
-	struct device *dev = to_device(isp_res);
-
-	if (offset % 32)
-		return -EINVAL;
-	isp_reg_writel(dev, offset << ISPRSZ_SDR_INOFF_OFFSET_SHIFT,
-		       OMAP3_ISP_IOMEM_RESZ, ISPRSZ_SDR_INOFF);
-
-	dev_dbg(dev, "%s: In offset: 0x%04X\n", __func__, offset);
-
-	return 0;
-}
-
-/**
- * ispresizer_set_out_offset - Configures the write address line offset.
- * @offset: Line offset for the preview output.
- *
- * Returns 0 if successful, or -EINVAL if address is not 32 bits aligned.
- **/
-int ispresizer_set_out_offset(struct isp_res_device *isp_res, u32 offset)
-{
-	struct device *dev = to_device(isp_res);
-
-	if (offset % 32)
-		return -EINVAL;
-	isp_reg_writel(dev, offset << ISPRSZ_SDR_OUTOFF_OFFSET_SHIFT,
-		       OMAP3_ISP_IOMEM_RESZ, ISPRSZ_SDR_OUTOFF);
-
-	dev_dbg(dev, "%s: Out offset: 0x%04X\n", __func__, offset);
-
-	return 0;
-}
+u8 need_to_write_filter_coefs;
 
 /* Structure for saving/restoring resizer module registers */
 static struct isp_reg isprsz_reg_list[] = {
@@ -706,84 +155,47 @@ static struct isp_reg isprsz_reg_list[] = {
 };
 
 /**
- * ispresizer_applycrop - Apply crop to input image.
- **/
-void ispresizer_applycrop(struct isp_res_device *isp_res)
-{
-	struct isp_device *isp = to_isp_device(isp_res);
-	struct isp_node *pipe = &isp->pipeline.rsz;
-	int bpp = ISP_BYTES_PER_PIXEL;
-
-	if (!isp_res->applycrop)
-		return;
-
-	ispresizer_set_ratio(isp->dev, isp_res->h_resz, isp_res->v_resz);
-	ispresizer_set_coeffs(isp->dev, NULL, isp_res->h_resz, isp_res->v_resz);
-
-	/* Switch filter, releated to up/down scale */
-	if (ispresizer_is_upscale(pipe))
-		ispresizer_enable_cbilin(isp_res, 1);
-	else
-		ispresizer_enable_cbilin(isp_res, 0);
-
-	/* Set input and output size */
-	ispresizer_set_input_size(isp->dev, isp_res->phy_rect.width,
-				  isp_res->phy_rect.height);
-	ispresizer_set_output_size(isp->dev, pipe->out.image.width,
-				   pipe->out.image.height);
-
-	/* Set input address and line offset address */
-	if (pipe->in.path != RSZ_OTFLY_YUV) {
-		/* Set the input address, plus calculated crop offset */
-		ispresizer_set_inaddr(isp_res, isp_res->in_buff_addr, pipe);
-		/* Set the input line offset/length */
-		ispresizer_set_in_offset(isp_res, pipe->in.image.bytesperline);
-	} else {
-		/* Set the input address.*/
-		ispresizer_set_inaddr(isp_res, 0, NULL);
-		/* Set the starting pixel offset */
-		ispresizer_set_start(isp->dev, isp_res->phy_rect.left * bpp,
-				     isp_res->phy_rect.top);
-		ispresizer_set_in_offset(isp_res, 0);
-	}
-
-	/* Set output line offset */
-	ispresizer_set_out_offset(isp_res, pipe->out.image.bytesperline);
-
-	isp_res->applycrop = 0;
-}
-
-/**
  * ispresizer_config_shadow_registers - Configure shadow registers.
  **/
-void ispresizer_config_shadow_registers(struct isp_res_device *isp_res)
+void ispresizer_config_shadow_registers()
 {
-	ispresizer_applycrop(isp_res);
+	if (need_to_write_filter_coefs)
+		ispresizer_write_filter_coef();
+}
+EXPORT_SYMBOL(ispresizer_config_shadow_registers);
 
+/**
+ * ispresizer_trycrop - Validate crop dimensions.
+ * @left: Left distance to start position of crop.
+ * @top: Top distance to start position of crop.
+ * @width: Width of input image.
+ * @height: Height of input image.
+ * @ow: Width of output image.
+ * @oh: Height of output image.
+ **/
+void ispresizer_trycrop(u32 left, u32 top, u32 width, u32 height, u32 ow,
+			u32 oh)
+{
+	ispres_obj.cropwidth = width + 6;
+	ispres_obj.cropheight = height + 6;
+	ispresizer_try_size(&ispres_obj.cropwidth, &ispres_obj.cropheight, &ow,
+			    &oh);
+	ispres_obj.ipht_crop = top;
+	ispres_obj.ipwd_crop = left;
+}
+EXPORT_SYMBOL(ispresizer_trycrop);
+
+/**
+ * ispresizer_applycrop - Apply crop to input image.
+ **/
+void ispresizer_applycrop(void)
+{
+	ispresizer_config_size(ispres_obj.cropwidth, ispres_obj.cropheight,
+			       ispres_obj.outputwidth,
+			       ispres_obj.outputheight);
 	return;
 }
-
-int ispresizer_config_crop(struct isp_res_device *isp_res,
-			   struct isp_node *pipe, struct v4l2_crop *a)
-{
-	struct isp_device *isp = to_isp_device(isp_res);
-	int rval = 0;
-
-	pipe->in.crop = a->c;
-
-	rval = ispresizer_try_ratio(to_device(isp_res), pipe,
-				    &isp_res->phy_rect, &isp_res->h_resz,
-				    &isp_res->v_resz);
-
-	a->c = pipe->in.crop;
-
-	isp_res->applycrop = 1;
-
-	if (isp->running == ISP_STOPPED)
-		ispresizer_applycrop(isp_res);
-
-	return rval;
-}
+EXPORT_SYMBOL(ispresizer_applycrop);
 
 /**
  * ispresizer_request - Reserves the Resizer module.
@@ -792,54 +204,105 @@ int ispresizer_config_crop(struct isp_res_device *isp_res,
  *
  * Returns 0 if successful, or -EBUSY if resizer module was already requested.
  **/
-int ispresizer_request(struct isp_res_device *isp_res)
+int ispresizer_request()
 {
-	struct device *dev = to_device(isp_res);
-
-	mutex_lock(&isp_res->ispres_mutex);
-	if (!isp_res->res_inuse) {
-		isp_res->res_inuse = 1;
-		mutex_unlock(&isp_res->ispres_mutex);
-		isp_reg_writel(dev,
-			       isp_reg_readl(dev,
-					     OMAP3_ISP_IOMEM_MAIN, ISP_CTRL) |
+	mutex_lock(&ispres_obj.ispres_mutex);
+	if (!ispres_obj.res_inuse) {
+		ispres_obj.res_inuse = 1;
+		mutex_unlock(&ispres_obj.ispres_mutex);
+		isp_reg_writel(isp_reg_readl(OMAP3_ISP_IOMEM_MAIN, ISP_CTRL) |
 			       ISPCTRL_SBL_WR0_RAM_EN |
 			       ISPCTRL_RSZ_CLK_EN,
 			       OMAP3_ISP_IOMEM_MAIN, ISP_CTRL);
 		return 0;
 	} else {
-		mutex_unlock(&isp_res->ispres_mutex);
-		dev_err(dev, "resizer: Module Busy\n");
+		mutex_unlock(&ispres_obj.ispres_mutex);
+		printk(KERN_ERR "ISP_ERR : Resizer Module Busy\n");
 		return -EBUSY;
 	}
 }
+EXPORT_SYMBOL(ispresizer_request);
 
 /**
  * ispresizer_free - Makes Resizer module free.
  *
  * Returns 0 if successful, or -EINVAL if resizer module was already freed.
  **/
-int ispresizer_free(struct isp_res_device *isp_res)
+int ispresizer_free()
 {
-	struct device *dev = to_device(isp_res);
-
-	mutex_lock(&isp_res->ispres_mutex);
-	if (isp_res->res_inuse) {
-		isp_res->res_inuse = 0;
-		mutex_unlock(&isp_res->ispres_mutex);
-		isp_reg_and(dev, OMAP3_ISP_IOMEM_MAIN, ISP_CTRL,
+	mutex_lock(&ispres_obj.ispres_mutex);
+	if (ispres_obj.res_inuse) {
+		ispres_obj.res_inuse = 0;
+		mutex_unlock(&ispres_obj.ispres_mutex);
+		isp_reg_and(OMAP3_ISP_IOMEM_MAIN, ISP_CTRL,
 			    ~(ISPCTRL_RSZ_CLK_EN | ISPCTRL_SBL_WR0_RAM_EN));
 		return 0;
 	} else {
-		mutex_unlock(&isp_res->ispres_mutex);
-		dev_err(dev, "Resizer Module already freed\n");
+		mutex_unlock(&ispres_obj.ispres_mutex);
+		DPRINTK_ISPRESZ("ISP_ERR : Resizer Module already freed\n");
 		return -EINVAL;
 	}
 }
+EXPORT_SYMBOL(ispresizer_free);
+
+/**
+ * ispresizer_config_datapath - Specifies which input to use in resizer module
+ * @input: Indicates the module that gives the image to resizer.
+ *
+ * Sets up the default resizer configuration according to the arguments.
+ *
+ * Returns 0 if successful, or -EINVAL if an unsupported input was requested.
+ **/
+int ispresizer_config_datapath(enum ispresizer_input input, u8 reset)
+{
+	u32 cnt = 0;
+	DPRINTK_ISPRESZ("ispresizer_config_datapath()+\n");
+	cnt = isp_reg_readl(OMAP3_ISP_IOMEM_RESZ, ISPRSZ_CNT);
+
+	ispres_obj.resinput = input;
+	switch (input) {
+	case RSZ_OTFLY_YUV:
+		cnt &= ~ISPRSZ_CNT_INPTYP;
+		cnt &= ~ISPRSZ_CNT_INPSRC;
+		ispresizer_set_inaddr(0);
+		ispresizer_config_inlineoffset(0);
+		break;
+	case RSZ_MEM_YUV:
+		cnt |= ISPRSZ_CNT_INPSRC;
+		cnt &= ~ISPRSZ_CNT_INPTYP;
+		break;
+	case RSZ_MEM_COL8:
+		cnt |= ISPRSZ_CNT_INPSRC;
+		cnt |= ISPRSZ_CNT_INPTYP;
+		break;
+	default:
+		printk(KERN_ERR "ISP_ERR : Wrong Input\n");
+		return -EINVAL;
+	}
+	isp_reg_writel(cnt, OMAP3_ISP_IOMEM_RESZ, ISPRSZ_CNT);
+
+	if (reset) {
+		/* Use bilinear interpolation for upsampling per TRM */
+		if (ispres_obj.outputwidth > ispres_obj.inputwidth)
+			ispresizer_enable_cbilin(1);
+		else
+			ispresizer_enable_cbilin(0);
+		ispresizer_config_ycpos(0);
+		ispresizer_config_filter_coef(&ispreszdefcoef);
+		ispresizer_config_luma_enhance(&ispreszdefaultyenh);
+	}
+	DPRINTK_ISPRESZ("ispresizer_config_datapath()-\n");
+	return 0;
+}
+EXPORT_SYMBOL(ispresizer_config_datapath);
 
 /**
  * ispresizer_try_size - Validates input and output images size.
- * @pipe: Resizer data path parameters.
+ * @input_w: input width for the resizer in number of pixels per line
+ * @input_h: input height for the resizer in number of lines
+ * @output_w: output width from the resizer in number of pixels per line
+ *            resizer when writing to memory needs this to be multiple of 16.
+ * @output_h: output height for the resizer in number of lines, must be even.
  *
  * Calculates the horizontal and vertical resize ratio, number of pixels to
  * be cropped in the resizer module and checks the validity of various
@@ -857,51 +320,158 @@ int ispresizer_free(struct isp_res_device *isp_res)
  * endpahse for width = ((64 * sph + (ow - 1) * hrsz + 32) >> 6) % 4
  * endphase for height = ((64 * sph + (oh - 1) * hrsz + 32) >> 6) % 4
  *
- */
-int ispresizer_try_pipeline(struct isp_res_device *isp_res,
-			    struct isp_node *pipe)
+ * Where:
+ * sph = Start phase horizontal
+ * spv = Start phase vertical
+ * ow = Output width
+ * oh = Output height
+ * hrsz = Horizontal resize value
+ * vrsz = Vertical resize value
+ *
+ * Fills up the output/input widht/height, horizontal/vertical resize ratio,
+ * horizontal/vertical crop variables in the isp_res structure.
+ **/
+int ispresizer_try_size(u32 *input_width, u32 *input_height, u32 *output_w,
+			u32 *output_h)
 {
-	if (pipe->in.image.pixelformat == V4L2_PIX_FMT_YUYV ||
-	    pipe->in.image.pixelformat == V4L2_PIX_FMT_UYVY) {
-		pipe->in.image.colorspace = V4L2_COLORSPACE_JPEG;
-	} else {
-		pipe->in.image.colorspace = V4L2_COLORSPACE_SRGB;
-	}
+	u32 rsz, rsz_7, rsz_4;
+	u32 sph;
+	u32 input_w, input_h;
+	int max_in_otf, max_out_7tap;
 
-	if (ispresizer_try_fmt(pipe, pipe->in.path != RSZ_OTFLY_YUV))
+	input_w = *input_width;
+	input_h = *input_height;
+
+	if (input_w < 32 || input_h < 32) {
+		DPRINTK_ISPCCDC("ISP_ERR: RESIZER cannot handle input width"
+				" less than 32 pixels or height less than"
+				" 32\n");
+		return -EINVAL;
+	}
+	input_w -= 6;
+	input_h -= 6;
+
+	if (input_h > MAX_IN_HEIGHT)
 		return -EINVAL;
 
-	if (ispresizer_try_ratio(to_device(isp_res), pipe, &isp_res->phy_rect,
-				 &isp_res->h_resz, &isp_res->v_resz))
-		return -EINVAL;
+	if (*output_w < 16)
+		*output_w = 16;
 
-	if (pipe->in.path == RSZ_MEM_COL8) {
-		pipe->in.image.bytesperline = ALIGN(pipe->in.image.width,
-						   PHY_ADDRESS_ALIGN);
-		pipe->out.image.bytesperline = ALIGN(pipe->out.image.width,
-						    PHY_ADDRESS_ALIGN);
+	if (*output_h < 2)
+		*output_h = 2;
+
+	if (omap_rev() == OMAP3430_REV_ES1_0) {
+		max_in_otf = MAX_IN_WIDTH_ONTHEFLY_MODE;
+		max_out_7tap = MAX_7TAP_VRSZ_OUTWIDTH;
 	} else {
-		pipe->in.image.bytesperline = ALIGN(pipe->in.image.width * 2,
-						   PHY_ADDRESS_ALIGN);
-		pipe->out.image.bytesperline = ALIGN(pipe->out.image.width * 2,
-						    PHY_ADDRESS_ALIGN);
+		max_in_otf = MAX_IN_WIDTH_ONTHEFLY_MODE_ES2;
+		max_out_7tap = MAX_7TAP_VRSZ_OUTWIDTH_ES2;
 	}
-	pipe->in.image.field = V4L2_FIELD_NONE;
-	pipe->in.image.sizeimage = pipe->in.image.bytesperline *
-				  pipe->in.image.height;
 
-	pipe->out.image.field = pipe->in.image.field;
-	pipe->out.image.colorspace = pipe->in.image.colorspace;
-	pipe->out.image.pixelformat = pipe->in.image.pixelformat;
-	pipe->out.image.sizeimage = pipe->out.image.bytesperline *
-				   pipe->out.image.height;
+	if (ispres_obj.resinput == RSZ_OTFLY_YUV) {
+		if (input_w > max_in_otf)
+			return -EINVAL;
+	} else {
+		if (input_w > MAX_IN_WIDTH_MEMORY_MODE)
+			return -EINVAL;
+	}
 
+	*output_h &= 0xfffffffe;
+	sph = DEFAULTSTPHASE;
+
+	rsz_7 = ((input_h - 7) * 256) / (*output_h - 1);
+	rsz_4 = ((input_h - 4) * 256) / (*output_h - 1);
+
+	rsz = (input_h * 256) / *output_h;
+
+	if (rsz <= MID_RESIZE_VALUE) {
+		rsz = rsz_4;
+		if (rsz < MINIMUM_RESIZE_VALUE) {
+			rsz = MINIMUM_RESIZE_VALUE;
+			*output_h = (((input_h - 4) * 256) / rsz) + 1;
+			DPRINTK_ISPRESZ("%s: using output_h"
+				"%d instead\n", __func__, *output_h);
+		}
+	} else {
+		rsz = rsz_7;
+		if (*output_w > max_out_7tap)
+			*output_w = max_out_7tap;
+		if (rsz > MAXIMUM_RESIZE_VALUE) {
+			rsz = MAXIMUM_RESIZE_VALUE;
+			*output_h = (((input_h - 7) * 256) / rsz) + 1;
+			DPRINTK_ISPRESZ("%s: using output_h"
+				"%d instead\n", __func__, *output_h);
+		}
+	}
+
+	if (rsz > MID_RESIZE_VALUE) {
+		input_h =
+			(((64 * sph) + ((*output_h - 1) * rsz) + 32) / 256) + 7;
+	} else {
+		input_h =
+			(((32 * sph) + ((*output_h - 1) * rsz) + 16) / 256) + 4;
+	}
+
+	ispres_obj.outputheight = *output_h;
+	ispres_obj.v_resz = rsz;
+	ispres_obj.inputheight = input_h;
+	ispres_obj.ipht_crop = DEFAULTSTPIXEL;
+	ispres_obj.v_startphase = sph;
+
+	*output_w &= 0xfffffff0;
+	sph = DEFAULTSTPHASE;
+
+	rsz_7 = ((input_w - 7) * 256) / (*output_w - 1);
+	rsz_4 = ((input_w - 4) * 256) / (*output_w - 1);
+
+	rsz = (input_w * 256) / *output_w;
+	if (rsz > MID_RESIZE_VALUE) {
+		rsz = rsz_7;
+		if (rsz > MAXIMUM_RESIZE_VALUE) {
+			rsz = MAXIMUM_RESIZE_VALUE;
+			*output_w = (((input_w - 7) * 256) / rsz) + 1;
+			*output_w = (*output_w + 0xf) & 0xfffffff0;
+			DPRINTK_ISPRESZ("%s: using output_w"
+				"%d instead\n", __func__, *output_w);
+		}
+	} else {
+		rsz = rsz_4;
+		if (rsz < MINIMUM_RESIZE_VALUE) {
+			rsz = MINIMUM_RESIZE_VALUE;
+			*output_w = (((input_w - 4) * 256) / rsz) + 1;
+			*output_w = (*output_w + 0xf) & 0xfffffff0;
+			DPRINTK_ISPRESZ("%s: using output_w %d"
+				"instead\n", __func__, *output_w);
+		}
+	}
+
+	/* Recalculate input based on TRM equations */
+	if (rsz > MID_RESIZE_VALUE) {
+		input_w =
+			(((64 * sph) + ((*output_w - 1) * rsz) + 32) / 256) + 7;
+	} else {
+		input_w =
+			(((32 * sph) + ((*output_w - 1) * rsz) + 16) / 256) + 7;
+	}
+
+	ispres_obj.outputwidth = *output_w;
+	ispres_obj.h_resz = rsz;
+	ispres_obj.inputwidth = input_w;
+	ispres_obj.ipwd_crop = DEFAULTSTPIXEL;
+	ispres_obj.h_startphase = sph;
+
+	*input_height = input_h;
+	*input_width = input_w;
 	return 0;
 }
+EXPORT_SYMBOL(ispresizer_try_size);
 
 /**
  * ispresizer_config_size - Configures input and output image size.
- * @pipe: Resizer data path parameters.
+ * @input_w: input width for the resizer in number of pixels per line.
+ * @input_h: input height for the resizer in number of lines.
+ * @output_w: output width from the resizer in number of pixels per line.
+ * @output_h: output height for the resizer in number of lines.
  *
  * Configures the appropriate values stored in the isp_res structure in the
  * resizer registers.
@@ -909,58 +479,187 @@ int ispresizer_try_pipeline(struct isp_res_device *isp_res,
  * Returns 0 if successful, or -EINVAL if passed values haven't been verified
  * with ispresizer_try_size() previously.
  **/
-int ispresizer_s_pipeline(struct isp_res_device *isp_res,
-			  struct isp_node *pipe)
+int ispresizer_config_size(u32 input_w, u32 input_h, u32 output_w,
+			   u32 output_h)
 {
-	struct device *dev = to_device(isp_res);
-	int bpp = ISP_BYTES_PER_PIXEL;
-
-	ispresizer_set_source(isp_res, pipe->in.path);
-	ispresizer_set_intype(isp_res, pipe->in.path);
-	ispresizer_set_start_phase(dev, NULL);
-	ispresizer_set_luma_enhance(dev, NULL);
-
-	if (pipe->in.image.pixelformat == V4L2_PIX_FMT_YUYV)
-		ispresizer_config_ycpos(isp_res, 1);
-	else
-		ispresizer_config_ycpos(isp_res, 0);
-
-	ispresizer_try_pipeline(isp_res, pipe);
-
-	ispresizer_set_ratio(dev, isp_res->h_resz, isp_res->v_resz);
-	ispresizer_set_coeffs(dev, NULL, isp_res->h_resz, isp_res->v_resz);
-
-	/* Switch filter, releated to up/down scale */
-	if (ispresizer_is_upscale(pipe))
-		ispresizer_enable_cbilin(isp_res, 1);
-	else
-		ispresizer_enable_cbilin(isp_res, 0);
-
-	/* Set input and output size */
-	ispresizer_set_input_size(dev, isp_res->phy_rect.width,
-				  isp_res->phy_rect.height);
-	ispresizer_set_output_size(dev, pipe->out.image.width,
-				   pipe->out.image.height);
-
-	/* Set input address and line offset address */
-	if (pipe->in.path != RSZ_OTFLY_YUV) {
-		/* Set the input address, plus calculated crop offset */
-		ispresizer_set_inaddr(isp_res, isp_res->in_buff_addr, pipe);
-		/* Set the input line offset/length */
-		ispresizer_set_in_offset(isp_res, pipe->in.image.bytesperline);
-	} else {
-		/* Set the input address.*/
-		ispresizer_set_inaddr(isp_res, 0, NULL);
-		/* Set the starting pixel offset */
-		ispresizer_set_start(dev, isp_res->phy_rect.left * bpp,
-				     isp_res->phy_rect.top);
-		ispresizer_set_in_offset(isp_res, 0);
+	int i, j;
+	u32 res;
+	DPRINTK_ISPRESZ("ispresizer_config_size()+, input_w = %d,input_h ="
+			" %d, output_w = %d, output_h"
+			" = %d,hresz = %d,vresz = %d,"
+			" hcrop = %d, vcrop = %d,"
+			" hstph = %d, vstph = %d\n",
+			ispres_obj.inputwidth,
+			ispres_obj.inputheight,
+			ispres_obj.outputwidth,
+			ispres_obj.outputheight,
+			ispres_obj.h_resz,
+			ispres_obj.v_resz,
+			ispres_obj.ipwd_crop,
+			ispres_obj.ipht_crop,
+			ispres_obj.h_startphase,
+			ispres_obj.v_startphase);
+	if ((output_w != ispres_obj.outputwidth)
+	    || (output_h != ispres_obj.outputheight)) {
+		printk(KERN_ERR "Output parameters passed do not match the"
+		       " values calculated by the"
+		       " trysize passed w %d, h %d"
+		       " \n", output_w , output_h);
+		return -EINVAL;
 	}
 
-	/* Set output line offset */
-	ispresizer_set_out_offset(isp_res, pipe->out.image.bytesperline);
+	if (isp_lsc_workaround_enabled()) {
+		/* Set Resizer input address and offset adderss */
+		ispresizer_config_inlineoffset(isp_reg_readl(
+						OMAP3_ISP_IOMEM_PREV,
+						ISPPRV_WADD_OFFSET));
+	}
 
+	res = isp_reg_readl(OMAP3_ISP_IOMEM_RESZ, ISPRSZ_CNT) &
+		~(ISPRSZ_CNT_HSTPH_MASK | ISPRSZ_CNT_VSTPH_MASK);
+	isp_reg_writel(res |
+		       (ispres_obj.h_startphase << ISPRSZ_CNT_HSTPH_SHIFT) |
+		       (ispres_obj.v_startphase << ISPRSZ_CNT_VSTPH_SHIFT),
+		       OMAP3_ISP_IOMEM_RESZ,
+		       ISPRSZ_CNT);
+
+	if (isp_lsc_workaround_enabled()) {
+		/* Set start address for cropping */
+		isp_reg_writel(ispres_obj.tmp_buf + isp_get_buf_offset(),
+			OMAP3_ISP_IOMEM_RESZ, ISPRSZ_SDR_INADD);
+
+		isp_reg_writel((0x00 << ISPRSZ_IN_START_HORZ_ST_SHIFT) |
+			(0x00 << ISPRSZ_IN_START_VERT_ST_SHIFT),
+			OMAP3_ISP_IOMEM_RESZ,
+			ISPRSZ_IN_START);
+	} else {
+		/* ipwd_crop is in bytes, not pixels */
+		isp_reg_writel(
+			((ispres_obj.ipwd_crop << 1) <<
+				ISPRSZ_IN_START_HORZ_ST_SHIFT) |
+			(ispres_obj.ipht_crop  <<
+				ISPRSZ_IN_START_VERT_ST_SHIFT),
+			OMAP3_ISP_IOMEM_RESZ, ISPRSZ_IN_START);
+	}
+
+	isp_reg_writel((ispres_obj.inputwidth << ISPRSZ_IN_SIZE_HORZ_SHIFT) |
+		       (ispres_obj.inputheight <<
+			ISPRSZ_IN_SIZE_VERT_SHIFT),
+		       OMAP3_ISP_IOMEM_RESZ,
+		       ISPRSZ_IN_SIZE);
+	if (!ispres_obj.algo) {
+		isp_reg_writel((output_w << ISPRSZ_OUT_SIZE_HORZ_SHIFT) |
+			       (output_h << ISPRSZ_OUT_SIZE_VERT_SHIFT),
+			       OMAP3_ISP_IOMEM_RESZ,
+			       ISPRSZ_OUT_SIZE);
+	} else {
+		isp_reg_writel(((output_w - 4) << ISPRSZ_OUT_SIZE_HORZ_SHIFT) |
+			       (output_h << ISPRSZ_OUT_SIZE_VERT_SHIFT),
+			       OMAP3_ISP_IOMEM_RESZ,
+			       ISPRSZ_OUT_SIZE);
+	}
+
+	res = isp_reg_readl(OMAP3_ISP_IOMEM_RESZ, ISPRSZ_CNT) &
+		~(ISPRSZ_CNT_HRSZ_MASK | ISPRSZ_CNT_VRSZ_MASK);
+	isp_reg_writel(res |
+		       ((ispres_obj.h_resz - 1) << ISPRSZ_CNT_HRSZ_SHIFT) |
+		       ((ispres_obj.v_resz - 1) << ISPRSZ_CNT_VRSZ_SHIFT),
+		       OMAP3_ISP_IOMEM_RESZ,
+		       ISPRSZ_CNT);
+
+	/* write filter coefficients  */
+	/* why not call isp_write_filter_coefs() ? */
+	if (ispres_obj.h_resz <= MID_RESIZE_VALUE) {
+		j = 0;
+		for (i = 0; i < 16; i++) {
+			isp_reg_writel(
+				(ispres_obj.coeflist.h_filter_coef_4tap[j]
+				 << ISPRSZ_HFILT10_COEF0_SHIFT) |
+				(ispres_obj.coeflist.h_filter_coef_4tap[j + 1]
+				 << ISPRSZ_HFILT10_COEF1_SHIFT),
+				OMAP3_ISP_IOMEM_RESZ,
+				ISPRSZ_HFILT10 + (i * 0x04));
+			j += 2;
+		}
+	} else {
+		j = 0;
+		for (i = 0; i < 16; i++) {
+			if ((i + 1) % 4 == 0) {
+				isp_reg_writel((ispres_obj.coeflist.
+						h_filter_coef_7tap[j] <<
+						ISPRSZ_HFILT10_COEF0_SHIFT),
+					       OMAP3_ISP_IOMEM_RESZ,
+					       ISPRSZ_HFILT10 + (i * 0x04));
+				j += 1;
+			} else {
+				isp_reg_writel((ispres_obj.coeflist.
+						h_filter_coef_7tap[j] <<
+						ISPRSZ_HFILT10_COEF0_SHIFT) |
+					       (ispres_obj.coeflist.
+						h_filter_coef_7tap[j+1] <<
+						ISPRSZ_HFILT10_COEF1_SHIFT),
+					       OMAP3_ISP_IOMEM_RESZ,
+					       ISPRSZ_HFILT10 + (i * 0x04));
+				j += 2;
+			}
+		}
+	}
+	if (ispres_obj.v_resz <= MID_RESIZE_VALUE) {
+		j = 0;
+		for (i = 0; i < 16; i++) {
+			isp_reg_writel((ispres_obj.coeflist.
+					v_filter_coef_4tap[j] <<
+					ISPRSZ_VFILT10_COEF0_SHIFT) |
+				       (ispres_obj.coeflist.
+					v_filter_coef_4tap[j + 1] <<
+					ISPRSZ_VFILT10_COEF1_SHIFT),
+				       OMAP3_ISP_IOMEM_RESZ,
+				       ISPRSZ_VFILT10 + (i * 0x04));
+			j += 2;
+		}
+	} else {
+		j = 0;
+		for (i = 0; i < 16; i++) {
+			if ((i + 1) % 4 == 0) {
+				isp_reg_writel((ispres_obj.coeflist.
+						v_filter_coef_7tap[j] <<
+						ISPRSZ_VFILT10_COEF0_SHIFT),
+					       OMAP3_ISP_IOMEM_RESZ,
+					       ISPRSZ_VFILT10 + (i * 0x04));
+				j += 1;
+			} else {
+				isp_reg_writel((ispres_obj.coeflist.
+						v_filter_coef_7tap[j] <<
+						ISPRSZ_VFILT10_COEF0_SHIFT) |
+					       (ispres_obj.coeflist.
+						v_filter_coef_7tap[j+1] <<
+						ISPRSZ_VFILT10_COEF1_SHIFT),
+					       OMAP3_ISP_IOMEM_RESZ,
+					       ISPRSZ_VFILT10 + (i * 0x04));
+				j += 2;
+			}
+		}
+	}
+
+	ispresizer_config_outlineoffset(output_w*2);
+	DPRINTK_ISPRESZ("ispresizer_config_size()-\n");
 	return 0;
+}
+EXPORT_SYMBOL(ispresizer_config_size);
+
+void __ispresizer_enable(int enable)
+{
+	int val;
+	DPRINTK_ISPRESZ("+ispresizer_enable()+\n");
+	if (enable) {
+		val = (isp_reg_readl(OMAP3_ISP_IOMEM_RESZ, ISPRSZ_PCR) & 0x2) |
+			ISPRSZ_PCR_ENABLE;
+	} else {
+		val = isp_reg_readl(OMAP3_ISP_IOMEM_RESZ, ISPRSZ_PCR) &
+			~ISPRSZ_PCR_ENABLE;
+	}
+	isp_reg_writel(val, OMAP3_ISP_IOMEM_RESZ, ISPRSZ_PCR);
+	DPRINTK_ISPRESZ("+ispresizer_enable()-\n");
 }
 
 /**
@@ -969,226 +668,387 @@ int ispresizer_s_pipeline(struct isp_res_device *isp_res,
  *
  * Client should configure all the sub modules in resizer before this.
  **/
-void ispresizer_enable(struct isp_res_device *isp_res, int enable)
+void ispresizer_enable(int enable)
 {
-	struct device *dev = to_device(isp_res);
-	int val;
-
-	if (enable) {
-#ifdef CONFIG_VIDEO_OMAP34XX_ISP_DEBUG_FS
-		struct isp_device *isp = to_isp_device(isp_res);
-		if (isp->dfs_resz)
-			ispresz_dfs_dump(isp);
-#endif
-		val = (isp_reg_readl(dev, OMAP3_ISP_IOMEM_RESZ,
-			ISPRSZ_PCR) & ISPRSZ_PCR_ONESHOT) |
-			ISPRSZ_PCR_ENABLE;
-	} else {
-		val = isp_reg_readl(dev,
-				    OMAP3_ISP_IOMEM_RESZ, ISPRSZ_PCR) &
-			~ISPRSZ_PCR_ENABLE;
-	}
-	isp_reg_writel(dev, val, OMAP3_ISP_IOMEM_RESZ, ISPRSZ_PCR);
+	__ispresizer_enable(enable);
+	ispres_obj.pm_state = enable;
 }
+EXPORT_SYMBOL(ispresizer_enable);
+
+/**
+ * ispresizer_suspend - Suspend resizer module.
+ **/
+void ispresizer_suspend(void)
+{
+	if (ispres_obj.pm_state)
+		__ispresizer_enable(0);
+}
+EXPORT_SYMBOL(ispresizer_suspend);
+
+/**
+ * ispresizer_resume - Resume resizer module.
+ **/
+void ispresizer_resume(void)
+{
+	if (ispres_obj.pm_state)
+		__ispresizer_enable(1);
+}
+EXPORT_SYMBOL(ispresizer_resume);
 
 /**
  * ispresizer_busy - Checks if ISP resizer is busy.
  *
  * Returns busy field from ISPRSZ_PCR register.
  **/
-int ispresizer_busy(struct isp_res_device *isp_res)
+int ispresizer_busy(void)
 {
-	struct device *dev = to_device(isp_res);
-
-	return isp_reg_readl(dev, OMAP3_ISP_IOMEM_RESZ, ISPRSZ_PCR) &
-		ISPRSZ_PCR_BUSY;
+	return isp_reg_readl(OMAP3_ISP_IOMEM_RESZ, ISPRSZ_PCR) &
+		ISPPRV_PCR_BUSY;
 }
+EXPORT_SYMBOL(ispresizer_busy);
 
 /**
- * ispresizer_is_enabled - Checks if ISP resizer is enable.
- *
- * Returns busy field from ISPRSZ_PCR register.
- **/
-int ispresizer_is_enabled(struct isp_res_device *isp_res)
-{
-	struct device *dev = to_device(isp_res);
-
-	return isp_reg_readl(dev, OMAP3_ISP_IOMEM_RESZ, ISPRSZ_PCR) &
-		ISPRSZ_PCR_ENABLE;
-}
-/**
- * ispresizer_set_start_phase - Sets the horizontal and vertical start phase.
- * @phase: horizontal and vertical start phase (0 - 7).
+ * ispresizer_config_startphase - Sets the horizontal and vertical start phase.
+ * @hstartphase: horizontal start phase (0 - 7).
+ * @vstartphase: vertical startphase (0 - 7).
  *
  * This API just updates the isp_res struct. Actual register write happens in
  * ispresizer_config_size.
  **/
-void ispresizer_set_start_phase(struct device *dev, struct isprsz_phase *phase)
+void ispresizer_config_startphase(u8 hstartphase, u8 vstartphase)
 {
-	/* clear bits */
-	isp_reg_and(dev, OMAP3_ISP_IOMEM_RESZ, ISPRSZ_CNT,
-		    ~(ISPRSZ_CNT_HSTPH_MASK | ISPRSZ_CNT_VSTPH_MASK));
-
-	if (phase != NULL) {
-		isp_reg_or(dev, OMAP3_ISP_IOMEM_RESZ, ISPRSZ_CNT,
-			   ((phase->h_phase << ISPRSZ_CNT_HSTPH_SHIFT)
-			     & ISPRSZ_CNT_HSTPH_MASK) |
-			   ((phase->v_phase << ISPRSZ_CNT_VSTPH_SHIFT)
-			     & ISPRSZ_CNT_VSTPH_MASK));
-	} else {
-		isp_reg_or(dev, OMAP3_ISP_IOMEM_RESZ, ISPRSZ_CNT,
-			   ((DEFAULTSTPHASE << ISPRSZ_CNT_HSTPH_SHIFT)
-			     & ISPRSZ_CNT_HSTPH_MASK) |
-			   ((DEFAULTSTPHASE  << ISPRSZ_CNT_VSTPH_SHIFT)
-			     & ISPRSZ_CNT_VSTPH_MASK));
-	}
+	DPRINTK_ISPRESZ("ispresizer_config_startphase()+\n");
+	ispres_obj.h_startphase = hstartphase;
+	ispres_obj.v_startphase = vstartphase;
+	DPRINTK_ISPRESZ("ispresizer_config_startphase()-\n");
 }
+EXPORT_SYMBOL(ispresizer_config_startphase);
 
 /**
  * ispresizer_config_ycpos - Specifies if output should be in YC or CY format.
  * @yc: 0 - YC format, 1 - CY format
  **/
-void ispresizer_config_ycpos(struct isp_res_device *isp_res, u8 yc)
+void ispresizer_config_ycpos(u8 yc)
 {
-	struct device *dev = to_device(isp_res);
-
-	isp_reg_and_or(dev, OMAP3_ISP_IOMEM_RESZ, ISPRSZ_CNT,
-		       ~ISPRSZ_CNT_YCPOS, (yc ? ISPRSZ_CNT_YCPOS : 0));
+	DPRINTK_ISPRESZ("ispresizer_config_ycpos()+\n");
+	isp_reg_and_or(OMAP3_ISP_IOMEM_RESZ, ISPRSZ_CNT, ~ISPRSZ_CNT_YCPOS,
+		       (yc ? ISPRSZ_CNT_YCPOS : 0));
+	DPRINTK_ISPRESZ("ispresizer_config_ycpos()-\n");
 }
+EXPORT_SYMBOL(ispresizer_config_ycpos);
 
 /**
  * Sets the chrominance algorithm
  * @cbilin: 0 - chrominance uses same processing as luminance,
  *          1 - bilinear interpolation processing
  **/
-void ispresizer_enable_cbilin(struct isp_res_device *isp_res, u8 enable)
+void ispresizer_enable_cbilin(u8 enable)
 {
-	struct device *dev = to_device(isp_res);
-
-	isp_reg_and_or(dev, OMAP3_ISP_IOMEM_RESZ, ISPRSZ_CNT,
-		       ~ISPRSZ_CNT_CBILIN, (enable ? ISPRSZ_CNT_CBILIN : 0));
+	DPRINTK_ISPRESZ("ispresizer_enable_cbilin()+\n");
+	isp_reg_and_or(OMAP3_ISP_IOMEM_RESZ, ISPRSZ_CNT, ~ISPRSZ_CNT_CBILIN,
+		       (enable ? ISPRSZ_CNT_CBILIN : 0));
+	DPRINTK_ISPRESZ("ispresizer_enable_cbilin()-\n");
 }
+EXPORT_SYMBOL(ispresizer_enable_cbilin);
 
 /**
- * ispresizer_set_luma_enhance - Set luminance enhancer parameters.
- * @yenh: Pointer to structure containing desired values or NULL
- * to user default values for core, slope, gain and algo parameters.
+ * ispresizer_config_luma_enhance - Configures luminance enhancer parameters.
+ * @yenh: Pointer to structure containing desired values for core, slope, gain
+ *        and algo parameters.
  **/
-void ispresizer_set_luma_enhance(struct device *dev, struct isprsz_yenh *yenh)
+void ispresizer_config_luma_enhance(struct isprsz_yenh *yenh)
 {
-	if (yenh != NULL) {
-		isp_reg_writel(dev, (yenh->algo << ISPRSZ_YENH_ALGO_SHIFT) |
-				    (yenh->gain << ISPRSZ_YENH_GAIN_SHIFT) |
-				    (yenh->slope << ISPRSZ_YENH_SLOP_SHIFT) |
-				    (yenh->coreoffset <<
-				     ISPRSZ_YENH_CORE_SHIFT),
-				    OMAP3_ISP_IOMEM_RESZ, ISPRSZ_YENH);
+	DPRINTK_ISPRESZ("ispresizer_config_luma_enhance()+\n");
+	ispres_obj.algo = yenh->algo;
+	isp_reg_writel((yenh->algo << ISPRSZ_YENH_ALGO_SHIFT) |
+		       (yenh->gain << ISPRSZ_YENH_GAIN_SHIFT) |
+		       (yenh->slope << ISPRSZ_YENH_SLOP_SHIFT) |
+		       (yenh->coreoffset << ISPRSZ_YENH_CORE_SHIFT),
+		       OMAP3_ISP_IOMEM_RESZ,
+		       ISPRSZ_YENH);
+	DPRINTK_ISPRESZ("ispresizer_config_luma_enhance()-\n");
+}
+EXPORT_SYMBOL(ispresizer_config_luma_enhance);
+
+/**
+ * ispresizer_config_filter_coef - Sets filter coefficients for 4 & 7-tap mode.
+ * This API just updates the isp_res struct.Actual register write happens in
+ * ispresizer_config_size.
+ * @coef: Structure containing horizontal and vertical filter coefficients for
+ *        both 4-tap and 7-tap mode.
+ **/
+void ispresizer_config_filter_coef(struct isprsz_coef *coef)
+{
+	int i;
+	DPRINTK_ISPRESZ("ispresizer_config_filter_coef()+\n");
+	for (i = 0; i < 32; i++) {
+		ispres_obj.coeflist.h_filter_coef_4tap[i] =
+			coef->h_filter_coef_4tap[i];
+		ispres_obj.coeflist.v_filter_coef_4tap[i] =
+			coef->v_filter_coef_4tap[i];
+	}
+	for (i = 0; i < 28; i++) {
+		ispres_obj.coeflist.h_filter_coef_7tap[i] =
+			coef->h_filter_coef_7tap[i];
+		ispres_obj.coeflist.v_filter_coef_7tap[i] =
+			coef->v_filter_coef_7tap[i];
+	}
+
+	if (isp_state() == ISP_STOPPED)
+		ispresizer_write_filter_coef();
+	else
+		need_to_write_filter_coefs = 1;
+
+	DPRINTK_ISPRESZ("ispresizer_config_filter_coef()-\n");
+}
+EXPORT_SYMBOL(ispresizer_config_filter_coef);
+
+/**
+* ispresizer_get_filter_coef - Get the resizer filter coefficients.
+* @coef: Structure containing horizontal and vertical filter coefficients for
+*        both 4-tap and 7-tap mode.
+**/
+void ispresizer_get_filter_coef(struct isprsz_coef *coef)
+{
+	mutex_lock(&ispres_obj.ispres_mutex);
+	memcpy(coef, &ispres_obj.coeflist, sizeof(struct isprsz_coef));
+	mutex_unlock(&ispres_obj.ispres_mutex);
+}
+EXPORT_SYMBOL(ispresizer_get_filter_coef);
+
+/**
+* ispresizer_set_filter_coef - Writes the resizer filter coefficients to the
+* resizer registers.
+**/
+void ispresizer_write_filter_coef(void)
+{
+	int i, j;
+	DPRINTK_ISPRESZ("ispresizer_write_filter_coef\n");
+
+	if (ispresizer_busy() == 0) {
+		if (ispres_obj.h_resz <= MID_RESIZE_VALUE) {
+			j = 0;
+			for (i = 0; i < 16; i++) {
+				isp_reg_writel((ispres_obj.coeflist.
+						h_filter_coef_4tap[j] <<
+						ISPRSZ_HFILT10_COEF0_SHIFT) |
+						(ispres_obj.coeflist.
+						h_filter_coef_4tap[j + 1] <<
+						ISPRSZ_HFILT10_COEF1_SHIFT),
+						OMAP3_ISP_IOMEM_RESZ,
+						ISPRSZ_HFILT10 + (i * 0x04));
+				j += 2;
+			}
+		} else {
+			j = 0;
+			for (i = 0; i < 16; i++) {
+				if ((i + 1) % 4 == 0) {
+					isp_reg_writel((ispres_obj.coeflist.
+						h_filter_coef_7tap[j] <<
+						ISPRSZ_HFILT10_COEF0_SHIFT),
+						OMAP3_ISP_IOMEM_RESZ,
+						ISPRSZ_HFILT10 + (i * 0x04));
+					j += 1;
+				} else {
+					isp_reg_writel((ispres_obj.coeflist.
+						h_filter_coef_7tap[j] <<
+						ISPRSZ_HFILT10_COEF0_SHIFT) |
+						(ispres_obj.coeflist.
+						h_filter_coef_7tap[j+1] <<
+						ISPRSZ_HFILT10_COEF1_SHIFT),
+						OMAP3_ISP_IOMEM_RESZ,
+						ISPRSZ_HFILT10 + (i * 0x04));
+					j += 2;
+				}
+			}
+		}
+		if (ispres_obj.v_resz <= MID_RESIZE_VALUE) {
+			j = 0;
+			for (i = 0; i < 16; i++) {
+				isp_reg_writel((ispres_obj.coeflist.
+						v_filter_coef_4tap[j] <<
+						ISPRSZ_VFILT10_COEF0_SHIFT) |
+						(ispres_obj.coeflist.
+						v_filter_coef_4tap[j + 1] <<
+						ISPRSZ_VFILT10_COEF1_SHIFT),
+						OMAP3_ISP_IOMEM_RESZ,
+						ISPRSZ_VFILT10 + (i * 0x04));
+				j += 2;
+			}
+		} else {
+			j = 0;
+			for (i = 0; i < 16; i++) {
+				if ((i + 1) % 4 == 0) {
+					isp_reg_writel((ispres_obj.coeflist.
+						v_filter_coef_7tap[j] <<
+						ISPRSZ_VFILT10_COEF0_SHIFT),
+						OMAP3_ISP_IOMEM_RESZ,
+						ISPRSZ_VFILT10 + (i * 0x04));
+					j += 1;
+				} else {
+					isp_reg_writel((ispres_obj.coeflist.
+						v_filter_coef_7tap[j] <<
+						ISPRSZ_VFILT10_COEF0_SHIFT) |
+						(ispres_obj.coeflist.
+						v_filter_coef_7tap[j+1] <<
+						ISPRSZ_VFILT10_COEF1_SHIFT),
+						OMAP3_ISP_IOMEM_RESZ,
+						ISPRSZ_VFILT10 + (i * 0x04));
+					j += 2;
+				}
+			}
+		}
+
+		need_to_write_filter_coefs = 0;
 	} else {
-		isp_reg_writel(dev, 0, OMAP3_ISP_IOMEM_RESZ, ISPRSZ_YENH);
+		DPRINTK_ISPRESZ("Resizer busy when programming filter coefs\n");
 	}
 }
+EXPORT_SYMBOL(ispresizer_write_filter_coef);
+
+/**
+ * ispresizer_config_inlineoffset - Configures the read address line offset.
+ * @offset: Line Offset for the input image.
+ *
+ * Returns 0 if successful, or -EINVAL if offset is not 32 bits aligned.
+ **/
+int ispresizer_config_inlineoffset(u32 offset)
+{
+	DPRINTK_ISPRESZ("ispresizer_config_inlineoffset()+\n");
+	if (offset % 32)
+		return -EINVAL;
+	isp_reg_writel(offset << ISPRSZ_SDR_INOFF_OFFSET_SHIFT,
+		       OMAP3_ISP_IOMEM_RESZ, ISPRSZ_SDR_INOFF);
+	DPRINTK_ISPRESZ("ispresizer_config_inlineoffset()-\n");
+	return 0;
+}
+EXPORT_SYMBOL(ispresizer_config_inlineoffset);
 
 /**
  * ispresizer_set_inaddr - Sets the memory address of the input frame.
  * @addr: 32bit memory address aligned on 32byte boundary.
- * @offset: Starting offset.
  *
  * Returns 0 if successful, or -EINVAL if address is not 32 bits aligned.
  **/
-int ispresizer_set_inaddr(struct isp_res_device *isp_res, u32 addr,
-			  struct isp_node *pipe)
+int ispresizer_set_inaddr(u32 addr)
 {
-	struct device *dev = to_device(isp_res);
-	u32 in_buf_plus_offs = 0;
-
+	DPRINTK_ISPRESZ("ispresizer_set_inaddr()+\n");
 	if (addr % 32)
 		return -EINVAL;
-
-	isp_res->in_buff_addr = addr;
-	if (pipe != NULL) {
-		dev_dbg(dev, "%s: In crop top: %d[%d] left: %d[%d]\n", __func__,
-			isp_res->phy_rect.top, pipe->in.crop.top,
-			isp_res->phy_rect.left, pipe->in.crop.left);
-		/* Calculate additional part to prepare crop offsets */
-		in_buf_plus_offs = ((isp_res->phy_rect.top *
-				     (pipe->in.image.bytesperline / 2) +
-				     (isp_res->phy_rect.left & ~0xf)) *
-				    ISP_BYTES_PER_PIXEL);
-
-		/* Set the fractional part of the crop */
-		ispresizer_set_start(dev, isp_res->phy_rect.left & 0xf, 0);
-
-		dev_dbg(dev, "%s: In address offs: 0x%08X\n", __func__,
-			in_buf_plus_offs);
-	}
-
-	isp_reg_writel(dev, isp_res->in_buff_addr + in_buf_plus_offs,
+	isp_reg_writel(addr << ISPRSZ_SDR_INADD_ADDR_SHIFT,
 		       OMAP3_ISP_IOMEM_RESZ, ISPRSZ_SDR_INADD);
-
-	dev_dbg(dev, "%s: In address base: 0x%08X\n", __func__, addr);
-
+	ispres_obj.tmp_buf = addr;
+	DPRINTK_ISPRESZ("ispresizer_set_inaddr()-\n");
 	return 0;
 }
+EXPORT_SYMBOL(ispresizer_set_inaddr);
+
+/**
+ * ispresizer_config_outlineoffset - Configures the write address line offset.
+ * @offset: Line offset for the preview output.
+ *
+ * Returns 0 if successful, or -EINVAL if address is not 32 bits aligned.
+ **/
+int ispresizer_config_outlineoffset(u32 offset)
+{
+	DPRINTK_ISPRESZ("ispresizer_config_outlineoffset()+\n");
+	if (offset % 32)
+		return -EINVAL;
+	isp_reg_writel(offset << ISPRSZ_SDR_OUTOFF_OFFSET_SHIFT,
+		       OMAP3_ISP_IOMEM_RESZ, ISPRSZ_SDR_OUTOFF);
+	DPRINTK_ISPRESZ("ispresizer_config_outlineoffset()-\n");
+	return 0;
+}
+EXPORT_SYMBOL(ispresizer_config_outlineoffset);
 
 /**
  * Configures the memory address to which the output frame is written.
  * @addr: 32bit memory address aligned on 32byte boundary.
  **/
-int ispresizer_set_outaddr(struct isp_res_device *isp_res, u32 addr)
+int ispresizer_set_outaddr(u32 addr)
 {
-	struct device *dev = to_device(isp_res);
-
+	DPRINTK_ISPRESZ("ispresizer_set_outaddr()+\n");
 	if (addr % 32)
 		return -EINVAL;
-	isp_reg_writel(dev, addr << ISPRSZ_SDR_OUTADD_ADDR_SHIFT,
+	isp_reg_writel(addr << ISPRSZ_SDR_OUTADD_ADDR_SHIFT,
 		       OMAP3_ISP_IOMEM_RESZ, ISPRSZ_SDR_OUTADD);
-
-	dev_dbg(dev, "%s: Out address: 0x%08X\n", __func__, addr);
-
+	DPRINTK_ISPRESZ("ispresizer_set_outaddr()-\n");
 	return 0;
 }
+EXPORT_SYMBOL(ispresizer_set_outaddr);
 
 /**
  * ispresizer_save_context - Saves the values of the resizer module registers.
  **/
-void ispresizer_save_context(struct device *dev)
+void ispresizer_save_context(void)
 {
-	isp_save_context(dev, isprsz_reg_list);
+	DPRINTK_ISPRESZ("Saving context\n");
+	isp_save_context(isprsz_reg_list);
 }
+EXPORT_SYMBOL(ispresizer_save_context);
 
 /**
  * ispresizer_restore_context - Restores resizer module register values.
  **/
-void ispresizer_restore_context(struct device *dev)
+void ispresizer_restore_context(void)
 {
-	isp_restore_context(dev, isprsz_reg_list);
+	DPRINTK_ISPRESZ("Restoring context\n");
+	isp_restore_context(isprsz_reg_list);
 }
+EXPORT_SYMBOL(ispresizer_restore_context);
+
+/**
+ * ispresizer_print_status - Prints the values of the resizer module registers.
+ **/
+void ispresizer_print_status()
+{
+	if (!is_ispresz_debug_enabled())
+		return;
+	DPRINTK_ISPRESZ("###ISP_CTRL inresizer =0x%x\n",
+			isp_reg_readl(OMAP3_ISP_IOMEM_MAIN, ISP_CTRL));
+	DPRINTK_ISPRESZ("###ISP_IRQ0ENABLE in resizer =0x%x\n",
+			isp_reg_readl(OMAP3_ISP_IOMEM_MAIN, ISP_IRQ0ENABLE));
+	DPRINTK_ISPRESZ("###ISP_IRQ0STATUS in resizer =0x%x\n",
+			isp_reg_readl(OMAP3_ISP_IOMEM_MAIN, ISP_IRQ0STATUS));
+	DPRINTK_ISPRESZ("###RSZ PCR =0x%x\n",
+			isp_reg_readl(OMAP3_ISP_IOMEM_RESZ, ISPRSZ_PCR));
+	DPRINTK_ISPRESZ("###RSZ CNT =0x%x\n",
+			isp_reg_readl(OMAP3_ISP_IOMEM_RESZ, ISPRSZ_CNT));
+	DPRINTK_ISPRESZ("###RSZ OUT SIZE =0x%x\n",
+			isp_reg_readl(OMAP3_ISP_IOMEM_RESZ, ISPRSZ_OUT_SIZE));
+	DPRINTK_ISPRESZ("###RSZ IN START =0x%x\n",
+			isp_reg_readl(OMAP3_ISP_IOMEM_RESZ, ISPRSZ_IN_START));
+	DPRINTK_ISPRESZ("###RSZ IN SIZE =0x%x\n",
+			isp_reg_readl(OMAP3_ISP_IOMEM_RESZ, ISPRSZ_IN_SIZE));
+	DPRINTK_ISPRESZ("###RSZ SDR INADD =0x%x\n",
+			isp_reg_readl(OMAP3_ISP_IOMEM_RESZ, ISPRSZ_SDR_INADD));
+	DPRINTK_ISPRESZ("###RSZ SDR INOFF =0x%x\n",
+			isp_reg_readl(OMAP3_ISP_IOMEM_RESZ, ISPRSZ_SDR_INOFF));
+	DPRINTK_ISPRESZ("###RSZ SDR OUTADD =0x%x\n",
+			isp_reg_readl(OMAP3_ISP_IOMEM_RESZ, ISPRSZ_SDR_OUTADD));
+	DPRINTK_ISPRESZ("###RSZ SDR OTOFF =0x%x\n",
+			isp_reg_readl(OMAP3_ISP_IOMEM_RESZ, ISPRSZ_SDR_OUTOFF));
+	DPRINTK_ISPRESZ("###RSZ YENH =0x%x\n",
+			isp_reg_readl(OMAP3_ISP_IOMEM_RESZ, ISPRSZ_YENH));
+}
+EXPORT_SYMBOL(ispresizer_print_status);
 
 /**
  * isp_resizer_init - Module Initialisation.
  *
  * Always returns 0.
  **/
-int __init isp_resizer_init(struct device *dev)
+int __init isp_resizer_init(void)
 {
-	struct isp_device *isp = dev_get_drvdata(dev);
-	struct isp_res_device *isp_res = &isp->isp_res;
-
-	mutex_init(&isp_res->ispres_mutex);
-#ifdef CONFIG_VIDEO_OMAP34XX_ISP_DEBUG_FS
-	ispresz_dfs_setup(isp);
-#endif
+	mutex_init(&ispres_obj.ispres_mutex);
+	ispres_obj.pm_state = 0;
+	need_to_write_filter_coefs = 0;
 	return 0;
 }
 
 /**
  * isp_resizer_cleanup - Module Cleanup.
  **/
-void isp_resizer_cleanup(struct device *dev)
+void isp_resizer_cleanup(void)
 {
-#ifdef CONFIG_VIDEO_OMAP34XX_ISP_DEBUG_FS
-	struct isp_device *isp = dev_get_drvdata(dev);
-
-	ispresz_dfs_shutdown(isp);
-#endif
 }

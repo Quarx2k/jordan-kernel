@@ -4,8 +4,8 @@
  * Copyright (C) 2009 Texas Instruments.
  *
  * Contributors:
- *	Sergio Aguirre <saaguirre@ti.com>
- *	Dominic Curran <dcurran@ti.com>
+ * 	Sergio Aguirre <saaguirre@ti.com>
+ * 	Dominic Curran <dcurran@ti.com>
  *
  * This package is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -20,14 +20,8 @@
 #define OMAP_ISP_CSI2_API_H
 #include <linux/videodev2.h>
 
-#define ISP_CSI2_LANE_OFF	0
-#define ISP_CSI2_LANE_ON	1
-
-enum isp_csi2_output {
-	CSI2_MEM,
-	CSI2_VP,
-	CSI2_MEM_VP, /* UNTESTED! */
-};
+#define ISP_CSI2_LANE_OFF 	0
+#define ISP_CSI2_LANE_ON 	1
 
 enum isp_csi2_irqevents {
 	OCP_ERR_IRQ = 0x4000,
@@ -72,7 +66,7 @@ enum isp_csi2_frame_mode {
 struct csi2_lanecfg {
 	u8 pos;
 	u8 pol;
-	u8 state;	/*Current state - 1-Used  0-Unused */
+	u8 state; 	/*Current state - 1-Used  0-Unused */
 };
 
 struct isp_csi2_lanes_cfg {
@@ -183,117 +177,70 @@ struct isp_csi2_cfg_update {
 	struct isp_csi2_ctrl_cfg_update ctrl;
 };
 
-struct isp_csi2_device {
-	struct device *dev;
-	struct isp_csi2_cfg current_cfg;
-	struct isp_csi2_cfg_update current_cfg_update;
-	bool update_complexio_cfg1;
-	bool update_phy_cfg0;
-	bool update_phy_cfg1;
-	bool update_ctx_ctrl1[8];
-	bool update_ctx_ctrl2[8];
-	bool update_ctx_ctrl3[8];
-	bool update_timing;
-	bool update_ctrl;
-	bool uses_videoport;
-	bool force_mem_out;
-};
+#if defined(CONFIG_VIDEO_MIPI_DLI_TEST)
+/*Counters for MIPI DLI.*/
+extern unsigned long ecc_counter;
+#endif
 
-int isp_csi2_complexio_lanes_config(struct isp_csi2_device *isp_csi2,
-				    struct isp_csi2_lanes_cfg *reqcfg);
-int isp_csi2_complexio_lanes_update(struct isp_csi2_device *isp_csi2,
-				    bool force_update);
-int isp_csi2_complexio_lanes_count(struct isp_csi2_device *isp_csi2, int cnt);
-int isp_csi2_complexio_lanes_get(struct isp_csi2_device *isp_csi2);
-int isp_csi2_complexio_power_autoswitch(struct isp_csi2_device *isp_csi2,
-					bool enable);
-int isp_csi2_complexio_power(struct isp_csi2_device *isp_csi2,
-			     enum isp_csi2_power_cmds power_cmd);
-int isp_csi2_ctrl_config_frame_mode(struct isp_csi2_device *isp_csi2,
-				    enum isp_csi2_frame_mode frame_mode);
-int isp_csi2_ctrl_config_vp_clk_enable(struct isp_csi2_device *isp_csi2,
-				       bool vp_clk_enable);
-int isp_csi2_ctrl_config_vp_only_enable(struct isp_csi2_device *isp_csi2,
-					bool vp_only_enable);
-int isp_csi2_ctrl_config_debug_enable(struct isp_csi2_device *isp_csi2,
-				      bool debug_enable);
-int isp_csi2_ctrl_config_burst_size(struct isp_csi2_device *isp_csi2,
-				    u8 burst_size);
-int isp_csi2_ctrl_config_ecc_enable(struct isp_csi2_device *isp_csi2,
-				    bool ecc_enable);
-int isp_csi2_ctrl_config_secure_mode(struct isp_csi2_device *isp_csi2,
-				     bool secure_mode);
-int isp_csi2_ctrl_config_if_enable(struct isp_csi2_device *isp_csi2,
-				   bool if_enable);
-int isp_csi2_ctrl_config_vp_out_ctrl(struct isp_csi2_device *isp_csi2,
-				     u8 vp_out_ctrl);
-int isp_csi2_ctrl_update(struct isp_csi2_device *isp_csi2, bool force_update);
-int isp_csi2_ctrl_get(struct isp_csi2_device *isp_csi2);
-int isp_csi2_ctx_config_virtual_id(struct isp_csi2_device *isp_csi2,
-				   u8 ctxnum, u8 virtual_id);
-int isp_csi2_ctx_config_frame_count(struct isp_csi2_device *isp_csi2,
-				    u8 ctxnum, u8 frame_count);
-int isp_csi2_ctx_config_format(struct isp_csi2_device *isp_csi2,
-			       u8 ctxnum, u32 pixformat);
-int isp_csi2_ctx_config_alpha(struct isp_csi2_device *isp_csi2,
-			      u8 ctxnum, u16 alpha);
-int isp_csi2_ctx_config_data_offset(struct isp_csi2_device *isp_csi2,
-				    u8 ctxnum, u16 data_offset);
-int isp_csi2_ctx_config_ping_addr(struct isp_csi2_device *isp_csi2,
-				  u8 ctxnum, u32 ping_addr);
-int isp_csi2_ctx_config_pong_addr(struct isp_csi2_device *isp_csi2,
-				  u8 ctxnum, u32 pong_addr);
-int isp_csi2_ctx_config_eof_enabled(struct isp_csi2_device *isp_csi2,
-				    u8 ctxnum, bool eof_enabled);
-int isp_csi2_ctx_config_eol_enabled(struct isp_csi2_device *isp_csi2,
-				    u8 ctxnum, bool eol_enabled);
-int isp_csi2_ctx_config_checksum_enabled(struct isp_csi2_device *isp_csi2,
-					 u8 ctxnum, bool checksum_enabled);
-int isp_csi2_ctx_config_enabled(struct isp_csi2_device *isp_csi2,
-				u8 ctxnum, bool enabled);
-int isp_csi2_ctx_update(struct isp_csi2_device *isp_csi2,
-			u8 ctxnum, bool force_update);
-int isp_csi2_ctx_get(struct isp_csi2_device *isp_csi2, u8 ctxnum);
-int isp_csi2_ctx_update_all(struct isp_csi2_device *isp_csi2,
-			    bool force_update);
-int isp_csi2_ctx_get_all(struct isp_csi2_device *isp_csi2);
-int isp_csi2_phy_config(struct isp_csi2_device *isp_csi2,
-			struct isp_csi2_phy_cfg *desiredphyconfig);
-int isp_csi2_calc_phy_cfg0(struct isp_csi2_device *isp_csi2,
-			   u32 mipiclk, u32 lbound_hs_settle,
+int isp_csi2_complexio_lanes_config(struct isp_csi2_lanes_cfg *reqcfg);
+int isp_csi2_complexio_lanes_update(bool force_update);
+int isp_csi2_complexio_lanes_count(int cnt);
+int isp_csi2_complexio_lanes_get(void);
+int isp_csi2_complexio_power_autoswitch(bool enable);
+int isp_csi2_complexio_power(enum isp_csi2_power_cmds power_cmd);
+int isp_csi2_ctrl_config_frame_mode(enum isp_csi2_frame_mode frame_mode);
+int isp_csi2_ctrl_config_vp_clk_enable(bool vp_clk_enable);
+int isp_csi2_ctrl_config_vp_only_enable(bool vp_only_enable);
+int isp_csi2_ctrl_config_debug_enable(bool debug_enable);
+int isp_csi2_ctrl_config_burst_size(u8 burst_size);
+int isp_csi2_ctrl_config_ecc_enable(bool ecc_enable);
+int isp_csi2_ctrl_config_secure_mode(bool secure_mode);
+int isp_csi2_ctrl_config_if_enable(bool if_enable);
+int isp_csi2_ctrl_config_vp_out_ctrl(u8 vp_out_ctrl);
+int isp_csi2_ctrl_update(bool force_update);
+int isp_csi2_ctrl_get(void);
+int isp_csi2_ctrl_phy_if_enable(u8 enable);
+int isp_csi2_ctx_config_virtual_id(u8 ctxnum, u8 virtual_id);
+int isp_csi2_ctx_config_frame_count(u8 ctxnum, u8 frame_count);
+int isp_csi2_ctx_config_format(u8 ctxnum, u32 pixformat);
+int isp_csi2_ctx_config_alpha(u8 ctxnum, u16 alpha);
+int isp_csi2_ctx_config_data_offset(u8 ctxnum, u16 data_offset);
+int isp_csi2_ctx_config_ping_addr(u8 ctxnum, u32 ping_addr);
+int isp_csi2_ctx_config_pong_addr(u8 ctxnum, u32 pong_addr);
+int isp_csi2_ctx_config_eof_enabled(u8 ctxnum, bool eof_enabled);
+int isp_csi2_ctx_config_eol_enabled(u8 ctxnum, bool eol_enabled);
+int isp_csi2_ctx_config_checksum_enabled(u8 ctxnum, bool checksum_enabled);
+int isp_csi2_ctx_config_enabled(u8 ctxnum, bool enabled);
+int isp_csi2_ctx_update(u8 ctxnum, bool force_update);
+int isp_csi2_ctx_get(u8 ctxnum);
+int isp_csi2_ctx_update_all(bool force_update);
+int isp_csi2_ctx_get_all(void);
+int isp_csi2_phy_config(struct isp_csi2_phy_cfg *desiredphyconfig);
+int isp_csi2_calc_phy_cfg0(u32 mipiclk, u32 lbound_hs_settle,
 			   u32 ubound_hs_settle);
-int isp_csi2_phy_update(struct isp_csi2_device *isp_csi2,
-			bool force_update);
-int isp_csi2_phy_get(struct isp_csi2_device *isp_csi2);
-int isp_csi2_timings_config_forcerxmode(struct isp_csi2_device *isp_csi2,
-					u8 io, bool force_rx_mode);
-int isp_csi2_timings_config_stopstate_16x(struct isp_csi2_device *isp_csi2,
-					  u8 io, bool stop_state_16x);
-int isp_csi2_timings_config_stopstate_4x(struct isp_csi2_device *isp_csi2,
-					 u8 io, bool stop_state_4x);
-int isp_csi2_timings_config_stopstate_cnt(struct isp_csi2_device *isp_csi2,
-					  u8 io, u16 stop_state_counter);
-int isp_csi2_timings_update(struct isp_csi2_device *isp_csi2,
-			    u8 io, bool force_update);
-int isp_csi2_timings_get(struct isp_csi2_device *isp_csi2, u8 io);
-int isp_csi2_timings_update_all(struct isp_csi2_device *isp_csi2,
-				bool force_update);
-int isp_csi2_timings_get_all(struct isp_csi2_device *isp_csi2);
-void isp_csi2_irq_complexio1_set(struct isp_csi2_device *isp_csi2, int enable);
-void isp_csi2_irq_ctx_set(struct isp_csi2_device *isp_csi2, int enable);
-void isp_csi2_irq_status_set(struct isp_csi2_device *isp_csi2, int enable);
-void isp_csi2_irq_all_set(struct isp_csi2_device *isp_csi2, int enable);
+int isp_csi2_phy_update(bool force_update);
+int isp_csi2_phy_get(void);
+int isp_csi2_timings_config_forcerxmode(u8 io, bool force_rx_mode);
+int isp_csi2_timings_config_stopstate_16x(u8 io, bool stop_state_16x);
+int isp_csi2_timings_config_stopstate_4x(u8 io, bool stop_state_4x);
+int isp_csi2_timings_config_stopstate_cnt(u8 io, u16 stop_state_counter);
+int isp_csi2_timings_update(u8 io, bool force_update);
+int isp_csi2_timings_get(u8 io);
+int isp_csi2_timings_update_all(bool force_update);
+int isp_csi2_timings_get_all(void);
+void isp_csi2_irq_complexio1_set(int enable);
+void isp_csi2_irq_ctx_set(int enable);
+void isp_csi2_irq_status_set(int enable);
+void isp_csi2_irq_set(int enable);
+void isp_csi2_irq_all_set(int enable);
 
-int isp_csi2_try_pipeline(struct isp_csi2_device *isp_csi2,
-			  struct isp_pipeline *pipe);
+void isp_csi2_isr(void);
+int isp_csi2_reset(void);
+void isp_csi2_enable(int enable);
+void isp_csi2_regdump(void);
 
-int isp_csi2_isr(struct isp_csi2_device *isp_csi2);
-int isp_csi2_reset(struct isp_csi2_device *isp_csi2);
-void isp_csi2_enable(struct isp_csi2_device *isp_csi2, int enable);
-void isp_csi2_regdump(struct isp_csi2_device *isp_csi2);
-
-void ispcsi2_save_context(struct device *dev);
-void ispcsi2_restore_context(struct device *dev);
+void ispcsi2_save_context(void);
+void ispcsi2_restore_context(void);
 
 #endif	/* OMAP_ISP_CSI2_H */
 

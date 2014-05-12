@@ -6,6 +6,7 @@
 #ifndef CAMISE_H
 #define CAMISE_H
 
+#include <media/v4l2-int-device.h>
 #define CAMISE_I2C_ADDR 0x3C
  /**
  * struct camise_platform_data - platform data values and access functions
@@ -15,11 +16,11 @@
  * @priv_data_set: device private data (pointer) access function
  */
 struct camise_platform_data {
-        int (*power_set)(struct v4l2_int_device *s, enum v4l2_power power);
+	int (*power_set)(struct device*, enum v4l2_power power);
 	int (*ifparm)(struct v4l2_ifparm *p);
 	int (*priv_data_set)(void *);
 	void (*lock_cpufreq)(int lock);
-	void (*if_config)(struct v4l2_int_device *s);
+	void (*if_config)(void);
 	int (*get_size)(int idx, unsigned long *w, unsigned long *h);
 };
 

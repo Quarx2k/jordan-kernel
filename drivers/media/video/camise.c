@@ -26,6 +26,7 @@
 #include "isp/ispreg.h"
 #include <linux/io.h>
 #include <linux/mm.h>
+//#include <../arch/arm/plat-omap/include/plat/board-mapphone.h>
 
 #define CAMISE_DRIVER_NAME "camise"
 #ifdef CONFIG_VIDEO_CAM_ISE
@@ -41,12 +42,12 @@ const static struct v4l2_fmtdesc camise_formats[] = {
 		.description	= "Bayer10 pattern (GrR/BGb)",
 		.pixelformat	= V4L2_PIX_FMT_PATT,
 	},
-
+ */
 	{
 		.description	= "Walking 1's pattern",
 		.pixelformat	= V4L2_PIX_FMT_W1S_PATT,
 	},
-*/
+
 	{
 		.description	= "YUYV Pattern",
 		.pixelformat	=  V4L2_PIX_FMT_YUYV,
@@ -147,7 +148,7 @@ static struct vcontrol {
 static int find_vctrl(int id)
 {
 	int i = 0;
-	printk("Enter to %s\n",__func__);
+
 	if (id < V4L2_CID_BASE)
 		return -EDOM;
 
@@ -167,7 +168,7 @@ static int find_vctrl(int id)
  */
 static int camise_configure(struct v4l2_int_device *s)
 {
-	printk("Enter to %s\n",__func__);
+
 	return 0;
 } /* end camise_configure() */
 
@@ -177,7 +178,6 @@ static int camise_configure(struct v4l2_int_device *s)
 static int ioctl_cropcap(struct v4l2_int_device *s,
 			 struct v4l2_cropcap *cropcap)
 {
-	printk("Enter to %s\n",__func__);
 	return 0;
 }
 
@@ -186,7 +186,6 @@ static int ioctl_cropcap(struct v4l2_int_device *s,
  */
 static int ioctl_g_crop(struct v4l2_int_device *s, struct  v4l2_crop *crop)
 {
-	printk("Enter to %s\n",__func__);
 	return 0;
 }
 
@@ -195,7 +194,6 @@ static int ioctl_g_crop(struct v4l2_int_device *s, struct  v4l2_crop *crop)
  */
 static int ioctl_s_crop(struct v4l2_int_device *s, struct  v4l2_crop *crop)
 {
-	printk("Enter to %s\n",__func__);
 	return 0;
 }
 
@@ -212,7 +210,7 @@ static int ioctl_queryctrl(struct v4l2_int_device *s,
 						struct v4l2_queryctrl *qc)
 {
 	int i;
-	printk("Enter to %s\n",__func__);
+
 	i = find_vctrl(qc->id);
 	if (i == -EINVAL)
 		qc->flags = V4L2_CTRL_FLAG_DISABLED;
@@ -237,7 +235,6 @@ static int ioctl_queryctrl(struct v4l2_int_device *s,
 static int ioctl_g_ctrl(struct v4l2_int_device *s,
 			struct v4l2_control *vc)
 {
-	printk("Enter to %s\n",__func__);
 	return 0;
 }
 
@@ -268,7 +265,7 @@ static int ioctl_s_ctrl(struct v4l2_int_device *s,
 {
 	int index = fmt->index;
 	enum v4l2_buf_type type = fmt->type;
-	printk("Enter to %s\n",__func__);
+
 	memset(fmt, 0, sizeof(*fmt));
 	fmt->index = index;
 	fmt->type = type;
@@ -304,7 +301,6 @@ static int ioctl_try_fmt_cap(struct v4l2_int_device *s,
 			     struct v4l2_format *f)
 {
 	/* TODO: NEED TO IMPLEMENT */
-	printk("Enter to %s\n",__func__);
 	return 0;
 }
 
@@ -331,7 +327,6 @@ static int ioctl_try_fmt_cap(struct v4l2_int_device *s,
 
 	sensor->pix = *pix;
 	*/
-	printk("Enter to %s\n",__func__);
 	return 0;
 }
 
@@ -350,7 +345,6 @@ static int ioctl_g_fmt_cap(struct v4l2_int_device *s,
 	struct ov3640_sensor *sensor = s->priv;
 	f->fmt.pix = sensor->pix;
 */
-	printk("Enter to %s\n",__func__);
 	return 0;
 }
 
@@ -377,7 +371,6 @@ static int ioctl_g_parm(struct v4l2_int_device *s,
 	cparm->capability = V4L2_CAP_TIMEPERFRAME;
 	cparm->timeperframe = sensor->timeperframe;
 */
-	printk("Enter to %s\n",__func__);
 	return 0;
 }
 
@@ -393,7 +386,6 @@ static int ioctl_g_parm(struct v4l2_int_device *s,
 static int ioctl_s_parm(struct v4l2_int_device *s,
 			     struct v4l2_streamparm *a)
 {
-	printk("Enter to %s\n",__func__);
 	return 0;
 }
 
@@ -408,7 +400,7 @@ static int ioctl_g_priv(struct v4l2_int_device *s, void *p)
 {
 
 	struct camise_sensor *sensor = s->priv;
-	printk("Enter to %s\n",__func__);
+
 	return sensor->pdata->priv_data_set(p);
 
 }
@@ -430,7 +422,7 @@ static int camise_read_reg(struct i2c_client *client, u16 data_length, u16 reg,
 	int err = 0;
 	struct i2c_msg msg[1];
 	unsigned char data[4];
-	printk("Enter to %s\n",__func__);
+
 	if (!client->adapter)
 		return -ENODEV;
 
@@ -473,7 +465,6 @@ static int camise_read_reg(struct i2c_client *client, u16 data_length, u16 reg,
 static int camise_detect(struct v4l2_int_device *s)
 {
 	u32 model_id = 0;
-	printk("Enter to %s\n",__func__);
 	struct camise_sensor *sensor = s->priv;
 	struct i2c_client *client = sensor->i2c_client;
 
@@ -494,7 +485,6 @@ static int camise_detect(struct v4l2_int_device *s)
  *
  * Sets devices power state to requrested state, if possible.
  */
-
 static int ioctl_s_power(struct v4l2_int_device *s, enum v4l2_power on)
 {
 	struct camise_sensor *sensor = s->priv;
@@ -502,25 +492,25 @@ static int ioctl_s_power(struct v4l2_int_device *s, enum v4l2_power on)
 	int rval = 0;
 
 	if (sensor->state == SENSOR_DETECTED) {
-		printk("Powering %s camise\n", (on ? "on" : "off"));
-		if (on == V4L2_POWER_ON && current_power_state == V4L2_POWER_OFF) {
-			rval = sensor->pdata->power_set(s, V4L2_POWER_ON);
-			sensor->pdata->if_config(s);
-		}
+		pr_info(CAMISE_DRIVER_NAME " Sensor in detected mode\n");
+		if (on == V4L2_POWER_ON &&
+			current_power_state == V4L2_POWER_OFF)
+			sensor->pdata->if_config();
+		rval = sensor->pdata->power_set(sensor->dev, V4L2_POWER_ON);
 		current_power_state = on;
 		return rval;
 	}
 
 	switch (on) {
 	case V4L2_POWER_ON:
-		rval = sensor->pdata->power_set(s, V4L2_POWER_ON);
+		rval = sensor->pdata->power_set(sensor->dev, V4L2_POWER_ON);
 		if (rval)
 			break;
 		if (current_power_state == V4L2_POWER_OFF)
 			camise_configure(s);
 		break;
 	case V4L2_POWER_OFF:
-		rval = sensor->pdata->power_set(s, V4L2_POWER_OFF);
+		rval = sensor->pdata->power_set(sensor->dev, V4L2_POWER_OFF);
 		if (sensor->state == SENSOR_DETECTING)
 			sensor->state = SENSOR_DETECTED;
 		break;
@@ -535,12 +525,12 @@ static int ioctl_s_power(struct v4l2_int_device *s, enum v4l2_power on)
 			dev_err(&c->dev, "Unable to detect "
 					CAMISE_DRIVER_NAME " sensor\n");
 			sensor->state = SENSOR_NOT_DETECTED;
-			sensor->pdata->power_set(s, V4L2_POWER_OFF);
+			sensor->pdata->power_set(sensor->dev, V4L2_POWER_OFF);
 			return rval;
 		}
 		sensor->state = SENSOR_DETECTING;
 		/* free up all the camise resources */
-		sensor->pdata->power_set(s, V4L2_POWER_OFF);
+		sensor->pdata->power_set(sensor->dev, V4L2_POWER_OFF);
 		platform_device_register(&cam_misc_device);
 		pr_info(CAMISE_DRIVER_NAME " Sensor detected\n");
 		rval = 0;
@@ -558,7 +548,6 @@ static int ioctl_s_power(struct v4l2_int_device *s, enum v4l2_power on)
  */
 static int ioctl_init(struct v4l2_int_device *s)
 {
-	printk("Enter to %s\n",__func__);
 	return 0;
 }
 
@@ -570,7 +559,6 @@ static int ioctl_init(struct v4l2_int_device *s)
  */
 static int ioctl_dev_exit(struct v4l2_int_device *s)
 {
-	printk("Enter to %s\n",__func__);
 	return 0;
 }
 
@@ -599,7 +587,6 @@ static int ioctl_dev_init(struct v4l2_int_device *s)
 	pr_info(OV3640_DRIVER_NAME " chip version 0x%02x detected\n",
 								sensor->ver);
 */
-	printk("Enter to %s\n",__func__);
 	return 0;
 }
 /**
@@ -614,7 +601,7 @@ static int ioctl_enum_framesizes(struct v4l2_int_device *s,
 {
 	struct camise_sensor *sensor = s->priv;
 	int ifmt;
-	printk("Enter to %s\n",__func__);
+
 	for (ifmt = 0; ifmt < NUM_CAPTURE_FORMATS; ifmt++) {
 		if (frms->pixel_format == camise_formats[ifmt].pixelformat)
 			break;
@@ -646,7 +633,7 @@ static int ioctl_enum_frameintervals(struct v4l2_int_device *s,
 					struct v4l2_frmivalenum *frmi)
 {
 	int ifmt;
-	printk("Enter to %s\n",__func__);
+
 	for (ifmt = 0; ifmt < NUM_CAPTURE_FORMATS; ifmt++) {
 		if (frmi->pixel_format == camise_formats[ifmt].pixelformat)
 			break;

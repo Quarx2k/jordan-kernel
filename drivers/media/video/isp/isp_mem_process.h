@@ -1,10 +1,13 @@
 /*
- * ispresizer_dfs.h
+ * isp_mem_process.h
  *
- * Copyright (C) 2009 Texas Instruments.
+ * Top level public header file for ISP Control module in
+ * TI's OMAP3 Camera ISP
+ *
+ * Copyright (C) 2010 Hewlett-Packard Co.
  *
  * Contributors:
- *	Atanas Filipov <afilipov@mm-sol.com>
+ * 	Tanvir Islam <tanvir.islam@hp.com>
  *
  * This package is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -15,15 +18,16 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#ifndef OMAP_ISP_RESIZER_DFS_API_H
-#define OMAP_ISP_RESIZER_DFS_API_H
+#include <plat/isp_user.h>
 
-struct isp_device;
+#ifndef OMAP_ISP_MEM_PROCESS_H
+#define OMAP_ISP_MEM_PROCESS_H
 
-void ispresz_dfs_dump(struct isp_device *isp);
+int isp_process_mem_data(struct isp_mem_data *data);
 
-void ispresz_dfs_setup(struct isp_device *isp);
+int isp_resize_mem_data(struct isp_mem_resize_data *data);
 
-void ispresz_dfs_shutdown(struct isp_device *isp);
+void isp_mem_process_init(void);
 
 #endif
+

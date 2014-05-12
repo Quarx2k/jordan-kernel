@@ -6,8 +6,8 @@
  * Copyright (C) 2009 Texas Instruments, Inc.
  *
  * Contributors:
- *	Sameer Venkatraman <sameerv@ti.com>
- *	Mohit Jalori
+ * 	Sameer Venkatraman <sameerv@ti.com>
+ * 	Mohit Jalori
  *	Sergio Aguirre <saaguirre@ti.com>
  *
  * This package is free software; you can redistribute it and/or modify
@@ -22,9 +22,51 @@
 #ifndef OMAP_ISP_RESIZER_H
 #define OMAP_ISP_RESIZER_H
 
-#define COEFFS_COUNT	32
+/*
+ * Resizer Constants
+ */
+#define MAX_IN_WIDTH_MEMORY_MODE	4095
 
-enum resizer_input {
+#define MAX_IN_WIDTH_ONTHEFLY_MODE	1280
+#define MAX_IN_WIDTH_ONTHEFLY_MODE_ES2	4095
+#define MAX_IN_HEIGHT			4095
+#define MINIMUM_RESIZE_VALUE		64
+#define MAXIMUM_RESIZE_VALUE		1024
+#define MID_RESIZE_VALUE		512
+
+#define MAX_7TAP_HRSZ_OUTWIDTH		1280
+#define MAX_7TAP_VRSZ_OUTWIDTH		640
+
+#define MAX_7TAP_HRSZ_OUTWIDTH_ES2	3300
+#define MAX_7TAP_VRSZ_OUTWIDTH_ES2	1650
+
+#define DEFAULTSTPIXEL			0
+#define DEFAULTSTPHASE			1
+#define DEFAULTHSTPIXEL4TAPMODE		3
+#define FOURPHASE			4
+#define EIGHTPHASE			8
+#define RESIZECONSTANT			256
+#define SHIFTER4TAPMODE			0
+#define SHIFTER7TAPMODE			1
+#define DEFAULTOFFSET			7
+#define OFFSETVERT4TAPMODE		4
+#define OPWDALIGNCONSTANT		0xfffffff0
+
+/*
+ * The client is supposed to call resizer API in the following sequence:
+ * 	- request()
+ * 	- config_datatpath()
+ * 	- optionally config/enable sub modules
+ * 	- try/config size
+ * 	- setup callback
+ * 	- setup in/out memory offsets and ptrs
+ * 	- enable()
+ * 	...
+ * 	- disable()
+ * 	- free()
+ */
+
+enum ispresizer_input {
 	RSZ_OTFLY_YUV,
 	RSZ_MEM_YUV,
 	RSZ_MEM_COL8
@@ -42,20 +84,10 @@ enum resizer_input {
  *			mode (.25x-.5x)
  */
 struct isprsz_coef {
-	u16 h_filter_coef_4tap[COEFFS_COUNT];
-	u16 v_filter_coef_4tap[COEFFS_COUNT];
-	u16 h_filter_coef_7tap[COEFFS_COUNT];
-	u16 v_filter_coef_7tap[COEFFS_COUNT];
-};
-
-/**
- * struct isprsz_phase - Structure horizontal and vertical start phase.
- * @h_phase: horizontal start phase.
- * @v_phase: vertical start phase.
- */
-struct isprsz_phase {
-	u8 h_phase;
-	u8 v_phase;
+	u16 h_filter_coef_4tap[32];
+	u16 v_filter_coef_4tap[32];
+	u16 h_filter_coef_7tap[28];
+	u16 v_filter_coef_7tap[28];
 };
 
 /**
@@ -72,84 +104,59 @@ struct isprsz_yenh {
 	u8 coreoffset;
 };
 
-/**
- * struct isp_res_device - Structure for the resizer module to store its
- *			information.
- * @res_inuse: Indicates if resizer module has been reserved. 1 - Reserved,
- *             0 - Freed.
- * @h_startphase: Horizontal starting phase.
- * @v_startphase: Vertical starting phase.
- * @h_resz: Horizontal resizing value.
- * @v_resz: Vertical resizing value.
- * @outputwidth: Output Image Width in pixels.
- * @outputheight: Output Image Height in pixels.
- * @inputwidth: Input Image Width in pixels.
- * @inputheight: Input Image Height in pixels.
- * @algo: Algorithm select. 0 - Disable, 1 - [-1 2 -1]/2 high-pass filter,
- *        2 - [-1 -2 6 -2 -1]/4 high-pass filter.
- * @ipht_crop: Vertical start line for cropping.
- * @ipwd_crop: Horizontal start pixel for cropping.
- * @cropwidth: Crop Width.
- * @cropheight: Crop Height.
- * @resinput: Resizer input.
- * @coeflist: Register configuration for Resizer.
- * @ispres_mutex: Mutex for isp resizer.
- */
-struct isp_res_device {
-	u8 res_inuse;
-	u16 h_resz;
-	u16 v_resz;
-	struct v4l2_rect phy_rect;
-	struct mutex ispres_mutex; /* For checking/modifying res_inuse */
-	int applycrop;
-	u32 in_buff_addr;
-};
+void ispresizer_config_shadow_registers(void);
 
-bool ispresizer_is_upscale(struct isp_node *pipe);
+int ispresizer_request(void);
 
-int ispresizer_config_crop(struct isp_res_device *isp_res,
-			   struct isp_node *pipe, struct v4l2_crop *a);
-void ispresizer_config_shadow_registers(struct isp_res_device *isp_res);
+int ispresizer_free(void);
 
-int ispresizer_request(struct isp_res_device *isp_res);
+int ispresizer_config_datapath(enum ispresizer_input input, u8 reset);
 
-int ispresizer_free(struct isp_res_device *isp_res);
+void ispresizer_enable_cbilin(u8 enable);
 
-void ispresizer_enable_cbilin(struct isp_res_device *isp_res, u8 enable);
+void ispresizer_config_ycpos(u8 yc);
 
-void ispresizer_config_ycpos(struct isp_res_device *isp_res, u8 yc);
+void ispresizer_config_startphase(u8 hstartphase, u8 vstartphase);
 
-/* Sets the horizontal and vertical start phase */
-void ispresizer_set_start_phase(struct device *dev, struct isprsz_phase *phase);
+void ispresizer_config_filter_coef(struct isprsz_coef *coef);
 
-/* Setup coefficents for polyphase filter*/
-void ispresizer_set_coeffs(struct device *dev, struct isprsz_coef *coeffs,
-			   unsigned h_ratio, unsigned v_ratio);
+void ispresizer_get_filter_coef(struct isprsz_coef *coef);
 
-/* Configures luminance enhancer parameters */
-void ispresizer_set_luma_enhance(struct device *dev, struct isprsz_yenh *yenh);
+void ispresizer_write_filter_coef(void);
 
-int ispresizer_try_pipeline(struct isp_res_device *isp_res,
-			    struct isp_node *pipe);
+void ispresizer_config_luma_enhance(struct isprsz_yenh *yenh);
 
-int ispresizer_s_pipeline(struct isp_res_device *isp_res,
-			  struct isp_node *pipe);
+int ispresizer_try_size(u32 *input_w, u32 *input_h, u32 *output_w,
+			u32 *output_h);
 
-int ispresizer_set_inaddr(struct isp_res_device *isp_res, u32 addr,
-			  struct isp_node *pipe);
+void ispresizer_applycrop(void);
 
-int ispresizer_set_outaddr(struct isp_res_device *isp_res, u32 addr);
+void ispresizer_trycrop(u32 left, u32 top, u32 width, u32 height, u32 ow,
+			u32 oh);
 
-int ispresizer_set_out_offset(struct isp_res_device *isp_res, u32 offset);
+int ispresizer_config_size(u32 input_w, u32 input_h, u32 output_w,
+			   u32 output_h);
 
-void ispresizer_enable(struct isp_res_device *isp_res, int enable);
+int ispresizer_config_inlineoffset(u32 offset);
 
-int ispresizer_busy(struct isp_res_device *isp_res);
+int ispresizer_set_inaddr(u32 addr);
 
-int ispresizer_is_enabled(struct isp_res_device *isp_res);
+int ispresizer_config_outlineoffset(u32 offset);
 
-void ispresizer_save_context(struct device *dev);
+int ispresizer_set_outaddr(u32 addr);
 
-void ispresizer_restore_context(struct device *dev);
+void ispresizer_enable(int enable);
+
+void ispresizer_suspend(void);
+
+void ispresizer_resume(void);
+
+int ispresizer_busy(void);
+
+void ispresizer_save_context(void);
+
+void ispresizer_restore_context(void);
+
+void ispresizer_print_status(void);
 
 #endif		/* OMAP_ISP_RESIZER_H */

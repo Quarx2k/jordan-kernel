@@ -175,7 +175,7 @@ int hp3a_config_histogram(struct hp3a_histogram_config *config,
 
 	if (config->enable) {
 		/* Install HIST_IRQ callback. */
-		ret = isp_set_callback(device->dev, CBK_HIST_DONE, hp3a_histogram_isr,
+		ret = isp_set_callback(CBK_HIST_DONE, hp3a_histogram_isr,
 					(void *)NULL, (void *)NULL);
 		if (ret)
 			return ret;
@@ -311,7 +311,7 @@ int hp3a_config_histogram(struct hp3a_histogram_config *config,
 		ret = 0;
 	} else {
 		spin_lock_irqsave(&g_tc.hist_lock, irqflags);
-		isp_unset_callback(device->dev, CBK_HIST_DONE);
+		isp_unset_callback(CBK_HIST_DONE);
 		g_tc.hist_hw_configured = 0;
 
 		if (g_tc.hist_hw_enable == 1) {
