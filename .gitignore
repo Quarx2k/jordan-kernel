@@ -35,6 +35,7 @@ modules.builtin
 *.sh
 *.xzkern
 ashldi3.S
+build.sh
 
 #
 # Top-level generic files
