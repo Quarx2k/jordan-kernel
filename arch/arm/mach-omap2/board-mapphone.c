@@ -227,8 +227,6 @@ static void mapphone_wifi_init(void)
 {
 	int ret;
 
-	printk("mapphone_wifi_init\n");
-
 	ret = gpio_request(MAPPHONE_WIFI_PMENA_GPIO, "wifi_pmena");
 	if (ret < 0) {
 		printk(KERN_ERR "%s: can't reserve GPIO: %d\n", __func__,
@@ -241,7 +239,7 @@ static void mapphone_wifi_init(void)
 	{
 		pr_err("Error setting wl12xx data\n");
 	}
-	printk("Wifi init done\n");
+
 }
 
 static void mapphone_pm_power_off(void)
