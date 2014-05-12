@@ -60,6 +60,18 @@ void __init mapphone_camera_init(void)
 }
 
 #ifdef CONFIG_VIDEO_OMAP3_HPLENS
+
+static u8 cam_flags;
+
+static void mapphone_lock_cpufreq(int lock)
+{
+}
+
+static u8 mapphone_get_config_flags(void)
+{
+	return cam_flags;
+}
+
 static int hplens_power_set(enum v4l2_power power)
 {
 	(void)power;
@@ -86,9 +98,9 @@ struct hplens_platform_data mapphone_hplens_platform_data = {
 
 #ifdef CONFIG_VIDEO_MT9P012
 static struct omap34xxcam_sensor_config cam_hwc = {
-    .sensor_isp = 0,
-    .capture_mem = PAGE_ALIGN(2592 * 1944 * 2) * 4,
-    .ival_default    = { 1, 10 },
+	.sensor_isp = 0,
+	.xclk = OMAP34XXCAM_XCLK_A,
+	.capture_mem = PAGE_ALIGN(2592 * 1944 * 2) * 4
 };
  
 static int mt9p012_sensor_set_prv_data(void *priv)
@@ -144,7 +156,7 @@ static int mt9p012_sensor_power_set(struct device* dev, enum v4l2_power power)
 		mt9p012_sensor_set_xclk(0);
 		msleep(1);
 		/* Release pm constraints */
-		//omap_pm_set_min_bus_tput(dev, OCP_INITIATOR_AGENT, 0);
+		omap_pm_set_min_bus_tput(dev, OCP_INITIATOR_AGENT, 0);
 		//omap_pm_set_max_mpu_wakeup_lat(dev, -1);
 		/* mt9p012 autofocus module needs the standby
 		   put the standby to high after safe mode */
@@ -229,8 +241,8 @@ static int mt9p012_sensor_power_set(struct device* dev, enum v4l2_power power)
 struct mt9p012_platform_data mapphone_mt9p012_platform_data = {
 	.power_set = mt9p012_sensor_power_set,
 	.priv_data_set = mt9p012_sensor_set_prv_data,
-	//.lock_cpufreq = mapphone_lock_cpufreq,
-	//.get_config_flags = mapphone_get_config_flags,
+	.lock_cpufreq = mapphone_lock_cpufreq,
+	.get_config_flags = mapphone_get_config_flags,
 	.csi2_lane_count = isp_csi2_complexio_lanes_count,
 	.csi2_cfg_vp_out_ctrl = isp_csi2_ctrl_config_vp_out_ctrl,
 	.csi2_ctrl_update = isp_csi2_ctrl_update,
@@ -246,29 +258,31 @@ struct camise_capture_size {
 	unsigned long width;
 	unsigned long height;
 };
-const static struct camise_capture_size camise_sizes_1[] = {
+
+const static struct camise_capture_size defy_camise_sizes_1[] = {
 	{  176, 144 }, /* QCIF for Video Recording */
 	{  320, 240 }, /* QVGA for Preview and Video Recording */
 	{  352, 288 }, /* CIF for Video Recording */
 	{  480, 360 }, /* Bigger Viewfinder */
 	{  640, 480 }, /* 4X BINNING */
 	{  512, 1024},
-	/*{  512, 2048},*/ /* Jpeg Capture Resolution */
 	{  640, 2048}, /* JPEG Catpure Resolution */
 	{  848, 480 }, /* Support for WVGA preview */
 };
-const static struct camise_capture_size camise_sizes_2[] = {
+
+const static struct camise_capture_size kobe_camise_sizes_1[] = {
 	{  176, 144 }, /* QCIF for Video Recording */
 	{  320, 240 }, /* QVGA for Preview and Video Recording */
 	{  352, 288 }, /* CIF for Video Recording */
 	{  480, 360 }, /* Bigger Viewfinder */
-	{  640, 480 }, /* 4X BINNING */
-	{  512, 1024},
-	{  768, 1024}, /* JPEG Catpure Resolution */
+	{  512, 1024}, /* Jpeg Capture Resolution */
+	{  640, 480 },	 /* 4X BINNING */
+	{  768, 1024},	 /* JPEG Catpure Resolution */
 };
 
 static struct omap34xxcam_sensor_config camise_cam_hwc = {
 	.sensor_isp = 1,
+	.xclk = OMAP34XXCAM_XCLK_A,
 	.capture_mem = PAGE_ALIGN(2048 * 1536 * 2) * 4,
 };
 
@@ -280,33 +294,65 @@ static struct isp_interface_config camise_if_config = {
 	.prestrobe = 0x0,
 	.shutter = 0x0,
 	.wenlog = ISPCCDC_CFG_WENLOG_AND,
+	.dcsub = 0,	 /* Disabling DCSubtract function */
+	/*.raw_fmt_in = ISPCCDC_INPUT_FMT_GR_BG,*/
+	.wait_bayer_frame = 1,
+	.wait_yuv_frame = 1,
+	/*.cam_mclk = 216000000,
+	.cam_mclk_src_div = OMAP_MCAM_SRC_DIV_36xx, */
 	.cam_mclk = 216000000,
+	.cam_mclk_src_div = 4,//OMAP_MCAM_SRC_DIV,
 	.raw_fmt_in = ISPCCDC_INPUT_FMT_RG_GB,
 	.u.par.par_bridge = 0x3,
 	.u.par.par_clk_pol = 0x0,
 };
 
-static int camise_get_capture_size(int index,
-				unsigned long *w,
-				unsigned long *h)
+static int camise_get_capture_size(int index, unsigned long *w,	unsigned long *h)
 {
+	struct device_node *node;
+	const void *prop;
+	int max_size = 0;
 
-	int max_size = ARRAY_SIZE(camise_sizes_1);
-
-	if (index < max_size) {
-		*h = camise_sizes_1[index].height;
-		*w = camise_sizes_1[index].width;
+	node = of_find_node_by_path(DT_PATH_CHOSEN);
+	if (node == NULL) {
+		pr_err("Unable to read node %s from device tree!\n",
+			DT_PATH_CHOSEN);
+		return max_size;
 	}
+
+	prop = of_get_property(node, DT_PROP_CHOSEN_USB_PROD_NAME, NULL);
+	if (prop) {
+		if (!strcmp(prop, "MB526")) {
+			max_size =  ARRAY_SIZE(defy_camise_sizes_1);
+			if (index < max_size) {
+				*h = defy_camise_sizes_1[index].height;
+				*w = defy_camise_sizes_1[index].width;
+			}
+		} else if (!strcmp(prop, "MB520")) {
+			max_size =  ARRAY_SIZE(kobe_camise_sizes_1);
+			if (index < max_size) {
+				*h = kobe_camise_sizes_1[index].height;
+				*w = kobe_camise_sizes_1[index].width;
+			}
+		}
+	} else {
+		pr_err("Read property %s error!\n",
+		       DT_PROP_CHOSEN_USB_PROD_NAME);
+	}
+
+	of_node_put(node);
 
 	return max_size;
 }
+
 static int camise_sensor_set_prv_data(void *priv)
 {
 	struct omap34xxcam_hw_config *hwc = priv;
+	hwc->u.sensor.xclk = camise_cam_hwc.xclk;
 	hwc->u.sensor.sensor_isp = camise_cam_hwc.sensor_isp;
 	hwc->u.sensor.capture_mem = camise_cam_hwc.capture_mem;
 	hwc->dev_index = 1;
-	hwc->dev_minor = 1;
+	hwc->dev_minor = CAM_DEVICE_SOC;
 	hwc->dev_type = OMAP34XXCAM_SLAVE_SENSOR;
 	return 0;
 }
