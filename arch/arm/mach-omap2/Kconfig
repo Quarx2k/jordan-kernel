@@ -420,15 +420,6 @@ config OMAP3_SDRC_AC_TIMING
 	  wish to say no.  Selecting yes without understanding what is
 	  going on could result in system crashes;
 
-config DISABLE_OMAP_ERRATA_i583
-	bool "Override errata i583
-	depends on ARCH_OMAP3
-	default n
-	help
-	  Errata i583 affects JDEC memory timing when waking from OFF mode on
-	  ES 1.1 and older OMAP3.  If the system clock is 26MHz or 38.4MHz and
-	  there is no DDR on CS1, then it is safe to disable this errata check.
-
 config OMAP4_ERRATA_I688
 	bool "OMAP4 errata: Async Bridge Corruption"
 	depends on (ARCH_OMAP4 || SOC_OMAP5) && !ARCH_MULTIPLATFORM

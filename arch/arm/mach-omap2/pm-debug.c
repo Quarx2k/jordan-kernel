@@ -227,7 +227,9 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *dir)
 
 static int option_get(void *data, u64 *val)
 {
-	*val = omap_pm_get_off_mode();
+	u32 *option = data;
+
+	*val = *option;
 
 	return 0;
 }
