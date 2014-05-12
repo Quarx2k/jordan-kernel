@@ -1735,6 +1735,7 @@ static int serial_omap_probe(struct platform_device *pdev)
 	up->port.mapbase = mem->start;
 	up->port.membase = devm_ioremap(&pdev->dev, mem->start,
 						resource_size(mem));
+
 	if (!up->port.membase) {
 		dev_err(&pdev->dev, "can't ioremap UART\n");
 		ret = -ENOMEM;
