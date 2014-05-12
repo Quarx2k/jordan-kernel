@@ -3029,13 +3029,8 @@ int dsi_vc_send_bta_sync(struct omap_dss_device *dssdev, int channel)
 {
 	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
 	DECLARE_COMPLETION_ONSTACK(completion);
-	int r = 0;
+	int r = 0, i = 0;
 	u32 err;
-
-	r = dsi_register_isr_vc(dsidev, channel, dsi_completion_handler,
-			&completion, DSI_VC_IRQ_BTA);
-	if (r)
-		goto err0;
 
 	r = dsi_register_isr(dsidev, dsi_completion_handler, &completion,
 			DSI_IRQ_ERROR_MASK);
@@ -3044,29 +3039,32 @@ int dsi_vc_send_bta_sync(struct omap_dss_device *dssdev, int channel)
 
 	r = dsi_vc_send_bta(dsidev, channel);
 	if (r)
-		goto err2;
+		goto err1;
 
-	if (wait_for_completion_timeout(&completion,
-				msecs_to_jiffies(500)) == 0) {
-		DSSERR("Failed to receive BTA\n");
-		r = -EIO;
-		goto err2;
+	/* wait for BTA ACK */
+	while (i < 500) {
+		if (REG_GET(dsidev, DSI_VC_IRQSTATUS(channel), 5, 5)) {
+			DSSDBG("BTA recieved\n");
+			REG_FLD_MOD(dsidev, DSI_VC_IRQSTATUS(channel), 1, 5, 5);
+			break;
+		}
+		i++;
+		mdelay(1);
 	}
+
+	if (i >= 500)
+		DSSERR("sending BTA failed\n");
 
 	err = dsi_get_errors(dsidev);
 	if (err) {
 		DSSERR("Error while sending BTA: %x\n", err);
 		r = -EIO;
-		goto err2;
 	}
-err2:
+
+err1:
 	dsi_unregister_isr(dsidev, dsi_completion_handler, &completion,
 			DSI_IRQ_ERROR_MASK);
-err1:
-	dsi_unregister_isr_vc(dsidev, channel, dsi_completion_handler,
-			&completion, DSI_VC_IRQ_BTA);
-err0:
-	return r;
+	return 0;
 }
 
 
