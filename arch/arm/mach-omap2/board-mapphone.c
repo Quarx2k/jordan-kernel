@@ -17,7 +17,7 @@
 #include <asm/mach/arch.h>
 
 #include "common.h"
-
+#include "pm.h"
 
 
 #include "sdram-toshiba-hynix-numonyx.h"
@@ -34,6 +34,8 @@ static void __init omap_mapphone_init(void)
              clk_enable(clkp);
              printk("sad2d_ick enabled\n");
 	}
+
+	omap_cpcap_init();
 }
 
 MACHINE_START(MAPPHONE, "mapphone_")
