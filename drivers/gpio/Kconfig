@@ -704,6 +704,12 @@ config GPIO_MSIC
 	  Enable support for GPIO on intel MSIC controllers found in
 	  intel MID devices
 
+config GPIO_MAPPING
+	bool "Support GPIO mapping"
+	default n
+	help
+	  GPIO interface supports pin number and name mapping.
+
 comment "USB GPIO expanders:"
 
 config GPIO_VIPERBOARD

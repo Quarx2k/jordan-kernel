@@ -622,5 +622,10 @@ config TILE_SROM
 	  device appear much like a simple EEPROM, and knows
 	  how to partition a single ROM for multiple purposes.
 
+config GPIODEV
+	tristate "Enable Motorola GPIODev"
+	default n
+	help
+          This feature enables GPIODev for accessing GPIO pins in user space.
 endmenu
 

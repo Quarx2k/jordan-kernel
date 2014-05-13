@@ -18,6 +18,7 @@
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
+#include <mach/board-mapphone.h>
 
 #include "common.h"
 #include "pm.h"
@@ -67,7 +68,7 @@ static void __init omap_mapphone_init(void)
              clk_enable(clkp);
              printk("sad2d_ick enabled\n");
 	}
-
+	mapphone_gpio_mapping_init();
 	omap_cpcap_init();
 }
 
