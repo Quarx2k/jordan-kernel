@@ -222,16 +222,10 @@ static int mt9p012_sensor_power_set(struct device* dev, enum v4l2_power power)
 		}
 		break;
 
-	case V4L2_POWER_STANDBY:
-		printk("V4L2_POWER_STANDBY\n");
-		/* stand by */
-
-		gpio_set_value(cam_standby_gpio, 1);
-		omap_pm_set_min_bus_tput(dev, OCP_INITIATOR_AGENT, 0);
-		if (mt9p012_previous_power == V4L2_POWER_ON)
-               		 mt9p012_sensor_set_xclk(0);
-
-		break;
+        case V4L2_POWER_STANDBY:
+                /* Stand By Sequence */
+                mt9p012_sensor_set_xclk(0);
+                break;
 	}
 	/* Save powerstate to know what was before calling POWER_ON. */
 	mt9p012_previous_power = power;
