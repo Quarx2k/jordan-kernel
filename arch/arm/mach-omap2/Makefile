@@ -257,6 +257,7 @@ obj-$(CONFIG_MACH_OMAP4_PANDA)		+= board-omap4panda.o
 obj-$(CONFIG_MACH_OMAP_MAPPHONE)	+= board-mapphone.o \
 					   pmic-cpcap.o \
 					   board-mapphone-gpio.o \
+					   board-mapphone-hsmmc.o
 
 obj-$(CONFIG_MACH_OMAP3517EVM)		+= board-am3517evm.o
 

@@ -536,7 +536,7 @@ static void __init omap_hsmmc_init_one(struct omap2_hsmmc_info *hsmmcinfo,
 	}
 
 	hsmmcinfo->pdev = pdev;
-
+	hsmmcinfo->dev = &od->pdev->dev;
 	if (hsmmcinfo->deferred)
 		goto free_mmc;
 

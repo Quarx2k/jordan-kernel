@@ -26,6 +26,7 @@ struct omap2_hsmmc_info {
 	int	gpio_wp;	/* or -EINVAL */
 	char	*name;		/* or NULL for default */
 	struct platform_device *pdev;	/* mmc controller instance */
+	struct device *dev;	/* returned: pointer to mmc adapter */
 	int	ocr_mask;	/* temporary HACK */
 	int	max_freq;	/* maximum clock, if constrained by external
 				 * circuitry, or 0 for default */
@@ -51,3 +52,5 @@ static inline void omap_hsmmc_late_init(struct omap2_hsmmc_info *info)
 }
 
 #endif
+
+extern int wifi_set_power(struct device *dev, int slot, int power_on, int vdd);
