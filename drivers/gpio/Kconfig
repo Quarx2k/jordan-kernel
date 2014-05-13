@@ -851,6 +851,12 @@ config GPIO_BCM_KONA
 	help
 	  Turn on GPIO support for Broadcom "Kona" chips.
 
+config GPIO_MAPPING
+	bool "Support GPIO mapping"
+	default n
+	help
+	  GPIO interface supports pin number and name mapping.
+
 comment "USB GPIO expanders:"
 
 config GPIO_VIPERBOARD

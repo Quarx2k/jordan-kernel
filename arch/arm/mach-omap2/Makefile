@@ -257,6 +257,7 @@ obj-$(CONFIG_MACH_TOUCHBOOK)		+= board-omap3touchbook.o
 
 obj-$(CONFIG_MACH_OMAP_MAPPHONE)	+= board-mapphone.o \
 					   pmic-cpcap.o \
+					   board-mapphone-gpio.o \
 
 obj-$(CONFIG_MACH_OMAP3517EVM)		+= board-am3517evm.o
 
