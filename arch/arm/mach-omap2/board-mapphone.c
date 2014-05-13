@@ -26,6 +26,8 @@
 #include "sdram-toshiba-hynix-numonyx.h"
 
 #define ATAG_FLAT_DEV_TREE_ADDRESS 0xf100040A
+#define MAPPHONE_WIFI_PMENA_GPIO 186
+#define MAPPHONE_WIFI_IRQ_GPIO 65
 
 struct tag_flat_dev_tree_address {
 	u32 address;
@@ -34,6 +36,23 @@ struct tag_flat_dev_tree_address {
 
 static u32 fdt_start_address;
 static u32 fdt_size;
+
+int wifi_set_power(struct device *dev, int slot, int power_on, int vdd)
+{
+	static int power_state;
+	printk("Powering %s wifi\n", (power_on ? "on" : "off"));
+	if (power_on == power_state) {
+		return 0;
+	}
+	power_state = power_on;
+	if (power_on) {
+		gpio_set_value(MAPPHONE_WIFI_PMENA_GPIO, 1);
+	} else {
+		gpio_set_value(MAPPHONE_WIFI_PMENA_GPIO, 0);
+	}
+	return 0;
+}
+
 
 /* process flat device tree for hardware configuration */
 static int __init parse_tag_flat_dev_tree_address(const struct tag *tag)
@@ -76,6 +95,7 @@ static void __init omap_mapphone_init(void)
              printk("sad2d_ick enabled\n");
 	}
 	mapphone_gpio_mapping_init();
+	mapphone_hsmmc_init();
 	omap_cpcap_init();
 }
 
