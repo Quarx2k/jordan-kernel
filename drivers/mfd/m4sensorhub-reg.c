@@ -25,7 +25,8 @@
 
 #include "m4sensorhub-reg.h"    /* auto-generated header defining registers */
 
-#define I2C_RETRY_DELAY              5
+#define I2C_RETRY_DELAY_MIN         20
+#define I2C_RETRY_DELAY_MAX         50
 #define I2C_RETRIES                  5
 
 #define DEBUG_LINE_LENGTH           80
@@ -352,7 +353,7 @@ int m4sensorhub_i2c_write_read(struct m4sensorhub_data *m4sensorhub,
 		err = i2c_transfer(m4sensorhub->i2c_client->adapter,
 				   &msgs[msgstart], msglen);
 		if (err != msglen)
-			msleep_interruptible(I2C_RETRY_DELAY);
+			usleep_range(I2C_RETRY_DELAY_MIN, I2C_RETRY_DELAY_MAX);
 	} while ((err != msglen) && (++tries < I2C_RETRIES));
 	if (err != msglen) {
 		dev_err(&m4sensorhub->i2c_client->dev, "i2c transfer error; "
