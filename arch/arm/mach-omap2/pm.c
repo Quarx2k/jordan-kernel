@@ -209,8 +209,6 @@ static int omap_pm_enter(suspend_state_t suspend_state)
 	case PM_SUSPEND_STANDBY:
 	case PM_SUSPEND_MEM:
 		ret = omap_pm_suspend();
-		if (cpu_is_omap34xx())
-			omap_prcm_irq_prepare();
 		break;
 	default:
 		ret = -EINVAL;
@@ -222,6 +220,8 @@ static int omap_pm_enter(suspend_state_t suspend_state)
 static int omap_pm_begin(suspend_state_t state)
 {
 	cpu_idle_poll_ctrl(true);
+	if (cpu_is_omap34xx())
+		omap_prcm_irq_prepare();
 	return 0;
 }
 
