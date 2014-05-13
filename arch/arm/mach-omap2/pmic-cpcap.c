@@ -92,6 +92,9 @@ int __init omap_cpcap_init(void)
 	voltdm = voltdm_lookup("mpu_iva");
 	omap_voltage_register_pmic(voltdm, &omap_cpcap_iva);
 
+	voltdm = voltdm_lookup("vdd_mpu_iva");
+	omap_voltage_register_pmic(voltdm, &omap_cpcap_iva);
+
 	voltdm = voltdm_lookup("core");
 	omap_voltage_register_pmic(voltdm, &omap_cpcap_core);
 

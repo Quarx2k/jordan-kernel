@@ -302,6 +302,8 @@ void omap_sram_idle(void)
 	    core_next_state == PWRDM_POWER_OFF)
 		sdrc_pwr = sdrc_read_reg(SDRC_POWER);
 
+
+#if 0  //XXX Check null pointer!!!
 	/*
 	 * omap3_arm_context is the location where some ARM context
 	 * get saved. The rest is placed on the stack, and restored
@@ -313,6 +315,8 @@ void omap_sram_idle(void)
 		cpu_suspend(save_state, omap34xx_do_sram_idle);
 	else
 		omap34xx_do_sram_idle(save_state);
+#endif
+
 
 	/* Restore normal SDRC POWER settings */
 	if (cpu_is_omap3430() && omap_rev() >= OMAP3430_REV_ES3_0 &&
@@ -757,7 +761,9 @@ int __init omap3_pm_init(void)
 		local_irq_disable();
 
 		omap_dma_global_context_save();
+#if 0  //XXX Check null pointer!!!
 		omap3_save_secure_ram_context();
+#endif
 		omap_dma_global_context_restore();
 
 		local_irq_enable();

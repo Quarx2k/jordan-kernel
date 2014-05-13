@@ -155,3 +155,14 @@ obj-$(CONFIG_MFD_LM3533)	+= lm3533-core.o lm3533-ctrlbank.o
 obj-$(CONFIG_VEXPRESS_CONFIG)	+= vexpress-config.o vexpress-sysreg.o
 obj-$(CONFIG_MFD_RETU)		+= retu-mfd.o
 obj-$(CONFIG_MFD_AS3711)	+= as3711.o
+
+cpcap-objs			:= cpcap-core.o \
+				   cpcap-irq.o \
+				   cpcap-regacc.o \
+				   cpcap-key.o \
+				   cpcap-usb-det.o \
+				   cpcap-adc.o \
+				   cpcap-uc.o \
+				   cpcap-3mm5.o
+
+obj-$(CONFIG_MFD_CPCAP)		+= cpcap.o
