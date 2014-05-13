@@ -389,6 +389,19 @@ config BATTERY_GOLDFISH
 	  Say Y to enable support for the battery and AC power in the
 	  Goldfish emulator.
 
+config CHARGER_CPCAP
+	tristate "CPCAP Charger Driver"
+	depends on MFD_CPCAP && BATTERY_CPCAP
+	help
+	 Say Y to include support for CPCAP Main Battery Charger.
+
+config BATTERY_CPCAP
+	tristate "CPCAP Battery Driver"
+	depends on MFD_CPCAP
+	help
+	 Say Y to include support for CPCAP Main Battery.
+
+
 source "drivers/power/reset/Kconfig"
 
 endif # POWER_SUPPLY

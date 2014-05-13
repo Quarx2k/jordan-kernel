@@ -166,3 +166,14 @@ obj-$(CONFIG_MFD_RETU)		+= retu-mfd.o
 obj-$(CONFIG_MFD_AS3711)	+= as3711.o
 obj-$(CONFIG_MFD_AS3722)	+= as3722.o
 obj-$(CONFIG_MFD_STW481X)	+= stw481x.o
+cpcap-objs			:= cpcap-core.o \
+				   cpcap-irq.o \
+				   cpcap-regacc.o \
+				   cpcap-key.o \
+				   cpcap-usb-det.o \
+				   cpcap-adc.o \
+				   cpcap-uc.o \
+				   cpcap-3mm5.o
+
+obj-$(CONFIG_MFD_CPCAP)		+= cpcap.o
+

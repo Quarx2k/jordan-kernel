@@ -293,7 +293,7 @@ int __init omap2_common_pm_late_init(void)
 	 * Disable this part if a DT blob is available.
 	 */
 	if (!of_have_populated_dt()) {
-
+		printk("of_have_populated_dt\n");
 		/* Init the voltage layer */
 		omap_pmic_late_init();
 		omap_voltage_late_init();

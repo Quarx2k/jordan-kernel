@@ -408,6 +408,8 @@ dtb-$(CONFIG_MACH_DOVE) += dove-cm-a510.dtb \
 	dove-d2plug.dtb \
 	dove-d3plug.dtb \
 	dove-dove-db.dtb
+dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb
+dtb-$(CONFIG_MACH_OMAP_MAPPHONE) += umts_defy-prod.dtb
 
 targets += dtbs dtbs_install
 targets += $(dtb-y)
