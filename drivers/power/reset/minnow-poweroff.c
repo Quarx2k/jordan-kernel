@@ -42,11 +42,8 @@ static void minnow_gpio_poweroff_do_poweroff(void)
 
 	/* check for USB cable present, if so, wait for
 	 some time before going ahead. */
-
-	/* TODO : Check USB status before sleeping
-	Please see IKXCLOCK-138*/
-	/* sleep for 500 ms */
-	msleep(500);
+	if (g_usb_connected)
+		msleep(500);
 
 	/* config gpio 143 back from safe mode to reset the device */
 	pinctrl_select_state(gp_pctrl, gp_outputstate);
@@ -58,8 +55,7 @@ static void minnow_gpio_poweroff_do_poweroff(void)
 
 	WARN_ON(1);
 }
-/* This is not being used right now, will be used once
- IKXCLOCK-138 is implemented */
+
 int pmic_usb_ncb(struct notifier_block *nb, unsigned long val,
 			void *priv)
 {
@@ -71,7 +67,12 @@ int pmic_usb_ncb(struct notifier_block *nb, unsigned long val,
 		break;
 	case USB_DEVICE_REMOVE:
 	case USB_BUS_REMOVE:
-		g_usb_connected = 0;
+		/* During poweroff, the USB stack deinits and sends a remove
+		 notification even if a USB cable is still plugged in. To
+		 address this limitation, once USB cable is plugged in, always
+		 assume cable will be left plugged in up until powerdown. This
+		 should not impact regular user use-case scenarios since they
+		 would never be using USB cable. */
 		break;
 	}
 	return result;
@@ -87,6 +88,7 @@ static int minnow_gpio_poweroff_probe(struct platform_device *pdev)
 	int i, ret;
 	struct device_node *np;
 
+	g_usb_connected = 0;
 	/* Lets register right away for usb notifications */
 	usb_register_notify(&pmic_usb_notifier);
 
