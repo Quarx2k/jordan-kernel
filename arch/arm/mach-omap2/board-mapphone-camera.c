@@ -105,14 +105,15 @@ static struct omap34xxcam_sensor_config cam_hwc = {
  
 static int mt9p012_sensor_set_prv_data(void *priv)
 {
-    struct omap34xxcam_hw_config *hwc = priv;
+	struct omap34xxcam_hw_config *hwc = priv;
 
-    hwc->u.sensor.sensor_isp = cam_hwc.sensor_isp;
-    hwc->u.sensor.capture_mem = cam_hwc.capture_mem;
-    hwc->dev_index = 0;
-    hwc->dev_minor = 0;
-    hwc->dev_type = OMAP34XXCAM_SLAVE_SENSOR;
-    return 0;
+	hwc->u.sensor.xclk = cam_hwc.xclk;
+	hwc->u.sensor.sensor_isp = cam_hwc.sensor_isp;
+	hwc->u.sensor.capture_mem =cam_hwc.capture_mem;
+	hwc->dev_index = 0;
+	hwc->dev_minor = 0;
+	hwc->dev_type = OMAP34XXCAM_SLAVE_SENSOR;
+	return 0;
 }
  
 static struct isp_interface_config mt9p012_if_config = {

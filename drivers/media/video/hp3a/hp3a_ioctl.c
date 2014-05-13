@@ -26,7 +26,7 @@
 
 #include "hp3a_common.h"
 #include "hp3a_user.h"
-//#include "ispmmu.h"
+#include "ispmmu.h"
 
  /**
  * hp3a_unlocked_ioctl - I/O control function for hp3a module
@@ -124,7 +124,6 @@ long hp3a_unlocked_ioctl(struct file *file, unsigned int cmd,
 		if (index < fh->buffer_count && index > -1) {
 			ibuffer = &(fh->buffers[index]);
 			if (ibuffer->isp_addr == 0) {
-#if 0
 		#if defined(CONFIG_VIDEO_OLDOMAP3)
 				ibuffer->isp_addr =
 					ispmmu_map_pages(ibuffer->pages,
@@ -147,7 +146,6 @@ long hp3a_unlocked_ioctl(struct file *file, unsigned int cmd,
 					return -EFAULT;
 				}
 		#endif
-#endif
 			}
 			flush_dcache_ibuffer(ibuffer);
 			ret = hp3a_enqueue_irqsave(&g_tc.af_stat_queue,
@@ -166,7 +164,6 @@ long hp3a_unlocked_ioctl(struct file *file, unsigned int cmd,
 		if (index < fh->buffer_count && index > -1) {
 			ibuffer = &(fh->buffers[index]);
 			if (ibuffer->isp_addr == 0) {
-#if 0
 		#if defined(CONFIG_VIDEO_OLDOMAP3)
 				ibuffer->isp_addr =
 					ispmmu_map_pages(ibuffer->pages,
@@ -189,7 +186,6 @@ long hp3a_unlocked_ioctl(struct file *file, unsigned int cmd,
 					return -EFAULT;
 				}
 		#endif
-#endif
 			}
 			ret = hp3a_enqueue_irqsave(&g_tc.raw_frame_queue,
 				&ibuffer);

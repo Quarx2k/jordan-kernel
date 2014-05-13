@@ -22,7 +22,7 @@
 #include <linux/slab.h>
 #include "hp3a_common.h"
 #include "hp3a_user.h"
-//#include "ispmmu.h"
+#include "ispmmu.h"
 
 /**
  * map_user_memory - Maps user space memory into kernel.
@@ -119,7 +119,6 @@ int map_user_to_kernel(struct hp3a_buffer *src, struct hp3a_internal_buffer *des
  **/
 void unmap_buffer_from_kernel(struct hp3a_internal_buffer *ibuffer)
 {
-# if 0 
 	if (ibuffer->isp_addr) {
 #if defined(CONFIG_VIDEO_OLDOMAP3)
 		if (ispmmu_unmap(ibuffer->isp_addr) != 0) {
@@ -138,7 +137,6 @@ void unmap_buffer_from_kernel(struct hp3a_internal_buffer *ibuffer)
 		kfree(ibuffer->pages);
 		ibuffer->pages = NULL;
 	}
-#endif
 }
 
 /**
