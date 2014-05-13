@@ -143,9 +143,7 @@ u32 mt9p012_sensor_set_xclk(u32 xclkfreq)
 static int mt9p012_sensor_power_set(struct device* dev, enum v4l2_power power)
 {
 	switch (power) {
-
 	case V4L2_POWER_OFF:
-		printk("V4L2_POWER_OFF\n");
 		/* Power Down Sequence */
 		if (cam_reset_gpio >= 0) {
 			gpio_set_value(cam_reset_gpio, 0);
@@ -155,7 +153,9 @@ static int mt9p012_sensor_power_set(struct device* dev, enum v4l2_power power)
 		}
 
 		mt9p012_sensor_set_xclk(0);
+
 		msleep(1);
+
 		/* Release pm constraints */
 		omap_pm_set_min_bus_tput(dev, OCP_INITIATOR_AGENT, 0);
 		//omap_pm_set_max_mpu_wakeup_lat(dev, -1);
@@ -168,7 +168,6 @@ static int mt9p012_sensor_power_set(struct device* dev, enum v4l2_power power)
 		}
 	break;
 	case V4L2_POWER_ON:
-		printk("V4L2_POWER_ON\n");
 		if (mt9p012_previous_power == V4L2_POWER_OFF) {
 
 			/* mt9p012 autofocus module needs the standby
@@ -183,9 +182,8 @@ static int mt9p012_sensor_power_set(struct device* dev, enum v4l2_power power)
 
 			/* Configure ISP */
 			isp_configure_interface(&mt9p012_if_config);
-
-			msleep(5);
 		}
+
 		mt9p012_sensor_set_xclk(MT9P012_XCLK_48MHZ);
 		msleep(3);
 
@@ -198,6 +196,7 @@ static int mt9p012_sensor_power_set(struct device* dev, enum v4l2_power power)
 				if (gpio_request(cam_reset_gpio,
 					"camera reset") != 0) {
 					printk(KERN_ERR "Failed to req cam reset\n");
+					goto failed_cam_reset_gpio;
 				}
 				gpio_direction_output(cam_reset_gpio, 0);
 			}
@@ -205,6 +204,7 @@ static int mt9p012_sensor_power_set(struct device* dev, enum v4l2_power power)
 				if (gpio_request(cam_standby_gpio,
 						"camera standby") != 0) {
 					printk(KERN_ERR "Failed to req cam standby\n");
+					goto failed_cam_standby_gpio;
 				}
 				gpio_direction_output(cam_standby_gpio, 0);
 				gpio_set_value(cam_standby_gpio, 1);
@@ -221,14 +221,24 @@ static int mt9p012_sensor_power_set(struct device* dev, enum v4l2_power power)
 			msleep(3);
 		}
 		break;
-
+failed_cam_standby_gpio:
+		if (cam_standby_gpio >= 0) {
+			gpio_free(cam_standby_gpio);
+			cam_standby_gpio = -1;
+		}
+failed_cam_reset_gpio:
+		if (cam_reset_gpio >= 0) {
+			gpio_free(cam_reset_gpio);
+			cam_reset_gpio = -1;
+		}
         case V4L2_POWER_STANDBY:
                 /* Stand By Sequence */
                 mt9p012_sensor_set_xclk(0);
                 break;
-	}
-	/* Save powerstate to know what was before calling POWER_ON. */
-	mt9p012_previous_power = power;
+        }
+        /* Save powerstate to know what was before calling POWER_ON. */
+        mt9p012_previous_power = power;
+
 	return 0;
 }
 
