@@ -194,7 +194,10 @@ static int m4sensorhub_hw_init(struct m4sensorhub_data *m4sensorhub,
 			gpio, err);
 		goto error_reset;
 	}
-	gpio_direction_output(gpio, 1);
+	/* hold M4 reset till M4 load firmware procduce starts
+	 * this is needed for snowflake touch determination
+	 */
+	gpio_direction_output(gpio, 0);
 	m4sensorhub->hwconfig.reset_gpio = gpio;
 
 	gpio = of_get_named_gpio_flags(node, "mot,wake-gpio", 0, NULL);
@@ -236,8 +239,6 @@ static int m4sensorhub_hw_init(struct m4sensorhub_data *m4sensorhub,
 	}
 	gpio_direction_output(gpio, 0);
 	m4sensorhub->hwconfig.mpu_9150_en_gpio = gpio;
-
-	m4sensorhub_hw_reset(m4sensorhub);
 
 	return 0;
 

@@ -177,11 +177,72 @@ atmxt_of_init(struct i2c_client *client)
 
 	return pdata;
 }
+
+static int atmxt_pctrl_sel_state(struct device *dev, struct pinctrl *pctrl,
+				 const char *state)
+{
+	int r;
+	struct pinctrl_state *pctrl_state = pinctrl_lookup_state(pctrl, state);
+	if (IS_ERR(pctrl_state)) {
+		dev_err(dev, "no %s pinctrl state\n", state);
+		return PTR_ERR(pctrl_state);
+	}
+	r = pinctrl_select_state(pctrl, pctrl_state);
+	if (r)
+		dev_err(dev, "failed to activate pinctrl %s\n", state);
+	return r;
+}
+
+inline int atmxt_tdat_detect_snowflake(struct i2c_client *client,
+				       struct touch_platform_data *pdata)
+{
+	int r;
+	struct pinctrl *pctrl = devm_pinctrl_get(&client->dev);
+	if (IS_ERR(pctrl)) {
+		dev_err(&client->dev, "no pinctrl handle\n");
+		return PTR_ERR(pctrl);
+	}
+	/* To detect new snowflake touch sensor, it needs set touch_irq
+	 *   to pull-down, then read it back, the low value means snowflake
+	 *   touch is connected
+	 */
+
+	r = atmxt_pctrl_sel_state(&client->dev, pctrl, "pulldown");
+	if (r)
+		goto exit;
+
+	msleep(1);
+	if (gpio_get_value(pdata->gpio_interrupt) == 0) {
+		/* detected snowflake, replace tdat file name */
+		const char *fp = NULL;
+		r = of_property_read_string_index(client->dev.of_node,
+						  "atmel,atmxt-tdat-filename",
+						  1, &fp);
+		if (r) {
+			dev_err(&client->dev, "no snowflake tdat file defined\n");
+			goto exit;
+		}
+		pdata->filename = (char *)fp;
+	}
+
+	r = atmxt_pctrl_sel_state(&client->dev, pctrl, "pullup");
+	dev_dbg(&client->dev, "tdat file is %s\n", pdata->filename);
+
+exit:
+	devm_pinctrl_put(pctrl);
+	return r;
+}
 #else
 static inline struct touch_platform_data *
 atmxt_of_init(struct i2c_client *client)
 {
 	return NULL;
+}
+
+inline int atmxt_tdat_detect_snowflake(struct i2c_client *client,
+				       struct touch_platform_data *pdata)
+{
+	return 0
 }
 #endif
 
@@ -279,6 +340,10 @@ static int atmxt_probe(struct i2c_client *client,
 		goto atmxt_probe_fail;
 
 	err = atmxt_gpio_init(dd);
+	if (err < 0)
+		goto atmxt_probe_fail;
+
+	err = atmxt_tdat_detect_snowflake(client, dd->pdata);
 	if (err < 0)
 		goto atmxt_probe_fail;
 

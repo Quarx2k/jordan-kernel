@@ -261,7 +261,10 @@
 		wakeup-source;
 		gpios = <&gpio4 3 0>, /* IRQ   gpio-099 */
 			<&gpio6 4 0>; /* RESET gpio-164*/
-		atmel,atmxt-tdat-filename = "atmxt-r2.tdat";
+		atmel,atmxt-tdat-filename = "atmxt-r2.tdat", "atmxt-r3.tdat";
+		pinctrl-names = "pullup", "pulldown";
+		pinctrl-0 = <&atmxt_int_pullup>;
+		pinctrl-1 = <&atmxt_int_pulldown>;
 	};
 };
 
@@ -546,7 +549,6 @@
 			0x0dc 0x004	/* CAM_HS, MODE4 | OUTPUT */
 			0x0ea 0x004	/* MUXCAM_D2, MODE4 | OUTPUT */
 			0x0e4 0x004	/* CAM_FLD, MODE4 | OUTPUT */
-			0x0e6 0x411c	/* CAM_D0, MODE4 | INPUT_PULLUP | OFFWAKEUP */
 			0x122 0x004	/* SIM_CLK, MODE4 | OUTPUT */
 			0x124 0x00f	/* SIM_PWRCTRL, MODE7 | PULLDOWN */
 			0x13e 0x00F     /* MCBSP3_DR, MODE7 | PULLDOWN */
@@ -675,6 +677,18 @@
 	charge_startb_pin: pinmax_charge_startb_pin {
 		pinctrl-single,pins = <
 			0x1a2 0x4104     /* MCSPI1_CS2, MODE4 | INPUT | OFFWAKEUP */
+		>;
+	};
+
+	atmxt_int_pullup: pinmux_atmxt_int_pullup {
+		pinctrl-single,pins = <
+			0x0e6 0x411c	/* CAM_D0, MODE4 | INPUT_PULLUP | OFFWAKEUP */
+		>;
+	};
+
+	atmxt_int_pulldown: pinmux_atmxt_int_pulldown {
+		pinctrl-single,pins = <
+			0x0e6 0x10c	/* CAM_D0, MODE4 | INPUT_PULLDOWN */
 		>;
 	};
 };
