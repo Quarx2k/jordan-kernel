@@ -196,17 +196,24 @@ static int atmxt_pctrl_sel_state(struct device *dev, struct pinctrl *pctrl,
 inline int atmxt_tdat_detect_snowflake(struct i2c_client *client,
 				       struct touch_platform_data *pdata)
 {
-	int r;
+	int r, need = 0;
 	struct pinctrl *pctrl = devm_pinctrl_get(&client->dev);
 	if (IS_ERR(pctrl)) {
 		dev_err(&client->dev, "no pinctrl handle\n");
 		return PTR_ERR(pctrl);
 	}
+
+	r = of_property_read_u32(client->dev.of_node,
+				"support-snowflake", &need);
+	if (r || !need) {
+		dev_dbg(&client->dev, "do not support snowflake\n");
+		goto exit_pullup;
+	}
+
 	/* To detect new snowflake touch sensor, it needs set touch_irq
 	 *   to pull-down, then read it back, the low value means snowflake
 	 *   touch is connected
 	 */
-
 	r = atmxt_pctrl_sel_state(&client->dev, pctrl, "pulldown");
 	if (r)
 		goto exit;
@@ -225,6 +232,8 @@ inline int atmxt_tdat_detect_snowflake(struct i2c_client *client,
 		pdata->filename = (char *)fp;
 	}
 
+exit_pullup:
+	/* switch to pullup by default that allow touch interrupt */
 	r = atmxt_pctrl_sel_state(&client->dev, pctrl, "pullup");
 	dev_dbg(&client->dev, "tdat file is %s\n", pdata->filename);
 

@@ -265,6 +265,7 @@
 		pinctrl-names = "pullup", "pulldown";
 		pinctrl-0 = <&atmxt_int_pullup>;
 		pinctrl-1 = <&atmxt_int_pulldown>;
+		support-snowflake = <1>;
 	};
 };
 

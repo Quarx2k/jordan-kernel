@@ -22,3 +22,9 @@
 	};
 
 };
+
+&i2c1 {
+	atmxt@4a {
+		support-snowflake = <0>;
+	};
+};

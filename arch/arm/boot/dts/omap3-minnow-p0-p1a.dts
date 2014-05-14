@@ -23,3 +23,10 @@
 &spi_flash {
 	m25p,m4sensorhub_cb;
 };
+
+&i2c1 {
+	atmxt@4a {
+		support-snowflake = <0>;
+	};
+};
+
