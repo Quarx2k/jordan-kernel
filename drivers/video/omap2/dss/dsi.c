@@ -4363,16 +4363,52 @@ static void dsi_te_timeout(unsigned long arg)
 }
 #endif
 
+#define DISPC_CONTROL		0x48041040
+
 static void dsi_handle_framedone(struct platform_device *dsidev, int error)
 {
 	struct dsi_data *dsi = dsi_get_dsidrv_data(dsidev);
+	struct omap_dss_device *device;
+	int channel;
+
+	if (!cpu_is_omap44xx())
+		channel = dsi->update_channel;
+	else
+		channel = OMAP_DSS_DSI_TYPE_CMD_MODE;
+
+	device = dsi->vc[channel].dssdev;
 
 	/* SIDLEMODE back to smart-idle */
 	dispc_enable_sidle();
 
+	if (error == -ETIMEDOUT && device->manager) {
+		/* Ensures recovery of DISPC after a failed lcd_enable*/
+		/*
+		 * OSS is callinged the device->manager->disable() to turn off
+		 * LCD but this API is not just turning off the LCD, and it'll
+		 * wait for framedone. Because this wait, will cause problem
+		 * when we call it in the IRQ context. In this case, timeout is
+		 * happened and no framedone IRQ, then we just turn off the bit
+		 *
+		 * Don't want to create a new API in dispc.c that might be
+		 * mis-used. So we change bit 0 directly from DISPC_CONTROL1 to
+		 * turn off the LCD
+		 */
+		int val;
+		val = omap_readl(DISPC_CONTROL) ;       /*DISPC_CONTROL1*/
+		omap_writel((val & ~0x1), DISPC_CONTROL); /*Turn off LCDENABLE*/
+	}
+
+
 	if (dsi->te_enabled) {
 		/* enable LP_RX_TO again after the TE */
 		REG_FLD_MOD(dsidev, DSI_TIMING2, 1, 15, 15); /* LP_RX_TO */
+	}
+
+	/* RX_FIFO_NOT_EMPTY */
+	if (REG_GET(dsidev, DSI_VC_CTRL(channel), 20, 20)) {
+		DSSERR("Received error during frame transfer:\n");
+		dsi_vc_flush_receive_data(dsidev, channel);
 	}
 
 	dsi->framedone_callback(error, dsi->framedone_data);

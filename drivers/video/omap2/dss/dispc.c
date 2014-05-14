@@ -3637,6 +3637,7 @@ static irqreturn_t omap_dispc_irq_handler(int irq, void *arg)
 
 	/* IRQ is not for us */
 	if (!(irqstatus & irqenable)) {
+		dispc_runtime_put();
 		spin_unlock(&dispc.irq_lock);
 		return IRQ_NONE;
 	}
