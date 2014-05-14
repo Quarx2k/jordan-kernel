@@ -546,14 +546,14 @@ static int m4ped_driver_init(struct init_calldata *p_arg)
 	}
 
 	err = m4sensorhub_irq_register(dd->m4,
-		M4SH_IRQ_PEDOMETER_DATA_READY, m4ped_isr, iio);
+		M4SH_IRQ_PEDOMETER_DATA_READY, m4ped_isr, iio, 0);
 	if (err < 0) {
 		m4ped_err("%s: Failed to register M4 PED IRQ.\n", __func__);
 		goto m4ped_driver_init_fail;
 	}
 
 	err = m4sensorhub_irq_register(dd->m4,
-		M4SH_IRQ_ACTIVITY_CHANGE, m4ped_isr, iio);
+		M4SH_IRQ_ACTIVITY_CHANGE, m4ped_isr, iio, 0);
 	if (err < 0) {
 		m4ped_err("%s: Failed to register M4 ACT IRQ.\n", __func__);
 		goto m4ped_driver_init_irq_act_fail;

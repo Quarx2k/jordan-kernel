@@ -288,7 +288,7 @@ static int m4als_driver_init(struct init_calldata *p_arg)
 	}
 
 	err = m4sensorhub_irq_register(dd->m4, M4SH_IRQ_LIGHTSENSOR_DATA_READY,
-		m4als_isr, dd);
+		m4als_isr, dd, 0);
 	if (err < 0) {
 		m4als_err("%s: Failed to register M4 IRQ.\n", __func__);
 		goto m4als_driver_init_irq_fail;

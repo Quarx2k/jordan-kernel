@@ -332,7 +332,7 @@ static int m4ges_driver_init(struct init_calldata *p_arg)
 	}
 
 	err = m4sensorhub_irq_register(dd->m4,
-		M4SH_IRQ_GESTURE_DETECTED, m4ges_isr, iio);
+		M4SH_IRQ_GESTURE_DETECTED, m4ges_isr, iio, 1);
 	if (err < 0) {
 		m4ges_err("%s: Failed to register M4 IRQ.\n", __func__);
 		goto m4ges_driver_init_fail;

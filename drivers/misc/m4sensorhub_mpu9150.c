@@ -531,7 +531,7 @@ static int mpu9150_irq_init(struct mpu9150_client *mpu9150_client_data)
 	ret = m4sensorhub_irq_register(mpu9150_client_data->m4sensorhub,
 				M4SH_IRQ_GYRO_DATA_READY,
 				m4_handle_mpu9150_gyro_irq,
-				mpu9150_client_data);
+				mpu9150_client_data, 0);
 	if (ret < 0) {
 		KDEBUG(M4SH_ERROR, "Error registering int %d (%d)\n",
 					M4SH_IRQ_GYRO_DATA_READY, ret);
@@ -540,7 +540,7 @@ static int mpu9150_irq_init(struct mpu9150_client *mpu9150_client_data)
 	ret = m4sensorhub_irq_register(mpu9150_client_data->m4sensorhub,
 				M4SH_IRQ_ACCEL_DATA_READY,
 				m4_handle_mpu9150_accel_irq,
-				mpu9150_client_data);
+				mpu9150_client_data, 0);
 	if (ret < 0) {
 		KDEBUG(M4SH_ERROR, "Error registering int %d (%d)\n",
 					M4SH_IRQ_ACCEL_DATA_READY, ret);
@@ -549,7 +549,7 @@ static int mpu9150_irq_init(struct mpu9150_client *mpu9150_client_data)
 	ret = m4sensorhub_irq_register(mpu9150_client_data->m4sensorhub,
 				M4SH_IRQ_COMPASS_DATA_READY,
 				m4_handle_mpu9150_compass_irq,
-				mpu9150_client_data);
+				mpu9150_client_data, 0);
 	if (ret < 0) {
 		KDEBUG(M4SH_ERROR, "Error registering int %d (%d)\n",
 				M4SH_IRQ_COMPASS_DATA_READY, ret);

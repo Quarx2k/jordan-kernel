@@ -90,6 +90,7 @@ struct m4sensorhub_irq_info {
 	uint8_t enabled;
 	uint32_t ena_fired;
 	uint32_t disa_fired;
+	uint8_t tm_wakelock;
 };
 
 struct m4sensorhub_irqdata {
@@ -100,6 +101,7 @@ struct m4sensorhub_irqdata {
 	struct m4sensorhub_event_handler event_handler[M4SH_IRQ__NUM];
 	struct m4sensorhub_irq_info irq_info[M4SH_IRQ__NUM];
 	struct wake_lock wake_lock;
+	struct wake_lock tm_wake_lock; /* timeout wakelock */
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *debugfs;
 #endif
@@ -197,6 +199,8 @@ int m4sensorhub_irq_init(struct m4sensorhub_data *m4sensorhub)
 	mutex_init(&data->lock);
 
 	wake_lock_init(&data->wake_lock, WAKE_LOCK_SUSPEND, "m4sensorhub-irq");
+	wake_lock_init(&data->tm_wake_lock, WAKE_LOCK_SUSPEND,
+		       "m4sensorhub-timed-irq");
 
 	retval = request_irq(i2c->irq, event_isr, IRQF_DISABLED |
 				IRQF_TRIGGER_RISING, "m4sensorhub-irq", data);
@@ -239,6 +243,7 @@ err_free_irq:
 	data->m4sensorhub = NULL;
 err_destroy_wq:
 	wake_lock_destroy(&data->wake_lock);
+	wake_lock_destroy(&data->tm_wake_lock);
 	mutex_destroy(&data->lock);
 	destroy_workqueue(data->workqueue);
 err_free:
@@ -277,6 +282,10 @@ void m4sensorhub_irq_shutdown(struct m4sensorhub_data *m4sensorhub)
 		wake_unlock(&data->wake_lock);
 	wake_lock_destroy(&data->wake_lock);
 
+	if (wake_lock_active(&data->tm_wake_lock))
+		wake_unlock(&data->tm_wake_lock);
+	wake_lock_destroy(&data->tm_wake_lock);
+
 	if (mutex_is_locked(&data->lock))
 		mutex_unlock(&data->lock);
 	mutex_destroy(&data->lock);
@@ -305,7 +314,7 @@ EXPORT_SYMBOL_GPL(m4sensorhub_irq_shutdown);
 int m4sensorhub_irq_register(struct m4sensorhub_data *m4sensorhub,
 			     enum m4sensorhub_irqs irq,
 			     void (*cb_func) (enum m4sensorhub_irqs, void *),
-			     void *data)
+			     void *data, uint8_t enable_timed_wakelock)
 {
 	struct m4sensorhub_irqdata *irqdata;
 	int retval = 0;
@@ -324,6 +333,7 @@ int m4sensorhub_irq_register(struct m4sensorhub_data *m4sensorhub,
 
 	if (irqdata->event_handler[irq].func == NULL) {
 		irqdata->irq_info[irq].registered = 1;
+		irqdata->irq_info[irq].tm_wakelock = enable_timed_wakelock;
 		irqdata->event_handler[irq].func = cb_func;
 		irqdata->event_handler[irq].data = data;
 		KDEBUG(M4SH_NOTICE, "m4sensorhub: %s IRQ registered\n",
@@ -522,7 +532,6 @@ error:
 	return;
 }
 EXPORT_SYMBOL_GPL(m4sensorhub_irq_pm_dbg_resume);
-
 /* --------------- Local Functions ----------------- */
 
 static unsigned short get_enable_reg(enum m4sensorhub_irqs event)
@@ -617,10 +626,17 @@ static void irq_work_func(struct work_struct *work)
 			if (data->irq_info[index].enabled) {
 				event_handler = &data->event_handler[index];
 
-				if (event_handler && event_handler->func)
+				if (event_handler && event_handler->func) {
 					event_handler->func(index,
 							   event_handler->data);
-
+					if (data->irq_info[index].tm_wakelock) {
+						/* Hold a 500ms wakelock to
+						   let data get to apps */
+						wake_lock_timeout(
+							&data->tm_wake_lock,
+							0.5 * HZ);
+					}
+				}
 				mutex_lock(&data->lock);
 				data->irq_info[index].ena_fired++;
 				mutex_unlock(&data->lock);

@@ -482,7 +482,7 @@ static int m4hrt_driver_init(struct init_calldata *p_arg)
 	}
 
 	err = m4sensorhub_irq_register(dd->m4,
-		M4SH_IRQ_HEARTRATE_DATA_READY, m4hrt_isr, iio);
+		M4SH_IRQ_HEARTRATE_DATA_READY, m4hrt_isr, iio, 0);
 	if (err < 0) {
 		m4hrt_err("%s: Failed to register M4 IRQ.\n", __func__);
 		goto m4hrt_driver_init_fail;

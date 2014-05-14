@@ -263,7 +263,7 @@ static int rtc_sensorhub_init(struct init_calldata *p_arg)
 	err = m4sensorhub_irq_register(p_priv_data->p_m4sensorhub_data,
 						M4SH_IRQ_AP_ALARM_EXPIRED,
 						rtc_handle_sensorhub_irq,
-						p_priv_data);
+						p_priv_data, 1);
 
 	if (err < 0)
 		pr_err("%s: irq register failed\n", DRIVER_NAME);

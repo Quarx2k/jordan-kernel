@@ -317,7 +317,7 @@ static int download_driver_init(struct init_calldata *p_arg)
 	struct m4sensorhub_data *m4sensorhub = p_arg->p_m4sensorhub_data;
 	ret = m4sensorhub_irq_register(m4sensorhub, M4SH_IRQ_DLCMD_RESP_READY,
 					m4_handle_download_irq,
-					misc_download_data);
+					misc_download_data, 0);
 	if (ret < 0) {
 		KDEBUG(M4SH_ERROR, "Error registering int %d (%d)\n",
 			M4SH_IRQ_DLCMD_RESP_READY, ret);

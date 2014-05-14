@@ -403,7 +403,7 @@ static int m4pas_driver_init(struct init_calldata *p_arg)
 	}
 
 	err = m4sensorhub_irq_register(dd->m4,
-		M4SH_IRQ_PASSIVE_BUFFER_FULL, m4pas_isr, iio);
+		M4SH_IRQ_PASSIVE_BUFFER_FULL, m4pas_isr, iio, 1);
 	if (err < 0) {
 		m4pas_err("%s: Failed to register M4 IRQ.\n", __func__);
 		goto m4pas_driver_init_fail;

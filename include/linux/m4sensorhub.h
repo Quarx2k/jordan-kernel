@@ -191,7 +191,7 @@ void m4sensorhub_irq_shutdown(struct m4sensorhub_data *m4sensorhub);
 int m4sensorhub_irq_register(struct m4sensorhub_data *m4sensorhub,
 			     enum m4sensorhub_irqs irq,
 			     void (*cb_func) (enum m4sensorhub_irqs, void *),
-			     void *data);
+			     void *data, uint8_t enable_timed_wakelock);
 int m4sensorhub_irq_unregister(struct m4sensorhub_data *m4sensorhub,
 			       enum m4sensorhub_irqs irq);
 int m4sensorhub_irq_disable(struct m4sensorhub_data *m4sensorhub,

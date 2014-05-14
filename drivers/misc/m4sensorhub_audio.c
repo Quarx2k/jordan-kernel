@@ -355,7 +355,7 @@ static int audio_driver_init(struct init_calldata *p_arg)
 	struct m4sensorhub_data *m4sensorhub = p_arg->p_m4sensorhub_data;
 
 	ret = m4sensorhub_irq_register(m4sensorhub, M4SH_IRQ_MIC_DATA_READY,
-		m4_handle_audio_irq, audio_data);
+		m4_handle_audio_irq, audio_data, 0);
 	if (ret < 0) {
 		KDEBUG(M4SH_ERROR, "Error registering int %d (%d)\n",
 			M4SH_IRQ_MIC_DATA_READY, ret);
