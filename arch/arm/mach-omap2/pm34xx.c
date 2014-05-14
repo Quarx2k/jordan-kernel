@@ -242,10 +242,15 @@ static void omap34xx_save_context(u32 *save)
 
 static int omap34xx_do_sram_idle(unsigned long save_state)
 {
-	if (suspend_debug)
+	if (suspend_debug) {
 		pr_debug("OMAP3_PRM_IRQENABLE_MPU_OFFSET 0x%08x\n",
 			 omap2_prm_read_mod_reg(OCP_MOD,
 				OMAP3_PRM_IRQENABLE_MPU_OFFSET));
+		omap_prcm_irq_restore();
+		pr_debug("OMAP3_PRM_IRQENABLE_MPU_OFFSET 0x%08x\n",
+			 omap2_prm_read_mod_reg(OCP_MOD,
+				OMAP3_PRM_IRQENABLE_MPU_OFFSET));
+	}
 
 	omap34xx_cpu_suspend(save_state);
 	return 0;

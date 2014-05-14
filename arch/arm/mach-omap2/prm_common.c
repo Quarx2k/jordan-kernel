@@ -216,6 +216,14 @@ void omap_prcm_irq_prepare(void)
 	prcm_irq_setup->suspended = true;
 }
 
+void omap_prcm_irq_restore(void)
+{
+	if (prcm_irq_setup->suspend_save_flag) {
+		prcm_irq_setup->restore_irqen(prcm_irq_setup->saved_mask);
+		prcm_irq_setup->ocp_barrier();
+	}
+}
+
 void omap_prcm_irq_complete(void)
 {
 	prcm_irq_setup->suspended = false;
