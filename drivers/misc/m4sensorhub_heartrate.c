@@ -75,6 +75,19 @@ static void m4hrt_isr(enum m4sensorhub_irqs int_event, void *handle)
 		goto m4hrt_isr_fail;
 	}
 
+	size = m4sensorhub_reg_getsize(dd->m4, M4SH_REG_HEARTRATE_CONFIDENCE);
+	err = m4sensorhub_reg_read(dd->m4, M4SH_REG_HEARTRATE_CONFIDENCE,
+		(char *)&(dd->iiodat.confidence));
+	if (err < 0) {
+		m4hrt_err("%s: Failed to read confidence data.\n", __func__);
+		goto m4hrt_isr_fail;
+	} else if (err != size) {
+		m4hrt_err("%s: Read %d bytes instead of %d for %s.\n",
+			  __func__, err, size, "confidence");
+		err = -EBADE;
+		goto m4hrt_isr_fail;
+	}
+
 	dd->iiodat.timestamp = iio_get_time_ns();
 	iio_push_to_buffers(iio, (unsigned char *)&(dd->iiodat));
 
@@ -207,8 +220,9 @@ static ssize_t m4hrt_iiodata_show(struct device *dev,
 	ssize_t size = 0;
 
 	mutex_lock(&(dd->mutex));
-	size = snprintf(buf, PAGE_SIZE, "%s%hu\n",
-		"heartrate: ", dd->iiodat.heartrate);
+	size = snprintf(buf, PAGE_SIZE, "%s%hu\n%s%hhu\n",
+		"heartrate: ", dd->iiodat.heartrate,
+		"confidence: ", dd->iiodat.confidence);
 	mutex_unlock(&(dd->mutex));
 	return size;
 }
