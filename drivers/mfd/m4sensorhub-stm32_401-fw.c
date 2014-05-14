@@ -682,6 +682,8 @@ static int m4sensorhub_jump_to_user(struct m4sensorhub_data *m4sensorhub)
 
 	if (barker_read_from_device == BARKER_NUMBER) {
 		m4sensorhub_bl_go(m4sensorhub, USER_FLASH_FIRST_PAGE_ADDRESS);
+		KDEBUG(M4SH_NOTICE, "Waiting for M4 setup\n");
+		msleep(100);
 		KDEBUG(M4SH_NOTICE, "Executing M4 code\n");
 		ret = 0;
 	} else {
