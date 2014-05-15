@@ -94,6 +94,32 @@ static struct powerdomain *mpu_pwrdm, *neon_pwrdm;
 static struct powerdomain *core_pwrdm, *per_pwrdm;
 static struct powerdomain *cam_pwrdm;
 
+static struct prm_setup_vc prm_setup = {
+	.clksetup = 0xff,
+	.voltsetup_time1 = 0xfff,
+	.voltsetup_time2 = 0xfff,
+	.voltoffset = 0xff,
+	.voltsetup2 = 0xff,
+	.vdd0_on = 0x30,	/* 1.2v */
+	.vdd0_onlp = 0x20,	/* 1.0v */
+	.vdd0_ret = 0x1e,	/* 0.975v */
+	.vdd0_off = 0x00,	/* 0.6v */
+	.vdd1_on = 0x2c,	/* 1.15v */
+	.vdd1_onlp = 0x20,	/* 1.0v */
+	.vdd1_ret = 0x1e,	/* .975v */
+	.vdd1_off = 0x00,	/* 0.6v */
+	.i2c_slave_ra = (R_SRI2C_SLAVE_ADDR << OMAP3430_SMPS_SA1_SHIFT) |
+			(R_SRI2C_SLAVE_ADDR << OMAP3430_SMPS_SA0_SHIFT),
+	.vdd_vol_ra = (R_VDD2_SR_CONTROL << OMAP3430_VOLRA1_SHIFT) |
+			(R_VDD1_SR_CONTROL << OMAP3430_VOLRA0_SHIFT),
+	/* vdd_vol_ra controls both cmd and vol, set the address equal */
+	.vdd_cmd_ra = (R_VDD2_SR_CONTROL << OMAP3430_VOLRA1_SHIFT) |
+			(R_VDD1_SR_CONTROL << OMAP3430_VOLRA0_SHIFT),
+	.vdd_ch_conf = OMAP3430_CMD1 | OMAP3430_RAV1,
+	.vdd_i2c_cfg = OMAP3430_MCODE_SHIFT | OMAP3430_HSEN | OMAP3430_SREN,
+};
+
+
 static void omap3_enable_io_chain(void)
 {
 	int timeout = 0;
@@ -897,6 +923,31 @@ int omap3_pm_set_suspend_state(struct powerdomain *pwrdm, int state)
 	return -EINVAL;
 }
 
+void omap3_pm_init_vc(struct prm_setup_vc *setup_vc)
+{
+	if (!setup_vc)
+		return;
+
+	prm_setup.clksetup = setup_vc->clksetup;
+	prm_setup.voltsetup_time1 = setup_vc->voltsetup_time1;
+	prm_setup.voltsetup_time2 = setup_vc->voltsetup_time2;
+	prm_setup.voltoffset = setup_vc->voltoffset;
+	prm_setup.voltsetup2 = setup_vc->voltsetup2;
+	prm_setup.vdd0_on = setup_vc->vdd0_on;
+	prm_setup.vdd0_onlp = setup_vc->vdd0_onlp;
+	prm_setup.vdd0_ret = setup_vc->vdd0_ret;
+	prm_setup.vdd0_off = setup_vc->vdd0_off;
+	prm_setup.vdd1_on = setup_vc->vdd1_on;
+	prm_setup.vdd1_onlp = setup_vc->vdd1_onlp;
+	prm_setup.vdd1_ret = setup_vc->vdd1_ret;
+	prm_setup.vdd1_off = setup_vc->vdd1_off;
+	prm_setup.i2c_slave_ra = setup_vc->i2c_slave_ra;
+	prm_setup.vdd_vol_ra = setup_vc->vdd_vol_ra;
+	prm_setup.vdd_cmd_ra = setup_vc->vdd_cmd_ra;
+	prm_setup.vdd_ch_conf = setup_vc->vdd_ch_conf;
+	prm_setup.vdd_i2c_cfg = setup_vc->vdd_i2c_cfg;
+}
+
 static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 {
 	struct power_state *pwrst;
@@ -916,16 +967,6 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 
 	return omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
 }
-
-static int __init omap3_pm_early_init(void)
-{
-	/* set sys_off_mode active low */
-	omap2_prm_clear_mod_reg_bits(OMAP3430_OFFMODE_POL_MASK, OMAP3430_GR_MOD,
-				OMAP3_PRM_POLCTRL_OFFSET);
-	return 0;
-}
-
-arch_initcall(omap3_pm_early_init);
 
 /*
  * Enable hw supervised mode for all clockdomains if it's
@@ -1075,5 +1116,98 @@ err2:
 	}
 	return ret;
 }
+
+/* Program Power IC via bypass interface */
+int omap3_bypass_cmd(u8 slave_addr, u8 reg_addr, u8 cmd) {
+	u32 vc_bypass_value;
+	u32 loop_cnt = 0, retries_cnt = 0;
+
+	vc_bypass_value = (cmd << OMAP3430_DATA_SHIFT) |
+			(reg_addr << OMAP3430_REGADDR_SHIFT) |
+			(slave_addr << OMAP3430_SLAVEADDR_SHIFT);
+
+	omap2_prm_write_mod_reg(vc_bypass_value, OMAP3430_GR_MOD,
+			OMAP3_PRM_VC_BYPASS_VAL_OFFSET);
+
+	vc_bypass_value = omap2_prm_set_mod_reg_bits(OMAP3430_VALID, OMAP3430_GR_MOD,
+					OMAP3_PRM_VC_BYPASS_VAL_OFFSET);
+
+	while ((vc_bypass_value & OMAP3430_VALID) != 0x0) {
+		loop_cnt++;
+		if (retries_cnt > 10) {
+			printk(KERN_ERR"Loop count exceeded in check SR I2C"
+								"write\n");
+			return 1;
+		}
+		if (loop_cnt > 50) {
+			retries_cnt++;
+			loop_cnt = 0;
+			udelay(10);
+		}
+		vc_bypass_value = omap2_prm_read_mod_reg(OMAP3430_GR_MOD,
+					OMAP3_PRM_VC_BYPASS_VAL_OFFSET);
+	}
+
+	return 0;
+}
+
+static void __init configure_vc(void)
+{
+	omap2_prm_write_mod_reg(prm_setup.i2c_slave_ra, OMAP3430_GR_MOD,
+				OMAP3_PRM_VC_SMPS_SA_OFFSET);
+	omap2_prm_write_mod_reg(prm_setup.vdd_vol_ra, OMAP3430_GR_MOD,
+				OMAP3_PRM_VC_SMPS_VOL_RA_OFFSET);
+
+	/* Only set if power_ic has different voltage and cmd addrs */
+	if (prm_setup.vdd_vol_ra != prm_setup.vdd_cmd_ra)
+		omap2_prm_write_mod_reg(prm_setup.vdd_cmd_ra, OMAP3430_GR_MOD,
+				OMAP3_PRM_VC_SMPS_CMD_RA_OFFSET);
+
+	omap2_prm_write_mod_reg((prm_setup.vdd0_on << OMAP3430_VC_CMD_ON_SHIFT) |
+		(prm_setup.vdd0_onlp << OMAP3430_VC_CMD_ONLP_SHIFT) |
+		(prm_setup.vdd0_ret << OMAP3430_VC_CMD_RET_SHIFT) |
+		(prm_setup.vdd0_off << OMAP3430_VC_CMD_OFF_SHIFT),
+		OMAP3430_GR_MOD, OMAP3_PRM_VC_CMD_VAL_0_OFFSET);
+
+	omap2_prm_write_mod_reg((prm_setup.vdd1_on << OMAP3430_VC_CMD_ON_SHIFT) |
+		(prm_setup.vdd1_onlp << OMAP3430_VC_CMD_ONLP_SHIFT) |
+		(prm_setup.vdd1_ret << OMAP3430_VC_CMD_RET_SHIFT) |
+		(prm_setup.vdd1_off << OMAP3430_VC_CMD_OFF_SHIFT),
+		OMAP3430_GR_MOD, OMAP3_PRM_VC_CMD_VAL_1_OFFSET);
+
+	omap2_prm_write_mod_reg(prm_setup.vdd_ch_conf, OMAP3430_GR_MOD,
+				OMAP3_PRM_VC_CH_CONF_OFFSET);
+
+	omap2_prm_write_mod_reg(prm_setup.vdd_i2c_cfg, OMAP3430_GR_MOD,
+				OMAP3_PRM_VC_I2C_CFG_OFFSET);
+
+	/* Write setup times */
+	omap2_prm_write_mod_reg(prm_setup.clksetup, OMAP3430_GR_MOD,
+			OMAP3_PRM_CLKSETUP_OFFSET);
+	omap2_prm_write_mod_reg((prm_setup.voltsetup_time2 <<
+			OMAP3430_SETUP_TIME2_SHIFT) |
+			(prm_setup.voltsetup_time1 <<
+			OMAP3430_SETUP_TIME1_SHIFT),
+			OMAP3430_GR_MOD, OMAP3_PRM_VOLTSETUP1_OFFSET);
+
+	omap2_prm_write_mod_reg(prm_setup.voltoffset, OMAP3430_GR_MOD,
+			OMAP3_PRM_VOLTOFFSET_OFFSET);
+	omap2_prm_write_mod_reg(prm_setup.voltsetup2, OMAP3430_GR_MOD,
+			OMAP3_PRM_VOLTSETUP2_OFFSET);
+
+	pm_dbg_regset_init(1);
+	pm_dbg_regset_init(2);
+}
+static int __init omap3_pm_early_init(void)
+{
+	/* set sys_off_mode active low */
+	omap2_prm_clear_mod_reg_bits(OMAP3430_OFFMODE_POL_MASK, OMAP3430_GR_MOD,
+				OMAP3_PRM_POLCTRL_OFFSET);
+
+	configure_vc();
+	return 0;
+}
+
+arch_initcall(omap3_pm_early_init);
 
 late_initcall(omap3_pm_init);

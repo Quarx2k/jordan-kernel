@@ -36,6 +36,7 @@
 #include "pm.h"
 #include "hsmmc.h"
 #include "timer-gp.h"
+#include "prm-regbits-34xx.h"
 
 #ifdef CONFIG_EMU_UART_DEBUG
 #include <plat/board-mapphone-emu_uart.h>
@@ -54,6 +55,19 @@
 #define MAPPHONE_WIFI_PMENA_GPIO 186
 #define MAPPHONE_WIFI_IRQ_GPIO 65
 #define MAPPHONE_BT_RESET_GPIO 21 //get_gpio_by_name("bt_reset_b")
+
+/* CPCAP Defines */
+#define CPCAP_SMPS_VOL_OPP1        0x02
+#define CPCAP_SMPS_VOL_OPP2        0x03
+
+/* SMPS I2C voltage control register Address*/
+#define CPCAP_SRI2C_VDD_CONTROL        0x00
+/* SMPS I2C Address for VDD1 */
+#define CPCAP_SRI2C_SLAVE_ADDR_VDD1    0x1
+/* SMPS I2C Address for VDD2 */
+#define CPCAP_SRI2C_SLAVE_ADDR_VDD2    0x2
+/* SMPS I2C voltage control register Address, used for SR command */
+#define CPCAP_SMPS_VOL_CNTL        0x01
 
 #define ATAG_FLAT_DEV_TREE_ADDRESS 0xf100040A
 
@@ -267,12 +281,62 @@ static void __init mapphone_power_off_init(void)
 	pm_power_off = mapphone_pm_power_off;
 }
 
+static struct prm_setup_vc mapphone_prm_setup = {
+	.clksetup = 0x4c,
+	.voltsetup_time1 = 0x94,
+	.voltsetup_time2 = 0x94,
+	.voltoffset = 0x0,
+	.voltsetup2 = 0x0,
+	.vdd0_on = 0x65,
+	.vdd0_onlp = 0x45,
+	.vdd0_ret = 0x19,
+	.vdd0_off = 0x00,
+	.vdd1_on = 0x65,
+	.vdd1_onlp = 0x45,
+	.vdd1_ret = 0x19,
+	.vdd1_off = 0x00,
+	.i2c_slave_ra = (CPCAP_SRI2C_SLAVE_ADDR_VDD2 <<
+			OMAP3430_SMPS_SA1_SHIFT) |
+			(CPCAP_SRI2C_SLAVE_ADDR_VDD1 <<
+			OMAP3430_SMPS_SA0_SHIFT),
+	.vdd_vol_ra = (CPCAP_SRI2C_VDD_CONTROL << OMAP3430_VOLRA1_SHIFT) |
+			(CPCAP_SRI2C_VDD_CONTROL << OMAP3430_VOLRA0_SHIFT),
+	/* vdd_vol_ra controls both cmd and vol, set the address equal */
+	.vdd_cmd_ra = (CPCAP_SMPS_VOL_CNTL << OMAP3430_CMDRA1_SHIFT) |
+		(CPCAP_SMPS_VOL_CNTL << OMAP3430_CMDRA0_SHIFT),
+	.vdd_ch_conf = OMAP3430_CMD1 | OMAP3430_RACEN0 |
+			OMAP3430_PRM_VC_CH_CONF_SA1 | OMAP3430_RACEN1 |
+			OMAP3430_RAV1 | OMAP3430_RAC1, OMAP3430_GR_MOD,
+	.vdd_i2c_cfg = OMAP3430_MCODE_SHIFT | OMAP3430_HSEN,
+};
 
 static void __init mapphone_voltage_init(void)
 {
 	/* cpcap is the default power supply for core and iva */
 	omap_cpcap_init();
+
+	omap3_pm_init_vc(&mapphone_prm_setup);
+	/* Set CPCAP SW1/SW2 I2C CNTL Reg to 0x45 (PSM/PSM mode, VPLL enabled)
+	 * to avoid extra current drain in active case before hit RET once
+	 */
+	omap3_bypass_cmd(CPCAP_SRI2C_SLAVE_ADDR_VDD1,
+			CPCAP_SMPS_VOL_CNTL, 0x45);
+	omap3_bypass_cmd(CPCAP_SRI2C_SLAVE_ADDR_VDD1,
+			CPCAP_SMPS_VOL_OPP1, 0x13);
+	omap3_bypass_cmd(CPCAP_SRI2C_SLAVE_ADDR_VDD1,
+			CPCAP_SMPS_VOL_OPP2, 0x32);
+
+	/* SW2, OPP1 for RET Voltage --- 0.8375V,
+	 * OPP2 for ON Voltge --- 1.175V(OPP3)
+	 */
+	omap3_bypass_cmd(CPCAP_SRI2C_SLAVE_ADDR_VDD2,
+			CPCAP_SMPS_VOL_CNTL, 0x45);
+	omap3_bypass_cmd(CPCAP_SRI2C_SLAVE_ADDR_VDD2,
+			CPCAP_SMPS_VOL_OPP1, 0x13);
+	omap3_bypass_cmd(CPCAP_SRI2C_SLAVE_ADDR_VDD2,
+			CPCAP_SMPS_VOL_OPP2, 0x2E);
 }
+
 
 /* Platform device structure for the SIM driver */
 struct platform_device sim_device = {

@@ -262,6 +262,33 @@ static inline int omap_tps6236x_update(char *name, u32 old_chip_id,
 
 extern int omap4_ldo_trim_configure(void);
 
+struct prm_setup_vc {
+	u16 clksetup;
+	u16 voltsetup_time1;
+	u16 voltsetup_time2;
+	u16 voltoffset;
+	u16 voltsetup2;
+
+/* PRM_VC_CMD_VAL_0 specific bits */
+	u16 vdd0_on;
+	u16 vdd0_onlp;
+	u16 vdd0_ret;
+	u16 vdd0_off;
+/* PRM_VC_CMD_VAL_1 specific bits */
+	u16 vdd1_on;
+	u16 vdd1_onlp;
+	u16 vdd1_ret;
+	u16 vdd1_off;
+
+/* Values for VDD registers */
+	u32 i2c_slave_ra;
+	u32 vdd_vol_ra;
+	u32 vdd_cmd_ra;
+	u32 vdd_ch_conf;
+	u32 vdd_i2c_cfg;
+};
+extern int omap3_bypass_cmd(u8 slave_addr, u8 reg_addr, u8 cmd);
+extern void omap3_pm_init_vc(struct prm_setup_vc *setup_vc);
 #ifdef CONFIG_PM
 extern bool omap_pm_is_ready_status;
 /**

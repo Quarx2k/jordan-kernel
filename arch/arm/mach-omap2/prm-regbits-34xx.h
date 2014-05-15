@@ -18,6 +18,24 @@
 
 /* Shared register bits */
 
+/* PRM_VC_SMPS_SA */
+#define OMAP3430_SMPS_SA1_SHIFT				16
+#define OMAP3430_SMPS_SA1_MASK				(0x7f << 16)
+#define OMAP3430_SMPS_SA0_SHIFT				0
+#define OMAP3430_SMPS_SA0_MASK				(0x7f << 0)
+
+/* PRM_VC_SMPS_VOL_RA */
+#define OMAP3430_VOLRA1_SHIFT				16
+#define OMAP3430_VOLRA1_MASK				(0xff << 16)
+#define OMAP3430_VOLRA0_SHIFT				0
+#define OMAP3430_VOLRA0_MASK				(0xff << 0)
+
+/* PRM_VC_SMPS_CMD_RA */
+#define OMAP3430_CMDRA1_SHIFT				16
+#define OMAP3430_CMDRA1_MASK				(0xff << 16)
+#define OMAP3430_CMDRA0_SHIFT				0
+#define OMAP3430_CMDRA0_MASK				(0xff << 0)
+
 /* PRM_VC_CMD_VAL_0, PRM_VC_CMD_VAL_1 shared bits */
 #define OMAP3430_ON_SHIFT				24
 #define OMAP3430_ON_MASK				(0xff << 24)
@@ -490,8 +508,36 @@
 #define OMAP3430_MCODE_SHIFT				0
 #define OMAP3430_MCODE_MASK				(0x7 << 0)
 
+/* PRM_VC_I2C_CFG */
+#define OMAP3430_HSMASTER				(1 << 5)
+#define OMAP3430_SREN					(1 << 4)
+#define OMAP3430_HSEN					(1 << 3)
+#define OMAP3430_MCODE_SHIFT				0
+#define OMAP3430_MCODE_MASK				(0x7 << 0)
+
+/* PRM_VC_CH_CONF */
+#define OMAP3430_CMD1					(1 << 20)
+#define OMAP3430_RACEN1					(1 << 19)
+#define OMAP3430_RAC1					(1 << 18)
+#define OMAP3430_RAV1					(1 << 17)
+#define OMAP3430_PRM_VC_CH_CONF_SA1			(1 << 16)
+#define OMAP3430_CMD0					(1 << 4)
+#define OMAP3430_RACEN0					(1 << 3)
+#define OMAP3430_RAC0					(1 << 2)
+#define OMAP3430_RAV0					(1 << 1)
+#define OMAP3430_PRM_VC_CH_CONF_SA0			(1 << 0)
+
 /* PRM_VC_BYPASS_VAL */
 #define OMAP3430_VALID_MASK				(1 << 24)
+#define OMAP3430_DATA_SHIFT				16
+#define OMAP3430_DATA_MASK				(0xff << 16)
+#define OMAP3430_REGADDR_SHIFT				8
+#define OMAP3430_REGADDR_MASK				(0xff << 8)
+#define OMAP3430_SLAVEADDR_SHIFT			0
+#define OMAP3430_SLAVEADDR_MASK				(0x7f << 0)
+
+/* PRM_VC_BYPASS_VAL */
+#define OMAP3430_VALID					(1 << 24)
 #define OMAP3430_DATA_SHIFT				16
 #define OMAP3430_DATA_MASK				(0xff << 16)
 #define OMAP3430_REGADDR_SHIFT				8
