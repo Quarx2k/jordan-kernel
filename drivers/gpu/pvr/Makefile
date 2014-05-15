@@ -52,7 +52,8 @@ ccflags-y = -Idrivers/video/omap2 \
 ccflags-$(CONFIG_SGX_OMAP3630) += \
 	-Idrivers/gpu/pvr/services4/system/omap3630 \
 	-DSGX530 -DSUPPORT_SGX530 -DSGXCORE=530 \
-	-DSGX_CORE_REV=125
+	-DSGX_CORE_REV=125 \
+	-DSKIP_FIRST_FLIP_BUFS=4
 
 ccflags-$(CONFIG_SGX_BUILD_RELEASE) += \
 	-DPVR_BUILD_TYPE="\"release\"" \

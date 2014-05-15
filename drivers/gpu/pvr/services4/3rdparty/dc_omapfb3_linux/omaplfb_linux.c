@@ -334,6 +334,16 @@ void OMAPLFBFlip(OMAPLFB_DEVINFO *psDevInfo, OMAPLFB_BUFFER *psBuffer)
 	struct fb_var_screeninfo sFBVar;
 	int res;
 	unsigned long ulYResVirtual;
+#ifdef	SKIP_FIRST_FLIP_BUFS
+	/* Skip first n numbers of flip buffers to avoid draw blank screen
+	 * that occurred flicker at first time booting up
+	 */
+	static unsigned int skip_flips = SKIP_FIRST_FLIP_BUFS;
+	if (skip_flips) {
+		--skip_flips;
+		return;
+	}
+#endif
 
 	OMAPLFB_CONSOLE_LOCK();
 
