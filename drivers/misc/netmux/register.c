@@ -61,12 +61,14 @@
 #define LOG_COMMAND_LEN            2
 
 /*Netmux info accessible via the proc interface*/
+#ifdef CONFIG_DEBUG_NETMUX
 static struct proc_dir_entry *proc_netmux_log_entry = NULL;
 char *NetmuxLogState = NULL;
 static int GetNetmuxLogState(char *buf, char **start, off_t offset,
 			     int count, int *eof, void *data);
 static int WriteNetmuxLogCommand(struct file *file, const char *buffer,
 				 unsigned long count, void *data);
+#endif
 /*
  * Declare a list to hold each registered interface
  */
@@ -286,7 +288,7 @@ void DeactivateMUX(INTERFACELIST *ilist)
 
 	free_mem(ilist);
 }
-
+#ifdef CONFIG_DEBUG_NETMUX
 /*
  * GetNetmuxLogState is a read callback function of proc interface on NetMUX.
  *
@@ -333,7 +335,6 @@ static int WriteNetmuxLogCommand(struct file *file, const char *buffer,
 
 void NetmuxLogInit(void)
 {
-#ifdef CONFIG_DEBUG_NETMUX
 	NetmuxLogState = alloc_mem(LOG_COMMAND_LEN);
 	NetmuxLogState[0] = '0';
 	NetmuxLogState[1] = '\0';
@@ -346,5 +347,6 @@ void NetmuxLogInit(void)
 		proc_netmux_log_entry->read_proc = GetNetmuxLogState;
 		proc_netmux_log_entry->write_proc = WriteNetmuxLogCommand;
 	}
-#endif
+
 }
+#endif

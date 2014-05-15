@@ -97,9 +97,9 @@ static int __init netmux_init(void)
 		printk(KERN_ERR "Error in creating netmux_class class\n");
 		return PTR_ERR(netmux_class);
 	}
-
+#ifdef CONFIG_DEBUG_NETMUX
 	NetmuxLogInit();
-
+#endif
 	wake_lock_init(&netmux_send_wakelock, WAKE_LOCK_SUSPEND,
 		       "NETMUX_send");
 	wake_lock_init(&netmux_receive_wakelock, WAKE_LOCK_SUSPEND,

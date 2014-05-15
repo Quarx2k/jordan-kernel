@@ -52,6 +52,13 @@
 #include <linux/sched.h>
 extern struct class *netmux_class;
 
+static int TTYOpen(struct tty_struct *, struct file *);
+static void TTYClose(struct tty_struct *, struct file *);
+static ssize_t TTYWrite(struct tty_struct *, const unsigned char *, int);
+static int TTYDataInBuffer(struct tty_struct *);
+static int TTYWriteRoom(struct tty_struct *);
+
+static int TTYIOCtl(struct tty_struct *, unsigned int, unsigned long);
 static const struct tty_operations tty_ops = {
 	.open = TTYOpen,
 	.close = TTYClose,
@@ -611,7 +618,7 @@ int32 DestroyTTYInterface(TTYINTERFACE *tty)
  * tty-- used to let us fetch the major/minor of the device
  * filp -- some private data is set within this structure
  */
-int TTYOpen(struct tty_struct *tty, struct file *filp)
+static int TTYOpen(struct tty_struct *tty, struct file *filp)
 {
 	TTYINTERFACE *ttyif;
 	TTY_CHANNELDATA *chdat;
@@ -677,7 +684,7 @@ int TTYOpen(struct tty_struct *tty, struct file *filp)
  * filp -- stores some private data which we use to fetch the tty
  *         interface structure
  */
-void TTYClose(struct tty_struct *tty, struct file *filp)
+static void TTYClose(struct tty_struct *tty, struct file *filp)
 {
 	TTYINTERFACE *ttyif;
 	TTY_CHANNELDATA *chdat;
@@ -729,7 +736,7 @@ void TTYClose(struct tty_struct *tty, struct file *filp)
  * buf -- a pointer to the data to be copied
  * count -- the number of bytes to be copied
  */
-ssize_t TTYWrite(struct tty_struct *tty, const unsigned char *buf,
+static ssize_t TTYWrite(struct tty_struct *tty, const unsigned char *buf,
 		 int count)
 {
 	COMMBUFF *commbuff;
@@ -783,7 +790,7 @@ ssize_t TTYWrite(struct tty_struct *tty, const unsigned char *buf,
  * Params:
  * tty -- used to get the devices minor number
  */
-int TTYWriteRoom(struct tty_struct *tty)
+static int TTYWriteRoom(struct tty_struct *tty)
 {
 	TTYINTERFACE *ttyif;
 	TTY_CHANNELDATA *chdat;
@@ -812,7 +819,7 @@ int TTYWriteRoom(struct tty_struct *tty)
  * Params:
  * tty -- used to get the devices minor number
  */
-int TTYDataInBuffer(struct tty_struct *tty)
+static int TTYDataInBuffer(struct tty_struct *tty)
 {
 	TTYINTERFACE *ttyif;
 	TTY_CHANNELDATA *chdat;
@@ -845,7 +852,7 @@ int TTYDataInBuffer(struct tty_struct *tty)
  * cmd -- the IOCtl type
  * arg -- the argument to the IOCtl
  */
-int TTYIOCtl(struct tty_struct *tty, struct file *file, unsigned int cmd,
+static int TTYIOCtl(struct tty_struct *tty, unsigned int cmd,
 	     unsigned long arg)
 {
 	wait_queue_head_t *queue;
@@ -859,7 +866,7 @@ int TTYIOCtl(struct tty_struct *tty, struct file *file, unsigned int cmd,
 	int32 original_flags;
 	int32 wait_flags;
 
-	DEBUG("TTYIOCtl(0x%p, 0x%p, %d, %lu)\n", tty, file, cmd, arg);
+	DEBUG("TTYIOCtl(0x%p, 0x%p, %d, %lu)\n", tty, cmd, arg);
 
 	ttyif = (TTYINTERFACE *) tty->driver->driver_state;
 	minor = tty->index + ttyif->channel_min;

@@ -71,9 +71,9 @@ static COMMBUFFTAG *released_tagged_commbuffs = 0;
 static LOCALTASK tagged_commbuff_release_task;
 
 void ProcessReleasedCommBuffs(struct work_struct *);
-
+#ifdef CONFIG_DEBUG_NETMUX
 extern char *NetmuxLogState;
-
+#endif
 void initialize_utilities(void)
 {
 	tagged_commbuff_release_task.released_tagged_commbuffs =
@@ -364,6 +364,7 @@ void output(SU_PORT_HANDLE port, int32 msgid, sint8 *fmt, ...)
 	vprintk(fmt, args);
 	va_end(args);
 #endif				/* _DEBUG_ || _LOG_ */
+#ifdef CONFIG_DEBUG_NETMUX
 	if (NetmuxLogState) {
 		if ((NetmuxLogState[0] == LOG_COMMAND_ALL_WORK)
 		    || (NetmuxLogState[0] == LOG_COMMAND_FUNCTION)) {
@@ -373,6 +374,7 @@ void output(SU_PORT_HANDLE port, int32 msgid, sint8 *fmt, ...)
 			va_end(args);
 		}
 	}
+#endif
 }
 
 /*
@@ -411,6 +413,7 @@ void log_commbuff(int32 msgid, sint8 *header, COMMBUFF *cb, int32 length)
 
 	printk("\n");
 #endif				/* _LOG_ */
+#ifdef CONFIG_DEBUG_NETMUX
 	if ((NetmuxLogState)
 	    && ((NetmuxLogState[0] == LOG_COMMAND_ALL_WORK)
 		|| (NetmuxLogState[0] == LOG_COMMAND_BUFFER))) {
@@ -436,4 +439,5 @@ void log_commbuff(int32 msgid, sint8 *header, COMMBUFF *cb, int32 length)
 
 		printk("\n");
 	}
+#endif
 }

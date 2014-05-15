@@ -155,21 +155,9 @@ typedef struct TTYINTERFACE {
 /*
  * Define various functions used by the tty interface
  */
-
-int32 TTYInform(void *, void *);
-int32 TTYReceive(COMMBUFF *, void *);
-
 int32 CreateTTYInterface(sint8 *, sint8 *, int32, int32, int32, MUX *,
 			 TTYINTERFACE **);
 int32 DestroyTTYInterface(TTYINTERFACE *);
-
-int TTYOpen(struct tty_struct *, struct file *);
-void TTYClose(struct tty_struct *, struct file *);
-ssize_t TTYWrite(struct tty_struct *, const unsigned char *, int);
-int TTYDataInBuffer(struct tty_struct *);
-int TTYWriteRoom(struct tty_struct *);
-int TTYIOCtl(struct tty_struct *, struct file *, unsigned int,
-	     unsigned long);
 
 
 #endif
