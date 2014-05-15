@@ -371,9 +371,13 @@ tps65912_0: tps65912 {
 			0x29 0x10 /* SET_OFF1: LDO5 */
 			0x2A 0x24 /* SET_OFF2: DCDC1, DCDC4 */
 			0x2d 0x88 /* DISCHARGE1: Enable LDO4, LDO8 */
+			0x17 0xC0 /* LDO3_AVS b6=1 : ECO mode */
 			0x19 0x64 /* LDO4_OP: b6 = 1 : give AVS register the on/off control, b0-5:1.8V */
 			0x1A 0x24 /* LDO4_AVS b7 = 0 : disables the reg, b0-5:1.8V */
 			0x1B 0x3f /* LDO4_LIMIT b0-5: ANY */
+			0x1f 0xf8 /* LDO8: b6=1 : ECO mode */
+			0x20 0xca /* LD09: b6=1 : ECO mode */
+			0x21 0xf2 /* LD10: b6=1 : ECO mode */
 			0x62 0x00 /* LOADSWITCH: Disable load switch at all times*/
 		>;
 

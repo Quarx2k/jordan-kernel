@@ -43,5 +43,9 @@
 			0x29 0x10 /* SET_OFF1: LDO5 */
 			0x2A 0x24 /* SET_OFF2: DCDC1, DCDC4 */
 			0x2d 0x88 /* DISCHARGE1: Enable LDO4, LDO8 */
+			0x17 0xC0 /* LDO3_AVS b6=1 : ECO mode */
+			0x1f 0xf8 /* LDO8: b6=1 : ECO mode */
+			0x20 0xca /* LD09: b6=1 : ECO mode */
+			0x21 0xf2 /* LD10: b6=1 : ECO mode */
 		>;
 };
