@@ -287,7 +287,8 @@ static ssize_t m4_mpu9150_write_accel_setdelay(struct device *dev,
 	return count;
 }
 
-static DEVICE_ATTR(accel_setdelay, 0222, NULL, m4_mpu9150_write_accel_setdelay);
+static DEVICE_ATTR(accel_setdelay, S_IRUSR | S_IWUSR, NULL,
+				m4_mpu9150_write_accel_setdelay);
 
 static ssize_t m4_mpu9150_write_gyro_setdelay(struct device *dev,
 			struct device_attribute *attr,
@@ -323,7 +324,8 @@ static ssize_t m4_mpu9150_write_gyro_setdelay(struct device *dev,
 	return count;
 }
 
-static DEVICE_ATTR(gyro_setdelay, 0222, NULL, m4_mpu9150_write_gyro_setdelay);
+static DEVICE_ATTR(gyro_setdelay, S_IRUSR | S_IWUSR, NULL,
+				m4_mpu9150_write_gyro_setdelay);
 
 static ssize_t m4_mpu9150_write_compass_setdelay(struct device *dev,
 			struct device_attribute *attr,
@@ -358,7 +360,7 @@ static ssize_t m4_mpu9150_write_compass_setdelay(struct device *dev,
 	}
 	return count;
 }
-static DEVICE_ATTR(compass_setdelay, 0222, NULL,
+static DEVICE_ATTR(compass_setdelay, S_IRUSR | S_IWUSR, NULL,
 				m4_mpu9150_write_compass_setdelay);
 static struct attribute *mpu9150_control_attributes[] = {
 	&dev_attr_accel_setdelay.attr,
