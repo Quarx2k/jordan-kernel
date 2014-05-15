@@ -775,6 +775,9 @@ tps65912_0: tps65912 {
 
 &gpio6 {
 	ti,no_idle_on_suspend;
+	/* wakeup from off via docking and undocking on this bank */
+	offmode-wkup-isr = <0x00010000>; /* gpio_176 */
+	offmode-wkup-pad = <0x01a2>;  /* CONTROL_PADCONF_MCSPI1_CS1[31:16] */
 };
 
 /* external */
