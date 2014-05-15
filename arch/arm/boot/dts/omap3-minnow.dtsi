@@ -775,6 +775,9 @@ tps65912_0: tps65912 {
 
 &gpio5 {
 	ti,no_idle_on_suspend;
+	/* wakeup from off via max170xx on this bank */
+	offmode-wkup-isr = <0x00001000>; /* 12 */
+	offmode-wkup-pad = <0x013c>; /* CONTROL_PADCONF_MCBSP3_DX[15:0] */
 };
 
 &gpio6 {
