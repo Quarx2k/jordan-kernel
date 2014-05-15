@@ -22,10 +22,12 @@
 
 #include "omap-mcbsp.h"
 
-#define INPUT_CLOCK_FREQUENCY 83456000
-/* We desire a bit clock of 512 kHz for 16 bit 2 channel 16 kHz audio.
- * We get this from 83.456 Mhz / (162 + 1) = 512 kHz */
-#define CLKDIV (INPUT_CLOCK_FREQUENCY / 512000 - 1)
+/* The input clock is from PER_96M_FCLK and should be 96 Mhz. But for some
+ * reason using the resultant divider with 96 Mhz gives us audio slightly
+ * faster than 16 kHz and so we are hardcoding a value here for input clock */
+#define INPUT_CLOCK_FREQUENCY 100864000
+/* We desire a bit clock of 512 kHz for 16 bit 2 channel 16 kHz audio. */
+#define CLKDIV (INPUT_CLOCK_FREQUENCY / 512000)
 
 static int omap_soc_c55_hw_params(struct snd_pcm_substream *substream,
 	struct snd_pcm_hw_params *params)
