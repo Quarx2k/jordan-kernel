@@ -134,6 +134,10 @@
 
 #define	OMAP_UHH_DEBUG_CSR				(0x44)
 
+#define	OHCI_BASE_ADDR		0x48064400
+#define	OHCI_HC_CONTROL		(OHCI_BASE_ADDR + 0x4)
+#define	OHCI_HC_CTRL_SUSPEND	(3 << 6)
+
 /* Values of UHH_REVISION - Note: these are not given in the TRM */
 #define OMAP_USBHS_REV1		0x00000010	/* OMAP3 */
 #define OMAP_USBHS_REV2		0x50700100	/* OMAP4 */
@@ -743,6 +747,11 @@ static void omap_usbhs_init(struct device *dev)
 	omap->usbhs_rev = usbhs_read(omap->uhh_base, OMAP_UHH_REVISION);
 	dev_dbg(dev, "OMAP UHH_REVISION 0x%x\n", omap->usbhs_rev);
 
+	/* We need to suspend OHCI in order for the usbhost
+	 * domain to go standby.
+	 * OHCI would never be resumed for UMTS modem */
+	omap_writel(OHCI_HC_CTRL_SUSPEND, OHCI_HC_CONTROL);
+
 	/*
 	 * Really enable the port clocks
 	 * first call of pm_runtime_get_sync does not enable these
@@ -808,6 +817,7 @@ static void omap_usbhs_init(struct device *dev)
 		else if (is_ehci_hsic_mode(pdata->port_mode[1]))
 			reg |= OMAP4_P2_MODE_HSIC;
 	}
+
 
 	usbhs_write(omap->uhh_base, OMAP_UHH_HOSTCONFIG, reg);
 	dev_dbg(dev, "UHH setup done, uhh_hostconfig=%x\n", reg);
