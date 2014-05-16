@@ -655,7 +655,7 @@ unsigned long try_to_compact_pages(struct zonelist *zonelist,
 
 
 /* Compact all zones within a node */
-static int compact_node(int nid, bool sync)
+static int compact_node(int nid)
 {
 	int zoneid;
 	pg_data_t *pgdat;
@@ -673,7 +673,6 @@ static int compact_node(int nid, bool sync)
 			.nr_freepages = 0,
 			.nr_migratepages = 0,
 			.order = -1,
-            .sync = sync,
 		};
 
 		zone = &pgdat->node_zones[zoneid];
@@ -694,12 +693,12 @@ static int compact_node(int nid, bool sync)
 }
 
 /* Compact all nodes in the system */
-int compact_nodes(bool sync)
+int compact_nodes(void)
 {
 	int nid;
 
 	for_each_online_node(nid)
-		compact_node(nid, sync);
+		compact_node(nid);
 
 	return COMPACT_COMPLETE;
 }
@@ -712,7 +711,7 @@ int sysctl_compaction_handler(struct ctl_table *table, int write,
 			void __user *buffer, size_t *length, loff_t *ppos)
 {
 	if (write)
-		return compact_nodes(true);
+		return compact_nodes();
 
 	return 0;
 }
