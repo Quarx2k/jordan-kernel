@@ -42,6 +42,7 @@ struct c55_ctrl_data {
 	struct pinctrl_state *states[C55_MODE_MAX];
 	int c55_mode;
 	struct mutex ctrl_mutex;	/* mutex to handle critical area */
+	int fw_verified;
 };
 
 const char *c55_pin_state_labels[C55_MODE_MAX] = {
@@ -216,6 +217,38 @@ static ssize_t c55_ctrl_enable(struct device *dev,
 
 static DEVICE_ATTR(enable, S_IWUSR | S_IWGRP, NULL, c55_ctrl_enable);
 
+static ssize_t c55_fw_verified_write(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct c55_ctrl_data *cdata = dev_get_drvdata(dev);
+	int verified = 0;
+
+	if (kstrtoint(buf, 10, &verified) < 0)
+		return -EINVAL;
+
+	mutex_lock(&cdata->ctrl_mutex);
+	cdata->fw_verified = verified;
+	mutex_unlock(&cdata->ctrl_mutex);
+
+	return count;
+}
+
+static ssize_t c55_fw_verified_read(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct c55_ctrl_data *cdata = dev_get_drvdata(dev);
+	int ret;
+
+	mutex_lock(&cdata->ctrl_mutex);
+	ret = sprintf(buf, "%d\n", cdata->fw_verified);
+	mutex_unlock(&cdata->ctrl_mutex);
+
+	return ret;
+}
+
+static DEVICE_ATTR(fw_verified, S_IRUSR | S_IRGRP | S_IWUSR | S_IWGRP,
+	c55_fw_verified_read, c55_fw_verified_write);
+
 static int c55_ctrl_pin_setup(struct device *dev, struct c55_ctrl_data *cdata)
 {
 	int i, ret = 0;
@@ -299,6 +332,15 @@ static int c55_ctrl_probe(struct platform_device *pdev)
 	ret = device_create_file(&pdev->dev, &dev_attr_enable);
 	if (ret) {
 		dev_err(&pdev->dev, "%s: c55_ctrl creating set_mode failed.\n",
+			__func__);
+		return ret;
+	}
+
+	cdata->fw_verified = 0;
+
+	ret = device_create_file(&pdev->dev, &dev_attr_fw_verified);
+	if (ret) {
+		dev_err(&pdev->dev, "%s: c55_ctrl creating fw_verified failed.\n",
 			__func__);
 		return ret;
 	}
