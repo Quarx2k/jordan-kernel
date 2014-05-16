@@ -16,18 +16,18 @@
  * 02111-1307, USA
  */
 
+#include <linux/clk.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <sound/soc.h>
 
 #include "omap-mcbsp.h"
 
-/* The input clock is from PER_96M_FCLK and should be 96 Mhz. But for some
- * reason using the resultant divider with 96 Mhz gives us audio slightly
- * faster than 16 kHz and so we are hardcoding a value here for input clock */
-#define INPUT_CLOCK_FREQUENCY 100864000
 /* We desire a bit clock of 512 kHz for 16 bit 2 channel 16 kHz audio. */
-#define CLKDIV (INPUT_CLOCK_FREQUENCY / 512000)
+#define BIT_CLOCK (16000*16*2)
+static struct clk *per_96m_fck;
+static unsigned long rate;
+static int clkdiv;
 
 static int omap_soc_c55_hw_params(struct snd_pcm_substream *substream,
 	struct snd_pcm_hw_params *params)
@@ -38,21 +38,13 @@ static int omap_soc_c55_hw_params(struct snd_pcm_substream *substream,
 
 	/* Set McBSP4 clock to use PER_96M_FCLK */
 	ret = snd_soc_dai_set_sysclk(cpu_dai, OMAP_MCBSP_SYSCLK_CLKS_FCLK,
-		INPUT_CLOCK_FREQUENCY, SND_SOC_CLOCK_OUT);
+		rate, SND_SOC_CLOCK_OUT);
 	if (ret < 0) {
 		dev_err(rtd->dev, "can't set cpu system clock\n");
 		return ret;
 	}
 
-	/* Set McBSP4 clock to use MCBSP4_ICLK */
-	ret = snd_soc_dai_set_sysclk(cpu_dai, OMAP_MCBSP_SYSCLK_CLK,
-		INPUT_CLOCK_FREQUENCY, SND_SOC_CLOCK_OUT);
-	if (ret < 0) {
-		dev_err(rtd->dev, "can't set cpu system clock\n");
-		return ret;
-	}
-
-	ret = snd_soc_dai_set_clkdiv(cpu_dai, OMAP_MCBSP_CLKGDV, CLKDIV);
+	ret = snd_soc_dai_set_clkdiv(cpu_dai, OMAP_MCBSP_CLKGDV, clkdiv);
 	if (ret < 0) {
 		dev_err(rtd->dev, "can't set SRG clock divider\n");
 		return ret;
@@ -61,8 +53,20 @@ static int omap_soc_c55_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
+static int omap_soc_c55_startup(struct snd_pcm_substream *substream)
+{
+	return clk_enable(per_96m_fck);
+}
+
+static void omap_soc_c55_shutdown(struct snd_pcm_substream *substream)
+{
+	clk_disable(per_96m_fck);
+}
+
 static struct snd_soc_ops omap_soc_c55_ops = {
+	.startup = omap_soc_c55_startup,
 	.hw_params = omap_soc_c55_hw_params,
+	.shutdown = omap_soc_c55_shutdown,
 };
 
 /* Digital audio interface glue - connects codec <--> CPU */
@@ -126,12 +130,23 @@ static int omap_soc_c55_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	per_96m_fck = clk_get(&pdev->dev, "per_96m_fck");
+	if (IS_ERR(per_96m_fck)) {
+		dev_err(&pdev->dev, "could not get per_96m_fck clock\n");
+		return PTR_ERR(per_96m_fck);
+	}
+
+	rate = clk_get_rate(per_96m_fck);
+	clkdiv = rate / BIT_CLOCK;
+
 	return 0;
 }
 
 static int omap_soc_c55_remove(struct platform_device *pdev)
 {
 	struct snd_soc_card *card = platform_get_drvdata(pdev);
+
+	clk_put(per_96m_fck);
 
 	snd_soc_unregister_card(card);
 
