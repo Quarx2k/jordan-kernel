@@ -396,7 +396,7 @@ int disp_node_create(struct disp_object *disp_obj,
 			 * don't just reach into the hnode struct because
 			 * that would break the node object's abstraction.
 			 */
-			get_node_info(hnode, &node_info);
+			rmgr_get_node_info(hnode, &node_info);
 			more_task_args->priority = node_info.execution_priority;
 			more_task_args->stack_size = task_arg_obj.stack_size;
 			more_task_args->sysstack_size =

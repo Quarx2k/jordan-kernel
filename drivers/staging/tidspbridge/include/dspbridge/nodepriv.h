@@ -150,7 +150,7 @@ extern u32 node_get_timeout(struct node_object *hnode);
 extern enum node_type node_get_type(struct node_object *hnode);
 
 /*
- *  ======== get_node_info ========
+ *  ======== rmgr_get_node_info ========
  *  Purpose:
  *      Get node information without holding semaphore.
  *  Parameters:
@@ -162,7 +162,7 @@ extern enum node_type node_get_type(struct node_object *hnode);
  *      Valid hnode.
  *  Ensures:
  */
-extern void get_node_info(struct node_object *hnode,
+extern void rmgr_get_node_info(struct node_object *hnode,
 			  struct dsp_nodeinfo *node_info);
 
 /*

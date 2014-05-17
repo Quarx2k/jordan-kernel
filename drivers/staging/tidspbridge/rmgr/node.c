@@ -1694,7 +1694,7 @@ int node_get_attr(struct node_object *hnode,
 	pattr->node_attr_inputs = hnode->num_gpp_inputs;
 	pattr->node_attr_outputs = hnode->num_gpp_outputs;
 	/* dsp_nodeinfo */
-	get_node_info(hnode, &(pattr->node_info));
+	rmgr_get_node_info(hnode, &(pattr->node_info));
 	/* end of sync_enter_cs */
 	/* Exit critical section */
 	mutex_unlock(&hnode_mgr->node_mgr_lock);
@@ -2779,11 +2779,11 @@ static int get_fxn_address(struct node_object *hnode, u32 * fxn_addr,
 }
 
 /*
- *  ======== get_node_info ========
+ *  ======== rmgr_get_node_info ========
  *  Purpose:
  *      Retrieves the node information.
  */
-void get_node_info(struct node_object *hnode, struct dsp_nodeinfo *node_info)
+void rmgr_get_node_info(struct node_object *hnode, struct dsp_nodeinfo *node_info)
 {
 	u32 i;
 
