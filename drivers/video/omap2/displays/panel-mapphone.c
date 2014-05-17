@@ -375,13 +375,13 @@ static void mapphone_esd_work(struct work_struct *work)
 	}
 
 	dsi_bus_lock(dssdev);
-	dsi_from_dss_runtime_get(dssdev);
+	
 
 	r = dsi_vc_dcs_read(dssdev, dsi_vc_cmd, EDISCO_CMD_GET_POWER_MODE,
 			&power_mode, 1);
 	if (r != 1) {
 		dev_err(&dssdev->dev, "Failed to get power mode, r = %d\n", r);
-		dsi_from_dss_runtime_put(dssdev);
+		
 		dsi_bus_unlock(dssdev);
 		mutex_unlock(&mp_data->lock);
 		return;
@@ -428,7 +428,7 @@ static void mapphone_esd_work(struct work_struct *work)
 	}
 #endif
 
-	dsi_from_dss_runtime_put(dssdev);
+	
 	dsi_bus_unlock(dssdev);
 
 	queue_delayed_work(mp_data->esd_wq, &mp_data->esd_work,
@@ -457,7 +457,7 @@ err:
 		dssdev->state = OMAP_DSS_DISPLAY_ACTIVE;
 	}
 
-	dsi_from_dss_runtime_put(dssdev);
+	
 	dsi_bus_unlock(dssdev);
 
 	queue_delayed_work(mp_data->esd_wq, &mp_data->esd_work,
@@ -480,7 +480,7 @@ static void mapphone_framedone_cb(int err, void *data)
 //	DBG("%s()\n", __func__);
 
 #ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
-	dsi_from_dss_runtime_put(dssdev);
+	
 	dsi_bus_unlock(dssdev);
 #endif
 
@@ -552,7 +552,7 @@ static int mapphone_panel_update(struct omap_dss_device *dssdev,
 
 	mutex_lock(&mp_data->lock);
 	dsi_bus_lock(dssdev);
-	dsi_from_dss_runtime_get(dssdev);
+	
 
 	if (!mp_data->enabled) {
 		DBG("Got update for disabled panel\n");
@@ -597,7 +597,7 @@ static int mapphone_panel_update(struct omap_dss_device *dssdev,
 
 	return 0;
 err:
-	dsi_from_dss_runtime_put(dssdev);
+	
 	dsi_bus_unlock(dssdev);
 	mutex_unlock(&mp_data->lock);
 	return r;
@@ -1005,7 +1005,7 @@ static ssize_t mapphone_panel_supplier_id_show(struct device *dev,
 			goto end;
 
 		dsi_bus_lock(dssdev);
-		dsi_from_dss_runtime_get(dssdev);
+		
 
 		switch (dssdev->panel.panel_id) {
 		case MOT_DISP_MIPI_CM_480_854:
@@ -1026,7 +1026,7 @@ static ssize_t mapphone_panel_supplier_id_show(struct device *dev,
 			printk(KERN_ERR "Do not support supplier_id of the panel\n");
 		}
 
-		dsi_from_dss_runtime_put(dssdev);
+		
 		dsi_bus_unlock(dssdev);
 	}
 end:
@@ -1073,7 +1073,7 @@ static ssize_t panel_cabc_show(struct device *dev,
 		goto err;
 	}
 
-	dsi_from_dss_runtime_get(dssdev);
+	
 	dsi_bus_lock(dssdev);
 
 	if ((dsi_vc_dcs_read(dssdev, dsi_vc_cmd,
@@ -1085,7 +1085,7 @@ static ssize_t panel_cabc_show(struct device *dev,
 				"data=0x%x\n", data);
 
 	dsi_bus_unlock(dssdev);
-	dsi_from_dss_runtime_put(dssdev);
+	
 
 err:
 	mutex_unlock(&mp_data->lock);
@@ -1127,7 +1127,7 @@ static ssize_t panel_cabc_store(struct device *dev,
 		goto err;
 	}
 
-	dsi_from_dss_runtime_get(dssdev);
+	
 	dsi_bus_lock(dssdev);
 
 	data[0] = EDISCO_CMD_SET_CABC;
@@ -1143,7 +1143,7 @@ static ssize_t panel_cabc_store(struct device *dev,
 	}
 
 	dsi_bus_unlock(dssdev);
-	dsi_from_dss_runtime_put(dssdev);
+	
 err:
 	mutex_unlock(&mp_data->lock);
 	return r ? r : count;
@@ -1308,14 +1308,14 @@ static ssize_t panel_acl_store(struct device *dev,
 	}
 
 	if (mp_data->acl_enabled != acl_val) {
-		dsi_from_dss_runtime_get(dssdev);
+		
 		dsi_bus_lock(dssdev);
 
 		r = mapphone_panel_acl_enable_locked(acl_val, mp_data, dssdev);
 		mp_data->acl_enabled = acl_val;
 
 		dsi_bus_unlock(dssdev);
-		dsi_from_dss_runtime_put(dssdev);
+		
 	}
 end:
 	mutex_unlock(&mp_data->lock);
@@ -4103,7 +4103,7 @@ static int mapphone_panel_power_on(struct omap_dss_device *dssdev)
 		 * This allows the DSS power domain to be OFF when not
 		 * communicating with the display.
 		 */
-		dsi_from_dss_runtime_put(dssdev);
+		
 	}
 
 	printk(KERN_INFO "Mapphone Display is ENABLE\n");
@@ -4120,7 +4120,7 @@ err0:
 	if (panel_init_state == MAPPHONE_PANEL_UNDETERMINE)
 		panel_init_state = MAPPHONE_PANEL_NOT_PRESENT;
 
-	dsi_from_dss_runtime_put(dssdev);
+	
 	return ret;
 }
 static void set_vc_channels(struct omap_dss_device *dssdev)
@@ -4251,7 +4251,7 @@ static void mapphone_panel_power_off(struct omap_dss_device *dssdev,
 		 * For video mode, the DSS clocks are disabled in the
 		 * omapdss_dsi_display_disable() call below.
 		 */
-		dsi_from_dss_runtime_get(dssdev);
+		
 
 	if (mp_data->enabled)
 		mapphone_panel_disable_local(dssdev);
@@ -4414,7 +4414,7 @@ static int mapphone_panel_enable_te(struct omap_dss_device *dssdev, bool enable)
 
 		if (map_data->te_enabled != enable) {
 			dsi_bus_lock(dssdev);
-			dsi_from_dss_runtime_get(dssdev);
+			
 
 			if (map_data->som_enabled) {
 				/*If in secret off, just save the new TE state*/
@@ -4429,7 +4429,7 @@ static int mapphone_panel_enable_te(struct omap_dss_device *dssdev, bool enable)
 				}
 			}
 
-			dsi_from_dss_runtime_put(dssdev);
+			
 			dsi_bus_unlock(dssdev);
 		}
 
@@ -4587,7 +4587,7 @@ static int mapphone_panel_reg_read(struct omap_dss_device *dssdev,
 	DBG("read reg, address = 0x%X, size = %d\n", address, size);
 	mutex_lock(&mp_data->lock);
 	dsi_bus_lock(dssdev);
-	dsi_from_dss_runtime_get(dssdev);
+	
 
 	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE) {
 		r = -EIO;
@@ -4614,7 +4614,7 @@ static int mapphone_panel_reg_read(struct omap_dss_device *dssdev,
 	r = 0;
 
 end:
-	dsi_from_dss_runtime_put(dssdev);
+	
 	dsi_bus_unlock(dssdev);
 	mutex_unlock(&mp_data->lock);
 	DBG("read reg done, r = %d\n", r);
@@ -4630,7 +4630,7 @@ static int mapphone_panel_reg_write(struct omap_dss_device *dssdev,
 	DBG("write reg, size = %d\n", size);
 	mutex_lock(&mp_data->lock);
 	dsi_bus_lock(dssdev);
-	dsi_from_dss_runtime_get(dssdev);
+	
 
 	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE) {
 		r = -EIO;
@@ -4644,7 +4644,7 @@ static int mapphone_panel_reg_write(struct omap_dss_device *dssdev,
 	r = dsi_vc_dcs_write(dssdev, dsi_vc_cmd, buf, size);
 
 end:
-	dsi_from_dss_runtime_put(dssdev);
+	
 	dsi_bus_unlock(dssdev);
 	mutex_unlock(&mp_data->lock);
 	DBG("write reg done, r = %d\n", r);
@@ -4836,10 +4836,10 @@ static int dsi_mipi_cm_430_540_960_amoled_bl_update_status(
 		r = 0;
 	} else {
 		dsi_bus_lock(dssdev);
-		dsi_from_dss_runtime_get(dssdev);
+		
 		r = dsi_mipi_cm_430_540_960_amoled_bl_set_locked(dssdev,
 								level);
-		dsi_from_dss_runtime_put(dssdev);
+		
 		dsi_bus_unlock(dssdev);
 	}
 	mutex_unlock(&mp_data->lock);
