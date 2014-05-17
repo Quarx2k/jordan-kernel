@@ -156,6 +156,7 @@ struct uart_omap_port {
 	int			DTR_inverted;
 	int			DTR_active;
 
+	bool			pm_qos_disabled;
 	struct pm_qos_request	pm_qos_request;
 	u32			latency;
 	u32			calc_latency;
@@ -731,8 +732,9 @@ static void serial_omap_uart_qos_work(struct work_struct *work)
 {
 	struct uart_omap_port *up = container_of(work, struct uart_omap_port,
 						qos_work);
+	if (!up->pm_qos_disabled)
+		pm_qos_update_request(&up->pm_qos_request, up->latency);
 
-	pm_qos_update_request(&up->pm_qos_request, up->latency);
 	if (gpio_is_valid(up->DTR_gpio))
 		gpio_set_value_cansleep(up->DTR_gpio,
 					up->DTR_active != up->DTR_inverted);
@@ -1394,6 +1396,8 @@ static struct omap_uart_port_info *of_get_uart_port_info(struct device *dev)
 					 &omap_up_info->uartclk);
 	of_property_read_u32(dev->of_node, "flags",
 					 &omap_up_info->flags);
+	omap_up_info->pm_qos_disabled = of_property_read_bool(dev->of_node,
+				"ti,no-pm-qos");
 
 	return omap_up_info;
 }
@@ -1498,6 +1502,7 @@ static int serial_omap_probe(struct platform_device *pdev)
 
 	up->latency = PM_QOS_CPU_DMA_LAT_DEFAULT_VALUE;
 	up->calc_latency = PM_QOS_CPU_DMA_LAT_DEFAULT_VALUE;
+	up->pm_qos_disabled = omap_up_info->pm_qos_disabled;
 	pm_qos_add_request(&up->pm_qos_request,
 		PM_QOS_CPU_DMA_LATENCY, up->latency);
 	serial_omap_uart_wq = create_singlethread_workqueue(up->name);

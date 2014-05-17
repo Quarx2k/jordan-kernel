@@ -41,6 +41,7 @@ struct omap_uart_port_info {
 	int			DTR_gpio;
 	int			DTR_inverted;
 	int			DTR_present;
+	bool			pm_qos_disabled;
 
 	int (*get_context_loss_count)(struct device *);
 	void (*enable_wakeup)(struct device *, bool);
