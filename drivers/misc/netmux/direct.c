@@ -59,6 +59,8 @@
 #include "debug.h"
 #include <linux/sched.h>
 
+//#define DEBUG_NETMUX_AUDIO
+
 /*
  * major_list keeps track of a list of major numbers
  * associated with a NetMUX. Each item in the list
@@ -68,7 +70,34 @@
 DIRECT_MAJOR_LIST *major_list = 0;
 
 extern struct class *netmux_class;
+#ifdef DEBUG_NETMUX_AUDIO
+static void dump_hex(char *buf, int size)
+{
+    int i = 0 ;
+    unsigned char c;
+    unsigned int tmp;
+    char buffer[257];
 
+    for(; i < (size * 2) && i < ((sizeof(buffer) - 1));)
+    {
+        //printk(KERN_INFO "(%s), i[%d], buf[0x%2x]\n", __func__, i, *buf);
+        c = *(buf++);
+        tmp = ((c & 0xF0) >> 4) & 0x0F;
+        if (tmp > 9)
+            buffer[i++] = 'A' + (tmp - 10);
+        else
+            buffer[i++] = '0' + tmp;
+
+        tmp = (c & 0x0F);
+        if (tmp > 9)
+            buffer[i++] = 'A' + (tmp - 10);
+        else
+            buffer[i++] = '0' + tmp;
+    }
+    buffer[i] = 0;
+    printk(KERN_INFO "(%s): buffer[%s]\n", __func__, buffer);
+}
+#endif
 /*
  * DirectInform is called by the mux (and sometimes the
  * config interface) to inform the interface that something
@@ -112,9 +141,9 @@ int32 DirectInform(void *param1, void *param2)
 	INTERFACEINFORM *informdata;
 	int32 channel;
 	int32 type;
-
-	DEBUG("DirectInform(0x%p, 0x%p)\n", param1, param2);
-
+#ifdef DEBUG_NETMUX_AUDIO
+	//printk(KERN_INFO "(%s): DirectInform(0x%p, 0x%p)\n", __func__, param1, param2);
+#endif
 	informdata = (INTERFACEINFORM *) param1;
 	direct = (DIRECTINTERFACE *) param2;
 
@@ -146,7 +175,9 @@ int32 DirectInform(void *param1, void *param2)
 			memcpy(chdat->device_file,
 			       configpacket->channel_name,
 			       PACKET_MAXNAME_LENGTH);
-
+#ifdef DEBUG_NETMUX_AUDIO
+			printk(KERN_INFO "(%s): DirectInform(0x%p, 0x%p), device_file[%s]\n", __func__, param1, param2, chdat->device_file);
+#endif
 			init_waitqueue_head(&chdat->event_wait);
 			init_waitqueue_head(&chdat->close_wait);
 			init_waitqueue_head(&chdat->rdevent);
@@ -514,7 +545,15 @@ int DirectOpen(struct inode *inode, struct file *filp)
 	int32 major;
 	int32 minor;
 	int32 result;
-
+#ifdef DEBUG_NETMUX_AUDIO
+	char *pathname = 0, pathbuf[256];
+	struct path path = filp->f_path;
+	path_get(&filp->f_path);
+	pathname = d_path(&path, pathbuf, sizeof(pathbuf));
+	path_put(&path);
+	if (!strcmp(pathname, "/dev/audio"))
+		printk(KERN_INFO "(%s): enter,  pathname[%s]\n", __func__, (pathname ? pathname : "NULL"));
+#endif
 	DEBUG("DirectOpen(0x%p, 0x%p)\n", inode, filp);
 
 	major = MAJOR(inode->i_rdev);
@@ -597,7 +636,14 @@ int DirectClose(struct inode *inode, struct file *filp)
 	int32 minor;
 	int32 client_interface;
 	int32 result;
-
+#ifdef DEBUG_NETMUX_AUDIO
+	char *pathname = 0, pathbuf[256];
+	struct path path = filp->f_path;
+	path_get(&filp->f_path);
+	pathname = d_path(&path, pathbuf, sizeof(pathbuf));
+	path_put(&path);
+	//printk(KERN_INFO "(%s): enter,  pathname[%s]\n", __func__, (pathname ? pathname : "NULL"));
+#endif
 	DEBUG("DirectClose(0x%p, 0x%p)\n", inode, filp);
 
 	direct = filp->private_data;
@@ -645,7 +691,15 @@ unsigned int DirectPoll(struct file *filp, poll_table * table)
 	DIRECT_CHANNELDATA *chdat;
 	int32 minor;
 	int32 mask;
+#ifdef DEBUG_NETMUX_AUDIO
+	char *pathname = 0, pathbuf[256];
+	struct path path = filp->f_path;
+	path_get(&filp->f_path);
+	pathname = d_path(&path, pathbuf, sizeof(pathbuf));
+	path_put(&path);
 
+	//fprintk(KERN_INFO "(%s): enter,  pathname[%s]\n", __func__, (pathname ? pathname : "NULL"));
+#endif
 	DEBUG("DirectPoll(0x%p, 0x%p)\n", filp, table);
 
 	direct = filp->private_data;
@@ -693,10 +747,18 @@ ssize_t DirectRead(struct file *filp, char *buf, size_t count,
 	int32 minor;
 	int32 result;
 	int32 commbuffsize;
-
+#ifdef DEBUG_NETMUX_AUDIO
+	char *pathname = 0, pathbuf[256];
+	struct path path = filp->f_path;
+	path_get(&filp->f_path);
+	pathname = d_path(&path, pathbuf, sizeof(pathbuf));
+	path_put(&path);
+#endif
 	DEBUG("DirectRead(0x%p, 0x%p, %d, 0x%p)\n", filp, buf, count,
 	      f_pos);
-
+#ifdef DEBUG_NETMUX_AUDIO
+	//printk(KERN_INFO "(%s): DirectWrite begin(0x%p, 0x%p, %d, 0x%p), pathname[%s]\n", __func__, filp, buf, count, f_pos, (pathname ? pathname : "NULL"));
+#endif
 	direct = filp->private_data;
 	minor = MINOR(filp->f_dentry->d_inode->i_rdev);
 
@@ -727,13 +789,20 @@ ssize_t DirectRead(struct file *filp, char *buf, size_t count,
 
 		return -EFAULT;
 	}
-
+#ifdef DEBUG_NETMUX_AUDIO
+	if (!strcmp(pathname, "/dev/audio"))
+	{
+		dump_hex(commbuff_data(commbuff), commbuffsize);
+	}
+#endif
 	LOGCOMMBUFF_CH(minor, "DirectRead( )-->", commbuff, commbuffsize);
 
 	free_commbuff(commbuff);
 
 	return commbuffsize;
 }
+
+
 
 /*
  * DirectWrite is called whenever the user tries to write data
@@ -756,10 +825,18 @@ ssize_t DirectWrite(struct file *filp, const char *buf, size_t count,
 	DIRECT_CHANNELDATA *chdat;
 	int32 minor;
 	int32 result;
-
+#ifdef DEBUG_NETMUX_AUDIO
+	char *pathname = 0, pathbuf[256];
+	struct path path = filp->f_path;
+	path_get(&filp->f_path);
+	pathname = d_path(&path, pathbuf, sizeof(pathbuf));
+	path_put(&path);
+#endif
 	DEBUG("DirectWrite begin(0x%p, 0x%p, %d, 0x%p)\n", filp, buf,
 	      count, f_pos);
-
+#ifdef DEBUG_NETMUX_AUDIO
+	//printk(KERN_INFO "(%s): DirectWrite begin(0x%p, 0x%p, %d, 0x%p), pathname[%s]\n", __func__, filp, buf, count, f_pos, (pathname ? pathname : "NULL"));
+#endif
 	direct = filp->private_data;
 	minor = MINOR(filp->f_dentry->d_inode->i_rdev);
 
@@ -778,7 +855,12 @@ ssize_t DirectWrite(struct file *filp, const char *buf, size_t count,
 
 		return -EFAULT;
 	}
-
+#ifdef DEBUG_NETMUX_AUDIO
+	if (!strcmp(pathname, "/dev/audio"))
+	{
+		dump_hex(commbuff_data(commbuff), count);
+	}
+#endif
 	result = SendData(minor, commbuff, NULL, direct->mux);
 	if (result != ERROR_NONE) {
 		free_commbuff(commbuff);
