@@ -823,4 +823,5 @@ tps65912_0: tps65912 {
 
 &uart2 {
 	flags = <0x00200000>;
+	ti,no-pm-qos;
 };
