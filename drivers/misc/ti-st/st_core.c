@@ -30,10 +30,19 @@
 #include <linux/wakelock.h>
 
 #include <linux/ti_wilink_st.h>
+#include <linux/pm_qos.h>
 
 #define ST_WAKE_LOCK_TIMEOUT_MS    150
 
 static struct wake_lock st_wk_lock_timeout;
+
+struct st_pm_qos_t {
+	struct pm_qos_request st_pm_qos_request;
+	u32 st_pm_qos_latency;
+	spinlock_t st_pm_qos_lock; /* protect internal members */
+};
+
+static struct st_pm_qos_t st_pm_qos;
 
 extern void st_kim_recv(void *, const unsigned char *, long);
 void st_int_recv(void *, const unsigned char *, long);
@@ -59,6 +68,44 @@ static void remove_channel_from_table(struct st_data_s *st_gdata,
 	pr_info("%s: id %d\n", __func__, proto->chnl_id);
 /*	st_gdata->list[proto->chnl_id] = NULL; */
 	st_gdata->is_registered[proto->chnl_id] = false;
+}
+
+/*
+ * called when Bluetooth IC changes sleep state.
+ *
+ * This function dynamically changes pm_qos to allow
+ * CPU to go to deep idle state when there is no
+ * communication between host and Bluetooth IC.
+ */
+void st_pm_qos_update(struct st_data_s *st_gdata, bool awake)
+{
+	struct kim_data_s *kim_plat_data;
+	u32 latency;
+	unsigned long flags;
+
+	if (unlikely(st_gdata == NULL || st_gdata->kim_data == NULL)) {
+		pr_err("%s: Invalid argument\n", __func__);
+		return;
+	}
+
+	spin_lock_irqsave(&st_pm_qos.st_pm_qos_lock, flags);
+
+	kim_plat_data = (struct kim_data_s *)st_gdata->kim_data;
+	if (awake) {
+		/* UART FIFO is 64 bytes */
+		latency = (USEC_PER_SEC * 64) / (kim_plat_data->baud_rate / 8);
+	} else {
+		/* drop PM QoS constraint */
+		latency = PM_QOS_CPU_DMA_LAT_DEFAULT_VALUE;
+	}
+
+	if (st_pm_qos.st_pm_qos_latency != latency) {
+		st_pm_qos.st_pm_qos_latency = latency;
+		pm_qos_update_request(&st_pm_qos.st_pm_qos_request,
+				      st_pm_qos.st_pm_qos_latency);
+	}
+
+	spin_unlock_irqrestore(&st_pm_qos.st_pm_qos_lock, flags);
 }
 
 /*
@@ -852,6 +899,10 @@ int st_core_init(struct st_data_s **core_data)
 	long err;
 
 	wake_lock_init(&st_wk_lock_timeout, WAKE_LOCK_SUSPEND, "st_wake_lock");
+	spin_lock_init(&st_pm_qos.st_pm_qos_lock);
+	pm_qos_add_request(&st_pm_qos.st_pm_qos_request,
+			   PM_QOS_CPU_DMA_LATENCY,
+			   PM_QOS_CPU_DMA_LAT_DEFAULT_VALUE);
 	err = tty_register_ldisc(N_TI_WL, &st_ldisc_ops);
 	if (err) {
 		pr_err("error registering %d line discipline %ld\n",
@@ -913,6 +964,7 @@ void st_core_exit(struct st_data_s *st_gdata)
 		/* free the global data pointer */
 		kfree(st_gdata);
 	}
+	pm_qos_remove_request(&st_pm_qos.st_pm_qos_request);
 	wake_lock_destroy(&st_wk_lock_timeout);
 }
 

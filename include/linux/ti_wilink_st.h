@@ -161,6 +161,15 @@ struct st_data_s {
 };
 
 /*
+ * called when Bluetooth IC changes sleep state.
+ *
+ * This function dynamically changes pm_qos to allow
+ * CPU to go to deep idle state when there is no
+ * communication between host and Bluetooth IC.
+ */
+void st_pm_qos_update(struct st_data_s *st_gdata, bool awake);
+
+/*
  * wrapper around tty->ops->write_room to check
  * availability during firmware download
  */

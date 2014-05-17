@@ -32,7 +32,14 @@ static void send_ll_cmd(struct st_data_s *st_data,
 {
 
 	pr_debug("%s: writing %x\n", __func__, cmd);
+
+	if (cmd == LL_WAKE_UP_IND || cmd == LL_WAKE_UP_ACK)
+		st_pm_qos_update(st_data, 1);
+
 	st_int_write(st_data, &cmd, 1);
+
+	if (cmd == LL_SLEEP_ACK)
+		st_pm_qos_update(st_data, 0);
 	return;
 }
 
