@@ -2309,7 +2309,7 @@ static int b43_request_firmware(struct b43_wldev *dev)
 	for (i = 0; i < B43_NR_FWTYPES; i++) {
 		errmsg = ctx->errors[i];
 		if (strlen(errmsg))
-			b43err(dev->wl, errmsg);
+			b43err(dev->wl, "%s", errmsg);
 	}
 	b43_print_fw_helptext(dev->wl, 1);
 	err = -ENOENT;
@@ -2398,6 +2398,13 @@ static int b43_upload_microcode(struct b43_wldev *dev)
 		b43err(dev->wl, "YOUR FIRMWARE IS TOO OLD. Firmware from "
 		       "binary drivers older than version 4.x is unsupported. "
 		       "You must upgrade your firmware files.\n");
+		b43_print_fw_helptext(dev->wl, 1);
+		err = -EOPNOTSUPP;
+		goto error;
+	} else if (fwrev >= 598) {
+		b43err(dev->wl, "YOUR FIRMWARE IS TOO NEW. Support for "
+		       "firmware 598 and up requires kernel 3.2 or newer. You "
+		       "have to install older firmware or upgrade kernel.\n");
 		b43_print_fw_helptext(dev->wl, 1);
 		err = -EOPNOTSUPP;
 		goto error;

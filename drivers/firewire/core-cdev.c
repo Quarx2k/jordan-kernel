@@ -216,15 +216,33 @@ struct inbound_phy_packet_event {
 	struct fw_cdev_event_phy_packet phy_packet;
 };
 
-static inline void __user *u64_to_uptr(__u64 value)
+#ifdef CONFIG_COMPAT
+static void __user *u64_to_uptr(u64 value)
+{
+	if (is_compat_task())
+		return compat_ptr(value);
+	else
+		return (void __user *)(unsigned long)value;
+}
+
+static u64 uptr_to_u64(void __user *ptr)
+{
+	if (is_compat_task())
+		return ptr_to_compat(ptr);
+	else
+		return (u64)(unsigned long)ptr;
+}
+#else
+static inline void __user *u64_to_uptr(u64 value)
 {
 	return (void __user *)(unsigned long)value;
 }
 
-static inline __u64 uptr_to_u64(void __user *ptr)
+static inline u64 uptr_to_u64(void __user *ptr)
 {
-	return (__u64)(unsigned long)ptr;
+	return (u64)(unsigned long)ptr;
 }
+#endif /* CONFIG_COMPAT */
 
 static int fw_device_op_open(struct inode *inode, struct file *file)
 {
@@ -453,8 +471,8 @@ static int ioctl_get_info(struct client *client, union ioctl_arg *arg)
 	client->bus_reset_closure = a->bus_reset_closure;
 	if (a->bus_reset != 0) {
 		fill_bus_reset_event(&bus_reset, client);
-		ret = copy_to_user(u64_to_uptr(a->bus_reset),
-				   &bus_reset, sizeof(bus_reset));
+		/* unaligned size of bus_reset is 36 bytes */
+		ret = copy_to_user(u64_to_uptr(a->bus_reset), &bus_reset, 36);
 	}
 	if (ret == 0 && list_empty(&client->link))
 		list_add_tail(&client->link, &client->device->client_list);

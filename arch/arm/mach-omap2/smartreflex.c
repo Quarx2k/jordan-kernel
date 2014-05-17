@@ -211,7 +211,6 @@ static irqreturn_t sr_interrupt(int irq, void *data)
 		value = notifier_to_irqen_v2(sr_class->notify_flags);
 		/* Read the status bits */
 		status = sr_read_reg(sr_info, IRQSTATUS);
-		status &= value;
 
 		/* Clear them by writing back */
 		sr_write_reg(sr_info, IRQSTATUS, status);

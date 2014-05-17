@@ -45,10 +45,13 @@
 #define L2X0_CLEAN_INV_LINE_PA		0x7F0
 #define L2X0_CLEAN_INV_LINE_IDX		0x7F8
 #define L2X0_CLEAN_INV_WAY		0x7FC
-#define L2X0_LOCKDOWN_WAY_D0		0x900
-#define L2X0_LOCKDOWN_WAY_D1		0x908
-#define L2X0_LOCKDOWN_WAY_I0		0x904
-#define L2X0_LOCKDOWN_WAY_I1		0x90C
+/*
+ * The lockdown registers repeat 8 times for L310, the L210 has only one
+ * D and one I lockdown register at 0x0900 and 0x0904.
+ */
+#define L2X0_LOCKDOWN_WAY_D_BASE	0x900
+#define L2X0_LOCKDOWN_WAY_I_BASE	0x904
+#define L2X0_LOCKDOWN_STRIDE		0x08sss
 #define L2X0_TEST_OPERATION		0xF00
 #define L2X0_LINE_DATA			0xF10
 #define L2X0_LINE_TAG			0xF30

@@ -2069,6 +2069,7 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 	if (status < 0)
 		goto fail3;
 
+
 	if (is_otg_enabled(musb) || is_host_enabled(musb))
 		wake_lock_init(&musb->musb_wakelock, WAKE_LOCK_SUSPEND,
 						"musb_autosuspend_wake_lock");
