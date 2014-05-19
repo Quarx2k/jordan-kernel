@@ -55,6 +55,8 @@ struct tusb_usb {
 	struct clk *clk_in;
 	bool clk_in_en;
 	struct power_supply psy;
+	/* device lock used for setting vbus  gpio */
+	spinlock_t lock;
 };
 
 static int tusb_get_property(struct power_supply *psy,
@@ -101,16 +103,6 @@ static int tusb_set_host(struct usb_otg *otg, struct usb_bus *host)
 	return 0;
 }
 
-
-static int tusb_usb_set_vbus(struct usb_otg *otg, bool enabled)
-{
-	return 0;
-}
-static int tusb_usb_start_srp(struct usb_otg *otg)
-{
-	return 0;
-}
-
 static int tusb_usb_enable_clkin(struct tusb_usb *tusb, bool enable)
 {
 	int r = 0;
@@ -125,12 +117,57 @@ static int tusb_usb_enable_clkin(struct tusb_usb *tusb, bool enable)
 	return r;
 }
 
+static int tusb_enable(struct tusb_usb *tusb, bool enable)
+{
+	int i;
+	unsigned long flags;
+
+	dev_info(tusb->dev, "USB Reset [%s]\n", enable ? "Enable" : "Disable");
+
+	spin_lock_irqsave(&tusb->lock, flags);
+
+	/* enable external clock at first */
+	if (enable)
+		tusb_usb_enable_clkin(tusb, true);
+
+	for (i = 0; i < tusb->num_gpios; i++) {
+		if (!(tusb->gpio_list[i].flags & GPIOF_DIR_IN)) {
+			bool default_level =
+				!!(tusb->gpio_list[i].flags & GPIOF_INIT_HIGH);
+			gpio_set_value(tusb->gpio_list[i].gpio,
+			    enable ^ default_level);
+		}
+	}
+
+	/* disable external clock at last */
+	if (!enable)
+		tusb_usb_enable_clkin(tusb, false);
+
+	spin_unlock_irqrestore(&tusb->lock, flags);
+
+	return 0;
+}
+
+static int tusb_usb_set_vbus(struct usb_otg *otg, bool enabled)
+{
+	struct usb_phy	*phy = otg->phy;
+	struct tusb_usb	*tusb = dev_get_drvdata(phy->dev);
+
+	tusb_enable(tusb, enabled);
+
+	return 0;
+}
+
+static int tusb_usb_start_srp(struct usb_otg *otg)
+{
+	return 0;
+}
+
 static void tusb_usb_work_func(struct work_struct *work)
 {
 	struct tusb_usb *tusb =
 		container_of(work, struct tusb_usb, work);
 	bool vbus_state = gpio_get_value(tusb->irq_gpio);
-	int i;
 
 	if (vbus_state) {
 		atomic_notifier_call_chain(&tusb->phy.notifier,
@@ -157,25 +194,12 @@ static void tusb_usb_work_func(struct work_struct *work)
 	dev_info(tusb->dev, "%s USB phy [%d/%d]\n",
 		 (vbus_state | factory_override) ? "Enable" : "Disable",
 		 vbus_state, factory_override);
-	/* enable external clock at first */
-	if (vbus_state | factory_override)
-		tusb_usb_enable_clkin(tusb, true);
-	for (i = 0; i < tusb->num_gpios; i++) {
-		if (!(tusb->gpio_list[i].flags & GPIOF_DIR_IN)) {
-			bool default_level =
-				!!(tusb->gpio_list[i].flags & GPIOF_INIT_HIGH);
-			gpio_set_value(tusb->gpio_list[i].gpio,
-			    (vbus_state | factory_override) ^ default_level);
-		}
-	}
-	/* disable external clock at last */
-	if (!(vbus_state | factory_override))
-		tusb_usb_enable_clkin(tusb, false);
+
+	tusb_enable(tusb, (vbus_state | factory_override));
 
 	if (wake_lock_active(&tusb->wake_lock))
 		wake_unlock(&tusb->wake_lock);
 }
-
 
 static irqreturn_t tusb_usb_isr(int irq, void *data)
 {
@@ -368,6 +392,8 @@ static int  tusb_usb_probe(struct platform_device *pdev)
 
 	/* initialize PHY to correct state */
 	queue_work(tusb->workqueue, &tusb->work);
+
+	spin_lock_init(&tusb->lock);
 
 	return 0;
 
