@@ -1612,10 +1612,21 @@ static void musb_pullup(struct musb *musb, int is_on)
 	u8 power;
 
 	power = musb_readb(musb->mregs, MUSB_POWER);
+#ifndef CONFIG_MUSB_HARDCONNECT
 	if (is_on)
 		power |= MUSB_POWER_SOFTCONN;
 	else
 		power &= ~MUSB_POWER_SOFTCONN;
+#else
+	/* call otg set_vbus which will call phy to controle vbus */
+	if (is_on) {
+		power |= MUSB_POWER_SOFTCONN;
+		musb_platform_set_vbus(musb, 1);
+	} else {
+		power &= ~MUSB_POWER_SOFTCONN;
+		musb_platform_set_vbus(musb, 0);
+	}
+#endif
 
 	/* FIXME if on, HdrcStart; if off, HdrcStop */
 
@@ -1660,10 +1671,18 @@ static int musb_gadget_pullup(struct usb_gadget *gadget, int is_on)
 	 * not pullup unless the B-session is active.
 	 */
 	spin_lock_irqsave(&musb->lock, flags);
+
+#ifndef CONFIG_MUSB_HARDCONNECT
 	if (is_on != musb->softconnect) {
 		musb->softconnect = is_on;
 		musb_pullup(musb, is_on);
 	}
+#else
+	/* force transition of D+/D- no matter what the p revious state is */
+	musb->softconnect = is_on;
+	musb_pullup(musb, is_on);
+#endif
+
 	spin_unlock_irqrestore(&musb->lock, flags);
 
 	pm_runtime_put(musb->controller);

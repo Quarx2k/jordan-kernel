@@ -149,6 +149,11 @@ static void omap2430_musb_set_vbus(struct musb *musb, int is_on)
 	 * that must be ignored.
 	 */
 
+#ifdef CONFIG_MUSB_HARDCONNECT
+	/* set vbus irrespect of state machine as it has been requested
+	   by gadget driver */
+	otg_set_vbus(otg, (bool)is_on);
+#endif
 	devctl = musb_readb(musb->mregs, MUSB_DEVCTL);
 
 	if (is_on) {
@@ -173,8 +178,9 @@ static void omap2430_musb_set_vbus(struct musb *musb, int is_on)
 					break;
 				}
 			}
-
+#ifndef CONFIG_MUSB_HARDCONNECT
 			otg_set_vbus(otg, 1);
+#endif
 		} else {
 			musb->is_active = 1;
 			otg->default_a = 1;
