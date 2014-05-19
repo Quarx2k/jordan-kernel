@@ -1635,7 +1635,7 @@ static int serial_omap_runtime_suspend(struct device *dev)
 		return -EINVAL;
 
 	if (!pdata)
-		return 0;
+		goto qos;
 
 	up->context_loss_cnt = serial_omap_get_context_loss_count(up);
 
@@ -1651,6 +1651,7 @@ static int serial_omap_runtime_suspend(struct device *dev)
 		}
 	}
 
+qos:
 	up->latency = PM_QOS_CPU_DMA_LAT_DEFAULT_VALUE;
 	schedule_work(&up->qos_work);
 
