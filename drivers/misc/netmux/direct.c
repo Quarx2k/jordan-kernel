@@ -59,7 +59,7 @@
 #include "debug.h"
 #include <linux/sched.h>
 
-//#define DEBUG_NETMUX_AUDIO
+#define DEBUG_NETMUX_AUDIO
 
 /*
  * major_list keeps track of a list of major numbers
@@ -790,10 +790,12 @@ ssize_t DirectRead(struct file *filp, char *buf, size_t count,
 		return -EFAULT;
 	}
 #ifdef DEBUG_NETMUX_AUDIO
+/*
 	if (!strcmp(pathname, "/dev/audio"))
 	{
 		dump_hex(commbuff_data(commbuff), commbuffsize);
 	}
+*/
 #endif
 	LOGCOMMBUFF_CH(minor, "DirectRead( )-->", commbuff, commbuffsize);
 
