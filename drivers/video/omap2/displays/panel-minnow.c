@@ -785,7 +785,7 @@ static int minnow_panel_verify_otm3201(struct minnow_panel_data *mpd,
 				    (cmdbuf, panel_init_ssd2848_320x320_1)) {
 					dev_info(&mpd->dssdev->dev,
 						 "Force reset for new settings"
-						 "of  panel 1.0!\n");
+						 " of panel 1.0!\n");
 					mpd->panel_retry_count = 0;
 					r = -EIO;
 					break;
@@ -1783,6 +1783,12 @@ static int minnow_panel_probe(struct omap_dss_device *dssdev)
 			 "There is not panel id coming from boot-loader\n");
 		break;
 	case OTM3201_1_0:
+		/* it needs replace the settings for panel 1.0 */
+		if (minnow_panel_replace_cmdbuf(mpd->power_on.cmdbuf,
+						panel_init_ssd2848_320x320_1)){
+			dev_info(&dssdev->dev, "Replaced for the settings "
+				 "of panel 1.0!\n");
+		}
 	case OTM3201_2_0:
 	case OTM3201_2_1:
 		mpd->skip_first_init = true;
