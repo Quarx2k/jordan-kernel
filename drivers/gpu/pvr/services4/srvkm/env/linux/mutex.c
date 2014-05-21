@@ -66,6 +66,11 @@ IMG_VOID LinuxLockMutex(PVRSRV_LINUX_MUTEX *psPVRSRVMutex)
     mutex_lock(psPVRSRVMutex);
 }
 
+IMG_VOID LinuxLockMutexNested(PVRSRV_LINUX_MUTEX *psPVRSRVMutex, unsigned int uiLockClass)
+{
+	mutex_lock_nested(psPVRSRVMutex, uiLockClass);
+}
+
 PVRSRV_ERROR LinuxLockMutexInterruptible(PVRSRV_LINUX_MUTEX *psPVRSRVMutex)
 {
     if(mutex_lock_interruptible(psPVRSRVMutex) == -EINTR)
@@ -109,6 +114,11 @@ IMG_VOID LinuxLockMutex(PVRSRV_LINUX_MUTEX *psPVRSRVMutex)
     atomic_dec(&psPVRSRVMutex->Count);
 }
 
+IMG_VOID LinuxLockMutexNested(PVRSRV_LINUX_MUTEX *psPVRSRVMutex, unsigned int uiLockClass)
+{
+	LinuxLockMutex(psPVRSRVMutex);
+}
+
 PVRSRV_ERROR LinuxLockMutexInterruptible(PVRSRV_LINUX_MUTEX *psPVRSRVMutex)
 {
     if(down_interruptible(&psPVRSRVMutex->sSemaphore) == -EINTR)
@@ -131,7 +141,7 @@ IMG_INT32 LinuxTryLockMutex(PVRSRV_LINUX_MUTEX *psPVRSRVMutex)
         atomic_dec(&psPVRSRVMutex->Count);
     }
 
-    return Status;
+    return Status == 0;
 }
 
 IMG_VOID LinuxUnLockMutex(PVRSRV_LINUX_MUTEX *psPVRSRVMutex)

@@ -87,9 +87,6 @@ struct _RA_STATISTICS_
 
     /** total number of spans deallocated by the callback mechanism */
     IMG_SIZE_T uExportCount;
-
-    IMG_SIZE_T uFailedAllocCount;
-
 };
 typedef struct _RA_STATISTICS_ RA_STATISTICS;
 

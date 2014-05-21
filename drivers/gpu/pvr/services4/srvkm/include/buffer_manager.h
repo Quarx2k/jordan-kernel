@@ -91,17 +91,6 @@ struct _BM_MAPPING_
 	IMG_UINT32			ui32NumVirtChunks;
 	IMG_UINT32			ui32NumPhysChunks;
 	IMG_BOOL			*pabMapChunk;
-
-	/* GPU mapping reference count
-	 * When goes down to 0 GPU mapping
-	 * gets removed */
-	IMG_UINT32			ui32MappingCount;
-
-	/* need to track the original required alignment to make sure
-	 * that an unmapped buffer which is later remapped to device
-	 * is remapped with the original alignment restrictions.
-	 */
-	IMG_UINT32			ui32DevVAddrAlignment;
 };
 
 /*
@@ -346,8 +335,8 @@ BM_Alloc (IMG_HANDLE			hDevMemHeap,
  */
 IMG_BOOL
 BM_Wrap (	IMG_HANDLE hDevMemHeap,
-		    IMG_SIZE_T ui32Size,
-			IMG_SIZE_T ui32Offset,
+		    IMG_SIZE_T uSize,
+			IMG_SIZE_T uOffset,
 			IMG_BOOL bPhysContig,
 			IMG_SYS_PHYADDR *psSysAddr,
 			IMG_VOID *pvCPUVAddr,
@@ -421,32 +410,6 @@ BM_HandleToSysPaddr (BM_HANDLE hBuf);
  */
 IMG_HANDLE
 BM_HandleToOSMemHandle (BM_HANDLE hBuf);
-
-/**
- *  @Function   BM_RemapToDev
- *
- *  @Description
- *
- *  Remaps the device Virtual Mapping.
- *
- *  @Input hBuf - buffer handle.
- *  @Return ref count on success
- */
-IMG_INT32
-BM_RemapToDev(BM_HANDLE hBuf);
-
-/**
- *  @Function   BM_UnmapFromDev
- *
- *  @Description
- *
- *  Removes the device Virtual Mapping.
- *
- *  @Input hBuf - buffer handle.
- *  @Return Ref count on success
- */
-IMG_INT32
-BM_UnmapFromDev(BM_HANDLE hBuf);
 
 /**
  *  @Function   BM_GetPhysPageAddr
@@ -631,7 +594,6 @@ IMG_BOOL BM_VirtOffsetToPhysical(IMG_HANDLE hBMHandle,
 PVRSRV_ERROR BM_XProcWorkaroundSetShareIndex(IMG_UINT32 ui32Index);
 PVRSRV_ERROR BM_XProcWorkaroundUnsetShareIndex(IMG_UINT32 ui32Index);
 PVRSRV_ERROR BM_XProcWorkaroundFindNewBufferAndSetShareIndex(IMG_UINT32 *pui32Index);
-IMG_INT32 BM_XProcGetShareDataRefCount(IMG_UINT32 ui32Index);
 
 #if defined(PVRSRV_REFCOUNT_DEBUG)
 IMG_VOID _BM_XProcIndexAcquireDebug(const IMG_CHAR *pszFile, IMG_INT iLine, IMG_UINT32 ui32Index);
@@ -646,26 +608,13 @@ IMG_VOID _BM_XProcIndexReleaseDebug(const IMG_CHAR *pszFile, IMG_INT iLine, IMG_
 IMG_VOID _BM_XProcIndexAcquire(IMG_UINT32 ui32Index);
 IMG_VOID _BM_XProcIndexRelease(IMG_UINT32 ui32Index);
 
+
 #define BM_XProcIndexAcquire(x) \
 	_BM_XProcIndexAcquire( x)
 #define BM_XProcIndexRelease(x) \
 	_BM_XProcIndexRelease( x)
 #endif
 
-static INLINE IMG_CHAR *
-_BMMappingType (IMG_INT eCpuMemoryOrigin)
-{
-	switch (eCpuMemoryOrigin)
-	{
-	case hm_wrapped: return "hm_wrapped";
-	case hm_wrapped_scatter: return "hm_wrapped_scatter";
-	case hm_wrapped_virtaddr: return "hm_wrapped_virtaddr";
-	case hm_wrapped_scatter_virtaddr: return "hm_wrapped_scatter_virtaddr";
-	case hm_env: return "hm_env";
-	case hm_contiguous: return "hm_contiguous";
-	}
-	return "junk";
-}
 
 #if defined(__cplusplus)
 }

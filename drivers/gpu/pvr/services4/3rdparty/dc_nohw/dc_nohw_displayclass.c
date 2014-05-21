@@ -374,79 +374,90 @@ static PVRSRV_ERROR CreateDCSwapChain(IMG_HANDLE hDevice,
 	{
 		return (PVRSRV_ERROR_FLIP_CHAIN_EXISTS);
 	}
-
-	/* check the buffer count */
-	if(ui32BufferCount > DC_NOHW_MAX_BACKBUFFERS)
-	{
-		return (PVRSRV_ERROR_TOOMANYBUFFERS);
-	}
-
-	/*
-		verify the DST/SRC attributes
-		- SRC/DST must match the current display mode config
-	*/
-	if(psDstSurfAttrib->pixelformat != psDevInfo->sSysFormat.pixelformat
-	|| psDstSurfAttrib->sDims.ui32ByteStride != psDevInfo->sSysDims.ui32ByteStride
-	|| psDstSurfAttrib->sDims.ui32Width != psDevInfo->sSysDims.ui32Width
-	|| psDstSurfAttrib->sDims.ui32Height != psDevInfo->sSysDims.ui32Height)
-	{
-		/* DST doesn't match the current mode */
-		return (PVRSRV_ERROR_INVALID_PARAMS);
-	}
-
-	if(psDstSurfAttrib->pixelformat != psSrcSurfAttrib->pixelformat
-	|| psDstSurfAttrib->sDims.ui32ByteStride != psSrcSurfAttrib->sDims.ui32ByteStride
-	|| psDstSurfAttrib->sDims.ui32Width != psSrcSurfAttrib->sDims.ui32Width
-	|| psDstSurfAttrib->sDims.ui32Height != psSrcSurfAttrib->sDims.ui32Height)
-	{
-		/* DST doesn't match the SRC */
-		return (PVRSRV_ERROR_INVALID_PARAMS);
-	}
-
-	/* INTEGRATION_POINT: check the flags */
-	UNREFERENCED_PARAMETER(ui32Flags);
-
+	
 	/* create a swapchain structure */
 	psSwapChain = (DC_NOHW_SWAPCHAIN*)AllocKernelMem(sizeof(DC_NOHW_SWAPCHAIN));
 	if(!psSwapChain)
 	{
 		return (PVRSRV_ERROR_OUT_OF_MEMORY);
 	}
-
-	psBuffer = (DC_NOHW_BUFFER*)AllocKernelMem(sizeof(DC_NOHW_BUFFER) * ui32BufferCount);
-	if(!psBuffer)
-	{
-		FreeKernelMem(psSwapChain);
-		return (PVRSRV_ERROR_OUT_OF_MEMORY);
-	}
-
-	/* initialise allocations */
+	
 	memset(psSwapChain, 0, sizeof(DC_NOHW_SWAPCHAIN));
-	memset(psBuffer, 0, sizeof(DC_NOHW_BUFFER) * ui32BufferCount);
 
-	psSwapChain->ulBufferCount = (unsigned long)ui32BufferCount;
-	psSwapChain->psBuffer = psBuffer;
-
-	/* link the buffers */
-	for(i=0; i<ui32BufferCount-1; i++)
+	if (ui32BufferCount)
 	{
-		psBuffer[i].psNext = &psBuffer[i+1];
-	}
-	/* and link last to first */
-	psBuffer[i].psNext = &psBuffer[0];
-
-	/* populate the buffers */
-	for(i=0; i<ui32BufferCount; i++)
-	{
-		psBuffer[i].psSyncData = ppsSyncData[i];
+	
+		/* check the buffer count */
+		if(ui32BufferCount > DC_NOHW_MAX_BACKBUFFERS)
+		{
+			return (PVRSRV_ERROR_TOOMANYBUFFERS);
+		}
+	
+		/*
+			verify the DST/SRC attributes
+			- SRC/DST must match the current display mode config
+		*/
+		if(psDstSurfAttrib->pixelformat != psDevInfo->sSysFormat.pixelformat
+		|| psDstSurfAttrib->sDims.ui32ByteStride != psDevInfo->sSysDims.ui32ByteStride
+		|| psDstSurfAttrib->sDims.ui32Width != psDevInfo->sSysDims.ui32Width
+		|| psDstSurfAttrib->sDims.ui32Height != psDevInfo->sSysDims.ui32Height)
+		{
+			/* DST doesn't match the current mode */
+			return (PVRSRV_ERROR_INVALID_PARAMS);
+		}
+	
+		if(psDstSurfAttrib->pixelformat != psSrcSurfAttrib->pixelformat
+		|| psDstSurfAttrib->sDims.ui32ByteStride != psSrcSurfAttrib->sDims.ui32ByteStride
+		|| psDstSurfAttrib->sDims.ui32Width != psSrcSurfAttrib->sDims.ui32Width
+		|| psDstSurfAttrib->sDims.ui32Height != psSrcSurfAttrib->sDims.ui32Height)
+		{
+			/* DST doesn't match the SRC */
+			return (PVRSRV_ERROR_INVALID_PARAMS);
+		}
+	
+		/* INTEGRATION_POINT: check the flags */
+		UNREFERENCED_PARAMETER(ui32Flags);
+	
+	
+	
+		psBuffer = (DC_NOHW_BUFFER*)AllocKernelMem(sizeof(DC_NOHW_BUFFER) * ui32BufferCount);
+		if(!psBuffer)
+		{
+			FreeKernelMem(psSwapChain);
+			return (PVRSRV_ERROR_OUT_OF_MEMORY);
+		}
+	
+		/* initialise allocations */
+		memset(psBuffer, 0, sizeof(DC_NOHW_BUFFER) * ui32BufferCount);
+	
+		psSwapChain->ulBufferCount = (unsigned long)ui32BufferCount;
+		psSwapChain->psBuffer = psBuffer;
+	
+		/* link the buffers */
+		for(i=0; i<ui32BufferCount-1; i++)
+		{
+			psBuffer[i].psNext = &psBuffer[i+1];
+		}
+		/* and link last to first */
+		psBuffer[i].psNext = &psBuffer[0];
+	
+		/* populate the buffers */
+		for(i=0; i<ui32BufferCount; i++)
+		{
+			psBuffer[i].psSyncData = ppsSyncData[i];
 #if defined(DC_NOHW_DISCONTIG_BUFFERS)
-		psBuffer[i].psSysAddr = psDevInfo->asBackBuffers[i].psSysAddr;
+			psBuffer[i].psSysAddr = psDevInfo->asBackBuffers[i].psSysAddr;
 #else
-		psBuffer[i].sSysAddr = psDevInfo->asBackBuffers[i].sSysAddr;
+			psBuffer[i].sSysAddr = psDevInfo->asBackBuffers[i].sSysAddr;
 #endif
-		psBuffer[i].sDevVAddr = psDevInfo->asBackBuffers[i].sDevVAddr;
-		psBuffer[i].sCPUVAddr = psDevInfo->asBackBuffers[i].sCPUVAddr;
-		psBuffer[i].hSwapChain = (DC_HANDLE)psSwapChain;
+			psBuffer[i].sDevVAddr = psDevInfo->asBackBuffers[i].sDevVAddr;
+			psBuffer[i].sCPUVAddr = psDevInfo->asBackBuffers[i].sCPUVAddr;
+			psBuffer[i].hSwapChain = (DC_HANDLE)psSwapChain;
+		}
+	}
+	else
+	{
+		psSwapChain->psBuffer = NULL;
 	}
 
 	/* mark swapchain's existence */
@@ -478,7 +489,10 @@ static PVRSRV_ERROR DestroyDCSwapChain(IMG_HANDLE hDevice,
 	psSwapChain = (DC_NOHW_SWAPCHAIN*)hSwapChain;
 
 	/* free resources */
-	FreeKernelMem(psSwapChain->psBuffer);
+	if (psSwapChain->psBuffer)
+	{
+		FreeKernelMem(psSwapChain->psBuffer);
+	}
 	FreeKernelMem(psSwapChain);
 
 	/* mark swapchain as not existing */
@@ -598,8 +612,9 @@ static PVRSRV_ERROR SwapToDCBuffer(IMG_HANDLE	hDevice,
 static DC_ERROR Flip(DC_NOHW_DEVINFO	*psDevInfo,
                      DC_NOHW_BUFFER		*psBuffer)
 {
+	UNREFERENCED_PARAMETER(psBuffer);
 	/* check parameters */
-	if(!psDevInfo || !psBuffer)
+	if(!psDevInfo)
 	{
 		return (DC_ERROR_INVALID_PARAMS);
 	}
@@ -617,6 +632,8 @@ static IMG_BOOL ProcessFlip(IMG_HANDLE	hCmdCookie,
 	DISPLAYCLASS_FLIP_COMMAND *psFlipCmd;
 	DC_NOHW_DEVINFO	*psDevInfo;
 	DC_NOHW_BUFFER	*psBuffer;
+	
+	UNREFERENCED_PARAMETER(ui32DataSize);
 
 	/* check parameters */
 	if(!hCmdCookie)
@@ -626,7 +643,9 @@ static IMG_BOOL ProcessFlip(IMG_HANDLE	hCmdCookie,
 
 	/* validate data packet */
 	psFlipCmd = (DISPLAYCLASS_FLIP_COMMAND*)pvData;
-	if (psFlipCmd == IMG_NULL || sizeof(DISPLAYCLASS_FLIP_COMMAND) != ui32DataSize)
+	/* Under android, this may be a DISPLAYCLASS_FLIP_COMMAND2, but the structs
+	 * are compatable for everything used by dc_nohw so it makes no difference */
+	if (psFlipCmd == IMG_NULL)
 	{
 		return (IMG_FALSE);
 	}

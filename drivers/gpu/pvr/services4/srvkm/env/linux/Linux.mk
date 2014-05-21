@@ -41,5 +41,5 @@
 modules := srvkm
 
 srvkm_type := kernel_module
-srvkm_target := pvrsrvkm_sgx$(SGXCORE)_$(SGX_CORE_REV).ko
+srvkm_target := pvrsrvkm.ko
 srvkm_makefile := $(THIS_DIR)/Kbuild.mk
