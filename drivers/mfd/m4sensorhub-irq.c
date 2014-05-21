@@ -132,6 +132,7 @@ static irqreturn_t event_isr(int irq, void *data)
 	 * susbsequent jobs will have no interrupts left to service.
 	 */
 	struct m4sensorhub_irqdata *irq_data = data;
+	disable_irq_nosync(irq_data->m4sensorhub->i2c_client->irq);
 	wake_lock(&irq_data->wake_lock);
 	queue_work(irq_data->workqueue, &irq_data->work);
 
@@ -202,8 +203,8 @@ int m4sensorhub_irq_init(struct m4sensorhub_data *m4sensorhub)
 	wake_lock_init(&data->tm_wake_lock, WAKE_LOCK_SUSPEND,
 		       "m4sensorhub-timed-irq");
 
-	retval = request_irq(i2c->irq, event_isr, IRQF_DISABLED |
-				IRQF_TRIGGER_RISING, "m4sensorhub-irq", data);
+	retval = request_irq(i2c->irq, event_isr, IRQF_TRIGGER_HIGH,
+		"m4sensorhub-irq", data);
 	if (retval) {
 		KDEBUG(M4SH_ERROR, "m4sensorhub: Failed requesting irq.\n");
 		goto err_destroy_wq;
@@ -649,6 +650,7 @@ static void irq_work_func(struct work_struct *work)
 	}
 error:
 	wake_unlock(&data->wake_lock);
+	enable_irq(m4sensorhub->i2c_client->irq);
 }
 
 #ifdef CONFIG_DEBUG_FS
