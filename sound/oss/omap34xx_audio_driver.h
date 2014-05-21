@@ -13,9 +13,7 @@
 
 #ifdef MCBSP_WRAPPER
 
-#if defined(CONFIG_ARCH_OMAP24XX) || defined(CONFIG_ARCH_OMAP34XX)
 #define OMAP_MCBSP_REG_WKUPEN 0xA8
-#endif
 
 #define MCBSP_WKUP_XRDYEN		0x400
 
@@ -153,9 +151,6 @@ struct omap_mcbsp_wrapper {
 };
 #endif /* MCBSP_WRAPPER */
 #ifdef MCBSP_WRAPPER
-
-void omap_mcbsp_write(void __iomem *io_base, u16 reg, u32 val);
-int omap_mcbsp_read(void __iomem *io_base, u16 reg);
 
 int omap2_mcbsp_stop_datatx(u32 id);
 int omap2_mcbsp_stop_datarx(u32 id);
