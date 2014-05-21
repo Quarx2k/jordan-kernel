@@ -1,0 +1,39 @@
+config SGX_OMAP3630
+	tristate "PowerVR SGX for OMAP3630"
+	depends on ARCH_OMAP3
+	help
+	  Support for the PowerVR SGX 3D core with OMAP 3630.
+
+config SGX_SYNC
+	depends on SGX_OMAP3630 && SW_SYNC
+	bool "Andorid soft-synchronization objects"
+	default n
+	help
+	  Support  Android Frameworks Native Sync
+
+choice
+	prompt "PowerVR build type"
+	default SGX_BUILD_RELEASE
+
+config SGX_BUILD_RELEASE
+	depends on SGX_OMAP3630
+	bool "SGX RELEASE"
+        help
+          SGX Release Build.
+
+config SGX_BUILD_DEBUG
+	depends on SGX_OMAP3630
+	bool "SGX DEBUG"
+        help
+          SGX Debug Build.
+
+endchoice
+
+config SGX_PDUMP
+	depends on SGX_OMAP3630
+	bool "PowerVR SGX Parameter Dump"
+	default n
+	help
+	  This option enables the PDump (Parameter Dump) build to debug
+	  the SGX driver. The user side of the driver must be built with
+	  this option enabled as well.
