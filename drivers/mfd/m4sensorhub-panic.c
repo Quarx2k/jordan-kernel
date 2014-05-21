@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Motorola, Inc.
+ * Copyright (C) 2012-2014 Motorola, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -23,7 +23,6 @@
 #include <linux/slab.h>
 
 
-
 /* --------------- Global Declarations -------------- */
 #define PANIC_BANK              0xFF /* Reserved for Panic bank */
 #define PANIC_CMD_CHECK         0xCD /* Panic Handoff command */
@@ -33,6 +32,7 @@
 
 /* --------------- Local Declarations -------------- */
 static const char *callback_name[PANICHDL_MAX] = {
+	[PANICHDL_DISPLAY_RESTORE] = "display_restore",
 	[PANICHDL_IRQ_RESTORE] = "irq_restore",
 };
 
@@ -71,14 +71,32 @@ int m4sensorhub_panic_init(struct m4sensorhub_data *m4sensorhub)
 	int retval = 0;
 	struct m4sensorhub_panicdata *data;
 
-	data = kzalloc(sizeof(struct m4sensorhub_panicdata), GFP_KERNEL);
-	if (data) {
-		mutex_init(&data->lock);
-		m4sensorhub->panicdata = data;
-	} else {
-		KDEBUG(M4SH_ERROR, "m4sensorhub: Memory error in panic_init\n");
-		retval = -ENOMEM;
+	if (m4sensorhub == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: M4 data is NULL\n", __func__);
+		retval = -ENODATA;
+		goto m4sensorhub_panic_init_fail;
 	}
+
+	if (m4sensorhub->panicdata != NULL) {
+		KDEBUG(M4SH_ERROR,
+			"%s: Trying to overwrite previous panic data\n",
+			__func__);
+		retval = -EPERM;
+		goto m4sensorhub_panic_init_fail;
+	}
+
+	data = kzalloc(sizeof(struct m4sensorhub_panicdata), GFP_KERNEL);
+	if (data == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: Memory error in panic_init\n",
+			__func__);
+		retval = -ENOMEM;
+		goto m4sensorhub_panic_init_fail;
+	}
+
+	mutex_init(&data->lock);
+	m4sensorhub->panicdata = data;
+
+m4sensorhub_panic_init_fail:
 	return retval;
 }
 EXPORT_SYMBOL_GPL(m4sensorhub_panic_init);
@@ -91,54 +109,86 @@ EXPORT_SYMBOL_GPL(m4sensorhub_panic_init);
 */
 void m4sensorhub_panic_shutdown(struct m4sensorhub_data *m4sensorhub)
 {
-	if (m4sensorhub && m4sensorhub->panicdata) {
-		struct m4sensorhub_panicdata *data = m4sensorhub->panicdata;
+	struct m4sensorhub_panicdata *data = NULL;
+
+	if (m4sensorhub == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: M4 data is NULL\n", __func__);
+		return;
+	}
+
+	data = m4sensorhub->panicdata;
+	if (data != NULL) {
 		m4sensorhub->panicdata = NULL;
 		if (mutex_is_locked(&data->lock))
 			mutex_unlock(&data->lock);
 		mutex_destroy(&data->lock);
+		/*
+		 * Callback and data pointers were passed to us, so
+		 * we leave it to the registering functions to
+		 * clean up their own memory.
+		 */
 		kfree(data);
 	}
+
+	return;
 }
 EXPORT_SYMBOL_GPL(m4sensorhub_panic_shutdown);
 
 /* m4sensorhub_panic_register()
 
-   Register an panic handler to monitor M4 panic reset
+   Register a panic handler to monitor M4 panic reset
 
    Returns 0 on success or negative error code on failure
 
      m4sensorhub - pointer to the main m4sensorhub data struct
-     index - M4 Sensor Hub panic handler to resiter for
+     index - M4 Sensor Hub panic handler to register for
      cb_func - panic handler function to execute after M4 reset
      data - pointer to data for panic handler function
 */
-
 int m4sensorhub_panic_register(struct m4sensorhub_data *m4sensorhub,
 	enum m4sensorhub_panichdl_index index,
 	void (*cb_func) (struct m4sensorhub_data *, void *),
 	void *data)
 {
-	struct m4sensorhub_panicdata *panicdata;
+	struct m4sensorhub_panicdata *panicdata = NULL;
 	int retval = 0;
 
-	if (!m4sensorhub || (index >= PANICHDL_MAX) || !cb_func)
-		return -EINVAL;
+	if (m4sensorhub == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: M4 data is NULL\n", __func__);
+		retval = -ENODATA;
+		goto m4sensorhub_panic_register_exit;
+	} else if (cb_func == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: Callback is NULL\n", __func__);
+		retval = -ENOSYS;
+		goto m4sensorhub_panic_register_exit;
+	} else if (index >= PANICHDL_MAX) {
+		KDEBUG(M4SH_ERROR, "%s: Number of panic handlers exceeded\n",
+			__func__);
+		retval = -EOVERFLOW;
+		goto m4sensorhub_panic_register_exit;
+	} else if (m4sensorhub->panicdata == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: Panic data is missing\n", __func__);
+		retval = -ENODATA;
+		goto m4sensorhub_panic_register_exit;
+	}
 
 	panicdata = (struct m4sensorhub_panicdata *)m4sensorhub->panicdata;
 	mutex_lock(&panicdata->lock);
 	if (panicdata->funcs[index].callback == NULL) {
 		panicdata->funcs[index].callback = cb_func;
 		panicdata->funcs[index].data = data;
-		KDEBUG(M4SH_NOTICE, "m4sensorhub: %s callback registered\n",
-			callback_name[index]);
+		KDEBUG(M4SH_NOTICE, "%s: %s callback registered\n",
+			__func__, callback_name[index]);
 	} else {
-		KDEBUG(M4SH_ERROR, "m4sensorhub: %s callback"\
-			" registration failed\n", callback_name[index]);
+		KDEBUG(M4SH_ERROR, "%s: %s %s", __func__,
+			callback_name[index], "callback registration failed\n");
 		retval = -EPERM;
+		goto m4sensorhub_panic_register_fail;
 	}
-	mutex_unlock(&panicdata->lock);
 
+m4sensorhub_panic_register_fail:
+	mutex_unlock(&panicdata->lock);
+m4sensorhub_panic_register_exit:
 	return retval;
 }
 EXPORT_SYMBOL_GPL(m4sensorhub_panic_register);
@@ -155,20 +205,34 @@ EXPORT_SYMBOL_GPL(m4sensorhub_panic_register);
 int m4sensorhub_panic_unregister(struct m4sensorhub_data *m4sensorhub,
 	enum m4sensorhub_panichdl_index index)
 {
-	struct m4sensorhub_panicdata *panicdata;
+	int retval = 0;
+	struct m4sensorhub_panicdata *panicdata = NULL;
 
-	if (!m4sensorhub || (index >= PANICHDL_MAX))
-		return -EINVAL;
+	if (m4sensorhub == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: M4 data is NULL\n", __func__);
+		retval = -ENODATA;
+		goto m4sensorhub_panic_unregister_fail;
+	} else if (index >= PANICHDL_MAX) {
+		KDEBUG(M4SH_ERROR, "%s: Number of panic handlers exceeded\n",
+			__func__);
+		retval = -EOVERFLOW;
+		goto m4sensorhub_panic_unregister_fail;
+	} else if (m4sensorhub->panicdata == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: Panic data is missing\n", __func__);
+		retval = -ENODATA;
+		goto m4sensorhub_panic_unregister_fail;
+	}
 
 	panicdata = (struct m4sensorhub_panicdata *)m4sensorhub->panicdata;
 	mutex_lock(&panicdata->lock);
 	panicdata->funcs[index].callback = NULL;
 	panicdata->funcs[index].data = NULL;
 	mutex_unlock(&panicdata->lock);
-	KDEBUG(M4SH_NOTICE, "m4sensorhub: %s callback un-registered\n",
-			callback_name[index]);
+	KDEBUG(M4SH_NOTICE, "%s: %s callback un-registered\n",
+			__func__, callback_name[index]);
 
-	return 0;
+m4sensorhub_panic_unregister_fail:
+	return retval;
 }
 EXPORT_SYMBOL_GPL(m4sensorhub_panic_unregister);
 
@@ -201,9 +265,11 @@ void m4sensorhub_panic_process(struct m4sensorhub_data *m4sensorhub)
 	union panic_buf buf;
 	struct m4sensorhub_panic_callback handler;
 
-	if (!m4sensorhub || !m4sensorhub->panicdata) {
-		KDEBUG(M4SH_ERROR, "m4sensorhub: Invalid parameter in %s!\n",\
-					__func__);
+	if (m4sensorhub == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: M4 data is NULL\n", __func__);
+		return;
+	} else if (m4sensorhub->panicdata == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: Panic data is missing\n", __func__);
 		return;
 	}
 
@@ -211,41 +277,38 @@ void m4sensorhub_panic_process(struct m4sensorhub_data *m4sensorhub)
 
 	buf.in.bank = PANIC_BANK;
 	buf.in.cmd = PANIC_CMD_CHECK;
-	ret = m4sensorhub_i2c_write_read(m4sensorhub,\
-			(u8 *)&buf, sizeof(buf.in), sizeof(buf.data));
+	ret = m4sensorhub_i2c_write_read(m4sensorhub,
+		(u8 *)&buf, sizeof(buf.in), sizeof(buf.data));
 	if ((ret != sizeof(buf.data)) || (buf.data != PANIC_RESP_CHECK)) {
 		/* TODO maybe we shall check if M4/OMAP i2c broken */
-		KDEBUG(M4SH_ERROR, "m4sensorhub: Unknown IRQ status! "\
-				"M4 panic handoff ret=%d, data=0x%x\n",\
-				ret, buf.data);
+		KDEBUG(M4SH_ERROR, "m4sensorhub: %s ret=%d, data=0x%x\n",
+			"Unknown IRQ status! M4 panic handoff", ret, buf.data);
 		m4sensorhub_reg_access_unlock();
 		return;
 	}
 
-	KDEBUG(M4SH_ERROR, "m4sensorhub_panic: Detected M4 panic, reset M4!\n");
+	KDEBUG(M4SH_ERROR, "%s: Detected M4 panic, reset M4!\n", __func__);
 	m4sensorhub->pdev->hw_reset(m4sensorhub);
 	msleep(100);
-	if (m4sensorhub->i2c_client->addr == 0x39) {
+	if (m4sensorhub->i2c_client->addr == 0x39)
 		ret = m4sensorhub_401_load_firmware(m4sensorhub, 0, NULL);
-	} else {
+	else
 		ret = m4sensorhub_load_firmware(m4sensorhub, 0, NULL);
-	}
 
 	if (ret < 0) {
-		KDEBUG(M4SH_ERROR, "m4sensorhub_panic: "\
-			"Failed to restart M4, ret = %d\n", ret);
+		KDEBUG(M4SH_ERROR, "%s: Failed to restart M4, ret = %d\n",
+			__func__, ret);
 		BUG();
 	}
 
 	m4sensorhub_reg_access_unlock();
 
 	for (i = 0; i < PANICHDL_MAX; i++) {
-		handler = ((struct m4sensorhub_panicdata *)\
-				(m4sensorhub->panicdata))->funcs[i];
+		handler = ((struct m4sensorhub_panicdata *)
+			(m4sensorhub->panicdata))->funcs[i];
 		if (handler.callback) {
-			KDEBUG(M4SH_NOTICE, "m4sensorhub_panic: "\
-				"Calling %s as M4 restarted!\n",\
-				callback_name[i]);
+			KDEBUG(M4SH_NOTICE, "%s: Calling %s as M4 restarted!\n",
+				__func__, callback_name[i]);
 			handler.callback(m4sensorhub, handler.data);
 		}
 	}

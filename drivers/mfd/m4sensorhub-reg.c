@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Motorola, Inc.
+ * Copyright (C) 2012-2014 Motorola, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -51,9 +51,13 @@ static DEFINE_MUTEX(reg_access);
 
      m4sensorhub - pointer to the main m4sensorhub data struct
 */
-
 int m4sensorhub_reg_init(struct m4sensorhub_data *m4sensorhub)
 {
+	if (m4sensorhub == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: M4 data is NULL\n", __func__);
+		return -ENODATA;
+	}
+
 	return 0;
 }
 EXPORT_SYMBOL_GPL(m4sensorhub_reg_init);
@@ -66,9 +70,13 @@ EXPORT_SYMBOL_GPL(m4sensorhub_reg_init);
 
      m4sensorhub - pointer to the main m4sensorhub data struct
 */
-
 int m4sensorhub_reg_shutdown(struct m4sensorhub_data *m4sensorhub)
 {
+	if (m4sensorhub == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: M4 data is NULL\n", __func__);
+		return -ENODATA;
+	}
+
 	return 0;
 }
 EXPORT_SYMBOL_GPL(m4sensorhub_reg_shutdown);
@@ -86,27 +94,33 @@ EXPORT_SYMBOL_GPL(m4sensorhub_reg_shutdown);
      value - array to return data.  Needs to be at least register's size
      num - number of bytes to read
 */
-
 int m4sensorhub_reg_read_n(struct m4sensorhub_data *m4sensorhub,
 			   enum m4sensorhub_reg reg, unsigned char *value,
 			   short num)
 {
 	int ret = -EINVAL;
 	u8 stack_buf[M4SH_MAX_STACK_BUF_SIZE];
+	u8 *buf = NULL;
 
-	if (!m4sensorhub || !value || !num) {
-		KDEBUG(M4SH_ERROR, "%s() invalid parameter\n", __func__);
-		return ret;
+	if (m4sensorhub == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: M4 data is NULL\n", __func__);
+		return -ENODATA;
+	} else if (value == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: value array is NULL\n", __func__);
+		return -ENODATA;
+	} else if (num == 0) {
+		KDEBUG(M4SH_ERROR, "%s: Bytes requested is 0\n", __func__);
+		return -EINVAL;
 	}
 
-	if ((reg < M4SH_REG__NUM) && num <= M4SH_MAX_REG_SIZE &&\
+	if ((reg < M4SH_REG__NUM) && num <= M4SH_MAX_REG_SIZE &&
 	     register_info_tbl[reg].offset + num <=
 	     m4sensorhub_mapsize(reg)) {
-		u8 *buf = (num > (M4SH_MAX_STACK_BUF_SIZE-2))\
+		buf = (num > (M4SH_MAX_STACK_BUF_SIZE-2))
 			 ? kmalloc(num+2, GFP_KERNEL) : stack_buf;
 		if (!buf) {
-			KDEBUG(M4SH_ERROR, "%s() Failed alloc %d memeory\n"\
-					, __func__, num+2);
+			KDEBUG(M4SH_ERROR, "%s() Failed alloc %d memory\n",
+					__func__, num+2);
 			return -ENOMEM;
 		}
 		buf[0] = register_info_tbl[reg].type;
@@ -115,11 +129,13 @@ int m4sensorhub_reg_read_n(struct m4sensorhub_data *m4sensorhub,
 		mutex_lock(&reg_access);
 		ret = m4sensorhub_i2c_write_read(m4sensorhub, buf, 2, num);
 		mutex_unlock(&reg_access);
-
-		if (ret != num)
-			KDEBUG(M4SH_ERROR, "%s() read failure\n", __func__);
-		else
+		if (ret != num) {
+			KDEBUG(M4SH_ERROR, "%s() read failure (ret=%d)\n",
+				__func__, ret);
+		} else {
 			memcpy(value, buf, num);
+		}
+
 		if (buf != stack_buf)
 			kfree(buf);
 	} else {
@@ -128,6 +144,7 @@ int m4sensorhub_reg_read_n(struct m4sensorhub_data *m4sensorhub,
 			reg, M4SH_REG__NUM, num, M4SH_MAX_REG_SIZE,
 			m4sensorhub_mapsize(reg));
 	}
+
 	return ret;
 }
 EXPORT_SYMBOL_GPL(m4sensorhub_reg_read_n);
@@ -147,27 +164,34 @@ EXPORT_SYMBOL_GPL(m4sensorhub_reg_read_n);
 	    are to be changed, then &m4sh_no_mask can be passed here.
      num - number of bytes to write
 */
-
 int m4sensorhub_reg_write_n(struct m4sensorhub_data *m4sensorhub,
 			    enum m4sensorhub_reg reg, unsigned char *value,
 			    unsigned char *mask, short num)
 {
-	int i, ret = -EINVAL;
+	int i = 0;
+	int ret = -EINVAL;
 	u8 stack_buf[M4SH_MAX_STACK_BUF_SIZE];
+	u8 *buf = NULL;
 
-	if (!m4sensorhub || !value || !num) {
-		KDEBUG(M4SH_ERROR, "%s() invalid parameter\n", __func__);
-		return ret;
+	if (m4sensorhub == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: M4 data is NULL\n", __func__);
+		return -ENODATA;
+	} else if (value == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: value array is NULL\n", __func__);
+		return -ENODATA;
+	} else if (num == 0) {
+		KDEBUG(M4SH_ERROR, "%s: Bytes requested is 0\n", __func__);
+		return -EINVAL;
 	}
 
-	if ((reg < M4SH_REG__NUM) && num <= M4SH_MAX_REG_SIZE &&\
+	if ((reg < M4SH_REG__NUM) && num <= M4SH_MAX_REG_SIZE &&
 	     register_info_tbl[reg].offset + num <=
 	     m4sensorhub_mapsize(reg)) {
-		u8 *buf = (num > (M4SH_MAX_STACK_BUF_SIZE-2))\
+		buf = (num > (M4SH_MAX_STACK_BUF_SIZE-2))
 			? kmalloc(num+2, GFP_KERNEL) : stack_buf;
 		if (!buf) {
-			KDEBUG(M4SH_ERROR, "%s() Failed alloc %d memeory\n"\
-					, __func__, num+2);
+			KDEBUG(M4SH_ERROR, "%s() Failed alloc %d memory\n",
+					__func__, num+2);
 			return -ENOMEM;
 		}
 
@@ -180,7 +204,8 @@ int m4sensorhub_reg_write_n(struct m4sensorhub_data *m4sensorhub,
 							 2, num);
 			if (ret != num) {
 				KDEBUG(M4SH_ERROR, "%s() register read"
-						   "failure\n", __func__);
+						   "failure (ret=%d)\n",
+						   __func__, ret);
 				goto error;
 			}
 			/* move data right 2 positions and apply mask and
@@ -200,10 +225,12 @@ int m4sensorhub_reg_write_n(struct m4sensorhub_data *m4sensorhub,
 			KDEBUG(M4SH_ERROR, "%s() register write failure\n",
 			      __func__);
 			ret = -EINVAL;
-		} else
+		} else {
 			ret -= 2;
+		}
 
-error:		mutex_unlock(&reg_access);
+error:
+		mutex_unlock(&reg_access);
 		if (buf != stack_buf)
 			kfree(buf);
 	} else {
@@ -230,11 +257,15 @@ EXPORT_SYMBOL_GPL(m4sensorhub_reg_write_n);
      value - byte of data to write
      mask - mask representing which bits to change in register.
 */
-
 int m4sensorhub_reg_write_1byte(struct m4sensorhub_data *m4sensorhub,
 				enum m4sensorhub_reg reg, unsigned char value,
 				unsigned char mask)
 {
+	if (m4sensorhub == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: M4 data is NULL\n", __func__);
+		return -ENODATA;
+	}
+
 	if (register_info_tbl[reg].size == 1) {
 		if (mask == 0xFF) {
 			return m4sensorhub_reg_write(
@@ -245,6 +276,9 @@ int m4sensorhub_reg_write_1byte(struct m4sensorhub_data *m4sensorhub,
 				m4sensorhub, reg, &value, &mask
 				);
 		}
+	} else {
+		KDEBUG(M4SH_ERROR, "%s: Size is %hu instead of 1\n",
+			__func__, register_info_tbl[reg].size);
 	}
 	return -EINVAL;
 }
@@ -260,10 +294,14 @@ EXPORT_SYMBOL_GPL(m4sensorhub_reg_write_1byte);
      m4sensorhub - pointer to the main m4sensorhub data struct
      reg - Register to get size of
 */
-
 int m4sensorhub_reg_getsize(struct m4sensorhub_data *m4sensorhub,
 			    enum m4sensorhub_reg reg)
 {
+	if (m4sensorhub == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: M4 data is NULL\n", __func__);
+		return -ENODATA;
+	}
+
 	if (reg < M4SH_REG__NUM)
 		return register_info_tbl[reg].size;
 
@@ -276,7 +314,6 @@ EXPORT_SYMBOL_GPL(m4sensorhub_reg_getsize);
    Lock reg access to avoid broken I2C transmit process
 
 */
-
 void m4sensorhub_reg_access_lock(void)
 {
 	mutex_lock(&reg_access);
@@ -288,7 +325,6 @@ EXPORT_SYMBOL_GPL(m4sensorhub_reg_access_lock);
    Unlock reg access to wake up blocked I2C transmit process
 
 */
-
 void m4sensorhub_reg_access_unlock(void)
 {
 	mutex_unlock(&reg_access);
@@ -298,7 +334,7 @@ EXPORT_SYMBOL_GPL(m4sensorhub_reg_access_unlock);
 /* m4sensorhub_i2c_write_read()
 
    Directly I2C access to communicate with the M4 sensor hub.
-   It always read after write if both write and read length are non-zero
+   Reads are always after writes if both write and read lengths are non-zero
 
    Returns number of bytes write on success if readlen is zero
    Returns number of bytes read on success if readlen is non-zero
@@ -309,29 +345,33 @@ EXPORT_SYMBOL_GPL(m4sensorhub_reg_access_unlock);
      writelen - number of bytes write to
      readlen - number of bytes read from
 */
-
 int m4sensorhub_i2c_write_read(struct m4sensorhub_data *m4sensorhub,
 				      u8 *buf, int writelen, int readlen)
 {
 	int i, msglen, msgstart, err, tries = 0;
 	char buffer[DEBUG_LINE_LENGTH];
-	struct i2c_msg msgs[] = {
-		{
-		.addr = m4sensorhub->i2c_client->addr,
-		.flags = m4sensorhub->i2c_client->flags,
-		.len = writelen,
-		.buf = buf,
-		},
-		{
-		.addr = m4sensorhub->i2c_client->addr,
-		.flags = m4sensorhub->i2c_client->flags | I2C_M_RD,
-		.len = readlen,
-		.buf = buf,
-		},
-	};
+	struct i2c_msg msgs[2];
 
-	if (buf == NULL || (writelen == 0 && readlen == 0))
-		return -EFAULT;
+	if (m4sensorhub == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: M4 data is NULL\n", __func__);
+		return -ENODATA;
+	} else if (buf == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: Buffer is NULL\n", __func__);
+		return -ENODATA;
+	} else if ((writelen == 0) && (readlen == 0)) {
+		KDEBUG(M4SH_ERROR, "%s: Lengths are both 0\n", __func__);
+		return -EINVAL;
+	}
+
+	msgs[0].addr = m4sensorhub->i2c_client->addr;
+	msgs[0].flags = m4sensorhub->i2c_client->flags;
+	msgs[0].len = writelen;
+	msgs[0].buf = buf;
+
+	msgs[1].addr = m4sensorhub->i2c_client->addr;
+	msgs[1].flags = m4sensorhub->i2c_client->flags | I2C_M_RD;
+	msgs[1].len = readlen;
+	msgs[1].buf = buf;
 
 	/* Offset and size in msgs array depending on msg type */
 	msglen = (writelen && readlen) ? 2 : 1;
@@ -352,11 +392,19 @@ int m4sensorhub_i2c_write_read(struct m4sensorhub_data *m4sensorhub,
 	do {
 		err = i2c_transfer(m4sensorhub->i2c_client->adapter,
 				   &msgs[msgstart], msglen);
-		if (err != msglen)
+		if (err != msglen) {
+			/* TODO: Print on try 0 after M4 stops NACKing */
+			if (tries != 0) {
+				KDEBUG(M4SH_ERROR,
+					"%s: Fail on try %d (err=%d)\n",
+					__func__, tries, err);
+			}
 			usleep_range(I2C_RETRY_DELAY_MIN, I2C_RETRY_DELAY_MAX);
+		}
 	} while ((err != msglen) && (++tries < I2C_RETRIES));
+
 	if (err != msglen) {
-		dev_err(&m4sensorhub->i2c_client->dev, "i2c transfer error; "
+		dev_err(&m4sensorhub->i2c_client->dev, "i2c transfer error: "
 			"type=%d offset=%d\n", buf[0], buf[1]);
 		err = -EIO;
 	} else {
@@ -376,6 +424,7 @@ int m4sensorhub_i2c_write_read(struct m4sensorhub_data *m4sensorhub,
 			KDEBUG(M4SH_VERBOSE_DEBUG, "%s\n", buffer);
 		}
 	}
+
 	return err;
 }
 EXPORT_SYMBOL_GPL(m4sensorhub_i2c_write_read);

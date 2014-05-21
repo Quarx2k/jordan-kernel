@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Motorola, Inc.
+ * Copyright (C) 2012-2014 Motorola, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -51,19 +51,19 @@ static void irq_work_func(struct work_struct *work);
 #ifdef CONFIG_DEBUG_FS
 static int m4sensorhub_dbg_irq_open(struct inode *inode, struct file *file);
 #endif
-static void m4sensorhub_irq_restore(struct m4sensorhub_data *m4sensorhub,\
-					void *data);
+static void m4sensorhub_irq_restore(struct m4sensorhub_data *m4sensorhub,
+	void *data);
 
 /* ---------------- Local Declarations -------------- */
 
 static const char *irq_name[] = {
 	[M4SH_IRQ_TMP_DATA_READY]         = "TMP_DATA_READY",
-	[M4SH_IRQ_PRESSURE_DATA_READY]	  = "PRES_DATA_READY",
-	[M4SH_IRQ_GYRO_DATA_READY]	  = "GYRO_DATA_READY",
+	[M4SH_IRQ_PRESSURE_DATA_READY]    = "PRES_DATA_READY",
+	[M4SH_IRQ_GYRO_DATA_READY]        = "GYRO_DATA_READY",
 	[M4SH_IRQ_PEDOMETER_DATA_READY]   = "PEDO_DATA_READY",
-	[M4SH_IRQ_COMPASS_DATA_READY]	  = "COMPASS_DATA_READY",
-	[M4SH_IRQ_FUSION_DATA_READY]	  = "FUSION_DATA_READY",
-	[M4SH_IRQ_ACCEL_DATA_READY]	  = "ACCEL_DATA_READY",
+	[M4SH_IRQ_COMPASS_DATA_READY]     = "COMPASS_DATA_READY",
+	[M4SH_IRQ_FUSION_DATA_READY]      = "FUSION_DATA_READY",
+	[M4SH_IRQ_ACCEL_DATA_READY]       = "ACCEL_DATA_READY",
 	[M4SH_IRQ_GESTURE_DETECTED]       = "GESTURE_DETECTED",
 	[M4SH_IRQ_STILL_DETECTED]         = "STILL_DETECTED",
 	[M4SH_IRQ_MOTION_DETECTED]        = "MOTION_DETECTED",
@@ -164,40 +164,53 @@ static const struct file_operations debug_fops = {
 
      m4sensorhub - pointer to the main m4sensorhub data struct
 */
-
 int m4sensorhub_irq_init(struct m4sensorhub_data *m4sensorhub)
 {
-	int retval;
-	struct i2c_client *i2c = m4sensorhub->i2c_client;
-	struct m4sensorhub_irqdata *data;
+	int retval = 0;
+	struct i2c_client *i2c = NULL;
+	struct m4sensorhub_irqdata *data = NULL;
+
+	if (m4sensorhub == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: M4 data is NULL\n", __func__);
+		retval = -ENODATA;
+		goto done;
+	} else if (m4sensorhub->i2c_client == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: I2C client is missing\n", __func__);
+		retval = -ENODATA;
+		goto done;
+	}
+
+	i2c = m4sensorhub->i2c_client;
 
 	data = kzalloc(sizeof(struct m4sensorhub_irqdata), GFP_KERNEL);
-	if (!data) {
-		KDEBUG(M4SH_ERROR, "m4sensorhub: Memory error in irq_init\n");
+	if (data == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: Failed to allocat irqdata\n", __func__);
 		retval = -ENOMEM;
 		goto done;
 	}
-	KDEBUG(
-		M4SH_INFO,
-		"m4sensorhub: %u IRQs with valid_bits %02X%02X%02X\n",
-		M4SH_IRQ__NUM, int_registers[2].valid_bits,
-		int_registers[1].valid_bits, int_registers[0].valid_bits
-		);
+
+	mutex_init(&data->lock);
+
+	data->m4sensorhub = m4sensorhub;
+	m4sensorhub->irqdata = data;
+
+	KDEBUG(M4SH_INFO, "%s: %u IRQs with valid_bits %02X%02X%02X\n",
+		__func__, M4SH_IRQ__NUM, int_registers[2].valid_bits,
+		int_registers[1].valid_bits, int_registers[0].valid_bits);
 	retval = m4sensorhub_irq_disable_all(m4sensorhub);
-	if (retval) {
-		KDEBUG(M4SH_ERROR, "m4sensorhub: Failed disable all irqs\n");
+	if (retval < 0) {
+		KDEBUG(M4SH_ERROR, "%s: Failed disable all irqs\n", __func__);
 		goto err_free;
 	}
 
 	data->workqueue = create_workqueue("m4sensorhub_irq");
 	if (data->workqueue == NULL) {
-		KDEBUG(M4SH_ERROR, "m4sensorhub: IRQ Workqueue init failure\n");
+		KDEBUG(M4SH_ERROR, "%s: IRQ Workqueue init failure\n",
+			__func__);
 		retval = -ENOMEM;
 		goto err_free;
 	}
 	INIT_WORK(&data->work, irq_work_func);
-
-	mutex_init(&data->lock);
 
 	wake_lock_init(&data->wake_lock, WAKE_LOCK_SUSPEND, "m4sensorhub-irq");
 	wake_lock_init(&data->tm_wake_lock, WAKE_LOCK_SUSPEND,
@@ -206,16 +219,13 @@ int m4sensorhub_irq_init(struct m4sensorhub_data *m4sensorhub)
 	retval = request_irq(i2c->irq, event_isr, IRQF_TRIGGER_HIGH,
 		"m4sensorhub-irq", data);
 	if (retval) {
-		KDEBUG(M4SH_ERROR, "m4sensorhub: Failed requesting irq.\n");
+		KDEBUG(M4SH_ERROR, "%s: Failed requesting irq.\n", __func__);
 		goto err_destroy_wq;
 	}
 
-	data->m4sensorhub = m4sensorhub;
-	m4sensorhub->irqdata = data;
-
 	retval = enable_irq_wake(i2c->irq);
 	if (retval) {
-		KDEBUG(M4SH_ERROR, "m4sensorhub: Failed enabling irq wake.\n");
+		KDEBUG(M4SH_ERROR, "%s: Failed enabling irq wake.\n", __func__);
 		goto err_free_irq;
 	}
 
@@ -223,14 +233,15 @@ int m4sensorhub_irq_init(struct m4sensorhub_data *m4sensorhub)
 	data->debugfs = debugfs_create_file("m4sensorhub-irq", S_IRUGO, NULL,
 					    data, &debug_fops);
 	if (data->debugfs == NULL) {
-		KDEBUG(M4SH_ERROR, "m4sensorhub: Error creating debufs\n");
+		KDEBUG(M4SH_ERROR, "%s: Error creating debufs\n", __func__);
 		retval = -EINVAL;
 		goto err_disa_irq;
 	}
 #endif
-	m4sensorhub_panic_register(m4sensorhub, PANICHDL_IRQ_RESTORE,\
-					m4sensorhub_irq_restore, data);
-	KDEBUG(M4SH_INFO, "m4sensorhub IRQ subsystem initialized\n");
+	m4sensorhub_panic_register(m4sensorhub, PANICHDL_IRQ_RESTORE,
+		m4sensorhub_irq_restore, data);
+	KDEBUG(M4SH_INFO, "%s: m4sensorhub IRQ subsystem initialized\n",
+		__func__);
 	retval = 0;
 	goto done;
 
@@ -240,14 +251,14 @@ err_disa_irq:
 	disable_irq_wake(i2c->irq);
 err_free_irq:
 	free_irq(i2c->irq, data);
-	m4sensorhub->irqdata = NULL;
-	data->m4sensorhub = NULL;
 err_destroy_wq:
 	wake_lock_destroy(&data->wake_lock);
 	wake_lock_destroy(&data->tm_wake_lock);
-	mutex_destroy(&data->lock);
 	destroy_workqueue(data->workqueue);
 err_free:
+	mutex_destroy(&data->lock);
+	m4sensorhub->irqdata = NULL;
+	data->m4sensorhub = NULL;
 	kfree(data);
 done:
 	return retval;
@@ -262,10 +273,25 @@ EXPORT_SYMBOL_GPL(m4sensorhub_irq_init);
 */
 void m4sensorhub_irq_shutdown(struct m4sensorhub_data *m4sensorhub)
 {
-	struct i2c_client *i2c = m4sensorhub->i2c_client;
-	struct m4sensorhub_irqdata *data = m4sensorhub->irqdata;
+	struct i2c_client *i2c = NULL;
+	struct m4sensorhub_irqdata *data = NULL;
 
-	KDEBUG(M4SH_INFO, "shutdown m4sensorhub IRQ subsystem\n");
+	KDEBUG(M4SH_INFO, "%s: shutdown m4sensorhub IRQ subsystem\n",
+		__func__);
+
+	if (m4sensorhub == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: M4 data is NULL\n", __func__);
+		return;
+	} else if (m4sensorhub->i2c_client) {
+		KDEBUG(M4SH_ERROR, "%s: I2C client is NULL\n", __func__);
+		return;
+	} else if (m4sensorhub->irqdata) {
+		KDEBUG(M4SH_ERROR, "%s: IRQ data is NULL\n", __func__);
+		return;
+	}
+
+	i2c = m4sensorhub->i2c_client;
+	data = m4sensorhub->irqdata;
 
 	m4sensorhub_panic_unregister(m4sensorhub, PANICHDL_IRQ_RESTORE);
 
@@ -311,23 +337,36 @@ EXPORT_SYMBOL_GPL(m4sensorhub_irq_shutdown);
      cb_func - IRQ handler function to execute on inturrupt
      data - pointer to data for IRQ handler function
 */
-
 int m4sensorhub_irq_register(struct m4sensorhub_data *m4sensorhub,
 			     enum m4sensorhub_irqs irq,
 			     void (*cb_func) (enum m4sensorhub_irqs, void *),
 			     void *data, uint8_t enable_timed_wakelock)
 {
-	struct m4sensorhub_irqdata *irqdata;
+	struct m4sensorhub_irqdata *irqdata = NULL;
 	int retval = 0;
 
-	if ((!m4sensorhub) || (irq >= M4SH_IRQ__NUM) || (!cb_func))
-		return -EINVAL;
+	if (m4sensorhub == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: M4 data is NULL\n", __func__);
+		retval = -ENODATA;
+		goto m4sensorhub_irq_register_exit;
+	} else if (irq >= M4SH_IRQ__NUM) {
+		KDEBUG(M4SH_ERROR, "%s: IRQ %d exceeds maximum %d\n",
+			__func__, irq, M4SH_IRQ__NUM);
+		retval = -EINVAL;
+		goto m4sensorhub_irq_register_exit;
+	} else if (cb_func == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: Handler missing for IRQ %d\n",
+			__func__, irq);
+		retval = -ENOSYS;
+		goto m4sensorhub_irq_register_exit;
+	}
 
 	irqdata = m4sensorhub->irqdata;
-
 	if (irqdata == NULL) {
-		KDEBUG(M4SH_ERROR, "irqdata null for caller = %d\n", irq);
-		return -EINVAL;
+		KDEBUG(M4SH_ERROR, "%s: Caller irqdata is NULL (irq=%d)\n",
+			__func__, irq);
+		retval = -ENODATA;
+		goto m4sensorhub_irq_register_exit;
 	}
 
 	mutex_lock(&irqdata->lock);
@@ -337,16 +376,18 @@ int m4sensorhub_irq_register(struct m4sensorhub_data *m4sensorhub,
 		irqdata->irq_info[irq].tm_wakelock = enable_timed_wakelock;
 		irqdata->event_handler[irq].func = cb_func;
 		irqdata->event_handler[irq].data = data;
-		KDEBUG(M4SH_NOTICE, "m4sensorhub: %s IRQ registered\n",
-			irq_name[irq]);
+		KDEBUG(M4SH_NOTICE, "%s: %s IRQ registered\n",
+			__func__, irq_name[irq]);
 	} else {
-		KDEBUG(M4SH_ERROR, "m4sensorhub: %s IRQ registration failed\n",
-			irq_name[irq]);
+		KDEBUG(M4SH_ERROR, "%s: %s IRQ registration failed\n",
+			__func__, irq_name[irq]);
 		retval = -EPERM;
+		goto m4sensorhub_irq_register_fail;
 	}
 
+m4sensorhub_irq_register_fail:
 	mutex_unlock(&irqdata->lock);
-
+m4sensorhub_irq_register_exit:
 	return retval;
 }
 EXPORT_SYMBOL_GPL(m4sensorhub_irq_register);
@@ -363,14 +404,31 @@ EXPORT_SYMBOL_GPL(m4sensorhub_irq_register);
 int m4sensorhub_irq_unregister(struct m4sensorhub_data *m4sensorhub,
 			       enum m4sensorhub_irqs irq)
 {
-	struct m4sensorhub_irqdata *data = m4sensorhub->irqdata;
-	int retval;
+	struct m4sensorhub_irqdata *data = NULL;
+	int retval = 0;
 
-	if ((irq >= M4SH_IRQ__NUM) || (m4sensorhub == NULL) ||
-			(m4sensorhub->irqdata == NULL))
-		return -EINVAL;
+	if (m4sensorhub == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: M4 data is NULL\n", __func__);
+		retval = -ENODATA;
+		goto m4sensorhub_irq_unregister_exit;
+	} else if (irq >= M4SH_IRQ__NUM) {
+		KDEBUG(M4SH_ERROR, "%s: IRQ %d exceeds maximum %d\n",
+			__func__, irq, M4SH_IRQ__NUM);
+		retval = -ENODATA;
+		goto m4sensorhub_irq_unregister_exit;
+	} else if (m4sensorhub->irqdata == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: IRQ data is NULL\n", __func__);
+		retval = -ENODATA;
+		goto m4sensorhub_irq_unregister_exit;
+	}
 
+	data = m4sensorhub->irqdata;
 	retval = m4sensorhub_irq_disable(m4sensorhub, irq);
+	if (retval < 0) {
+		KDEBUG(M4SH_ERROR, "%s: Failed to disable IRQ %d\n",
+			__func__, irq);
+		goto m4sensorhub_irq_unregister_exit;
+	}
 
 	mutex_lock(&data->lock);
 	data->event_handler[irq].func = NULL;
@@ -378,9 +436,10 @@ int m4sensorhub_irq_unregister(struct m4sensorhub_data *m4sensorhub,
 	data->irq_info[irq].registered = 0;
 	mutex_unlock(&data->lock);
 
-	KDEBUG(M4SH_NOTICE, "m4sensorhub: %s IRQ un-registered\n",
-			    irq_name[irq]);
+	KDEBUG(M4SH_NOTICE, "%s: %s IRQ un-registered\n",
+			    __func__, irq_name[irq]);
 
+m4sensorhub_irq_unregister_exit:
 	return retval;
 }
 EXPORT_SYMBOL_GPL(m4sensorhub_irq_unregister);
@@ -395,16 +454,31 @@ EXPORT_SYMBOL_GPL(m4sensorhub_irq_unregister);
      m4sensorhub - pointer to the main m4sensorhub data struct
      irq - M4 Sensor Hub interupt to check
 */
-
 int m4sensorhub_irq_enable_get(struct m4sensorhub_data *m4sensorhub,
 		       enum m4sensorhub_irqs irq)
 {
-	struct m4sensorhub_irqdata *data = m4sensorhub->irqdata;
+	struct m4sensorhub_irqdata *data = NULL;
 	int retval = -EINVAL;
 
-	if (irq < M4SH_IRQ__NUM)
-		return data->irq_info[irq].enabled;
+	if (m4sensorhub == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: M4 data is NULL\n", __func__);
+		retval = -ENODATA;
+		goto m4sensorhub_irq_enable_get_fail;
+	} else if (irq >= M4SH_IRQ__NUM) {
+		KDEBUG(M4SH_ERROR, "%s: IRQ %d exceeds maximum %d\n",
+			__func__, irq, M4SH_IRQ__NUM);
+		retval = -ENODATA;
+		goto m4sensorhub_irq_enable_get_fail;
+	} else if (m4sensorhub->irqdata == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: IRQ data is NULL\n", __func__);
+		retval = -ENODATA;
+		goto m4sensorhub_irq_enable_get_fail;
+	}
 
+	data = m4sensorhub->irqdata;
+	retval = data->irq_info[irq].enabled;
+
+m4sensorhub_irq_enable_get_fail:
 	return retval;
 }
 EXPORT_SYMBOL_GPL(m4sensorhub_irq_enable_get);
@@ -418,23 +492,57 @@ EXPORT_SYMBOL_GPL(m4sensorhub_irq_enable_get);
      m4sensorhub - pointer to the main m4sensorhub data struct
      irq - M4 Sensor Hub interupt to disable
 */
-
 int m4sensorhub_irq_disable(struct m4sensorhub_data *m4sensorhub,
 		   enum m4sensorhub_irqs irq)
 {
-	struct m4sensorhub_irqdata *data = m4sensorhub->irqdata;
+	struct m4sensorhub_irqdata *data = NULL;
 	int retval = -EINVAL;
+	bool enabled = true;
 
-	if (irq < M4SH_IRQ__NUM) {
-		mutex_lock(&data->lock);
-		data->irq_info[irq].enabled = 0;
-		mutex_unlock(&data->lock);
-		retval = m4sensorhub_reg_write_1byte(m4sensorhub,
-				get_enable_reg(irq), 0, EVENT_MASK(irq));
-		retval = CHECK_REG_ACCESS_RETVAL(m4sensorhub, retval,
-						 get_enable_reg(irq));
+	if (m4sensorhub == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: M4 data is NULL\n", __func__);
+		retval = -ENODATA;
+		goto m4sensorhub_irq_disable_fail;
+	} else if (irq >= M4SH_IRQ__NUM) {
+		KDEBUG(M4SH_ERROR, "%s: IRQ %d exceeds maximum %d\n",
+			__func__, irq, M4SH_IRQ__NUM);
+		retval = -ENODATA;
+		goto m4sensorhub_irq_disable_fail;
+	} else if (m4sensorhub->irqdata == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: IRQ data is NULL\n", __func__);
+		retval = -ENODATA;
+		goto m4sensorhub_irq_disable_fail;
 	}
 
+	data = m4sensorhub->irqdata;
+	mutex_lock(&data->lock);
+	if (data->irq_info[irq].enabled == 0)
+		enabled = false;
+	mutex_unlock(&data->lock);
+
+	/* Checking if the IRQ was previously disabled only to print an error */
+	if (!enabled) {
+		KDEBUG(M4SH_ERROR, "%s: IRQ %d is already disabled\n",
+			__func__, irq);
+		goto m4sensorhub_irq_disable_fail;
+	}
+
+	retval = m4sensorhub_reg_write_1byte(m4sensorhub,
+		get_enable_reg(irq), 0, EVENT_MASK(irq));
+	if (retval < 0) {
+		KDEBUG(M4SH_ERROR, "%s: Register write failed\n", __func__);
+		goto m4sensorhub_irq_disable_fail;
+	} else if (retval != 1) {
+		KDEBUG(M4SH_ERROR, "%s: Wrote %d bytes instead of 1\n",
+			__func__, retval);
+		goto m4sensorhub_irq_disable_fail;
+	}
+
+	mutex_lock(&data->lock);
+	data->irq_info[irq].enabled = 0;
+	mutex_unlock(&data->lock);
+
+m4sensorhub_irq_disable_fail:
 	return retval;
 }
 EXPORT_SYMBOL_GPL(m4sensorhub_irq_disable);
@@ -448,24 +556,57 @@ EXPORT_SYMBOL_GPL(m4sensorhub_irq_disable);
      m4sensorhub - pointer to the main m4sensorhub data struct
      irq - M4 Sensor Hub interupt to enable
 */
-
 int m4sensorhub_irq_enable(struct m4sensorhub_data *m4sensorhub,
 		     enum m4sensorhub_irqs irq)
 {
-	struct m4sensorhub_irqdata *data = m4sensorhub->irqdata;
+	struct m4sensorhub_irqdata *data = NULL;
 	int retval = -EINVAL;
+	bool disabled = true;
 
-	if (irq < M4SH_IRQ__NUM) {
-		mutex_lock(&data->lock);
-		data->irq_info[irq].enabled = 1;
-		mutex_unlock(&data->lock);
-		retval = m4sensorhub_reg_write_1byte(m4sensorhub,
-				get_enable_reg(irq), EVENT_MASK(irq),
-				EVENT_MASK(irq));
-		retval = CHECK_REG_ACCESS_RETVAL(m4sensorhub, retval,
-						 get_enable_reg(irq));
+	if (m4sensorhub == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: M4 data is NULL\n", __func__);
+		retval = -ENODATA;
+		goto m4sensorhub_irq_enable_fail;
+	} else if (irq >= M4SH_IRQ__NUM) {
+		KDEBUG(M4SH_ERROR, "%s: IRQ %d exceeds maximum %d\n",
+			__func__, irq, M4SH_IRQ__NUM);
+		retval = -ENODATA;
+		goto m4sensorhub_irq_enable_fail;
+	} else if (m4sensorhub->irqdata == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: IRQ data is NULL\n", __func__);
+		retval = -ENODATA;
+		goto m4sensorhub_irq_enable_fail;
 	}
 
+	data = m4sensorhub->irqdata;
+	mutex_lock(&data->lock);
+	if (data->irq_info[irq].enabled == 1)
+		disabled = false;
+	mutex_unlock(&data->lock);
+
+	/* Checking if the IRQ was previously enabled only to print an error */
+	if (!disabled) {
+		KDEBUG(M4SH_ERROR, "%s: IRQ %d is already enabled\n",
+			__func__, irq);
+		goto m4sensorhub_irq_enable_fail;
+	}
+
+	retval = m4sensorhub_reg_write_1byte(m4sensorhub,
+		get_enable_reg(irq), EVENT_MASK(irq), EVENT_MASK(irq));
+	if (retval < 0) {
+		KDEBUG(M4SH_ERROR, "%s: Register write failed\n", __func__);
+		goto m4sensorhub_irq_enable_fail;
+	} else if (retval != 1) {
+		KDEBUG(M4SH_ERROR, "%s: Wrote %d bytes instead of 1\n",
+			__func__, retval);
+		goto m4sensorhub_irq_enable_fail;
+	}
+
+	mutex_lock(&data->lock);
+	data->irq_info[irq].enabled = 1;
+	mutex_unlock(&data->lock);
+
+m4sensorhub_irq_enable_fail:
 	return retval;
 }
 EXPORT_SYMBOL_GPL(m4sensorhub_irq_enable);
@@ -475,7 +616,6 @@ EXPORT_SYMBOL_GPL(m4sensorhub_irq_enable);
    Called by core to track suspend state and wakeup cause
 
 */
-
 void m4sensorhub_irq_pm_dbg_suspend(void)
 {
 	irq_dbg_info.suspend = 1;
@@ -488,7 +628,6 @@ EXPORT_SYMBOL_GPL(m4sensorhub_irq_pm_dbg_suspend);
    Called by core to print interupt source on M4SH wakeup
 
 */
-
 void m4sensorhub_irq_pm_dbg_resume(void)
 {
 	char buffer[DBG_BUF_LINE_LEN];
@@ -514,18 +653,31 @@ void m4sensorhub_irq_pm_dbg_resume(void)
 				/* find the first set bit */
 				index = (unsigned char)
 					(ffs(irq_dbg_info.en_ints[i]) - 1);
-				if (index >= M4SH_IRQ__NUM)
+				if (index >= M4SH_IRQ__NUM) {
+					KDEBUG(M4SH_NOTICE,
+							"%s: No set bits found\n",
+							__func__);
 					goto error;
+				}
 
 				/* clear the bit */
 				irq_dbg_info.en_ints[i] &= ~(1 << index);
 				/* find the event that occurred */
 				index += M4SH_IRQ__START +
 					 (i * NUM_INTS_PER_REG);
-				if (index >= M4SH_IRQ__NUM)
+				if (index >= M4SH_IRQ__NUM) {
+					KDEBUG(M4SH_NOTICE,
+							"%s: IRQ index is %d\n",
+							__func__, index);
 					goto error;
+				}
 
-				KDEBUG(M4SH_NOTICE, "\t%s\n", irq_name[index]);
+				if (index <= ARRAY_SIZE(irq_name))
+					KDEBUG(M4SH_NOTICE, "\t%s\n",
+						irq_name[index]);
+				else
+					KDEBUG(M4SH_NOTICE,
+						"\tIRQ %d\n", index);
 			}
 		}
 	}
@@ -533,6 +685,55 @@ error:
 	return;
 }
 EXPORT_SYMBOL_GPL(m4sensorhub_irq_pm_dbg_resume);
+
+/* m4sensorhub_irq_disable_all()
+
+   Disables all M4 IRQs (bypasses m4sensorhub_irq_disable())
+
+*/
+int m4sensorhub_irq_disable_all(struct m4sensorhub_data *m4sensorhub)
+{
+	int retval = 0;
+	int i = 0;
+	struct m4sensorhub_irqdata *data = NULL;
+
+	if (m4sensorhub == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: M4 data is NULL\n", __func__);
+		retval = -ENODATA;
+		goto m4sensorhub_irq_disable_all_fail;
+	} else if (m4sensorhub->irqdata == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: IRQ data is NULL\n", __func__);
+		retval = -ENODATA;
+		goto m4sensorhub_irq_disable_all_fail;
+	}
+
+	for (i = 0; i < NUM_INT_REGS; i++) {
+		retval = m4sensorhub_reg_write_1byte(m4sensorhub,
+			int_registers[i].enable_reg, 0,
+			int_registers[i].valid_bits);
+		if (retval < 0) {
+			KDEBUG(M4SH_ERROR, "%s: Failed to disable INT%d\n",
+				__func__, i);
+			goto m4sensorhub_irq_disable_all_fail;
+		} else if (retval != 1) {
+			KDEBUG(M4SH_ERROR, "%s: Wrote %d bytes instead of 1\n",
+				__func__, retval);
+			retval = -EINVAL;
+			goto m4sensorhub_irq_disable_all_fail;
+		}
+	}
+
+	data = m4sensorhub->irqdata;
+	mutex_lock(&data->lock);
+	for (i = 0; i < M4SH_IRQ__NUM; i++)
+		data->irq_info[i].enabled = 0;
+	mutex_unlock(&data->lock);
+
+m4sensorhub_irq_disable_all_fail:
+	return retval;
+}
+EXPORT_SYMBOL_GPL(m4sensorhub_irq_disable_all);
+
 /* --------------- Local Functions ----------------- */
 
 static unsigned short get_enable_reg(enum m4sensorhub_irqs event)
@@ -552,23 +753,6 @@ static unsigned short get_enable_reg(enum m4sensorhub_irqs event)
 
 	return ret;
 }
-
-int m4sensorhub_irq_disable_all(struct m4sensorhub_data *m4sensorhub)
-{
-	int i;
-
-	for (i = 0; i < NUM_INT_REGS; i++) {
-		if (1 != m4sensorhub_reg_write_1byte(m4sensorhub,
-				int_registers[i].enable_reg, 0,
-				int_registers[i].valid_bits)) {
-			KDEBUG(M4SH_ERROR, "m4sensorhub_irq: "
-					"Failed disabling INT%d\n", i);
-			return -EFAULT;
-		}
-	}
-	return 0;
-}
-EXPORT_SYMBOL_GPL(m4sensorhub_irq_disable_all);
 
 static void irq_work_func(struct work_struct *work)
 {
@@ -685,8 +869,8 @@ static int m4sensorhub_dbg_irq_open(struct inode *inode, struct file *file)
    Callback Handler is called by Panic after M4 has been restarted
 
 */
-static void m4sensorhub_irq_restore(\
-	struct m4sensorhub_data *m4sensorhub, void *data)
+static void m4sensorhub_irq_restore(struct m4sensorhub_data *m4sensorhub,
+	void *data)
 {
 	int i;
 	unsigned short en_ints[NUM_INT_REGS] = {0};
@@ -700,13 +884,13 @@ static void m4sensorhub_irq_restore(\
 	mutex_unlock(&((struct m4sensorhub_irqdata *)data)->lock);
 
 	for (i = 0; i < NUM_INT_REGS; i++) {
-		KDEBUG(M4SH_INFO, "m4sensorhub_irq: Reseting INT%d-%02X\n",\
-					i, en_ints[i]);
+		KDEBUG(M4SH_INFO, "%s: Reseting INT%d-%02X\n", __func__,
+			i, en_ints[i]);
 		if (1 != m4sensorhub_reg_write_1byte(m4sensorhub,
 				int_registers[i].enable_reg, en_ints[i],
 				int_registers[i].valid_bits)) {
-			KDEBUG(M4SH_ERROR, "m4sensorhub_irq: "
-					"Failed reseting INT%d\n", i);
+			KDEBUG(M4SH_ERROR, "%s: Failed reseting INT%d\n",
+				__func__, i);
 		}
 	}
 }

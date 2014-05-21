@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Motorola, Inc.
+ * Copyright (C) 2012-2014 Motorola, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -119,8 +119,15 @@ int m4sensorhub_load_firmware(struct m4sensorhub_data *m4sensorhub,
 	u32 barker_read_from_device;
 	int j = 0;
 
+	if (m4sensorhub == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: M4 data is NULL\n", __func__);
+		ret = -ENODATA;
+		goto done;
+	}
+
 	buf = kzalloc(MAX_TRANSFER_SIZE+8, GFP_KERNEL);
 	if (!buf) {
+		KDEBUG(M4SH_ERROR, "%s: Failed to allocate buf\n", __func__);
 		ret = -ENOMEM;
 		goto done;
 	}
@@ -130,12 +137,13 @@ int m4sensorhub_load_firmware(struct m4sensorhub_data *m4sensorhub,
 	}
 	if (ret < 0) {
 		KDEBUG(M4SH_ERROR, "%s: request_firmware failed for %s\n",
-			__func__,  m4sensorhub->filename);
+			__func__, m4sensorhub->filename);
 		KDEBUG(M4SH_ERROR, "Trying to run firmware already on hw.\n");
 		ret = 0;
 		goto done;
 	}
-	KDEBUG(M4SH_INFO, "%s:Firmware = %s\n", m4sensorhub->filename, __func__);
+	KDEBUG(M4SH_INFO, "%s: Firmware = %s\n",
+		__func__, m4sensorhub->filename);
 
 	if (firmware->size > MAX_FILE_SIZE) {
 		KDEBUG(M4SH_ERROR, "%s: firmware file size is too big.\n",
@@ -408,7 +416,7 @@ static int m4sensorhub_jump_to_user(struct m4sensorhub_data *m4sensorhub)
 				__func__, __LINE__);
 			return ret;
 		}
-		KDEBUG(M4SH_NOTICE, "Executing M4 code \n");
+		KDEBUG(M4SH_NOTICE, "Executing M4 code\n");
 		msleep(5000); /* 5 secs delay */
 		ret = 0;
 	} else {

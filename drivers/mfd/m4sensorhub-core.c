@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Motorola, Inc.
+ * Copyright (C) 2012-2014 Motorola, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -94,8 +94,8 @@ static ssize_t m4sensorhub_get_dbg(struct device *dev,
 int m4sensorhub_set_bootmode(struct m4sensorhub_data *m4sensorhub,
 			 enum m4sensorhub_bootmode bootmode)
 {
-	if (!m4sensorhub) {
-		printk(KERN_ERR "set_bootmode: invalid pointer\n");
+	if (m4sensorhub == NULL) {
+		pr_err("%s: M4 data is NULL\n", __func__);
 		return -EINVAL;
 	}
 
@@ -125,27 +125,45 @@ EXPORT_SYMBOL_GPL(m4sensorhub_set_bootmode);
 
 void m4sensorhub_hw_reset(struct m4sensorhub_data *m4sensorhub)
 {
-	if (!m4sensorhub) {
-		printk(KERN_ERR "m4sensorhub_hw_reset: invalid pointer\n");
-		return;
+	int err = 0;
+
+	if (m4sensorhub == NULL) {
+		pr_err("%s: M4 data is NULL\n", __func__);
+		err = -ENODATA;
+		goto m4sensorhub_hw_reset_fail;
+	} else if (m4sensorhub->i2c_client == NULL) {
+		pr_err("%s: I2C client is missing\n", __func__);
+		err = -ENODATA;
+		goto m4sensorhub_hw_reset_fail;
 	}
 
-
 	if (m4sensorhub->i2c_client->addr == 0x39) {
-		m4sensorhub_set_bootmode(m4sensorhub, BOOTMODE01);
+		err = m4sensorhub_set_bootmode(m4sensorhub, BOOTMODE01);
+		if (err < 0) {
+			pr_err("%s: Failed to enter bootmode 01\n", __func__);
+			goto m4sensorhub_hw_reset_fail;
+		}
 		usleep_range(5000, 10000);
 		gpio_set_value(m4sensorhub->hwconfig.reset_gpio, 0);
 		usleep_range(10000, 12000);
 		gpio_set_value(m4sensorhub->hwconfig.reset_gpio, 1);
 		msleep(400);
 	} else {
-		m4sensorhub_set_bootmode(m4sensorhub, BOOTMODE00);
+		err = m4sensorhub_set_bootmode(m4sensorhub, BOOTMODE00);
+		if (err < 0) {
+			pr_err("%s: Failed to enter bootmode 00\n", __func__);
+			goto m4sensorhub_hw_reset_fail;
+		}
 		gpio_set_value(m4sensorhub->hwconfig.reset_gpio, 1);
 		usleep_range(5000, 10000);
 		gpio_set_value(m4sensorhub->hwconfig.reset_gpio, 0);
 		usleep_range(5000, 10000);
 		gpio_set_value(m4sensorhub->hwconfig.reset_gpio, 1);
 	}
+
+m4sensorhub_hw_reset_fail:
+	if (err < 0)
+		pr_err("%s: Failed with error code %d", __func__, err);
 }
 EXPORT_SYMBOL_GPL(m4sensorhub_hw_reset);
 
@@ -158,20 +176,20 @@ static int m4sensorhub_hw_init(struct m4sensorhub_data *m4sensorhub,
 	int err = -EINVAL;
 	const char *fp = NULL;
 
-	if (!m4sensorhub) {
-		printk(KERN_ERR "m4sensorhub_hw_init: invalid pointer\n");
-		err = -EINVAL;
+	if (m4sensorhub == NULL) {
+		pr_err("%s: M4 data is NULL\n", __func__);
+		err = -ENODATA;
 		goto error;
-	}
-	if (node == NULL) {
-		printk(KERN_ERR "m4sensorhub_hw_init: node null\n");
-		err = -EINVAL;
+	} else if (node == NULL) {
+		pr_err("%s: Device node is missing\n", __func__);
+		err = -ENODATA;
 		goto error;
 	}
 
 	of_property_read_string(node, "mot,fw-filename", &fp);
 	if (fp == NULL) {
-		pr_err("Missing M4 sensorhub firmware filename\n");
+		pr_err("%s: Missing M4 sensorhub firmware filename\n",
+			__func__);
 		err = -EINVAL;
 		goto error;
 	}
@@ -266,8 +284,8 @@ error:
 static void m4sensorhub_hw_free(struct m4sensorhub_data *m4sensorhub)
 {
 
-	if (!m4sensorhub) {
-		printk(KERN_ERR "hw_free: invalid pointer\n");
+	if (m4sensorhub == NULL) {
+		pr_err("%s: M4 data is NULL\n", __func__);
 		return;
 	}
 
@@ -311,9 +329,11 @@ int m4sensorhub_register_initcall(int(*initfunc)(struct init_calldata *),
 
 	inc = kzalloc(sizeof(struct init_call), GFP_KERNEL);
 	if (inc == NULL) {
-		KDEBUG(M4SH_ERROR, "Unable to allocate for init call\n");
+		KDEBUG(M4SH_ERROR, "%s: Unable to allocate init call mem\n",
+			__func__);
 		return -ENOMEM;
 	}
+
 	inc->initcb = initfunc;
 	inc->pdata = pdata;
 	/* add it to the list */
@@ -321,6 +341,7 @@ int m4sensorhub_register_initcall(int(*initfunc)(struct init_calldata *),
 		inc->next = NULL;
 	else
 		inc->next = inithead;
+
 	inithead = inc;
 	return 0;
 }
@@ -356,13 +377,14 @@ static void m4sensorhub_initialize(const struct firmware *firmware,
 	struct init_calldata arg;
 
 	if (firmware == NULL) {
-		KDEBUG(M4SH_ERROR, "%s:No firmware data recieved\n", __func__);
+		KDEBUG(M4SH_ERROR, "%s: No firmware data recieved\n",
+			__func__);
 		return;
 	}
 
 	/* initiate m4 firmware download */
-	KDEBUG(M4SH_CRITICAL, "Starting firmware download with force_upgrade "
-		"= %d\n", force_upgrade);
+	KDEBUG(M4SH_CRITICAL, "%s: Starting M4 download %s = %d\n",
+		__func__, "with force_upgrade", force_upgrade);
 	if (m4sensorhub_misc_data.i2c_client->addr == 0x39)
 		firmware_download_status = m4sensorhub_401_load_firmware(
 						&m4sensorhub_misc_data,
@@ -373,8 +395,10 @@ static void m4sensorhub_initialize(const struct firmware *firmware,
 						&m4sensorhub_misc_data,
 						force_upgrade,
 						firmware);
+
 	if (firmware_download_status < 0) {
-		KDEBUG(M4SH_ERROR, "Failed to load M4 firmware = %d\n", err);
+		KDEBUG(M4SH_ERROR, "%s: Failed to load M4 firmware = %d\n",
+			__func__, err);
 		/* Since firmware download failed, put m4 back into boot mode*/
 		m4sensorhub_hw_reset(&m4sensorhub_misc_data);
 		return;
@@ -382,7 +406,8 @@ static void m4sensorhub_initialize(const struct firmware *firmware,
 
 	err = m4sensorhub_irq_init(&m4sensorhub_misc_data);
 	if (err < 0) {
-		KDEBUG(M4SH_ERROR, "M4sensorhub irq init failed\n");
+		KDEBUG(M4SH_ERROR, "%s: m4sensorhub irq init failed (err=%d)\n",
+			__func__, err);
 		return;
 	}
 
@@ -393,8 +418,12 @@ static void m4sensorhub_initialize(const struct firmware *firmware,
 	while (inc) {
 		arg.p_data = inc->pdata;
 		err = inc->initcb(&arg);
-		if (err < 0)
+		if (err < 0) {
+			KDEBUG(M4SH_ERROR,
+				"%s: Callback failed with error code %d %s\n",
+				__func__, err, "(dumping stack)");
 			dump_stack();
+		}
 		prev = inc;
 		inc = inc->next;
 		kfree(prev);
@@ -415,8 +444,8 @@ static ssize_t m4sensorhub_set_dbg(struct device *dev,
 		return -EINVAL;
 
 	m4sensorhub_debug = debug;
-	KDEBUG(M4SH_CRITICAL, "M4 Sensor Hub debug level = %d\n",
-		m4sensorhub_debug);
+	KDEBUG(M4SH_CRITICAL, "%s: M4 Sensor Hub debug level = %d\n",
+		__func__, m4sensorhub_debug);
 
 	return count;
 }
@@ -464,7 +493,7 @@ void ParseAndUpdateLogLevels(char *tag, char *level,
 	*logLevels &= ~(mask << (tagindex * 2));
 	/*set debug level for the relevant bits*/
 	*logLevels |= (levelindex << (tagindex * 2));
-	KDEBUG(M4SH_INFO, "New M4 log levels = 0x%llx \n", *logLevels);
+	KDEBUG(M4SH_INFO, "New M4 log levels = 0x%llx\n", *logLevels);
 }
 
 /* Usage: adb shell into the directory of sysinterface log_level and
@@ -567,7 +596,8 @@ static ssize_t m4sensorhub_disable_interrupts(struct device *dev,
 
 	ret = m4sensorhub_irq_disable_all(&m4sensorhub_misc_data);
 	if (ret < 0) {
-		KDEBUG(M4SH_ERROR, "Unable to disable all m4 interrupts\n");
+		KDEBUG(M4SH_ERROR, "%s: Unable to disable all m4 interrupts\n",
+			__func__);
 		return ret;
 	}
 	return count;
@@ -596,7 +626,6 @@ static int m4sensorhub_probe(struct i2c_client *client,
 	struct device_node *node = client->dev.of_node;
 	int err = -EINVAL;
 
-
 	/* Set debug based on module argument if set, otherwise use
 	   default logging rate based on build type */
 	if (debug_level)
@@ -610,15 +639,16 @@ static int m4sensorhub_probe(struct i2c_client *client,
 		m4sensorhub_debug = M4SH_ERROR;
 #endif
 	}
+
 	/* Enabling detailed level M4 logs for all builds*/
 	m4sensorhub_debug = M4SH_INFO;
-	KDEBUG(M4SH_ERROR, "Initializing M4 Sensor Hub debug=%d\n",
-			m4sensorhub_debug);
+	KDEBUG(M4SH_ERROR, "%s: Initializing M4 Sensor Hub debug=%d\n",
+			__func__, m4sensorhub_debug);
 
 	m4sensorhub->mode = UNINITIALIZED;
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
-		KDEBUG(M4SH_ERROR, "client not i2c capable\n");
+		KDEBUG(M4SH_ERROR, "%s: client not i2c capable\n", __func__);
 		err = -ENODEV;
 		goto err_unload;
 	}
@@ -627,36 +657,41 @@ static int m4sensorhub_probe(struct i2c_client *client,
 	m4sensorhub->i2c_client = client;
 
 	err = m4sensorhub_hw_init(m4sensorhub, node);
-	if (err) {
-		printk(KERN_ERR "%s: hw_init Failed!", __func__);
+	if (err < 0) {
+		KDEBUG(M4SH_ERROR, "%s: hw_init failed!", __func__);
 		goto done;
 	}
 
 	/* link i2c_client to m4sensorhub */
 	i2c_set_clientdata(client, m4sensorhub);
 
-
 	err = misc_register(&m4sensorhub_misc_device);
 	if (err < 0) {
-		KDEBUG(M4SH_ERROR, "misc register failed: %d\n", err);
+		KDEBUG(M4SH_ERROR, "%s: misc_register failed: %d\n",
+			__func__, err);
 		goto err_hw_free;
 	}
 
 	err = sysfs_create_group(&client->dev.kobj, &m4sensorhub_control_group);
-	if (err)
+	if (err < 0) {
+		KDEBUG(M4SH_ERROR, "%s: Failed to create sysfs group\n",
+			__func__);
 		goto err_deregister;
+	}
 
 	if (m4sensorhub->hwconfig.irq_gpio >= 0)
 		client->irq = gpio_to_irq(m4sensorhub->hwconfig.irq_gpio);
 	else {
-		KDEBUG(M4SH_ERROR, "Error: No IRQ configured\n");
+		KDEBUG(M4SH_ERROR, "%s: No IRQ configured\n", __func__);
 		err = -ENODEV;
 		goto err_unregister_control_group;
 	}
 
 	err = m4sensorhub_panic_init(m4sensorhub);
-	if (err < 0)
+	if (err < 0) {
+		KDEBUG(M4SH_ERROR, "%s: Panic init failed\n", __func__);
 		goto err_reg_shutdown;
+	}
 
 	err = request_firmware_nowait(THIS_MODULE,
 			FW_ACTION_HOTPLUG, m4sensorhub->filename,
@@ -664,7 +699,8 @@ static int m4sensorhub_probe(struct i2c_client *client,
 			GFP_KERNEL, m4sensorhub,
 			m4sensorhub_initialize);
 	if (err < 0) {
-		KDEBUG(M4SH_ERROR, "request_firmware_nowait failed: %d\n", err);
+		KDEBUG(M4SH_ERROR, "%s: request_firmware_nowait failed: %d\n",
+			__func__, err);
 		goto err_panic_shutdown;
 	}
 	KDEBUG(M4SH_NOTICE, "Registered M4 Sensor Hub\n");
@@ -686,6 +722,11 @@ err_hw_free:
 	m4sensorhub = NULL;
 err_unload:
 done:
+	if (err < 0) {
+		KDEBUG(M4SH_ERROR, "%s: Probe failed with error code %d\n",
+			__func__, err);
+	}
+
 	return err;
 }
 
@@ -693,6 +734,9 @@ static int __exit m4sensorhub_remove(struct i2c_client *client)
 {
 	struct m4sensorhub_data *m4sensorhub = i2c_get_clientdata(client);
 	KDEBUG(M4SH_INFO, "Removing M4 Sensor Hub Driver\n");
+
+	if (m4sensorhub == NULL)
+		return 0;
 
 	m4sensorhub_irq_shutdown(m4sensorhub);
 	m4sensorhub_panic_shutdown(m4sensorhub);

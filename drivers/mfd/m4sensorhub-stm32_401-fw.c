@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Motorola Mobility LLC.
+ * Copyright (C) 2013-2014 Motorola Mobility LLC.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -134,10 +134,17 @@ int m4sensorhub_401_load_firmware(struct m4sensorhub_data *m4sensorhub,
 	u16 fw_version_file, fw_version_device;
 	u32 barker_read_from_device;
 
+	if (m4sensorhub == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: M4 data is NULL\n", __func__);
+		ret = -ENODATA;
+		goto done;
+	}
+
 	m4sensorhub_hw_reset(m4sensorhub);
 
 	buf = kzalloc(MAX_TRANSFER_SIZE, GFP_KERNEL);
 	if (!buf) {
+		KDEBUG(M4SH_ERROR, "%s: Failed to allocate buf\n", __func__);
 		ret = -ENOMEM;
 		goto done;
 	}
@@ -153,8 +160,8 @@ int m4sensorhub_401_load_firmware(struct m4sensorhub_data *m4sensorhub,
 		ret = 0;
 		goto done;
 	}
-	 KDEBUG(M4SH_INFO, "%s: Filename = %s",
-		__func__, m4sensorhub->filename);
+
+	KDEBUG(M4SH_INFO, "%s: Filename = %s", __func__, m4sensorhub->filename);
 
 	if (firmware->size > MAX_FILE_SIZE) {
 		KDEBUG(M4SH_ERROR, "%s: firmware file size is too big.\n",
@@ -196,7 +203,7 @@ int m4sensorhub_401_load_firmware(struct m4sensorhub_data *m4sensorhub,
 
 			if (fw_version_file == fw_version_device) {
 				KDEBUG(M4SH_NOTICE,
-					"Version of firmware on device is 0x%4x\n",
+					"Version of firmware on device is 0x%04x\n",
 					fw_version_device);
 				KDEBUG(M4SH_NOTICE,
 					"Firmware on device same as file, not loading firmware.\n");
@@ -205,23 +212,23 @@ int m4sensorhub_401_load_firmware(struct m4sensorhub_data *m4sensorhub,
 			/* Print statement below isn't really an ERROR, but
 			 * this ensures it is always printed */
 			KDEBUG(M4SH_ERROR,
-				"Version of firmware on device is 0x%4x\n",
+				"Version of firmware on device is 0x%04x\n",
 				fw_version_device);
 			KDEBUG(M4SH_ERROR,
-				"Version of firmware on file is 0x%4x\n",
+				"Version of firmware on file is 0x%04x\n",
 				fw_version_file);
 			KDEBUG(M4SH_ERROR,
 				"Firmware on device different from file, updating...\n");
 		}
 	} else {
-		KDEBUG(M4SH_NOTICE, "Version of firmware on file is 0x%4x\n",
+		KDEBUG(M4SH_NOTICE, "Version of firmware on file is 0x%04x\n",
 			fw_version_file);
 	}
 
 	/* The flash memory to update has to be erased before updating */
 	ret = m4sensorhub_bl_erase_fw(m4sensorhub);
 	if (ret < 0) {
-		pr_err("erase failed\n");
+		pr_err("%s: erase failed\n", __func__);
 		/* TODO : Not sure if this is critical error
 		goto done; */
 	}
@@ -241,8 +248,8 @@ int m4sensorhub_401_load_firmware(struct m4sensorhub_data *m4sensorhub,
 
 		if (m4sensorhub_bl_wm(m4sensorhub, address_to_write,
 				buf_to_read, bytes_to_write) != 0) {
-			KDEBUG(M4SH_ERROR, "%s : %d : error writing\n",
-				__func__, __LINE__);
+			KDEBUG(M4SH_ERROR, "%s : %d : error writing %d\n",
+				__func__, __LINE__, address_to_write);
 			ret = -EINVAL;
 			goto done;
 		}
@@ -678,6 +685,8 @@ static int m4sensorhub_jump_to_user(struct m4sensorhub_data *m4sensorhub)
 	    (u8 *)&barker_read_from_device, 4) != 0) {
 		KDEBUG(M4SH_ERROR, "%s : %d : error reading from device\n",
 		       __func__, __LINE__);
+		KDEBUG(M4SH_ERROR, "*** Not executing M4 code ***\n");
+		return -EIO;
 	}
 
 	if (barker_read_from_device == BARKER_NUMBER) {

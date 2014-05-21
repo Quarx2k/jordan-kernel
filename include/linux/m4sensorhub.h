@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, Motorola, Inc. All Rights Reserved.
+ * Copyright (c) 2012-2014, Motorola, Inc. All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -37,10 +37,6 @@ extern char m4sensorhub_debug;
 			printk(KERN_CRIT format, ##s);	\
 	} while (0)
 
-#define CHECK_REG_ACCESS_RETVAL(m4sensorhub, retval, reg) \
-		((retval == m4sensorhub_reg_getsize(m4sensorhub, reg)) \
-		 ? 0 : -EFAULT);
-
 enum m4sensorhub_debug_level {
 	M4SH_NODEBUG = 0x0,
 	M4SH_CRITICAL,
@@ -68,11 +64,15 @@ enum m4sensorhub_bootmode {
 /* This enum is used to register M4 panic callback
  * The sequence of this enum is also the sequence of calling
  *   i.e. it will be called follow this enum 0, 1, 2 ... max
-*/
+ */
 enum m4sensorhub_panichdl_index {
 	PANICHDL_DISPLAY_RESTORE,
-	/* Please add enum before PANICHDL_IRQ_RESTORE
-	   to make sure IRQ resotre will be called at last
+	/*
+	 * Please add enum before PANICHDL_IRQ_RESTORE
+	 * to make sure IRQ restore will be called last.
+	 *
+	 * Also, add your debug string name to
+	 * m4sensorhub-panic.c.
 	 */
 	PANICHDL_IRQ_RESTORE, /* Keep it as the last one */
 	PANICHDL_MAX = PANICHDL_IRQ_RESTORE+1
@@ -226,4 +226,3 @@ int m4sensorhub_irq_disable_all(struct m4sensorhub_data *m4sensorhub);
 
 #endif /* __KERNEL__ */
 #endif  /* __M4SENSORHUB_H__ */
-
