@@ -28,6 +28,8 @@ enum cpcap_audio_data_voice_type {
 	VOICE_TYPE_MOT = 4,
 };
 struct cpcap_audio_pdata {
+	int i2s_bp;
+	int analog_downlink;
 	int stereo_loudspeaker;
 	int mic3;
 	enum cpcap_audio_data_voice_type voice_type;
@@ -51,4 +53,6 @@ int cpcap_audio_has_19mhz_bp(void);
 /*does this product use i2s for voice calls, or network mode?*/
 int cpcap_audio_has_i2s_bp(void);
 
+/*is the downlink speech path analog or digital?*/
+int cpcap_audio_has_analog_downlink(void);
 #endif

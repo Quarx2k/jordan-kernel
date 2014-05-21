@@ -19,7 +19,7 @@
 
 #include <linux/kernel.h>
 #include <linux/proc_fs.h>
-#include <linux/smp_lock.h>
+//#include <linux/smp_lock.h>
 #include <linux/module.h>
 #include <linux/uaccess.h>
 #include <linux/spinlock.h>
@@ -28,15 +28,22 @@
 #include <linux/poll.h>
 #include "cpcap_audio_driver.h"
 #include <linux/spi/cpcap.h>
-#include <plat/resource.h>
+//#include <plat/resource.h>
+#include <linux/sched.h>
 #include <plat/hardware.h>
-#include <plat/board-mapphone.h>
+//#include <plat/board-mapphone.h>
 #include <linux/regulator/consumer.h>
 
 #define SLEEP_ACTIVATE_POWER 2
 
 #define CLOCK_TREE_RESET_TIME 1
 
+/*constants for ST delay workaround*/
+#define STM_STDAC_ACTIVATE_RAMP_TIME   1
+#define STM_STDAC_EN_TEST_PRE          0x090C
+#define STM_STDAC_EN_TEST_POST                 0x0000
+#define STM_STDAC_EN_ST_TEST1_PRE      0x2400
+#define STM_STDAC_EN_ST_TEST1_POST     0x0400
 #ifdef CPCAP_AUDIO_DEBUG
 #define CPCAP_AUDIO_DEBUG_LOG(args...)  \
 				printk(KERN_DEBUG "CPCAP_AUDIO_DRIVER:" args)
@@ -135,7 +142,9 @@ static inline int is_codec_changed(struct cpcap_audio_state *state,
 	if (state->codec_mode != prev_state->codec_mode ||
 		state->codec_rate != prev_state->codec_rate ||
 		state->microphone != prev_state->microphone ||
-		state->dai_config != prev_state->dai_config)
+		state->dai_config != prev_state->dai_config ||
+		state->codec_primary_speaker !=
+				prev_state->codec_primary_speaker)
 		return 1;
 
 	return 0;
@@ -562,39 +571,26 @@ static void cpcap_audio_configure_aud_mute(struct cpcap_audio_state *state,
 				struct cpcap_audio_state *prev_state)
 {
 	struct cpcap_regacc reg_changes = { 0 };
-	unsigned short int value1 = 0, value2 = 0;
 
 	if (state->codec_mute != prev_state->codec_mute) {
-		value1 = cpcap_audio_get_codec_output_amp_switches(
-				prev_state->codec_primary_speaker,
-				prev_state->codec_primary_balance);
-
-		value2 = cpcap_audio_get_codec_output_amp_switches(
-				prev_state->codec_secondary_speaker,
-				prev_state->codec_primary_balance);
-
-		reg_changes.mask = value1 | value2 | CPCAP_BIT_CDC_SW;
+		reg_changes.mask = CPCAP_BIT_CDC_SW;
 
 		if (state->codec_mute == CPCAP_AUDIO_CODEC_UNMUTE)
-			reg_changes.value = reg_changes.mask;
+			reg_changes.value = CPCAP_BIT_CDC_SW;
+		else
+			reg_changes.value = 0;
 
 		logged_cpcap_write(state->cpcap, CPCAP_REG_RXCOA,
-					reg_changes.value, reg_changes.mask);
+				reg_changes.value, reg_changes.mask);
 	}
 
 	if (state->stdac_mute != prev_state->stdac_mute) {
-		value1 = cpcap_audio_get_stdac_output_amp_switches(
-				prev_state->stdac_primary_speaker,
-				prev_state->stdac_primary_balance);
-
-		value2 = cpcap_audio_get_stdac_output_amp_switches(
-				prev_state->stdac_secondary_speaker,
-				prev_state->stdac_primary_balance);
-
-		reg_changes.mask = value1 | value2 | CPCAP_BIT_ST_DAC_SW;
+		reg_changes.mask = CPCAP_BIT_ST_DAC_SW;
 
 		if (state->stdac_mute == CPCAP_AUDIO_STDAC_UNMUTE)
-			reg_changes.value = reg_changes.mask;
+			reg_changes.value = CPCAP_BIT_ST_DAC_SW;
+		else
+			reg_changes.value = 0;
 
 		logged_cpcap_write(state->cpcap, CPCAP_REG_RXSDOA,
 					reg_changes.value, reg_changes.mask);
@@ -648,11 +644,14 @@ static void cpcap_audio_configure_codec(struct cpcap_audio_state *state,
 			 */
 			if (state->codec_primary_speaker !=
 					CPCAP_AUDIO_OUT_NONE &&
+				state->codec_primary_speaker !=
+					 CPCAP_AUDIO_OUT_BT_MONO &&
 				(state->dai_config ==
 					CPCAP_AUDIO_DAI_CONFIG_NORMAL ||
 				state->dai_config ==
 					CPCAP_AUDIO_DAI_CONFIG_VOICE_CALL)) {
-				codec_changes.value |= CPCAP_BIT_CDC_EN_RX;
+				codec_changes.value |= CPCAP_BIT_CDC_EN_RX |
+					CPCAP_BIT_AUDOHPF_0 | CPCAP_BIT_AUDOHPF_1;
 			}
 
 			if (needs_cpcap_mic1(state->microphone))
@@ -873,8 +872,25 @@ static void cpcap_audio_configure_stdac(struct cpcap_audio_state *state,
 		stdac_changes.mask = stdac_changes.value | prev_stdac_data;
 		prev_stdac_data = stdac_changes.value;
 
+		if ((stdac_changes.value | CPCAP_BIT_ST_DAC_EN) &&
+			(state->cpcap->vendor == CPCAP_VENDOR_ST)) {
+			logged_cpcap_write(state->cpcap, CPCAP_REG_TEST,
+				STM_STDAC_EN_TEST_PRE, 0xFFFF);
+			logged_cpcap_write(state->cpcap, CPCAP_REG_ST_TEST1,
+				STM_STDAC_EN_ST_TEST1_PRE, 0xFFFF);
+		}
+
 		logged_cpcap_write(state->cpcap, CPCAP_REG_SDAC,
 			stdac_changes.value, stdac_changes.mask);
+
+		if ((stdac_changes.value | CPCAP_BIT_ST_DAC_EN) &&
+			(state->cpcap->vendor == CPCAP_VENDOR_ST)) {
+			msleep(STM_STDAC_ACTIVATE_RAMP_TIME);
+			logged_cpcap_write(state->cpcap, CPCAP_REG_ST_TEST1,
+				STM_STDAC_EN_ST_TEST1_POST, 0xFFFF);
+			logged_cpcap_write(state->cpcap, CPCAP_REG_TEST,
+				STM_STDAC_EN_TEST_POST, 0xFFFF);
+		}
 	}
 }
 
@@ -1120,7 +1136,6 @@ static void cpcap_audio_configure_power(int power)
 			regulator_enable(audio_reg);
 			regulator_set_mode(audio_reg, REGULATOR_MODE_NORMAL);
 		} else {
-			printk(KERN_DEBUG "turning off regulator\n");
 			regulator_set_mode(audio_reg, REGULATOR_MODE_STANDBY);
 			regulator_disable(audio_reg);
 		}

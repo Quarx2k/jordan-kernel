@@ -57,6 +57,12 @@ config SOUND_OSS_CORE_PRECLAIM
 
 	  If unsure, say Y.
 
+config SOUND_CPCAP_OMAP
+	bool "Audio driver for OMAP3430 with CPCAP"
+	depends on MFD_CPCAP
+	default n
+	help
+	Audio driver for products using OMAP3430 and CPCAP.
 source "sound/oss/dmasound/Kconfig"
 
 if !M68K

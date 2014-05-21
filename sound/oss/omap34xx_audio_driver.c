@@ -19,7 +19,7 @@
 #include <linux/platform_device.h>
 #include <linux/kernel.h>
 #include <linux/proc_fs.h>
-#include <linux/smp_lock.h>
+//#include <linux/smp_lock.h>
 #include <linux/module.h>
 #include <linux/uaccess.h>
 #include <linux/spinlock.h>
@@ -27,16 +27,16 @@
 #include <linux/sound.h>
 #include <linux/poll.h>
 #include <linux/cpcap_audio_platform_data.h>
-
+#include <linux/sched.h>
 #ifdef CONFIG_WAKELOCK
 #include <linux/wakelock.h>
 #endif
 
 #include <plat/mux.h>
-#include <plat/control.h>
+#include "../arch/arm/mach-omap2/control.h"
 #include <plat/gpio.h>
 #include <plat/hardware.h>
-#include <plat/board-mapphone.h>
+#include <mach/board-mapphone.h>
 #include <linux/spi/cpcap.h>
 #include <linux/sound_fm_mixer.h>
 #include "omap34xx_audio_driver.h"
@@ -133,10 +133,10 @@ struct audio_stream {
 	struct inode *inode;
 };
 
+extern int cpcap_audio_has_analog_downlink(void);
 static int audio_stdac_open(struct inode *, struct file *);
 static int audio_stdac_release(struct inode *, struct file *);
-static int audio_ioctl(struct inode *, struct file *file, unsigned int cmd,
-			unsigned long arg);
+static long audio_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
 static ssize_t audio_write(struct file *fp, const char *buf, size_t bytes,
 			loff_t *nouse);
 static int audio_codec_open(struct inode *, struct file *);
@@ -163,7 +163,7 @@ static const struct file_operations audio_stdac_fops = {
 	.owner = THIS_MODULE,
 	.open = audio_stdac_open,
 	.release = audio_stdac_release,
-	.ioctl = audio_ioctl,
+	.unlocked_ioctl = audio_ioctl,
 	.write = audio_write,
 };
 
@@ -171,7 +171,7 @@ static const struct file_operations codec_fops = {
 	.owner = THIS_MODULE,
 	.open = audio_codec_open,
 	.release = audio_codec_release,
-	.ioctl = audio_ioctl,
+	.unlocked_ioctl = audio_ioctl,
 	.write = audio_write,
 	.read = audio_codec_read,
 };
@@ -180,7 +180,7 @@ static const struct file_operations mixer_fops = {
 	.owner = THIS_MODULE,
 	.open = audio_mixer_open,
 	.release = audio_mixer_close,
-	.ioctl = audio_ioctl,
+	.unlocked_ioctl = audio_ioctl,
 };
 
 /* Driver information structure*/
@@ -319,6 +319,22 @@ static struct wake_lock mcbsp_wakelock;
 
 #ifdef MCBSP_WRAPPER
 
+static void omap_mcbsp_write(void __iomem *io_base, u16 reg, u32 val)
+{
+	if (cpu_class_is_omap1() || cpu_is_omap2420())
+		__raw_writew((u16)val, io_base + reg);
+	else
+		__raw_writel(val, io_base + reg);
+}
+
+static int omap_mcbsp_read(void __iomem *io_base, u16 reg)
+{
+	if (cpu_class_is_omap1() || cpu_is_omap2420())
+		return __raw_readw(io_base + reg);
+	else
+		return __raw_readl(io_base + reg);
+}
+
 static void omap2_mcbsp_rx_dma_callback(int lch, unsigned short ch_status,
 					void *data)
 {
@@ -399,9 +415,11 @@ static void omap2_mcbsp_set_recv_param(unsigned int id,
 	if (rp->fs_polarity == OMAP_MCBSP_FS_ACTIVE_LOW)
 		mcbsp_cfg->pcr0 = mcbsp_cfg->pcr0 | FSRP;
 
+/* //XXX
 #ifdef CONFIG_USE_MCBSP_FIFO
 	mcbsp_cfg->wken = mcbsp_cfg->wken | RRDYEN;
 #endif
+*/
 	return;
 }
 
@@ -1654,7 +1672,6 @@ int audio_stop_ssi(struct inode *inode, struct file *file)
 {
 	int minor = MINOR(inode->i_rdev);
 	int ssi;
-	int mode = file->f_flags & O_ACCMODE;
 
 	ssi = (minor == state.dev_dsp) ? STDAC_SSI : CODEC_SSI;
 
@@ -1747,9 +1764,9 @@ static int audio_stdac_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int audio_ioctl(struct inode *inode, struct file *file,
-			unsigned int cmd, unsigned long arg)
+static long audio_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
+	struct inode *inode = file->f_path.dentry->d_inode;
 	int minor = MINOR(inode->i_rdev);
 	int ret = 0;
 	int mode = file->f_flags & O_ACCMODE;
@@ -2686,7 +2703,7 @@ static void __exit audio_exit(void)
 	wake_lock_destroy(&mcbsp_wakelock);
 }
 
-static void audio_callback(int status)
+static void audio_callback(struct cpcap_device *cpcap, int status)
 {
 	mutex_lock(&audio_lock);
 	if (status == 1 || status == 2) {
