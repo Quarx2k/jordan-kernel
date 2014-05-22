@@ -687,7 +687,7 @@ static int m25p80_get_device(struct mtd_info *mtd)
 			pinctrl_select_state(flash->pctrl,
 					     flash->pctrl_states[M25P_ON]);
 		if (gpio_is_valid(flash->enable_gpio)) {
-			gpio_set_value(flash->enable_gpio, 1);
+			gpio_direction_output(flash->enable_gpio, 1);
 			msleep(10);
 		}
 	}
@@ -700,11 +700,16 @@ static void m25p80_put_device(struct mtd_info *mtd)
 	struct m25p *flash = mtd_to_m25p(mtd);
 
 	if (!mtd->usecount) {
-		if (gpio_is_valid(flash->enable_gpio))
-			gpio_set_value(flash->enable_gpio, 0);
-		if (flash->pctrl)
+		if (flash->pctrl) {
+			/* if pinctrl is used, set gpio to input */
+			if (gpio_is_valid(flash->enable_gpio))
+				gpio_direction_input(flash->enable_gpio);
+
 			pinctrl_select_state(flash->pctrl,
 					     flash->pctrl_states[M25P_OFF]);
+		} else if (gpio_is_valid(flash->enable_gpio)) {
+			gpio_set_value(flash->enable_gpio, 0);
+		}
 	}
 }
 
@@ -1109,12 +1114,16 @@ static int m25p_init(struct spi_device *spi)
 			flash->addr_width = 3;
 	}
 
-	if (gpio_is_valid(flash->enable_gpio))
-		gpio_set_value(flash->enable_gpio, 0);
+	if (flash->pctrl) {
+		/* if pinctrl is used, set gpio to input instead of low */
+		if (gpio_is_valid(flash->enable_gpio))
+			gpio_direction_input(flash->enable_gpio);
 
-	if (flash->pctrl)
 		pinctrl_select_state(flash->pctrl,
 				     flash->pctrl_states[M25P_OFF]);
+	} else if (gpio_is_valid(flash->enable_gpio)) {
+		gpio_set_value(flash->enable_gpio, 0);
+	}
 
 	dev_info(&spi->dev, "%s (%lld Kbytes)\n", id->name,
 			(long long)flash->mtd.size >> 10);
