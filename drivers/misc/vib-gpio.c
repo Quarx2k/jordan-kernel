@@ -33,6 +33,7 @@ struct vib_gpio_data {
 	struct work_struct vib_work;
 	struct hrtimer timer;
 	spinlock_t lock;
+	struct mutex io_mutex; /* protect GPIO & regulator operations */
 
 	struct regulator *reg;
 	int gpio;
@@ -46,20 +47,28 @@ struct vib_gpio_data {
 
 static int power_on(struct vib_gpio_data *vib_data)
 {
-	if (vib_data->reg)
+	if (vib_data->reg) {
+		dev_dbg(vib_data->dev.dev, "enable regulator\n");
 		return regulator_enable(vib_data->reg);
+	}
 	return 0;
 }
 
 static int power_off(struct vib_gpio_data *vib_data)
 {
-	if (vib_data->reg)
+	if (vib_data->reg) {
+		dev_dbg(vib_data->dev.dev, "disable regulator\n");
 		return regulator_disable(vib_data->reg);
+	}
 	return 0;
 }
 
 static void vib_gpio_set(struct vib_gpio_data *vib_data, int on)
 {
+	dev_dbg(vib_data->dev.dev, "%s(%d)\n", __func__, on);
+
+	mutex_lock(&(vib_data->io_mutex));
+
 	if (on) {
 		if (!vib_data->vib_power_state) {
 			power_on(vib_data);
@@ -78,6 +87,8 @@ static void vib_gpio_set(struct vib_gpio_data *vib_data, int on)
 			vib_data->vib_power_state = 0;
 		}
 	}
+
+	mutex_unlock(&(vib_data->io_mutex));
 }
 
 static void vib_gpio_update(struct work_struct *work)
@@ -93,6 +104,7 @@ static enum hrtimer_restart gpio_timer_func(struct hrtimer *timer)
 {
 	struct vib_gpio_data *vib_data =
 	    container_of(timer, struct vib_gpio_data, timer);
+	dev_dbg(vib_data->dev.dev, "Timer expired: disabling vibrator\n");
 	vib_data->vib_state = 0;
 	schedule_work(&vib_data->vib_work);
 	return HRTIMER_NORESTART;
@@ -116,6 +128,8 @@ static void vib_gpio_enable(struct timed_output_dev *dev, int value)
 	struct vib_gpio_data *vib_data =
 	    container_of(dev, struct vib_gpio_data, dev);
 	unsigned long flags;
+
+	dev_dbg(dev->dev, "Enable vibrator for %dms\n", value);
 
 	spin_lock_irqsave(&vib_data->lock, flags);
 	hrtimer_cancel(&vib_data->timer);
@@ -148,6 +162,8 @@ static int vib_gpio_probe(struct platform_device *pdev)
 		ret = -ENOMEM;
 		goto err;
 	}
+
+	mutex_init(&(vib_data->io_mutex));
 
 	platform_set_drvdata(pdev, vib_data);
 
@@ -207,6 +223,7 @@ static int vib_gpio_probe(struct platform_device *pdev)
 
 reg_put:
 	regulator_put(vib_data->reg);
+	mutex_destroy(&(vib_data->io_mutex));
 free_mem:
 	kfree(vib_data);
 err:
@@ -219,6 +236,7 @@ static int vib_gpio_remove(struct platform_device *pdev)
 
 	timed_output_dev_unregister(&vib_data->dev);
 	regulator_put(vib_data->reg);
+	mutex_destroy(&(vib_data->io_mutex));
 	kfree(vib_data);
 
 	return 0;
