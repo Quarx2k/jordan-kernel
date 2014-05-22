@@ -3475,7 +3475,7 @@ static ssize_t atmxt_debug_drv_tdat_store(struct device *dev,
 	printk(KERN_INFO "%s: Enabling firmware class loader...\n", __func__);
 
 	err = request_firmware_nowait(THIS_MODULE,
-		FW_ACTION_NOHOTPLUG, "", &(dd->client->dev),
+		FW_ACTION_NOHOTPLUG, "atmxt", &(dd->client->dev),
 		GFP_KERNEL, dd, atmxt_tdat_callback);
 	if (err < 0) {
 		printk(KERN_ERR
