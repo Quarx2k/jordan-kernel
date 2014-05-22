@@ -94,9 +94,10 @@ static void __init omap_mapphone_init(void)
              clk_enable(clkp);
              printk("sad2d_ick enabled\n");
 	}
-	mapphone_gpio_mapping_init();
-	mapphone_hsmmc_init();
 	omap_cpcap_init();
+	mapphone_gpio_mapping_init();
+	mapphone_spi_init();
+	mapphone_hsmmc_init();
 }
 
 static void __init omap_mapphone_init_early(void)
