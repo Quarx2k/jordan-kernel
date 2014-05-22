@@ -233,9 +233,9 @@ MACHINE  := arch/arm/mach-$(word 1,$(machine-y))/
 else
 MACHINE  :=
 endif
-ifeq ($(CONFIG_ARCH_MULTIPLATFORM),y)
-MACHINE  :=
-endif
+#ifeq ($(CONFIG_ARCH_MULTIPLATFORM),y)
+#MACHINE  :=
+#endif
 
 machdirs := $(patsubst %,arch/arm/mach-%/,$(machine-y))
 platdirs := $(patsubst %,arch/arm/plat-%/,$(plat-y))
