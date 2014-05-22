@@ -106,6 +106,7 @@ static void __init omap_mapphone_init_early(void)
 	}
 	omap3630_init_early();
 }
+
 MACHINE_START(MAPPHONE, "mapphone_")
 	.atag_offset	= 0x100,
 	.reserve	= omap_reserve,
