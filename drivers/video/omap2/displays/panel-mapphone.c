@@ -575,11 +575,6 @@ static int mapphone_panel_update(struct omap_dss_device *dssdev,
 
 	if (mp_data->te_enabled && panel_data->use_ext_te &&
 		(dssdev->phy.dsi.type == OMAP_DSS_DSI_TYPE_CMD_MODE)) {
-		mp_data->update_region.x = x;
-		mp_data->update_region.y = y;
-		mp_data->update_region.w = w;
-		mp_data->update_region.h = h;
-		barrier();
 		schedule_delayed_work(&mp_data->te_timeout_work,
 					msecs_to_jiffies(250));
 		atomic_set(&mp_data->do_update, 1);
