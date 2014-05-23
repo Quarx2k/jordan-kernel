@@ -117,18 +117,3 @@ config MUSB_PIO_ONLY
 endchoice
 
 endif # USB_MUSB_HDRC
-
-config MUSB_HARDCONNECT
-	bool "Control D+/D- via enabling/disabling vbus"
-	depends on USB || USB_GADGET
-	help
-	  Say Y to  enable/disable based on the VBUS state
-	  When this feature is enabled, the driver will call the otg
-          controller which in turn will call the phy driver to set
-          vbus on/off when pullup api is called.  In certain cases
-          it was observed that softconnect feature doesn't enable
-	  D+/D- even when it is enabled causing the device to fail
-          enumeration.
-
-	  If you're not sure if this applies to you, it probably doesn't;
-	  say N here.

@@ -150,11 +150,6 @@ static int tusb_enable(struct tusb_usb *tusb, bool enable)
 
 static int tusb_usb_set_vbus(struct usb_otg *otg, bool enabled)
 {
-	struct usb_phy	*phy = otg->phy;
-	struct tusb_usb	*tusb = dev_get_drvdata(phy->dev);
-
-	tusb_enable(tusb, enabled);
-
 	return 0;
 }
 
