@@ -44,4 +44,5 @@
 			0x1f 0xf8 /* LDO8: b6=1 : ECO mode */
 			0x21 0xf2 /* LD10: b6=1 : ECO mode */
 		>;
+		ldo9_loadswitch_enabled;
 };

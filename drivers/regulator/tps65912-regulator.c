@@ -53,6 +53,8 @@ struct tps_info {
 	const char *name;
 };
 
+static bool enable_ldo9_ls;
+
 static struct tps_info tps65912_regs[] = {
 	{
 		.name = "DCDC1",
@@ -283,7 +285,7 @@ static int tps65912_reg_enable(struct regulator_dev *dev)
 	if (reg < 0)
 		return reg;
 
-	if (id == TPS65912_REG_LDO9) {
+	if ((id == TPS65912_REG_LDO9) && (enable_ldo9_ls == true)) {
 		lsw = tps65912_reg_read(mfd, TPS65912_LOADSWITCH);
 		lsw &= ~LOADSWITCH_MASK;
 		lsw |= LOADSWITCH_ENABLE;
@@ -303,7 +305,7 @@ static int tps65912_reg_disable(struct regulator_dev *dev)
 	if (reg < 0)
 		return reg;
 
-	if (id == TPS65912_REG_LDO9) {
+	if ((id == TPS65912_REG_LDO9) && (enable_ldo9_ls == true)) {
 		lsw = tps65912_reg_read(mfd, TPS65912_LOADSWITCH);
 		lsw &= ~LOADSWITCH_MASK;
 		lsw |= LOADSWITCH_DISABLE;
@@ -507,6 +509,9 @@ static struct tps65912_board *tps65912_parse_dt_reg_data(
 		dev_err(&pdev->dev, "regulator node not found\n");
 		return NULL;
 	}
+
+	enable_ldo9_ls = of_property_read_bool(np, "ldo9_loadswitch_enabled");
+
 	count = ARRAY_SIZE(tps65912_matches);
 	matches = tps65912_matches;
 
