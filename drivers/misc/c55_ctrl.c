@@ -357,6 +357,29 @@ static int c55_ctrl_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_PM
+static int c55_ctrl_suspend(struct platform_device *dev, pm_message_t state)
+{
+	struct c55_ctrl_data *cdata = dev_get_drvdata(&dev->dev);
+
+	pinctrl_select_state(cdata->pctrl, cdata->states[C55_OFF]);
+
+	return 0;
+}
+
+static int c55_ctrl_resume(struct platform_device *dev)
+{
+	struct c55_ctrl_data *cdata = dev_get_drvdata(&dev->dev);
+
+	pinctrl_select_state(cdata->pctrl, cdata->states[C55_ON]);
+
+	return 0;
+}
+#else
+#define c55_ctrl_suspend NULL
+#define c55_ctrl_resume NULL
+#endif
+
 static struct of_device_id c55_ctrl_match[] = {
 	{.compatible = "ti,c55-ctrl",},
 	{},
@@ -377,6 +400,8 @@ static struct platform_driver c55_ctrl_driver = {
 	},
 	.probe = c55_ctrl_probe,
 	.remove = c55_ctrl_remove,
+	.suspend = c55_ctrl_suspend,
+	.resume = c55_ctrl_resume,
 	.id_table = c55_ctrl_id_table,
 };
 
