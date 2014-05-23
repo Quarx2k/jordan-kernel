@@ -47,7 +47,7 @@
 
 #include "musb_core.h"
 
-
+static void stop_activity(struct musb *musb, struct usb_gadget_driver *driver);
 /* MUSB PERIPHERAL status 3-mar-2006:
  *
  * - EP0 seems solid.  It passes both USBCV and usbtest control cases.
@@ -330,6 +330,13 @@ static void txstate(struct musb *musb, struct musb_request *req)
 
 	musb_ep = req->ep;
 
+	/* Check if EP is disabled */
+	if (!musb_ep->desc) {
+		dev_dbg(musb->controller, "ep:%s disabled - ignore request\n",
+						musb_ep->end_point.name);
+		return;
+	}
+
 	/* we shouldn't get here while DMA is active ... but we do ... */
 	if (dma_channel_status(musb_ep->dma) == MUSB_DMA_STATUS_BUSY) {
 		dev_dbg(musb->controller, "dma pending...\n");
@@ -557,8 +564,7 @@ void musb_g_tx(struct musb *musb, u8 epnum)
 			&& (request->actual == request->length))
 #if defined(CONFIG_USB_INVENTRA_DMA) || defined(CONFIG_USB_UX500_DMA)
 			|| (is_dma && (!dma->desired_mode ||
-				(request->actual &
-					(musb_ep->packet_sz - 1))))
+				(request->actual % musb_ep->packet_sz)))
 #endif
 		) {
 			/*
@@ -570,21 +576,18 @@ void musb_g_tx(struct musb *musb, u8 epnum)
 
 			dev_dbg(musb->controller, "sending zero pkt\n");
 			musb_writew(epio, MUSB_TXCSR, MUSB_TXCSR_MODE
-					| MUSB_TXCSR_TXPKTRDY);
+					| MUSB_TXCSR_TXPKTRDY
+					| (csr & MUSB_TXCSR_P_ISO));
 			request->zero = 0;
+			/*
+			 * Return from here with the expectation of the endpoint
+			 * interrupt for further action.
+			 */
+			return;
 		}
 
 		if (request->actual == request->length) {
 			musb_g_giveback(musb_ep, request, 0);
-			/*
-			 * In the giveback function the MUSB lock is
-			 * released and acquired after sometime. During
-			 * this time period the INDEX register could get
-			 * changed by the gadget_queue function especially
-			 * on SMP systems. Reselect the INDEX to be sure
-			 * we are reading/modifying the right registers
-			 */
-			musb_ep_select(mbase, epnum);
 			req = musb_ep->desc ? next_request(musb_ep) : NULL;
 			if (!req) {
 				dev_dbg(musb->controller, "%s idle now\n",
@@ -651,6 +654,13 @@ static void rxstate(struct musb *musb, struct musb_request *req)
 		musb_ep = &hw_ep->ep_out;
 
 	len = musb_ep->packet_sz;
+
+	/* Check if EP is disabled */
+	if (!musb_ep->desc) {
+		dev_dbg(musb->controller, "ep:%s disabled - ignore request\n",
+						musb_ep->end_point.name);
+		return;
+	}
 
 	/* We shouldn't get here while DMA is active, but we do... */
 	if (dma_channel_status(musb_ep->dma) == MUSB_DMA_STATUS_BUSY) {
@@ -774,26 +784,6 @@ static void rxstate(struct musb *musb, struct musb_request *req)
 
 				if (use_dma)
 					return;
-				else {
-					if (req->mapped) {
-						/* Unmap the buffer to use PIO*/
-					    dma_unmap_single(musb->controller,
-							req->request.dma,
-							req->request.length,
-							req->tx
-							 ? DMA_TO_DEVICE
-							: DMA_FROM_DEVICE);
-
-					    req->request.dma = DMA_ADDR_INVALID;
-					    req->mapped = 0;
-					}
-
-					/* Need to clear DMAENAB for the
-					 * backup PIO mode transfer to work
-					 */
-					csr &= ~MUSB_RXCSR_DMAENAB;
-					musb_writew(epio, MUSB_RXCSR, csr);
-				}
 			}
 #elif defined(CONFIG_USB_UX500_DMA)
 			if ((is_buffer_mapped(req)) &&
@@ -1005,15 +995,6 @@ void musb_g_rx(struct musb *musb, u8 epnum)
 		}
 #endif
 		musb_g_giveback(musb_ep, request, 0);
-		/*
-		 * In the giveback function the MUSB lock is
-		 * released and acquired after sometime. During
-		 * this time period the INDEX register could get
-		 * changed by the gadget_queue function especially
-		 * on SMP systems. Reselect the INDEX to be sure
-		 * we are reading/modifying the right registers
-		 */
-		musb_ep_select(mbase, epnum);
 
 		req = next_request(musb_ep);
 		if (!req)
@@ -1697,7 +1678,7 @@ musb_gadget_set_self_powered(struct usb_gadget *gadget, int is_selfpowered)
 	return 0;
 }
 
-static void musb_pullup(struct musb *musb, int is_on)
+void musb_pullup(struct musb *musb, int is_on)
 {
 	u8 power;
 
@@ -1750,14 +1731,43 @@ int musb_gadget_pullup(struct usb_gadget *gadget, int is_on)
 	 * not pullup unless the B-session is active.
 	 */
 	spin_lock_irqsave(&musb->lock, flags);
-	if (is_on != musb->softconnect) {
-		musb->softconnect = is_on;
-		musb_pullup(musb, is_on);
+#if defined(CONFIG_USB_MOT_ANDROID) && defined(CONFIG_USB_MUSB_OTG)
+	if (is_host_active(musb)) {
+		pr_info("musb is on dock, delay pull up\n");
+		spin_unlock_irqrestore(&musb->lock, flags);
+		pm_runtime_put(musb->controller);
+		return 0;
 	}
+#endif
+	if (is_on) {
+		if (!musb->softconnect) {
+			musb_start(musb);
+			musb->softconnect = 1;
+			musb_pullup(musb, is_on);
+		}
+	} else
+		stop_activity(musb, musb->gadget_driver);
+
 	spin_unlock_irqrestore(&musb->lock, flags);
 
 	pm_runtime_put(musb->controller);
 
+	return 0;
+}
+
+static int musb_gadget_runtime_get(struct usb_gadget *gadget)
+{
+	struct musb     *musb = gadget_to_musb(gadget);
+
+	pm_runtime_get_sync(musb->controller);
+	return 0;
+}
+
+static int musb_gadget_runtime_put(struct usb_gadget *gadget)
+{
+	struct musb     *musb = gadget_to_musb(gadget);
+
+	pm_runtime_put(musb->controller);
 	return 0;
 }
 
@@ -1768,6 +1778,8 @@ static const struct usb_gadget_ops musb_gadget_operations = {
 	/* .vbus_session		= musb_gadget_vbus_session, */
 	.vbus_draw		= musb_gadget_vbus_draw,
 	.pullup			= musb_gadget_pullup,
+	.runtime_get            = musb_gadget_runtime_get,
+	.runtime_put            = musb_gadget_runtime_put,
 };
 
 /* ----------------------------------------------------------------------- */
@@ -1904,6 +1916,99 @@ void musb_gadget_cleanup(struct musb *musb)
 	device_unregister(&musb->g.dev);
 	the_gadget = NULL;
 }
+
+int usb_gadget_register_driver(struct usb_gadget_driver *driver)
+{
+	int retval;
+	unsigned long flags;
+	struct musb *musb = the_gadget;
+
+	if (!driver
+			|| driver->speed != USB_SPEED_HIGH
+			|| !driver->bind
+			|| !driver->setup){
+		return -EINVAL;
+	}
+	/* driver must be initialized to support peripheral mode */
+	if (!musb) {
+		dev_dbg((struct device *)1, "%s, no dev??\n", __func__);
+		return -ENODEV;
+	}
+
+	dev_dbg((struct device *)3,
+		"registering driver %s\n", driver->function);
+	spin_lock_irqsave(&musb->lock, flags);
+
+	if (musb->gadget_driver) {
+		dev_dbg((struct device *)1, "%s is already bound to %s\n",
+				musb_driver_name,
+				musb->gadget_driver->driver.name);
+		retval = -EBUSY;
+	} else {
+		musb->gadget_driver = driver;
+		musb->g.dev.driver = &driver->driver;
+		driver->driver.bus = NULL;
+		musb->softconnect = 0;
+		retval = 0;
+	}
+
+	spin_unlock_irqrestore(&musb->lock, flags);
+
+	if (retval == 0) {
+		retval = driver->bind(&musb->g);
+		if (retval != 0) {
+			dev_dbg((struct device *)3, "bind to driver %s failed --> %d\n",
+					driver->driver.name, retval);
+			musb->gadget_driver = NULL;
+			musb->g.dev.driver = NULL;
+		}
+
+		spin_lock_irqsave(&musb->lock, flags);
+
+		otg_set_peripheral(musb->xceiv, &musb->g);
+		musb->xceiv->state = OTG_STATE_B_IDLE;
+		musb->is_active = 1;
+
+		/* FIXME this ignores the softconnect flag.  Drivers are
+		 * allowed hold the peripheral inactive until for example
+		 * userspace hooks up printer hardware or DSP codecs, so
+		 * hosts only see fully functional devices.
+		 */
+
+		if (!is_otg_enabled(musb))
+			musb_start(musb);
+
+		otg_set_peripheral(musb->xceiv, &musb->g);
+
+		spin_unlock_irqrestore(&musb->lock, flags);
+
+		if (is_otg_enabled(musb)) {
+			struct usb_hcd	*hcd = musb_to_hcd(musb);
+
+			dev_dbg((struct device *)3, "OTG startup...\n");
+
+			/* REVISIT:  funcall to other code, which also
+			 * handles power budgeting ... this way also
+			 * ensures HdrcStart is indirectly called.
+			 */
+			retval = usb_add_hcd(musb_to_hcd(musb), -1, 0);
+			if (retval < 0) {
+				dev_dbg((struct device *)1,
+					"add_hcd failed, %d\n", retval);
+				spin_lock_irqsave(&musb->lock, flags);
+				otg_set_peripheral(musb->xceiv, NULL);
+				musb->gadget_driver = NULL;
+				musb->g.dev.driver = NULL;
+				spin_unlock_irqrestore(&musb->lock, flags);
+			} else {
+				hcd->self.uses_pio_for_control = 1;
+			}
+		}
+	}
+
+	return retval;
+}
+EXPORT_SYMBOL(usb_gadget_register_driver);
 
 /*
  * Register the gadget driver. Used by gadget drivers when
