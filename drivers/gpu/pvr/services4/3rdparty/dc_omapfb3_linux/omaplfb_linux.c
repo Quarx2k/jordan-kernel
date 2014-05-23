@@ -197,6 +197,14 @@ MODULE_SUPPORTED_DEVICE(DEVNAME);
 #endif	/* defined(PVR_OMAPFB3_OMAP5_UEVM) */
 #endif	/* !defined(PVR_OMAPLFB_DRM_FB) */
 
+#if defined(FAST_CHECK_BLANK_FLIP_BUFS)
+#if !defined(SKIP_FIRST_BLANK_FLIP_BUFS)
+#define	SKIP_FIRST_BLANK_FLIP_BUFS
+#endif /* !defined(SKIP_FIRST_BLANK_FLIP_BUFS) */
+#endif /* defined(FAST_CHECK_BLANK_FLIP_BUFS) */
+
+
+
 void *OMAPLFBAllocKernelMem(unsigned long ulSize)
 {
 	return kmalloc(ulSize, GFP_KERNEL);
@@ -355,23 +363,81 @@ void OMAPLFBDestroySwapQueue(OMAPLFB_SWAPCHAIN *psSwapChain)
 	destroy_workqueue(psSwapChain->psWorkQueue);
 }
 
+#if defined(SKIP_FIRST_BLANK_FLIP_BUFS)
+static OMAPLFB_BOOL IsBufferBlank(OMAPLFB_BUFFER *psBuffer, struct fb_info *fbi)
+{
+#if defined(FAST_CHECK_BLANK_FLIP_BUFS)
+	unsigned char __iomem *pix = (unsigned char __iomem *)psBuffer->sCPUVAddr;
+	unsigned int line_len = fbi->fix.line_length;
+	unsigned int x = fbi->var.xres, y = fbi->var.yres;
+	/* quickly check the pixel is not blank on the oblique line which start
+	 * from right-top with 45 degree slope, and end while x, y reaches the edge
+	 */
+	switch (fbi->var.bits_per_pixel)
+	{
+	case 32:
+		for (x *= 4; y-- && x; pix += line_len)
+		{
+			x -= 4;
+			/* For 32 bits RGBA or BGRA, should skip A info */
+			if (*(unsigned int *)(pix + x) & 0xFFFFFF)
+				return OMAPLFB_FALSE;
+		}
+		break;
+	case 24:
+		for (x *= 3; y-- && x; pix += line_len)
+		{
+			x -= 3;
+			if (pix[x] || pix[x+1] || pix[x+2])
+				return OMAPLFB_FALSE;
+		}
+		break;
+	case 16:
+		for (x *= 2; y-- && x; pix += line_len)
+		{
+			x -= 2;
+			if (*(unsigned short *)(pix + x))
+				return OMAPLFB_FALSE;
+		}
+		break;
+	}
+#else /* defined(FAST_CHECK_BLANK_FLIP_BUFS) */
+	unsigned int __iomem *pix = (unsigned int __iomem *)psBuffer->sCPUVAddr;
+	unsigned int count = (fbi->fix.line_length * fbi->var.yres) >> 2;
+	/* Search for whole buffer to look if there is a pixel not blank */
+	if (fbi->var.bits_per_pixel == 32)
+	{
+		/* For 32 bits RGBA or BGRA, should skip A info */
+		for (; count--; pix++)
+		{
+			if (*pix & 0xFFFFFF)
+				return OMAPLFB_FALSE;
+		}
+	}
+	else
+	{
+		for (; count--; pix++)
+		{
+			if (*pix)
+				return OMAPLFB_FALSE;
+		}
+	}
+#endif /* defined(FAST_CHECK_BLANK_FLIP_BUFS) */
+	return OMAPLFB_TRUE;
+}
+#endif /* defined(SKIP_FIRST_BLANK_FLIP_BUFS) */
+
 /* Flip display to given buffer */
 void OMAPLFBFlip(OMAPLFB_DEVINFO *psDevInfo, OMAPLFB_BUFFER *psBuffer)
 {
 	struct fb_var_screeninfo sFBVar;
 	int res;
-
-#ifdef	SKIP_FIRST_FLIP_BUFS
-	/* Skip first n numbers of flip buffers to avoid draw blank screen
+#if defined(SKIP_FIRST_BLANK_FLIP_BUFS)
+	/* Skip first blank flip buffers to avoid draw blank screen
 	 * that occurred flicker at first time booting up
 	 */
-	static unsigned int skip_flips = SKIP_FIRST_FLIP_BUFS;
-	if (skip_flips) {
-		--skip_flips;
-		return;
-	}
-#endif
-
+	static unsigned int skip_flips = 1;
+#endif /* defined(SKIP_FIRST_BLANK_FLIP_BUFS) */
 	if (!lock_fb_info(psDevInfo->psLINFBInfo))
 	{
 		DEBUG_PRINTK((KERN_WARNING DRIVER_PREFIX
@@ -379,6 +445,19 @@ void OMAPLFBFlip(OMAPLFB_DEVINFO *psDevInfo, OMAPLFB_BUFFER *psBuffer)
 		return;
 	}
 	OMAPLFB_CONSOLE_LOCK();
+
+#if defined(SKIP_FIRST_BLANK_FLIP_BUFS)
+	if (skip_flips)
+	{
+		if (IsBufferBlank(psBuffer, psDevInfo->psLINFBInfo) == OMAPLFB_TRUE)
+		{
+			skip_flips++;
+			goto __exit__;
+		}
+		DEBUG_PRINTK((KERN_INFO DRIVER_PREFIX ": %s: Skipped %d Frames\n", __FUNCTION__, skip_flips-1));
+		skip_flips = 0;
+	}
+#endif /* defined(SKIP_FIRST_BLANK_FLIP_BUFS) */
 
 	sFBVar = psDevInfo->psLINFBInfo->var;
 
@@ -495,6 +574,9 @@ void OMAPLFBFlip(OMAPLFB_DEVINFO *psDevInfo, OMAPLFB_BUFFER *psBuffer)
 	}
 #endif /* defined(CONFIG_DSSCOMP) */
 
+#if defined(SKIP_FIRST_BLANK_FLIP_BUFS)
+__exit__:
+#endif /* defined(SKIP_FIRST_BLANK_FLIP_BUFS) */
 	OMAPLFB_CONSOLE_UNLOCK();
 	unlock_fb_info(psDevInfo->psLINFBInfo);
 }
