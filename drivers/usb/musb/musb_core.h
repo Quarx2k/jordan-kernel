@@ -721,10 +721,4 @@ static inline int musb_platform_exit(struct musb *musb)
 	return musb->ops->exit(musb);
 }
 
-extern int musb_gadget_pullup(struct usb_gadget *gadget, int is_on);
-
-static inline void musb_set_vbus(struct musb *musb, int is_on)
-{
-	musb->ops->set_vbus(musb, is_on);
-}
 #endif	/* __MUSB_CORE_H__ */

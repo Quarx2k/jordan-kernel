@@ -2264,7 +2264,7 @@ static void musb_save_context(struct musb *musb)
 				musb_read_rxhubport(musb_base, i);
 		}
 	}
-	//musb_platform_save_context(musb);
+	musb_platform_save_context(musb);
 }
 
 static void musb_restore_context(struct musb *musb)
@@ -2274,7 +2274,7 @@ static void musb_restore_context(struct musb *musb)
 	void __iomem *ep_target_regs;
 	void __iomem *epio;
 
-	//musb_platform_restore_context(musb);
+	musb_platform_restore_context(musb);
 
 	if (is_host_enabled(musb)) {
 		musb_writew(musb_base, MUSB_FRAME, musb->context.frame);

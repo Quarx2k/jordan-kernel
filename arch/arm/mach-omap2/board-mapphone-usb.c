@@ -60,11 +60,7 @@ static int cpcap_usb_connected_probe(struct platform_device *pdev)
 static int cpcap_usb_connected_remove(struct platform_device *pdev)
 {
 	printk("USB Disconnected!\n");
-	//cpcap_musb_notifier_call(USB_EVENT_ID);
-	//msleep(5);
 	cpcap_musb_notifier_call(USB_EVENT_NONE);
-	//msleep(5);
-	//cpcap_musb_notifier_call(USB_EVENT_ID);
 	return 0;
 }
 
