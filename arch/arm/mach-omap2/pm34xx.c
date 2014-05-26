@@ -374,7 +374,7 @@ void omap_sram_idle(bool in_suspend)
 
 	/* PER */
 	if (per_next_state < PWRDM_POWER_ON)
-		omap2_gpio_resume_after_idle(in_suspend, per_going_off);
+		omap2_gpio_resume_after_idle(in_suspend);
 }
 
 static void omap3_pm_idle(void)

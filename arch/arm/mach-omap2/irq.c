@@ -40,10 +40,7 @@
 #define INTC_MIR0		0x0084
 #define INTC_MIR_CLEAR0		0x0088
 #define INTC_MIR_SET0		0x008c
-#define INTC_ISR_SET0		0x0090
-#define INTC_ISR_CLEAR0	0x0094
 #define INTC_PENDING_IRQ0	0x0098
-
 /* Number of IRQ state bits in each MIR register */
 #define IRQ_BITS_PER_REG	32
 
@@ -53,9 +50,6 @@
 #define ACTIVEIRQ_MASK		0x7f	/* omap2/3 active interrupt bits */
 #define INTCPS_NR_MIR_REGS	3
 #define INTCPS_NR_IRQS		96
-
-#define INTCPS_ISR_SET(n)	(INTC_ISR_SET0 + (0x20 * (n)))
-#define INTCPS_ISR_CLR(n)	(INTC_ISR_CLEAR0 + (0x20 * (n)))
 
 /*
  * OMAP2 has a number of different interrupt controllers, each interrupt
@@ -128,24 +122,6 @@ static void __init omap_irq_bank_init_one(struct omap_irq_bank *bank)
 	intc_bank_write_reg(1 << 0, bank, INTC_SYSCONFIG);
 }
 
-void omap_clr_soft_irq(int irq)
-{
-	u32 shift = (irq - domain->revmap_data.legacy.first_irq);
-	u32 offset = INTCPS_ISR_CLR(shift / (IRQ_BITS_PER_REG - 1));
-	u32 isr = 1 << (shift % IRQ_BITS_PER_REG);
-
-	__raw_writel(isr, OMAP2_L4_IO_ADDRESS(OMAP34XX_IC_BASE + offset));
-}
-
-void omap_set_soft_irq(int irq)
-{
-	u32 shift = (irq - domain->revmap_data.legacy.first_irq);
-	u32 offset = INTCPS_ISR_SET(shift / (IRQ_BITS_PER_REG - 1));
-	u32 isr = 1 << (shift % IRQ_BITS_PER_REG);
-
-	__raw_writel(isr, OMAP2_L4_IO_ADDRESS(OMAP34XX_IC_BASE + offset));
-}
-
 int omap_irq_pending(void)
 {
 	int i;
@@ -202,7 +178,6 @@ static void __init omap_init_irq(u32 base, int nr_irqs,
 
 	domain = irq_domain_add_legacy(node, nr_irqs, irq_base, 0,
 				       &irq_domain_simple_ops, NULL);
-
 
 	for (i = 0; i < ARRAY_SIZE(irq_banks); i++) {
 		struct omap_irq_bank *bank = irq_banks + i;

@@ -26,14 +26,6 @@ OMAP specific properties:
 - ti,gpio-always-on: 	Indicates if a GPIO bank is always powered and
 			so will never lose its logic state.
 
-OMAP3 specific properties
-Offmode wkup allows translation of a wakeup event
-from a single pad in a gpio bank to a wakeup + an interrupt.
-This works around the loss of isr status during off mode for
-gpio banks 2 through 6
-
--	offmode-wkup-isr:  The isr offset in the bank
--	offmode-wkup-pad:  The pad offset associated with this pin
 
 Example:
 
@@ -44,7 +36,4 @@ gpio4: gpio4 {
     #gpio-cells = <2>;
     interrupt-controller;
     #interrupt-cells = <2>;
-
-    offmode-wkup-isr = <0x00000008>;
-    offmode-wkup-pad = <0x008e>;
 };

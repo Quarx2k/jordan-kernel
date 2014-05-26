@@ -82,35 +82,11 @@ struct gpio_bank {
 	struct pad_context *pads_ctx;
 	void __iomem *pads_base;
 
-	u32 offmode_handle_soft_isr;
-	u32 offmode_wkup_isr;
-	u32 offmode_wkup_pad;
-	u32 offmode_wkup_pad_shift;
-
 	void (*set_dataout)(struct gpio_bank *bank, int gpio, int enable);
 	int (*get_context_loss_count)(struct device *dev);
 
 	struct omap_gpio_reg_offs *regs;
 };
-
-static inline void clr_soft_irq(struct gpio_bank *bank)
-{
-	omap_clr_soft_irq(bank->irq);
-}
-
-static inline void set_soft_irq(struct gpio_bank *bank)
-{
-	omap_set_soft_irq(bank->irq);
-}
-
-#define WAKEUPEVENT		0x8000
-static inline int is_wkup_pad(struct gpio_bank *bank)
-{
-	int pad = __raw_readl(bank->pads_base + bank->offmode_wkup_pad);
-	pad = pad >> bank->offmode_wkup_pad_shift;
-
-	return (pad & WAKEUPEVENT) ? 1 : 0;
-}
 
 #define GPIO_INDEX(bank, gpio) (gpio % bank->width)
 #define GPIO_BIT(bank, gpio) (1 << GPIO_INDEX(bank, gpio))
@@ -737,18 +713,8 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
 		u32 isr_saved, level_mask = 0;
 		u32 enabled;
 
-		if (unlikely(bank->offmode_handle_soft_isr)) {
-			clr_soft_irq(bank);
-
-			enabled = bank->offmode_handle_soft_isr;
-			isr = bank->offmode_handle_soft_isr & enabled;
-			isr_saved = isr;
-			bank->offmode_handle_soft_isr = 0x0;
-		} else {
-			enabled = _get_gpio_irqbank_mask(bank);
-			isr = __raw_readl(isr_reg) & enabled;
-			isr_saved = isr;
-		}
+		enabled = _get_gpio_irqbank_mask(bank);
+		isr_saved = isr = __raw_readl(isr_reg) & enabled;
 
 		if (bank->level_mask)
 			level_mask = bank->level_mask & enabled;
@@ -792,9 +758,6 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
 	handler(s) are executed in order to avoid spurious bank
 	interrupt */
 exit:
-
-	bank->offmode_handle_soft_isr = 0x0;
-
 	if (!unmasked)
 		chained_irq_exit(chip, desc);
 	pm_runtime_put(bank->dev);
@@ -1290,33 +1253,8 @@ static int omap_gpio_probe(struct platform_device *pdev)
 	bank->chip.of_node = of_node_get(node);
 #endif
 	if (node) {
-		int ret;
-		u32 offmode_wkup_isr;
-		u32 offmode_wkup_pad;
-
 		if (!of_property_read_bool(node, "ti,gpio-always-on"))
 			bank->loses_context = true;
-
-		/* offmode-wkup  */
-		ret = of_property_read_u32(node, "offmode-wkup-isr",
-				&offmode_wkup_isr);
-		ret |= of_property_read_u32(node, "offmode-wkup-pad",
-				&offmode_wkup_pad);
-
-		if (!ret) {
-			bank->offmode_wkup_isr = offmode_wkup_isr;
-			bank->offmode_wkup_pad =
-				offmode_wkup_pad & 0xFFFFFFFC;
-			bank->offmode_wkup_pad_shift =
-				offmode_wkup_pad % 4 ? 16 : 0;
-
-			dev_info(dev, "offmode_wkup_isr = 0x%08x\n",
-				 bank->offmode_wkup_isr);
-			dev_info(dev, "offmode_wkup_pad = 0x%08x\n",
-				 bank->offmode_wkup_pad);
-			dev_info(dev, "offmode_wkup_shift = %d\n",
-				 bank->offmode_wkup_pad_shift);
-		}
 	} else {
 		bank->loses_context = pdata->loses_context;
 
@@ -1603,7 +1541,7 @@ void omap2_gpio_prepare_for_idle(int pwr_mode)
 	}
 }
 
-void omap2_gpio_resume_after_idle(bool in_suspend, int pwr_mode)
+void omap2_gpio_resume_after_idle(bool in_suspend)
 {
 	struct gpio_bank *bank;
 
@@ -1616,11 +1554,6 @@ void omap2_gpio_resume_after_idle(bool in_suspend, int pwr_mode)
 		if (!in_suspend && bank->power_mode == OFF_MODE) {
 			bank->power_mode = 0;
 			omap_gpio_pad_ctx_restore(bank);
-		}
-		if (bank->offmode_wkup_isr && (pwr_mode == OFF_MODE) &&
-		    is_wkup_pad(bank)) {
-			bank->offmode_handle_soft_isr = bank->offmode_wkup_isr;
-			set_soft_irq(bank);
 		}
 	}
 }
