@@ -1,0 +1,17 @@
+OMAP3 pad wkup generator
+
+Functionality to map omap pad wkup status to irq events;
+
+Required properties:
+- ti,pad_irq  Maps a pad offset to a IRQ
+    on omap, the irqs are calculated as follows:
+    for the 96 intc IRQs
+       irq = 16 + irq_offset (from TRM sec 12.3.2)
+    for a gpio IRQ (banks numbered 1 to 6
+       irq = 16 + 96 + (gpio_bank - 1) * 32
+
+		ti,pad_irq = <0x008e 171>, /* m4sensor hub */
+		             <0x00e6 211>, /* touch */
+		             <0x013c 252>, /* battery */
+		             <0x0140 254>, /* USB */
+		             <0x01a2 288>; /* gpio-charger */

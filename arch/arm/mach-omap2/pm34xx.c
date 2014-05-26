@@ -54,6 +54,8 @@
 #include "pm-debug-regs.h"
 #include "iomap.h"
 
+#include "pad_wkup.h"
+
 /* pm34xx errata defined in pm.h */
 u16 pm34xx_errata;
 bool suspend_debug;
@@ -375,6 +377,7 @@ void omap_sram_idle(bool in_suspend)
 	/* PER */
 	if (per_next_state < PWRDM_POWER_ON)
 		omap2_gpio_resume_after_idle(in_suspend);
+
 }
 
 static void omap3_pm_idle(void)
@@ -411,6 +414,8 @@ static int omap3_pm_suspend(void)
 	omap3_intc_suspend();
 
 	omap_sram_idle(true);
+
+	prcm_handle_pad_wkup();
 
 restore:
 	/* Restore next_pwrsts */

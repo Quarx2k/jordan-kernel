@@ -420,8 +420,18 @@ config OMAP3_SDRC_AC_TIMING
 	  wish to say no.  Selecting yes without understanding what is
 	  going on could result in system crashes;
 
+
+config OMAP3_PAD_WKUP_IO
+	bool "Enable Generation of IRQ from pad status"
+	depends on ARCH_OMAP3
+	default n
+	help
+	 For offmode, gpio (and possibly other) domains can wakeup the system
+	 but will not retain their irq status internally.  This function generates
+	 the configured irq on each time the io irq (315) fires.
+
 config DISABLE_OMAP_ERRATA_i583
-	bool "Override errata i583
+	bool "Override errata i583"
 	depends on ARCH_OMAP3
 	default n
 	help
