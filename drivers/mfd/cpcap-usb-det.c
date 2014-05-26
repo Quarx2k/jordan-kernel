@@ -93,7 +93,7 @@ enum cpcap_det_state {
 	IDENTIFY,
 	USB,
 	FACTORY,
-        USB_DEVICE,
+	USB_DEVICE,
 };
 
 static const char *accy_names[8] = {
@@ -264,6 +264,7 @@ static int get_sense(struct cpcap_usb_det_data *data)
 		    dump_sense_bits(data);
 		}
 	}
+
 	return 0;
 }
 
@@ -285,8 +286,10 @@ static int configure_hardware(struct cpcap_usb_det_data *data,
 	switch (accy) {
 	case CPCAP_ACCY_USB:
 	case CPCAP_ACCY_FACTORY:
+		/* Disable VBus PullDown */
 		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC1, 0,
 					     CPCAP_BIT_VBUSPD);
+		/* Enable USB xceiver */
 		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC2,
 					     CPCAP_BIT_USBXCVREN,
 					     CPCAP_BIT_USBXCVREN);
@@ -306,22 +309,6 @@ static int configure_hardware(struct cpcap_usb_det_data *data,
 		break;
 
 	case CPCAP_ACCY_CHARGER:
-		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC1,
-					     CPCAP_BIT_VBUSPD,
-					     CPCAP_BIT_VBUSPD);
-		break;
-
-	case CPCAP_ACCY_USB_DEVICE:
-		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC2, 
-					     CPCAP_BIT_USBXCVREN,
-					     CPCAP_BIT_USBXCVREN);
-		/* DisableVBus PullDown */
-		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC1,
-					     0,
-					     CPCAP_BIT_VBUSPD);
-
-		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC3, 0,
-					     CPCAP_BIT_VBUSSTBY_EN);		
 		/* Disable Reverse Mode */
 		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_CRM,
 					     0, CPCAP_BIT_RVRSMODE);
@@ -329,17 +316,48 @@ static int configure_hardware(struct cpcap_usb_det_data *data,
 		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC1,
 					     CPCAP_BIT_VBUSPD,
 					     CPCAP_BIT_VBUSPD);
+		break;
+
+	case CPCAP_ACCY_USB_DEVICE:
+		/* Remove VBus PullDown */
+		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC1, 0,
+					     CPCAP_BIT_VBUSPD);
+		/* Enable Reverse Mode */
+		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_CRM,
+					     CPCAP_BIT_RVRSMODE,
+					     CPCAP_BIT_RVRSMODE);
+		/* enable USB xceiver */
+		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC2, 
+					     CPCAP_BIT_USBXCVREN,
+					     CPCAP_BIT_USBXCVREN);
+		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC3,
+					     0,
+					     CPCAP_BIT_DMPD_SPI |
+					     CPCAP_BIT_DPPD_SPI |
+					     CPCAP_BIT_SUSPEND_SPI |
+					     CPCAP_BIT_ULPI_SPI_SEL);
+		/* disable VBUS standby */
 		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC3, 0,
 					     CPCAP_BIT_VBUSSTBY_EN);
 		break;
 
 	case CPCAP_ACCY_UNKNOWN:
+		/* Remove VBus PullDown */
 		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC1, 0,
 					     CPCAP_BIT_VBUSPD);
+		/* Disable Reverse Mode */
+		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_CRM,
+					     0, CPCAP_BIT_RVRSMODE);
 		break;
 
 	case CPCAP_ACCY_NONE:
 	default:
+		/* Disable Reverse Mode */
+		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_CRM,
+					     0, CPCAP_BIT_RVRSMODE);
+	//	retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_VUSBC, 0,
+	//				     CPCAP_BIT_VBUS_SWITCH);
+		/* Enable VBus PullDown */
 		retval |= cpcap_regacc_write(data->cpcap, CPCAP_REG_USBC1,
 					     CPCAP_BIT_VBUSPD,
 					     CPCAP_BIT_VBUSPD);
@@ -349,11 +367,13 @@ static int configure_hardware(struct cpcap_usb_det_data *data,
 					     CPCAP_BIT_DMPD_SPI |
 					     CPCAP_BIT_DPPD_SPI |
 					     CPCAP_BIT_SUSPEND_SPI |
-					     CPCAP_BIT_ULPI_SPI_SEL,
+					     CPCAP_BIT_ULPI_SPI_SEL |
+					     CPCAP_BIT_VBUSSTBY_EN,
 					     CPCAP_BIT_DMPD_SPI |
 					     CPCAP_BIT_DPPD_SPI |
 					     CPCAP_BIT_SUSPEND_SPI |
-					     CPCAP_BIT_ULPI_SPI_SEL);
+					     CPCAP_BIT_ULPI_SPI_SEL |
+					     CPCAP_BIT_VBUSSTBY_EN);
 		break;
 	}
 
@@ -520,14 +540,26 @@ static void detection_work(struct work_struct *work)
 		} else if (data->sense & CPCAP_BIT_ID_GROUND_S) {
 			if (cpcap_usb_det_debug)
 				pr_info("cpcap_usb_det: OTG cable attached\n");
-			notify_accy(data, CPCAP_ACCY_USB_DEVICE);
+			data->state = USB_DEVICE;
 
+			/* mask VBUSVLD, CHGDET, SESSVLD as Reverse Mode enable may raise these */
+			cpcap_irq_mask(data->cpcap, CPCAP_IRQ_VBUSVLD);
+			cpcap_irq_mask(data->cpcap, CPCAP_IRQ_CHRG_DET);
+			cpcap_irq_mask(data->cpcap, CPCAP_IRQ_SESSVLD);
+
+			notify_accy(data, CPCAP_ACCY_USB_DEVICE);
+			cpcap_irq_unmask(data->cpcap, CPCAP_IRQ_IDFLOAT);
+			cpcap_irq_unmask(data->cpcap, CPCAP_IRQ_IDGND);
+
+		} else if ((data->sense & CPCAP_BIT_VBUSVLD_S) &&
+				(data->usb_accy == CPCAP_ACCY_NONE)) {
+			data->state = CONFIG;
 			cpcap_irq_unmask(data->cpcap, CPCAP_IRQ_CHRG_DET);
 			cpcap_irq_unmask(data->cpcap, CPCAP_IRQ_DPI);
 			cpcap_irq_unmask(data->cpcap, CPCAP_IRQ_DMI);
 			cpcap_irq_unmask(data->cpcap, CPCAP_IRQ_SE1);
 			cpcap_irq_unmask(data->cpcap, CPCAP_IRQ_IDGND);
-			data->state = USB_DEVICE;
+
 		} else {
 			notify_accy(data, CPCAP_ACCY_NONE);
 
@@ -547,6 +579,7 @@ static void detection_work(struct work_struct *work)
 			 * See cpcap_usb_det_suspend() for details.
 			 */
 			cpcap_irq_unmask(data->cpcap, CPCAP_IRQ_VBUSVLD);
+
 			cpcap_irq_unmask(data->cpcap, CPCAP_IRQ_IDFLOAT);
 		}
 		break;
@@ -606,12 +639,11 @@ static void detection_work(struct work_struct *work)
 		if (!(data->sense & CPCAP_BIT_ID_GROUND_S)) {
 			pr_info("cpcap_usb_det: OTG cable detached\n");
 			data->state = CONFIG;
+			cpcap_irq_unmask(data->cpcap, CPCAP_IRQ_VBUSVLD);
 			cpcap_irq_unmask(data->cpcap, CPCAP_IRQ_CHRG_DET);
-			cpcap_irq_unmask(data->cpcap, CPCAP_IRQ_CHRG_CURR1);
-			cpcap_irq_unmask(data->cpcap, CPCAP_IRQ_SE1);
-			cpcap_irq_unmask(data->cpcap, CPCAP_IRQ_IDGND);
-			cpcap_irq_unmask(data->cpcap, CPCAP_IRQ_IDFLOAT);
-			data->state = CONFIG;
+			cpcap_irq_unmask(data->cpcap, CPCAP_IRQ_SESSVLD);
+
+			notify_accy(data, CPCAP_ACCY_NONE);
 			schedule_delayed_work(&data->work, 0);
 		}
 		break;

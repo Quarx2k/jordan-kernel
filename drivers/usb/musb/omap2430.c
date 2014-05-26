@@ -47,32 +47,6 @@ struct omap2430_glue {
 
 static struct timer_list musb_idle_timer;
 
-#if defined(CONFIG_USB_MOT_ANDROID) && defined(CONFIG_USB_MUSB_OTG)
- /* blocking notifier support */
-
-void cpcap_musb_notifier_call(unsigned long event)
-{
-	struct musb *musb = g_musb;
-	printk("cpcap_musb_notifier_call \n");
-	switch (event) {
-	case USB_EVENT_VBUS:
-		DBG(1, "VBUS Connect\n");
-		DBG(1, "MUSB - Hold L3 Bus and C State Constraint \n");
-		pm_runtime_get_sync(musb->controller);
-		break;
-
-	case USB_EVENT_NONE:
-		DBG(1, "VBUS Disconnect\n");
-		pm_runtime_mark_last_busy(musb->controller);
-		pm_runtime_put_autosuspend(musb->controller);
-		break;
-	default:
-		DBG(1, "ID float\n");
-	}
-
-}
-#endif /*CONFIG_USB_MOT_ANDROID*/
-
 static void musb_do_idle(unsigned long _musb)
 {
 	struct musb	*musb = (void *)_musb;
@@ -513,11 +487,8 @@ static const struct musb_platform_ops omap2430_ops = {
 
 	.set_mode	= omap2430_musb_set_mode,
 	.try_idle	= omap2430_musb_try_idle,
-#ifndef CONFIG_USB_MOT_ANDROID
-	.set_vbus	= omap2430_musb_set_vbus,
-#else
-	.set_vbus	= 0,
-#endif
+
+	.set_vbus	= 0,//omap2430_musb_set_vbus,
 	.enable		= omap2430_musb_enable,
 	.disable	= omap2430_musb_disable,
 };

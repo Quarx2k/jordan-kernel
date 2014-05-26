@@ -46,7 +46,7 @@
 #include <linux/slab.h>
 
 #include "musb_core.h"
-
+#include "omap2430.h"
 
 /* MUSB PERIPHERAL status 3-mar-2006:
  *
@@ -1697,6 +1697,10 @@ musb_gadget_set_self_powered(struct usb_gadget *gadget, int is_selfpowered)
 	return 0;
 }
 
+static int musb_gadget_pullup(struct usb_gadget *gadget, int is_on);
+static void stop_activity(struct musb *musb, struct usb_gadget_driver *driver);
+int cpcap_usb = USB_EVENT_NONE;
+
 static void musb_pullup(struct musb *musb, int is_on)
 {
 	u8 power;
@@ -1713,6 +1717,22 @@ static void musb_pullup(struct musb *musb, int is_on)
 		musb->gadget_driver->function, is_on ? "on" : "off");
 	musb_writeb(musb->mregs, MUSB_POWER, power);
 }
+
+#if 0
+static void musb_pullup(struct musb *musb, int is_on)
+{
+
+	if (is_on && cpcap_usb == USB_EVENT_VBUS) {
+		printk("Enable usb\n");
+		__musb_pullup(musb, USB_EVENT_VBUS);
+		musb_gadget_pullup(&musb->g, 1);
+	} else {
+		printk("Disable usb\n");
+		__musb_pullup(musb, USB_EVENT_NONE);
+		musb_gadget_pullup(&musb->g, 0);
+		stop_activity(musb, musb->gadget_driver);
+}	}
+#endif
 
 #if 0
 static int musb_gadget_vbus_session(struct usb_gadget *gadget, int is_active)
@@ -1737,28 +1757,75 @@ static int musb_gadget_vbus_draw(struct usb_gadget *gadget, unsigned mA)
 	return otg_set_power(musb->xceiv, mA);
 }
 
+
 static int musb_gadget_pullup(struct usb_gadget *gadget, int is_on)
 {
 	struct musb	*musb = gadget_to_musb(gadget);
+
 	unsigned long	flags;
 
 	is_on = !!is_on;
 
 	pm_runtime_get_sync(musb->controller);
-
 	/* NOTE: this assumes we are sensing vbus; we'd rather
 	 * not pullup unless the B-session is active.
 	 */
 	spin_lock_irqsave(&musb->lock, flags);
+
 	if (is_on != musb->softconnect) {
 		musb->softconnect = is_on;
 		musb_pullup(musb, is_on);
 	}
 	spin_unlock_irqrestore(&musb->lock, flags);
 
-	pm_runtime_put(musb->controller);
-
+  	pm_runtime_put(musb->controller);
 	return 0;
+}
+
+void cpcap_musb_notifier_call(unsigned long event)
+{
+	struct musb *musb = g_musb;
+	u32 val;
+	cpcap_usb = event;
+	switch (event) {
+	case USB_EVENT_VBUS:
+		DBG(1, "VBUS Connect\n");
+		pm_runtime_get_sync(musb->controller);
+#if 0
+		musb_gadget_pullup(&musb->g, 1);
+		/* configure musb into smartidle with wakeup enabled
+		 * smart standby mode.
+		 */
+		musb_writel(musb->mregs, OTG_FORCESTDBY, 0);
+		val = musb_readl(musb->mregs, OTG_SYSCONFIG);
+		val |= SMARTIDLE | SMARTSTDBY | ENABLEWAKEUP;
+		musb_writel(musb->mregs, OTG_SYSCONFIG, val);
+		musb->xceiv->last_event = USB_EVENT_VBUS;
+		musb->xceiv->state = OTG_STATE_B_IDLE;
+#endif
+		break;
+	case USB_EVENT_NONE:
+		DBG(1, "VBUS Disconnect\n");
+#if 0
+		/* configure in force idle/ standby */
+		musb_writel(musb->mregs, OTG_FORCESTDBY, 1);
+		val = musb_readl(musb->mregs, OTG_SYSCONFIG);
+		val &= ~(SMARTIDLEWKUP | SMARTSTDBY | ENABLEWAKEUP);
+		val |= FORCEIDLE | FORCESTDBY;
+		musb_writel(musb->mregs, OTG_SYSCONFIG, val);
+		__musb_pullup(musb, 0);
+		musb_stop(musb);
+		musb->xceiv->last_event = USB_EVENT_NONE;
+		musb->xceiv->state = OTG_STATE_B_IDLE;
+		musb_gadget_pullup(&musb->g, 0);
+		stop_activity(musb, musb->gadget_driver);
+#endif
+		pm_runtime_mark_last_busy(musb->controller);
+		pm_runtime_put_autosuspend(musb->controller);
+		break;
+	default:
+		DBG(1, "ID float\n");
+	}
 }
 
 static const struct usb_gadget_ops musb_gadget_operations = {

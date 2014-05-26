@@ -596,8 +596,6 @@ int usb_ipc_data_probe(struct usb_interface *intf,
 	usb_ipc_data_param.working = 0;
 	usb_ipc_data_param.write_urb_used = 0;
 	usb_ipc_data_param.read_urb_used = 0;
-	usb_autopm_put_interface_no_suspend(usb_ifnum_to_if(usb_ipc_data_param.udev,
-						 IPC_DATA_CH_NUM));   //TODO CHECK!!!
 #endif
 	usb_ipc_data_param.ipc_events = 0;
 	kipcd_task = kthread_run(ipc_thread, NULL, "kipcd");
