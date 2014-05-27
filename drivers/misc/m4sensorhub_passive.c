@@ -186,6 +186,15 @@ static int m4pas_set_samplerate(struct iio_dev *iio, int16_t rate)
 	dd->samplerate = rate;
 
 	if (rate >= 0) {
+		/* Enable passive mode feature */
+		err = m4sensorhub_reg_write_1byte(dd->m4,
+						  M4SH_REG_PASSIVE_ENABLE,
+						  0x01, 0xFF);
+		if (err != 1) {
+			m4pas_err("%s: Failed to enable with %d.\n",
+				  __func__, err);
+			goto m4pas_set_samplerate_fail;
+		}
 		/* Enable the IRQ if necessary */
 		if (!(dd->status & (1 << M4PAS_IRQ_ENABLED_BIT))) {
 			err = m4sensorhub_irq_enable(dd->m4,
@@ -198,6 +207,15 @@ static int m4pas_set_samplerate(struct iio_dev *iio, int16_t rate)
 			dd->status = dd->status | (1 << M4PAS_IRQ_ENABLED_BIT);
 		}
 	} else {
+		/* Disable passive mode feature */
+		err = m4sensorhub_reg_write_1byte(dd->m4,
+						  M4SH_REG_PASSIVE_ENABLE,
+						  0x0, 0xFF);
+		if (err != 1) {
+			m4pas_err("%s: Failed to disable with %d.\n",
+				  __func__, err);
+			goto m4pas_set_samplerate_fail;
+		}
 		/* Disable the IRQ if necessary */
 		if (dd->status & (1 << M4PAS_IRQ_ENABLED_BIT)) {
 			err = m4sensorhub_irq_disable(dd->m4,
