@@ -225,6 +225,26 @@
 		gpio-names = "charge_reduce",
 			     "charge_terminate";
 	};
+
+	pad-wkup {
+		/* on omap, the irqs are calculated as follows:
+		 * for the 96 intc IRQs
+		 *   irq = 16 + irq_offset (from TRM sec 12.3.2)
+		 * for a gpio IRQ (banks numbered 1 to 6
+		 *   irq = 16 + 96 + (gpio_bank - 1) * 32
+		 */
+		compatible = "ti,pad-wkup";
+		           /* pad off  IRQ  */
+
+		ti,pad_irq = <0x144  89>, /* uart2 - bluetooth */
+		             <0x16e  90>, /* uart3 - serial rx */
+		             <0x0a2  96>, /* uart4 - m4 rx     */
+		             <0x08e 171>, /* m4sensor hub      */
+		             <0x0e6 211>, /* touch             */
+		             <0x13c 252>, /* battery           */
+		             <0x140 254>, /* USB               */
+		             <0x1a2 288>; /* gpio-charger      */
+	};
 };
 
 &vc {
@@ -274,6 +294,7 @@
 		compatible = "mot,m4sensorhub";
 		status = "ok";
 		reg = <0x39>;
+
 
 		mot,irq-gpio    = <&gpio2 27 1>; /* gpio-059 */
 		mot,reset-gpio  = <&gpio5  1 2>; /* gpio-129 */
@@ -766,16 +787,10 @@ tps65912_0: tps65912 {
 
 &gpio5 {
 	ti,no_idle_on_suspend;
-	/* wakeup from off via max170xx on this bank */
-	offmode-wkup-isr = <0x00001000>; /* 12 */
-	offmode-wkup-pad = <0x013c>; /* CONTROL_PADCONF_MCBSP3_DX[15:0] */
 };
 
 &gpio6 {
 	ti,no_idle_on_suspend;
-	/* wakeup from off via docking and undocking on this bank */
-	offmode-wkup-isr = <0x00010000>; /* gpio_176 */
-	offmode-wkup-pad = <0x01a2>;  /* CONTROL_PADCONF_MCSPI1_CS1[31:16] */
 };
 
 /* external */
