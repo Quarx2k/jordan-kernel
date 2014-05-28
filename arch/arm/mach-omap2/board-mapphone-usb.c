@@ -43,6 +43,36 @@
 
 void cpcap_musb_notifier_call(unsigned long event);
 
+static int mapphone_usb_modem_startup(void)
+{
+	int r;
+	r = gpio_request(MAPPHONE_IPC_USB_SUSP_GPIO, "ipc_usb_susp");
+	if (r < 0) {
+		printk(KERN_WARNING "Could not request GPIO %d"
+		" for IPC_USB_SUSP\n",
+		MAPPHONE_IPC_USB_SUSP_GPIO);
+		return r;
+	}
+	gpio_direction_output(MAPPHONE_IPC_USB_SUSP_GPIO, 0);
+	printk(KERN_INFO "%s - Configured GPIO 142 for USB Suspend \n",
+			__func__);
+	return 0;
+}
+
+int mapphone_usb_modem_suspend(int on)
+{
+	printk("Modem phy %s\n", on ? "suspended" : "resumed");
+	if (on)
+		gpio_direction_output(MAPPHONE_IPC_USB_SUSP_GPIO, 1);
+	else {
+		gpio_direction_output(MAPPHONE_IPC_USB_SUSP_GPIO, 0);
+		/* Delay 100 usec before enabling clocks */
+		udelay(100);
+	}
+
+	return 0;
+}
+
 static struct platform_device android_usb_platform_device = {
 	.name	= "android_gadget",
 	.id	= -1,
@@ -77,7 +107,6 @@ void mapphone_gadget_init(void)
 {
 	platform_driver_register(&cpcap_usb_connected_driver);
 	platform_device_register(&android_usb_platform_device);
-
 }
 
 static struct usbhs_omap_board_data usbhs_bdata  = {
@@ -92,5 +121,6 @@ static struct usbhs_omap_board_data usbhs_bdata  = {
 
 void __init mapphone_usbhost_init(void)
 {
+	mapphone_usb_modem_startup();
 	usbhs_init(&usbhs_bdata);
 }
