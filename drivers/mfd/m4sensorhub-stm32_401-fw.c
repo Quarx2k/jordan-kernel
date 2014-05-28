@@ -190,6 +190,11 @@ int m4sensorhub_401_load_firmware(struct m4sensorhub_data *m4sensorhub,
 				barker_read_from_device, BARKER_NUMBER);
 			KDEBUG(M4SH_NOTICE,
 				"forcing firmware update from file\n");
+			/*
+			 * This is likely a blank flash factory case, so
+			 * skip doing any driver pre-flash callbacks.
+			 */
+			goto m4sensorhub_401_load_firmware_erase_flash;
 		} else {
 			/* Read firmware version from device */
 			if (m4sensorhub_bl_rm(m4sensorhub, VERSION_ADDRESS,
@@ -223,9 +228,41 @@ int m4sensorhub_401_load_firmware(struct m4sensorhub_data *m4sensorhub,
 	} else {
 		KDEBUG(M4SH_NOTICE, "Version of firmware on file is 0x%04x\n",
 			fw_version_file);
+		/*
+		 * Currently no code uses the force_upgrade path,
+		 * but in case it is used for some recovery (and because
+		 * no numbers or error checking is done), we will skip
+		 * trying to call any driver pre-flash callbacks.
+		 */
+		goto m4sensorhub_401_load_firmware_erase_flash;
+	}
+
+	/* Boot M4, execute any pre-flash callbacks, then reset for BL mode */
+	if (m4sensorhub_preflash_callbacks_exist()) {
+		KDEBUG(M4SH_ERROR, "%s: Booting M4 to execute callbacks...\n",
+			__func__); /* Not an error (see similar above) */
+		ret = m4sensorhub_jump_to_user(m4sensorhub);
+		if (ret < 0) {
+			KDEBUG(M4SH_ERROR, "%s: %s %s %d.\n", __func__,
+				"Failed to boot M4 for callbacks",
+				"with error code", ret);
+			/*
+			 * Since we don't know the status of M4 at this point,
+			 * we will skip any callbacks, reset the IC to a known
+			 * state, and go ahead with a reflash.
+			 */
+			m4sensorhub_hw_reset(m4sensorhub);
+			goto m4sensorhub_401_load_firmware_erase_flash;
+		}
+
+		m4sensorhub_call_preflash_callbacks();
+		KDEBUG(M4SH_ERROR, "%s: Callbacks complete, flashing M4...\n",
+			__func__); /* Not an error (see similar above) */
+		m4sensorhub_hw_reset(m4sensorhub);
 	}
 
 	/* The flash memory to update has to be erased before updating */
+m4sensorhub_401_load_firmware_erase_flash:
 	ret = m4sensorhub_bl_erase_fw(m4sensorhub);
 	if (ret < 0) {
 		pr_err("%s: erase failed\n", __func__);

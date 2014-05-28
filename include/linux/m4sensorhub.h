@@ -31,10 +31,10 @@ extern char m4sensorhub_debug;
 #define M4SENSORHUB_DRIVER_NAME     "m4sensorhub"
 #define M4SENSORHUB_I2C_ADDR        0x18
 
-#define KDEBUG(i, format, s...) 			\
-	do {						\
+#define KDEBUG(i, format, s...)                         \
+	do {                                            \
 		if (m4sensorhub_debug >= i)             \
-			printk(KERN_CRIT format, ##s);	\
+			pr_crit(format, ##s);           \
 	} while (0)
 
 enum m4sensorhub_debug_level {
@@ -221,6 +221,23 @@ int m4sensorhub_register_initcall(int(*initfunc)(struct init_calldata *),
 							void *pdata);
 void m4sensorhub_unregister_initcall(
 		int(*initfunc)(struct init_calldata *));
+
+/*
+ * Some M4 drivers (e.g., RTC) require reading data on boot, even if M4
+ * needs a firmware update.  These functions allow drivers to register
+ * callbacks with the core to take care of small maintenance tasks before
+ * M4 is reflashed (e.g., caching the system time).
+ *
+ * NOTE:  Drivers should not rely on this call for normal operation.
+ *        Reflashing M4 is an uncommon event, and most of the time,
+ *        especially in production, these callbacks will never be used.
+ */
+int m4sensorhub_register_preflash_callback(
+		int(*initfunc)(struct init_calldata *), void *pdata);
+void m4sensorhub_unregister_preflash_callback(
+		int(*initfunc)(struct init_calldata *));
+void m4sensorhub_call_preflash_callbacks(void); /* For FW flash core */
+bool m4sensorhub_preflash_callbacks_exist(void); /* For FW flash core */
 
 int m4sensorhub_irq_disable_all(struct m4sensorhub_data *m4sensorhub);
 

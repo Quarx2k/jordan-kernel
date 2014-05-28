@@ -60,6 +60,7 @@ struct init_call {
 static struct m4sensorhub_data m4sensorhub_misc_data;
 static DEFINE_MUTEX(m4sensorhub_driver_lock);
 static struct init_call *inithead;
+static struct init_call *preflash_head;
 static int firmware_download_status = -1;
 static char tcmd_exec_status;
 
@@ -69,8 +70,8 @@ MODULE_PARM_DESC(force_upgrade, "Force FW download ignoring version check");
 
 unsigned short debug_level;
 module_param(debug_level, short, 0644);
-MODULE_PARM_DESC(debug_level, "Set debug level 1 (CRITICAL) to "
-				"7 (VERBOSE_DEBUG)");
+MODULE_PARM_DESC(debug_level,
+	"Set debug level 1 (CRITICAL) to 7 (VERBOSE_DEBUG)");
 
 /* -------------- Global Functions ----------------- */
 struct m4sensorhub_data *m4sensorhub_client_get_drvdata(void)
@@ -366,6 +367,89 @@ void m4sensorhub_unregister_initcall(int(*initfunc)(struct init_calldata *))
 	}
 }
 EXPORT_SYMBOL_GPL(m4sensorhub_unregister_initcall);
+
+int m4sensorhub_register_preflash_callback(
+		int(*initfunc)(struct init_calldata *), void *pdata)
+{
+	struct init_call *inc = NULL;
+
+	inc = kzalloc(sizeof(struct init_call), GFP_KERNEL);
+	if (inc == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: Unable to allocate init call mem\n",
+			__func__);
+		return -ENOMEM;
+	}
+
+	inc->initcb = initfunc;
+	inc->pdata = pdata;
+	/* add it to the list */
+	if (preflash_head == NULL)
+		inc->next = NULL;
+	else
+		inc->next = preflash_head;
+
+	preflash_head = inc;
+	return 0;
+}
+EXPORT_SYMBOL_GPL(m4sensorhub_register_preflash_callback);
+
+void m4sensorhub_unregister_preflash_callback(
+		int(*initfunc)(struct init_calldata *))
+{
+	struct init_call *node = preflash_head;
+	struct init_call *prev;
+
+	for (node = preflash_head, prev = NULL;
+		node != NULL;
+		prev = node, node = node->next) {
+		if (node->initcb == initfunc) {
+			/* remove this node */
+			if (node == preflash_head)
+				preflash_head = node->next;
+			else
+				prev->next = node->next;
+			kfree(node);
+		}
+	}
+}
+EXPORT_SYMBOL_GPL(m4sensorhub_unregister_preflash_callback);
+
+void m4sensorhub_call_preflash_callbacks(void)
+{
+	struct init_calldata arg;
+	struct init_call *inc = NULL;
+	struct init_call *prev = NULL;
+	int err = 0;
+
+	/* Call any registered preflash callbacks */
+	inc = preflash_head;
+	arg.p_m4sensorhub_data = &m4sensorhub_misc_data;
+	prev = NULL;
+	while (inc) {
+		arg.p_data = inc->pdata;
+		err = inc->initcb(&arg);
+		if (err < 0) {
+			KDEBUG(M4SH_ERROR,
+				"%s: Callback failed with error code %d\n",
+				__func__, err);
+		}
+		prev = inc;
+		inc = inc->next;
+		kfree(prev);
+	}
+
+	return;
+}
+EXPORT_SYMBOL_GPL(m4sensorhub_call_preflash_callbacks);
+
+bool m4sensorhub_preflash_callbacks_exist(void)
+{
+	if (preflash_head != NULL)
+		return true;
+	else
+		return false;
+}
+EXPORT_SYMBOL_GPL(m4sensorhub_preflash_callbacks_exist);
 /* END BOARD FILE FUNCTIONS */
 
 /* Downloads m4 firmware and also initializes all m4 drivers */
@@ -420,9 +504,8 @@ static void m4sensorhub_initialize(const struct firmware *firmware,
 		err = inc->initcb(&arg);
 		if (err < 0) {
 			KDEBUG(M4SH_ERROR,
-				"%s: Callback failed with error code %d %s\n",
-				__func__, err, "(dumping stack)");
-			dump_stack();
+				"%s: Callback failed with error code %d\n",
+				__func__, err);
 		}
 		prev = inc;
 		inc = inc->next;
@@ -439,7 +522,7 @@ static ssize_t m4sensorhub_set_dbg(struct device *dev,
 {
 	unsigned long debug;
 
-	if ((strict_strtol(buf, 10, &debug) < 0) ||
+	if ((kstrtol(buf, 10, &debug) < 0) ||
 	    (debug < M4SH_NODEBUG) || (debug > M4SH_VERBOSE_DEBUG))
 		return -EINVAL;
 
@@ -463,8 +546,8 @@ static ssize_t m4sensorhub_get_loglevel(struct device *dev,
 	KDEBUG(M4SH_INFO, "M4 loglevel = %llx", loglevel);
 	return sprintf(buf, "%llu\n", loglevel);
 }
-void ParseAndUpdateLogLevels(char *tag, char *level,
-			unsigned long long *logLevels)
+void m4sensorhub_update_loglevels(char *tag, char *level,
+			unsigned long long *log_levels)
 {
 	int i;
 	int levelindex = -1;
@@ -490,10 +573,10 @@ void ParseAndUpdateLogLevels(char *tag, char *level,
 
 	/*Clear the revelant bits*/
 	mask = 0x03;
-	*logLevels &= ~(mask << (tagindex * 2));
+	*log_levels &= ~(mask << (tagindex * 2));
 	/*set debug level for the relevant bits*/
-	*logLevels |= (levelindex << (tagindex * 2));
-	KDEBUG(M4SH_INFO, "New M4 log levels = 0x%llx\n", *logLevels);
+	*log_levels |= (levelindex << (tagindex * 2));
+	KDEBUG(M4SH_INFO, "New M4 log levels = 0x%llx\n", *log_levels);
 }
 
 /* Usage: adb shell into the directory of sysinterface log_level and
@@ -501,12 +584,12 @@ void ParseAndUpdateLogLevels(char *tag, char *level,
 static ssize_t m4sensorhub_set_loglevel(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t count)
 {
-	unsigned long long currentLogLevels;
+	unsigned long long cur_loglevels;
 	char *tag, *level;
 	char **logbuf = (char **) &buf;
 
 	m4sensorhub_reg_read(&m4sensorhub_misc_data,
-		M4SH_REG_LOG_LOGENABLE, (char *)&currentLogLevels);
+		M4SH_REG_LOG_LOGENABLE, (char *)&cur_loglevels);
 	while (1) {
 		tag = strsep(logbuf, "=,\n ");
 		if (tag == NULL)
@@ -514,11 +597,11 @@ static ssize_t m4sensorhub_set_loglevel(struct device *dev,
 		level = strsep(logbuf, "=,\n ");
 		if (level == NULL)
 			break;
-		ParseAndUpdateLogLevels(tag, level, &currentLogLevels);
+		m4sensorhub_update_loglevels(tag, level, &cur_loglevels);
 	}
 
 	return m4sensorhub_reg_write(&m4sensorhub_misc_data,
-		M4SH_REG_LOG_LOGENABLE, (char *)&currentLogLevels,
+		M4SH_REG_LOG_LOGENABLE, (char *)&cur_loglevels,
 		m4sh_no_mask);
 }
 
@@ -656,10 +739,11 @@ static ssize_t m4sensorhub_raw_i2c(struct device *dev,
 		buffer[1] = (addr & 0xFF);
 		ret = m4sensorhub_i2c_write_read(&m4sensorhub_misc_data,
 						 buffer, 2, len);
-		if (ret != len)
-			KDEBUG(M4SH_ERROR, "Failed to read from bank 0x%x \
-			       addr 0x%x", bank, addr);
-		else {
+		if (ret != len) {
+			KDEBUG(M4SH_ERROR,
+				"Failed to read from bank 0x%x addr 0x%x",
+				bank, addr);
+		} else {
 			for (i = 0; i < len; i++)
 				KDEBUG(M4SH_INFO, "0x%x ",
 				       (unsigned char)buffer[i]);
@@ -673,9 +757,11 @@ static ssize_t m4sensorhub_raw_i2c(struct device *dev,
 		buffer[2] = (len & 0xFF);
 		ret = m4sensorhub_i2c_write_read(&m4sensorhub_misc_data,
 						 buffer, 3, 0);
-		if (ret != 1)
-			KDEBUG(M4SH_ERROR, "Failed to write 0x%x from bank \
-			       0x%x addr 0x%x", len, bank, addr);
+		if (ret != 1) {
+			KDEBUG(M4SH_ERROR,
+				"Failed to write 0x%x from bank 0x%x addr 0x%x",
+				len, bank, addr);
+		}
 	} else {
 		KDEBUG(M4SH_ERROR, "Unknown operation = %c", operation);
 	}
