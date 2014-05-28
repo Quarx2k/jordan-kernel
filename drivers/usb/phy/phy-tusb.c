@@ -148,6 +148,13 @@ static int tusb_enable(struct tusb_usb *tusb, bool enable)
 	return 0;
 }
 
+static int tusb_phy_reset(struct usb_phy *x, int enable)
+{
+	struct tusb_usb	*tusb = dev_get_drvdata(x->dev);
+
+	return tusb_enable(tusb, (bool)enable);
+}
+
 static int tusb_usb_set_vbus(struct usb_otg *otg, bool enabled)
 {
 	return 0;
@@ -325,6 +332,7 @@ static int  tusb_usb_probe(struct platform_device *pdev)
 	tusb->phy.dev		= tusb->dev;
 	tusb->phy.label		= "tusb";
 	tusb->phy.set_suspend	= tusb_set_suspend;
+	tusb->phy.hw_reset	= tusb_phy_reset;
 	tusb->phy.otg		= otg;
 	tusb->phy.type		= USB_PHY_TYPE_USB2;
 	tusb->phy.last_event	= USB_EVENT_NONE;

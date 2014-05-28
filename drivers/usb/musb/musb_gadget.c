@@ -1612,15 +1612,20 @@ static void musb_pullup(struct musb *musb, int is_on)
 	u8 power;
 
 	power = musb_readb(musb->mregs, MUSB_POWER);
-	if (is_on)
+	if (is_on) {
+		usb_phy_reset(musb->xceiv, 0);
+		mdelay(10);
+		usb_phy_reset(musb->xceiv, 1);
 		power |= MUSB_POWER_SOFTCONN;
-	else
+	} else {
 		power &= ~MUSB_POWER_SOFTCONN;
+	}
 
 	/* FIXME if on, HdrcStart; if off, HdrcStop */
 
 	dev_dbg(musb->controller, "gadget D+ pullup %s\n",
 		is_on ? "on" : "off");
+
 	musb_writeb(musb->mregs, MUSB_POWER, power);
 }
 
@@ -1663,6 +1668,7 @@ static int musb_gadget_pullup(struct usb_gadget *gadget, int is_on)
 
 	if (is_on != musb->softconnect) {
 		musb->softconnect = is_on;
+		dev_dbg(musb->controller, "musb_gadget_pullup: %d", is_on);
 		musb_pullup(musb, is_on);
 	}
 

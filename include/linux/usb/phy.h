@@ -94,6 +94,10 @@ struct usb_phy {
 	/* enable/disable VBUS */
 	int	(*set_vbus)(struct usb_phy *x, int on);
 
+	/* hold/unhold usb controller in reset */
+	int	(*hw_reset)(struct usb_phy *x,
+				int enable);
+
 	/* effective for B devices, ignored for A-peripheral */
 	int	(*set_power)(struct usb_phy *x,
 				unsigned mA);
@@ -179,6 +183,15 @@ usb_phy_vbus_off(struct usb_phy *x)
 		return 0;
 
 	return x->set_vbus(x, false);
+}
+
+static inline int
+usb_phy_reset(struct usb_phy *x, int enable)
+{
+	if (!x->hw_reset)
+		return 0;
+
+	return x->hw_reset(x, enable);
 }
 
 /* for usb host and peripheral controller drivers */
