@@ -24,6 +24,7 @@
 #include <linux/slab.h>
 #include <linux/regulator/consumer.h>
 #include <linux/of.h>
+#include <linux/wakelock.h>
 
 /* TODO: replace with correct header */
 #include "../staging/android/timed_output.h"
@@ -34,6 +35,7 @@ struct vib_gpio_data {
 	struct hrtimer timer;
 	spinlock_t lock;
 	struct mutex io_mutex; /* protect GPIO & regulator operations */
+	struct wake_lock wake_lock;
 
 	struct regulator *reg;
 	int gpio;
@@ -70,6 +72,9 @@ static void vib_gpio_set(struct vib_gpio_data *vib_data, int on)
 	mutex_lock(&(vib_data->io_mutex));
 
 	if (on) {
+		if (!wake_lock_active(&vib_data->wake_lock))
+			wake_lock(&vib_data->wake_lock);
+
 		if (!vib_data->vib_power_state) {
 			power_on(vib_data);
 			vib_data->vib_power_state = 1;
@@ -86,6 +91,8 @@ static void vib_gpio_set(struct vib_gpio_data *vib_data, int on)
 			power_off(vib_data);
 			vib_data->vib_power_state = 0;
 		}
+
+		wake_unlock(&vib_data->wake_lock);
 	}
 
 	mutex_unlock(&(vib_data->io_mutex));
@@ -165,6 +172,8 @@ static int vib_gpio_probe(struct platform_device *pdev)
 
 	mutex_init(&(vib_data->io_mutex));
 
+	wake_lock_init(&vib_data->wake_lock, WAKE_LOCK_SUSPEND, "vibrator");
+
 	platform_set_drvdata(pdev, vib_data);
 
 	vib_data->gpio = -1;
@@ -176,7 +185,7 @@ static int vib_gpio_probe(struct platform_device *pdev)
 	np = pdev->dev.of_node;
 	if (!np) {
 		dev_err(&pdev->dev, "required device_tree entry not found\n");
-		goto free_mem;
+		goto destroy_wakelock;
 	}
 
 	if (!of_property_read_u32(np, "gpio", &prop))
@@ -195,7 +204,7 @@ static int vib_gpio_probe(struct platform_device *pdev)
 	vib_data->reg = regulator_get(&pdev->dev, "vib-gpio");
 	if (IS_ERR(vib_data->reg)) {
 		ret = PTR_ERR(vib_data->reg);
-		goto free_mem;
+		goto destroy_wakelock;
 	}
 
 	INIT_WORK(&vib_data->vib_work, vib_gpio_update);
@@ -218,13 +227,14 @@ static int vib_gpio_probe(struct platform_device *pdev)
 
 	vib_gpio_enable(&vib_data->dev, vib_data->initial_vibrate);
 
-	pr_info("vib gpio probe done");
+	pr_info("vib gpio probe done\n");
 	return 0;
 
 reg_put:
 	regulator_put(vib_data->reg);
+destroy_wakelock:
+	wake_lock_destroy(&vib_data->wake_lock);
 	mutex_destroy(&(vib_data->io_mutex));
-free_mem:
 	kfree(vib_data);
 err:
 	return ret;
@@ -236,6 +246,9 @@ static int vib_gpio_remove(struct platform_device *pdev)
 
 	timed_output_dev_unregister(&vib_data->dev);
 	regulator_put(vib_data->reg);
+	if (wake_lock_active(&vib_data->wake_lock))
+		wake_unlock(&vib_data->wake_lock);
+	wake_lock_destroy(&vib_data->wake_lock);
 	mutex_destroy(&(vib_data->io_mutex));
 	kfree(vib_data);
 
