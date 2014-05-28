@@ -522,8 +522,8 @@ tps65912_0: tps65912 {
 				reg = <12>;
 				regulator-compatible = "LDO9";
 				regulator-name = "LDO9";
-				regulator-min-microvolt = <1050000>;
-				regulator-max-microvolt = <1050000>;
+				regulator-min-microvolt = <1200000>;
+				regulator-max-microvolt = <1200000>;
 			};
 
 			ldo10_reg: regulator@13 {
