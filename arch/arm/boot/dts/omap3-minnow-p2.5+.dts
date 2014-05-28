@@ -13,6 +13,7 @@
 	mmi,revision = "p2";
 	mmi,hwrev = <
 		0x07   /* Minnow P2-5 portable (Rev A) */
+		0x08   /* Minnow P2-5 wingboard (issue 04) */
 	>;
 
 	Display@0 {
