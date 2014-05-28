@@ -514,5 +514,10 @@ config REGULATOR_AS3711
 	  This driver provides support for the voltage regulators on the
 	  AS3711 PMIC
 
+config REGULATOR_CPCAP
+	tristate "CPCAP regulator driver"
+	depends on MFD_CPCAP
+	help
+	  Say Y here to support the voltage regulators on CPCAP
 endif
 
