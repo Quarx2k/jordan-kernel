@@ -47,6 +47,53 @@ struct omap2430_glue {
 
 static struct timer_list musb_idle_timer;
 
+void cpcap_musb_notifier_call(unsigned long event)
+{
+	struct musb *musb = g_musb;
+#if 0
+	u32 val;
+#endif
+	switch (event) {
+	case USB_EVENT_VBUS:
+		DBG(1, "VBUS Connect\n");
+		pm_runtime_get_sync(musb->controller);
+#if 0
+		musb_gadget_pullup(&musb->g, 1);
+		/* configure musb into smartidle with wakeup enabled
+		 * smart standby mode.
+		 */
+		musb_writel(musb->mregs, OTG_FORCESTDBY, 0);
+		val = musb_readl(musb->mregs, OTG_SYSCONFIG);
+		val |= SMARTIDLE | SMARTSTDBY | ENABLEWAKEUP;
+		musb_writel(musb->mregs, OTG_SYSCONFIG, val);
+		musb->xceiv->last_event = USB_EVENT_VBUS;
+		musb->xceiv->state = OTG_STATE_B_IDLE;
+#endif
+		break;
+	case USB_EVENT_NONE:
+		DBG(1, "VBUS Disconnect\n");
+#if 0
+		/* configure in force idle/ standby */
+		musb_writel(musb->mregs, OTG_FORCESTDBY, 1);
+		val = musb_readl(musb->mregs, OTG_SYSCONFIG);
+		val &= ~(SMARTIDLEWKUP | SMARTSTDBY | ENABLEWAKEUP);
+		val |= FORCEIDLE | FORCESTDBY;
+		musb_writel(musb->mregs, OTG_SYSCONFIG, val);
+		__musb_pullup(musb, 0);
+		musb_stop(musb);
+		musb->xceiv->last_event = USB_EVENT_NONE;
+		musb->xceiv->state = OTG_STATE_B_IDLE;
+		musb_gadget_pullup(&musb->g, 0);
+		stop_activity(musb, musb->gadget_driver);
+#endif
+		pm_runtime_mark_last_busy(musb->controller);
+		pm_runtime_put_autosuspend(musb->controller);
+		break;
+	default:
+		DBG(1, "ID float\n");
+	}
+}
+
 static void musb_do_idle(unsigned long _musb)
 {
 	struct musb	*musb = (void *)_musb;
