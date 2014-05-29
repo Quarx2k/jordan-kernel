@@ -13,16 +13,17 @@
 #include <linux/gpio.h>
 #include <linux/clk.h>
 #include <linux/of_fdt.h>
+#include <linux/of_platform.h>
 #include <linux/bootmem.h>
-#include <asm/setup.h>
 
+#include <asm/setup.h>
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
+
 #include <mach/board-mapphone.h>
 
 #include "common.h"
 #include "pm.h"
-
 #include "sdram-toshiba-hynix-numonyx.h"
 
 #define ATAG_FLAT_DEV_TREE_ADDRESS 0xf100040A
@@ -76,11 +77,18 @@ static int __init parse_tag_flat_dev_tree_address(const struct tag *tag)
 
 __tagtable(ATAG_FLAT_DEV_TREE_ADDRESS, parse_tag_flat_dev_tree_address);
 
+static const char *omap3_boards_compat[] __initdata = {
+	"ti,mapphone",
+	"ti,omap3",
+	NULL,
+};
+
 static void __init omap_mapphone_init(void)
 {
 	struct clk *clkp;
 	omap2_sdrc_init(JEDEC_JESD209A_sdrc_params,
 				   JEDEC_JESD209A_sdrc_params);
+
 	/* Enable sad2d iclk */
 	clkp = clk_get(NULL, "sad2d_ick");
 	if (clkp) {
@@ -117,5 +125,6 @@ MACHINE_START(MAPPHONE, "mapphone_")
 	.init_machine	= omap_mapphone_init,
 	.init_late	= omap3630_init_late,
 	.init_time	= omap3_sync32k_timer_init,
+	.dt_compat	= omap3_boards_compat,
 	.restart	= omap3xxx_restart,
 MACHINE_END
