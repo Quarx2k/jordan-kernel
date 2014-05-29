@@ -21,7 +21,7 @@
 #include <linux/input.h>
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
-#include <linux/switch.h>
+#include <linux/extcon.h>
 #include <linux/workqueue.h>
 #include <linux/module.h>
 
@@ -39,7 +39,7 @@ enum {
 
 struct cpcap_3mm5_data {
 	struct cpcap_device *cpcap;
-	struct switch_dev sdev;
+	struct extcon_dev sdev;
 	unsigned int key_state;
 	struct regulator *regulator;
 	unsigned char audio_low_pwr_det;
@@ -48,9 +48,9 @@ struct cpcap_3mm5_data {
 	struct delayed_work work_mb2_en;
 };
 
-static ssize_t print_name(struct switch_dev *sdev, char *buf)
+static ssize_t print_name(struct extcon_dev *sdev, char *buf)
 {
-	switch (switch_get_state(sdev)) {
+	switch (extcon_get_state(sdev)) {
 	case NO_DEVICE:
 		return sprintf(buf, "No Device\n");
 	case HEADSET_WITH_MIC:
@@ -155,7 +155,7 @@ static void hs_handler(enum cpcap_irqs irq, void *data)
 		cpcap_irq_unmask(data_3mm5->cpcap, CPCAP_IRQ_HS);
 	}
 
-	//switch_set_state(&data_3mm5->sdev, new_state); //XXX TODO
+	extcon_set_state(&data_3mm5->sdev, new_state); //XXX TODO
 	if (data_3mm5->cpcap->h2w_new_state)
 		data_3mm5->cpcap->h2w_new_state(data_3mm5->cpcap, new_state);
 
@@ -171,7 +171,7 @@ static void key_handler(enum cpcap_irqs irq, void *data)
 		return;
 
 	if ((cpcap_irq_sense(data_3mm5->cpcap, CPCAP_IRQ_HS, 1) == 1) ||
-	    (switch_get_state(&data_3mm5->sdev) != HEADSET_WITH_MIC)) {
+	    (extcon_get_state(&data_3mm5->sdev) != HEADSET_WITH_MIC)) {
 		hs_handler(CPCAP_IRQ_HS, data_3mm5);
 		return;
 	}
@@ -218,7 +218,7 @@ static void mac13_handler(enum cpcap_irqs irq, void *data)
 static int cpcap_3mm5_suspend(struct platform_device *dev, pm_message_t state)
 {
 	struct cpcap_3mm5_data *data_3mm5 = platform_get_drvdata(dev);
-	if (switch_get_state(&data_3mm5->sdev) == HEADSET_WITHOUT_MIC)
+	if (extcon_get_state(&data_3mm5->sdev) == HEADSET_WITHOUT_MIC)
 		audio_low_power_set(data_3mm5, &data_3mm5->audio_low_pwr_det);
 	return 0;
 }
@@ -226,7 +226,7 @@ static int cpcap_3mm5_suspend(struct platform_device *dev, pm_message_t state)
 static int cpcap_3mm5_resume(struct platform_device *dev)
 {
 	struct cpcap_3mm5_data *data_3mm5 = platform_get_drvdata(dev);
-	if (switch_get_state(&data_3mm5->sdev) == HEADSET_WITHOUT_MIC)
+	if (extcon_get_state(&data_3mm5->sdev) == HEADSET_WITHOUT_MIC)
 		audio_low_power_clear(data_3mm5, &data_3mm5->audio_low_pwr_det);
 	return 0;
 }
