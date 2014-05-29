@@ -15,7 +15,6 @@ Optional properties:
 - clock-latency: Specify the possible maximum transition latency for clock,
   in unit of nanoseconds.
 - voltage-tolerance: Specify the CPU voltage tolerance in percentage.
-- reset-voltage:  Voltage to set on panic
 
 Examples:
 

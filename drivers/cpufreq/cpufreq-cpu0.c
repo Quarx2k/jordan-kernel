@@ -25,7 +25,6 @@
 
 static unsigned int transition_latency;
 static unsigned int voltage_tolerance; /* in percentage */
-static unsigned long reset_voltage;
 
 static struct device *cpu_dev;
 static struct clk *cpu_clk;
@@ -202,28 +201,6 @@ static struct notifier_block cpu0_cpufreq_reboot_notifier = {
 	.notifier_call = cpu0_cpufreq_reboot_notify,
 };
 
-static int cpu0_cpufreq_panic_handler(struct notifier_block *nb,
-			       unsigned long event, void *unused)
-{
-	int ret;
-
-	is_suspended = true;
-	if (cpu_reg && reset_voltage)
-		ret = regulator_set_voltage(cpu_reg,
-			reset_voltage, reset_voltage);
-
-	if (ret)
-		pr_err("Failed to set voltage on panic!\n");
-
-	return NOTIFY_OK;
-}
-
-static struct notifier_block cpu0_cpufreq_panic_notifier = {
-	.notifier_call  = cpu0_cpufreq_panic_handler,
-	.next           = NULL,
-	.priority       = 250   /* priority: INT_MAX >= x >= 0 */
-};
-
 static int cpu0_cpufreq_init(struct cpufreq_policy *policy)
 {
 	int ret;
@@ -250,9 +227,6 @@ static int cpu0_cpufreq_init(struct cpufreq_policy *policy)
 		register_pm_notifier(&cpu0_cpufreq_pm_notifier);
 
 	register_reboot_notifier(&cpu0_cpufreq_reboot_notifier);
-
-	atomic_notifier_chain_register(&panic_notifier_list,
-		&cpu0_cpufreq_panic_notifier);
 
 	return 0;
 }
@@ -288,7 +262,6 @@ static struct cpufreq_driver cpu0_cpufreq_driver = {
 static int cpu0_cpufreq_probe(struct platform_device *pdev)
 {
 	struct device_node *np, *parent;
-	u32 uV;
 	int ret;
 
 	parent = of_find_node_by_path("/cpus");
@@ -301,9 +274,6 @@ static int cpu0_cpufreq_probe(struct platform_device *pdev)
 		if (of_get_property(np, "operating-points", NULL))
 			break;
 	}
-
-	if (!of_property_read_u32(np, "reset-voltage", &uV))
-		reset_voltage = uV;
 
 	if (!np) {
 		pr_err("failed to find cpu0 node\n");
