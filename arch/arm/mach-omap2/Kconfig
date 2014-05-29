@@ -109,8 +109,8 @@ config ARCH_OMAP2PLUS_TYPICAL
 	select NEON if CPU_V7
 	select PM_RUNTIME
 	select REGULATOR
-	select TWL4030_CORE if ARCH_OMAP3 || ARCH_OMAP4
-	select TWL4030_POWER if ARCH_OMAP3 || ARCH_OMAP4
+	#select TWL4030_CORE if ARCH_OMAP3 || ARCH_OMAP4
+	#select TWL4030_POWER if ARCH_OMAP3 || ARCH_OMAP4
 	select VFP
 	help
 	  Compile a kernel suitable for booting most boards
