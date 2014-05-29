@@ -3554,8 +3554,10 @@ static const char *enable_init_clks[] = {
 
 int __init omap3xxx_clk_init(void)
 {
-	if (omap3_has_192mhz_clk())
+	if (omap3_has_192mhz_clk()) {
 		omap_96m_alwon_fck = omap_96m_alwon_fck_3630;
+		omap_96m_alwon_fck_3630.hw->clk = &omap_96m_alwon_fck;
+	}
 
 	if (cpu_is_omap3630()) {
 		dpll3_m3x2_ck = dpll3_m3x2_ck_3630;
