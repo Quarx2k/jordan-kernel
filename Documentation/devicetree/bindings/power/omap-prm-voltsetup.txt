@@ -27,12 +27,6 @@ Optional Properties:
   defined, then time is calculated based on PMIC slew rate and voltage level
   will be used. Claculated time is used also if value in device tree less then
   calculated.
-- setup_time1: VDD1 voltage setup time in micro seconds when the device exits
-  the off mode. It used only if sys_off_mode is false. If this value is not
-  defined, then time is calculated based on PMIC slew rate and voltage level
-  will be used. Claculated time is used also if value in device tree less then
-  calculated.
-- setup_time2: same as above only for VDD2.
 
 Example:
 glbl_prm: glbl_prm@48307250 {

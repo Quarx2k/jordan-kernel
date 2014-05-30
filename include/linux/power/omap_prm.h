@@ -20,10 +20,26 @@
 #define _POWER_OMAP_PRM_H
 
 #if IS_ENABLED(CONFIG_POWER_TI_HARDWARE_VOLTAGE_CONTROL)
+/*
+ * omap_prm_configure - Will configure global PRM register to low power values
+ *			for voltage setup timings and state according device
+ *			device tree properties.
+ * bool off:		If true then OFF state will be configured, otherwise
+ *			retention state. At least one of these state has to be
+ *			enabled in device tree with auto_off or auto_retention
+ *			flags&pointer
+ * Returns 0 if success, otherwise error code.
+ */
+int omap_prm_configure(bool off);
+
 void omap_pm_enable_off_mode(void);
 void omap_pm_disable_off_mode(void);
 bool omap_pm_get_off_mode(void);
 #else
+static inline int omap_prm_configure(bool off)
+{
+	return -ENODEV;
+}
 static inline void omap_pm_enable_off_mode(void)
 {
 }

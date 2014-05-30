@@ -20,12 +20,14 @@
 #define _POWER_OMAP_PRM_VOLTSETUP_H
 
 struct omap_pmic;
+struct omap_vc_channel_info;
 
 #if IS_ENABLED(CONFIG_POWER_TI_HARDWARE_VOLTAGE_CONTROL)
-int omap_prm_voltsetup(struct device *dev, struct omap_pmic *pmic, u32 uv);
+int omap_prm_voltsetup(struct omap_vc_channel_info *inf, struct omap_pmic *pmic,
+			u32 uv);
 #else
-static inline int omap_prm_voltsetup(struct device *dev, struct omap_pmic *pmic,
-				u32 uv)
+static inline int omap_prm_voltsetup(struct omap_vc_channel_info *inf,
+					struct omap_pmic *pmic,	u32 uv)
 {
 	return -ENODEV;
 }

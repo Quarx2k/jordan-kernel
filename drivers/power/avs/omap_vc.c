@@ -75,6 +75,8 @@ struct vc_channel_regs {
 	u32 command_val_onlp_mask;
 	u32 command_val_ret_mask;
 	u32 command_val_off_mask;
+	/* channel number */
+	u32 ch_num;
 };
 
 /**
@@ -182,6 +184,8 @@ static const struct vc_channel_regs omap3_ch_1_regs = {
 	.command_val_onlp_mask = 0xFF0000,
 	.command_val_ret_mask = 0xFF00,
 	.command_val_off_mask = 0xFF,
+
+	.ch_num = 1,
 };
 
 static const struct vc_channel_regs omap3_ch_0_regs = {
@@ -206,6 +210,8 @@ static const struct vc_channel_regs omap3_ch_0_regs = {
 	.command_val_onlp_mask = 0xFF0000,
 	.command_val_ret_mask = 0xFF00,
 	.command_val_off_mask = 0xFF,
+
+	.ch_num = 0,
 };
 
 static const struct vc_channel_regs omap4_ch_mpu_regs = {
@@ -230,6 +236,7 @@ static const struct vc_channel_regs omap4_ch_mpu_regs = {
 	.command_val_onlp_mask = 0xFF0000,
 	.command_val_ret_mask = 0xFF00,
 	.command_val_off_mask = 0xFF,
+	.ch_num = 2,
 };
 
 static const struct vc_channel_regs omap4_ch_iva_regs = {
@@ -254,6 +261,7 @@ static const struct vc_channel_regs omap4_ch_iva_regs = {
 	.command_val_onlp_mask = 0xFF0000,
 	.command_val_ret_mask = 0xFF00,
 	.command_val_off_mask = 0xFF,
+	.ch_num = 1,
 };
 
 static const struct vc_channel_regs omap4_ch_core_regs = {
@@ -278,6 +286,7 @@ static const struct vc_channel_regs omap4_ch_core_regs = {
 	.command_val_onlp_mask = 0xFF0000,
 	.command_val_ret_mask = 0xFF00,
 	.command_val_off_mask = 0xFF,
+	.ch_num = 0,
 };
 
 static const struct vc_channel_regs omap5_ch_core_regs = {
@@ -302,6 +311,7 @@ static const struct vc_channel_regs omap5_ch_core_regs = {
 	.command_val_onlp_mask = 0xFF0000,
 	.command_val_ret_mask = 0xFF00,
 	.command_val_off_mask = 0x00,	/* Reserved */
+	.ch_num = 0,
 };
 
 static const struct vc_channel_regs omap5_ch_mm_regs = {
@@ -326,6 +336,7 @@ static const struct vc_channel_regs omap5_ch_mm_regs = {
 	.command_val_onlp_mask = 0xFF0000,
 	.command_val_ret_mask = 0xFF00,
 	.command_val_off_mask = 0x00,	/* Reserved */
+	.ch_num = 1,
 };
 
 static const struct vc_channel_regs omap5_ch_mpu_regs = {
@@ -350,6 +361,7 @@ static const struct vc_channel_regs omap5_ch_mpu_regs = {
 	.command_val_onlp_mask = 0xFF0000,
 	.command_val_ret_mask = 0xFF00,
 	.command_val_off_mask = 0x00,	/* Reserved */
+	.ch_num = 2,
 };
 
 /* VC Generic register configurations */
@@ -471,7 +483,7 @@ int omap_vc_channel_set_on_voltage(struct omap_vc_channel_info *info, u32 uv)
 	if (ret)
 		goto fail_reg;
 
-	ret = omap_prm_voltsetup(dev, pmic, uv);
+	ret = omap_prm_voltsetup(info, pmic, uv);
 	if (ret) {
 		dev_err(dev, "Unable to set voltsetup parameters %d\n", ret);
 		goto out;
@@ -1083,6 +1095,7 @@ static int omap_vc_channel_probe(struct platform_device *pdev)
 	vc_channel->ch_regs = match->data;
 	info = &vc_channel->info;
 	info->ch = vc_channel;
+	info->ch_num = vc_channel->ch_regs->ch_num;
 
 	/* Pick up optional parameters */
 	of_property_read_u32(node, "ti,retention-micro-volts",

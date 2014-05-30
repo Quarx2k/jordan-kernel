@@ -38,6 +38,7 @@ struct omap_vc_channel;
  * @off_uV:		OFF voltage in micro volts
  */
 struct omap_vc_channel_info {
+	u32 ch_num;
 	struct omap_pmic *pmic;
 	u32 retention_uV;
 	u32 off_uV;

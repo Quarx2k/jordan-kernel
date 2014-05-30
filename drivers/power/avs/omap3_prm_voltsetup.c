@@ -28,6 +28,7 @@
 #include <linux/err.h>
 #include <linux/power/omap_prm.h>
 #include <linux/regulator/omap-pmic-regulator.h>
+#include "omap_vc.h"
 #include "omap_prm_voltsetup.h"
 
 #define DRIVER_NAME	"omap3-glbl-prm"
@@ -56,16 +57,20 @@
 #define VOLTOFFSET_MASK				0xffff
 #define VOLTSETUP1_TIME1_MASK			0x0000ffff
 #define VOLTSETUP1_TIME2_MASK			0xffff0000
+#define VOLTSETUP1_TIME1_2_MASK			0xffffffff
 
 
 struct omap_prm_voltsetup_data {
 	struct device *dev;
-	struct regmap *regmap;
+	struct regmap *rmap;
 	const struct omap_vc_common_reg *regs;
 	bool sys_off_mode;
 	bool auto_retention;
 	bool auto_off;
-	u32 clksetup_time; /* uSec */
+	u32 retsetup1_2; /* sys_clk ticks for time1 and time2*/
+	u32 offsetup1_2; /* sys_clk ticks for time1 and time2*/
+	u32 offmodesetup_cnt; /* 32K ticks */
+	u32 offoffset_cnt; /* 32K ticks */
 	u32 sys_clk_rate; /* Hz */
 };
 
@@ -83,101 +88,94 @@ static const struct of_device_id omap3_prm_voltsetup_match_tbl[] __initdata = {
 };
 MODULE_DEVICE_TABLE(of, omap3_prm_voltsetup_match_tbl);
 
-int omap_prm_voltsetup(struct device *dev, struct omap_pmic *pmic, u32 uv)
+int omap_prm_configure(bool off)
 {
-	struct regmap *regmap;
-	const char *str;
-	int ret = 0, val;
-	u32 v1, v2, v2_old, msk;
-	struct device *prm_dev = prm_voltsetup_data->dev;
+	u32 val, msk;
+	int ret = 0;
+	struct omap_prm_voltsetup_data *pd = prm_voltsetup_data;
 
-	if (!dev || !dev->of_node || !pmic || uv == 0) {
-		dev_err(prm_dev, "Invalid parameters\n");
-		return -EINVAL;
-	}
-	if (IS_ERR_OR_NULL(prm_voltsetup_data)) {
-		dev_err(prm_dev, "Device is not initialized\n");
+	if (!pd || !pd->dev) {
+		pr_err("PRM voltsetup device is not initialized\n");
 		return -ENODEV;
 	}
-	regmap = prm_voltsetup_data->regmap;
 
-	if (prm_voltsetup_data->sys_off_mode) {
-		ret = regmap_read(regmap, PRM_VOLTSETUP2_OFFS, &v2_old);
-		if (ret)
-			goto fail_reg;
-		v2_old &= OFFMODESETUPTIME_MASK;
-		v2_old >>= __ffs(OFFMODESETUPTIME_MASK);
+	/* set auto bit exclusive */
+	regmap_update_bits(pd->rmap, PRM_VOLTCTRL_OFFS, VOLTCTRL_AUTO_MASK, 0);
+	msk = off ? VOLTCTRL_AUTO_OFF_MASK : VOLTCTRL_AUTO_RET_MASK;
+	val = off ? (pd->auto_off ? 1 : 0) : (pd->auto_retention ? 1 : 0);
+	regmap_update_bits(pd->rmap, PRM_VOLTCTRL_OFFS, msk, val << __ffs(msk));
 
-		v2_old = DIV_ROUND_CLOSEST(v2_old * 1000000, 32768);
-
-		/* voltage / slew_rate, 2uS added as buffer */
-		val = DIV_ROUND_UP(uv, pmic->info->slew_rate_uV) + 2;
-
-		/*
-		 * Update v2 if higher than current value (needed because
-		 * we have multiple channels with different ramp times), also
-		 * update voltoffset always to value recommended by TRM
-		 */
-		if (val > v2_old) {
-			dev_dbg(prm_dev, "voltsetup2 is set to %d uS\n", val);
-			v2 = DIV_ROUND_UP(val * 32768, 1000000);
-			ret = regmap_update_bits(regmap, PRM_VOLTSETUP2_OFFS,
+	if (off && pd->auto_off) {
+		if (pd->sys_off_mode) {
+			val = pd->offmodesetup_cnt;
+			ret = regmap_update_bits(pd->rmap, PRM_VOLTSETUP2_OFFS,
 					OFFMODESETUPTIME_MASK,
-					v2 << __ffs(OFFMODESETUPTIME_MASK));
+					val << __ffs(OFFMODESETUPTIME_MASK));
 			if (ret)
 				goto fail_reg;
-		} else
-			val = v2_old;
-
-		if (prm_voltsetup_data->clksetup_time > val)
-			val = prm_voltsetup_data->clksetup_time - val;
-		else
-			val = 30;
-
-		dev_dbg(prm_dev, "voltoffset is set to %d uS\n", val);
-		val = DIV_ROUND_UP(val * 32768, 1000000);
-		ret = regmap_update_bits(regmap, PRM_VOLTOFFSET_OFFS,
+			val = pd->offoffset_cnt;
+			ret = regmap_update_bits(pd->rmap, PRM_VOLTOFFSET_OFFS,
 				VOLTOFFSET_MASK, val << __ffs(VOLTOFFSET_MASK));
+		} else
+			ret = regmap_update_bits(pd->rmap, PRM_VOLTSETUP1_OFFS,
+				VOLTSETUP1_TIME1_2_MASK, pd->offsetup1_2);
 		if (ret)
 			goto fail_reg;
-	} else {
-		ret = of_property_read_string(dev->of_node, "compatible", &str);
-		if (ret) {
-			dev_err(prm_dev,
-			"No compatible property in channel (%d)\n", ret);
-			return ret;
-		}
-		val = strlen(str);
-		if (str[val - 1] == '0')
-			msk = VOLTSETUP1_TIME1_MASK;
-		else if (str[val - 1] == '1')
-			msk = VOLTSETUP1_TIME2_MASK;
-		else {
-			pr_err("Unable to identify vc channel\n");
-			return -EINVAL;
-		}
-		ret = regmap_read(regmap, PRM_VOLTSETUP1_OFFS, &val);
+	} else if (!off && pd->auto_retention) {
+		ret = regmap_update_bits(pd->rmap, PRM_VOLTSETUP1_OFFS,
+			VOLTSETUP1_TIME1_2_MASK, pd->retsetup1_2);
 		if (ret)
 			goto fail_reg;
-		val &= msk;
-		val >>= __ffs(msk);
-
-		/* voltage / slew_rate */
-		v1 = DIV_ROUND_UP(uv, pmic->info->slew_rate_uV);
-		v1 = DIV_ROUND_UP_ULL(
-			(u64)v1 * prm_voltsetup_data->sys_clk_rate, 8000000);
-		if (val > v1)
-			v1 = val;
-		v1 <<= __ffs(msk);
-		ret = regmap_update_bits(regmap, PRM_VOLTSETUP1_OFFS, msk, v1);
+		ret = regmap_update_bits(pd->rmap, PRM_VOLTSETUP2_OFFS,
+				OFFMODESETUPTIME_MASK,
+				0 << __ffs(OFFMODESETUPTIME_MASK));
+		if (ret)
+			goto fail_reg;
+		ret = regmap_update_bits(pd->rmap, PRM_VOLTOFFSET_OFFS,
+			VOLTOFFSET_MASK, 0 << __ffs(VOLTOFFSET_MASK));
 		if (ret)
 			goto fail_reg;
 	}
-	return ret;
-
+	return 0;
 fail_reg:
-	dev_err(dev, "%s: Register operation failed with %d\n", __func__, ret);
+	dev_err(pd->dev, "%s: Register operation failed (%d)\n", __func__, ret);
 	return ret;
+}
+EXPORT_SYMBOL_GPL(omap_prm_configure);
+
+int omap_prm_voltsetup(struct omap_vc_channel_info *inf, struct omap_pmic *pmic,
+			u32 uv)
+{
+	u32 uv_diff, val, msk;
+	struct omap_prm_voltsetup_data *pd = prm_voltsetup_data;
+
+	if (!pd || !pd->dev) {
+		pr_err("PRM voltsetup device is not initialized\n");
+		return -ENODEV;
+	}
+	if (!inf || !pmic || uv == 0 || pmic->info->slew_rate_uV == 0 ||
+	    inf->retention_uV > uv) {
+		dev_err(pd->dev, "Invalid parameters\n");
+		return -EINVAL;
+	}
+	if (inf->ch_num != 0 && inf->ch_num != 1) {
+		dev_err(pd->dev, "Unable to identify vc channel\n");
+		return -EINVAL;
+	}
+	msk = inf->ch_num == 0 ? VOLTSETUP1_TIME1_MASK : VOLTSETUP1_TIME2_MASK;
+	uv_diff = uv - inf->retention_uV;
+	val = DIV_ROUND_UP(uv_diff, pmic->info->slew_rate_uV);
+	val = DIV_ROUND_UP_ULL((u64)val * pd->sys_clk_rate, 8000000);
+	pd->retsetup1_2 &= ~msk;
+	pd->retsetup1_2 |= val << __ffs(msk);
+	if (!pd->sys_off_mode) {
+		uv_diff = uv - inf->off_uV;
+		val = DIV_ROUND_UP(uv_diff, pmic->info->slew_rate_uV);
+		val = DIV_ROUND_UP_ULL((u64)val * pd->sys_clk_rate, 8000000);
+		pd->offsetup1_2 &= ~msk;
+		pd->retsetup1_2 |= val << __ffs(msk);
+	}
+	return 0;
 }
 EXPORT_SYMBOL_GPL(omap_prm_voltsetup);
 /**
@@ -215,44 +213,6 @@ bool omap_pm_get_off_mode(void)
 }
 EXPORT_SYMBOL_GPL(omap_pm_get_off_mode);
 
-static int omap3_prm_suspend_noirq(struct device *dev)
-{
-	u32 msk = VOLTCTRL_AUTO_MASK, val = 0;
-	struct platform_device *pdev = to_platform_device(dev);
-	struct omap_prm_voltsetup_data *data = platform_get_drvdata(pdev);
-
-	/* clean all auto bits */
-	regmap_update_bits(data->regmap, PRM_VOLTCTRL_OFFS, msk, val);
-	/* set auto mode exclusively wiht "off" as priority*/
-	if (data->auto_off) {
-		msk = VOLTCTRL_AUTO_OFF_MASK;
-		val = 1;
-	} else if (data->auto_retention) {
-		msk = VOLTCTRL_AUTO_RET_MASK;
-		val = 1;
-	}
-	return regmap_update_bits(data->regmap, PRM_VOLTCTRL_OFFS, msk,
-		val << __ffs(msk));
-}
-
-static int omap3_prm_resume_noirq(struct device *dev)
-{
-	u32 msk = VOLTCTRL_AUTO_MASK, val = 0;
-	struct platform_device *pdev = to_platform_device(dev);
-	struct omap_prm_voltsetup_data *data = platform_get_drvdata(pdev);
-
-	/* clean all auto bits */
-	regmap_update_bits(data->regmap, PRM_VOLTCTRL_OFFS, msk, val);
-	/* restore mode to retention by default if defined */
-	if (data->auto_retention) {
-		msk = VOLTCTRL_AUTO_RET_MASK;
-		val = 1;
-	}
-	return regmap_update_bits(data->regmap, PRM_VOLTCTRL_OFFS, msk,
-		val << __ffs(msk));
-}
-
-
 static int omap3_prm_voltsetup_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -262,9 +222,10 @@ static int omap3_prm_voltsetup_probe(struct platform_device *pdev)
 	char *pname;
 	const char *clk_name = NULL;
 	void __iomem *base;
-	struct regmap *regmap;
+	struct regmap *rmap;
 	struct omap_prm_voltsetup_data *data;
-	u32 clkmode, val = 0;
+	u32 clksetup_time; /* uSec */
+	u32 val = 0;
 	struct clk *sys_clk;
 
 	if (!nd) {
@@ -283,9 +244,9 @@ static int omap3_prm_voltsetup_probe(struct platform_device *pdev)
 		dev_err(dev, "Unable to map registers\n");
 		return -EADDRNOTAVAIL;
 	}
-	regmap = devm_regmap_init_mmio(dev, base, &regmap_cfg);
-	if (IS_ERR(regmap)) {
-		ret = PTR_ERR(regmap);
+	rmap = devm_regmap_init_mmio(dev, base, &regmap_cfg);
+	if (IS_ERR(rmap)) {
+		ret = PTR_ERR(rmap);
 		dev_err(dev, "regmap init failed(%d)\n", ret);
 		return ret;
 	}
@@ -294,7 +255,23 @@ static int omap3_prm_voltsetup_probe(struct platform_device *pdev)
 		dev_err(dev, "%s: Unable to allocate data\n", __func__);
 		return -ENOMEM;
 	}
-	data->regmap = regmap;
+	data->rmap = rmap;
+
+	pname = "auto_off";
+	data->auto_off = of_property_read_bool(nd, pname);
+	pname = "auto_retention";
+	data->auto_retention = of_property_read_bool(nd, pname);
+
+	if (!data->auto_off && !data->auto_retention) {
+		dev_warn(dev, "WARNING: No auto_retention nor auto_off\n");
+		return -EINVAL;
+	}
+	/* clean all auto bits */
+	regmap_update_bits(rmap, PRM_VOLTCTRL_OFFS, VOLTCTRL_AUTO_MASK, 0);
+	/* set to retention if enabled by default, off mode is set on demand */
+	val = data->auto_retention ? 1 : 0;
+	regmap_update_bits(rmap, PRM_VOLTCTRL_OFFS, VOLTCTRL_AUTO_RET_MASK,
+		val << __ffs(VOLTCTRL_AUTO_RET_MASK));
 
 	pname = "sys_clk";
 	ret = of_property_read_string(nd, pname, &clk_name);
@@ -309,75 +286,38 @@ static int omap3_prm_voltsetup_probe(struct platform_device *pdev)
 	data->sys_clk_rate = clk_get_rate(sys_clk);
 	clk_put(sys_clk);
 
-	pname = "autoextclkmode";
-	of_property_read_u32(nd, pname, &clkmode);
-
 	pname = "clksetup_time";
-	ret = of_property_read_u32(nd, pname, &data->clksetup_time);
-	if (ret || !data->clksetup_time)
+	ret = of_property_read_u32(nd, pname, &clksetup_time);
+	if (ret || !clksetup_time)
 		goto property_err;
-
-	pname = "auto_off";
-	data->auto_off = of_property_read_bool(nd, pname);
-	pname = "auto_retention";
-	data->auto_retention = of_property_read_bool(nd, pname);
-
-	/* clean all auto bits */
-	regmap_update_bits(regmap, PRM_VOLTCTRL_OFFS, VOLTCTRL_AUTO_MASK, 0);
-	/* set to retention if enabled by default */
-	val = data->auto_retention ? 1 : 0;
-	regmap_update_bits(regmap, PRM_VOLTCTRL_OFFS,
-		VOLTCTRL_AUTO_RET_MASK,
-		val << __ffs(VOLTCTRL_AUTO_RET_MASK));
+	val = DIV_ROUND_UP(clksetup_time * 32768, 1000000);
+	ret = regmap_update_bits(rmap, PRM_CLKSETUP_OFFS, CLKSETUP_MASK,
+		val << __ffs(CLKSETUP_MASK));
+	if (ret)
+		goto fail_reg;
 
 	pname = "sys_off_mode";
-	if (of_property_read_bool(nd, pname)) {
-		data->sys_off_mode = true;
-		regmap_update_bits(regmap, PRM_VOLTCTRL_OFFS,
-			VOLTCTRL_SEL_OFF_MASK,
-			1 << __ffs(VOLTCTRL_SEL_OFF_MASK));
+	data->sys_off_mode = of_property_read_bool(nd, pname);
+	val = data->sys_off_mode ? 1 : 0;
+	regmap_update_bits(rmap, PRM_VOLTCTRL_OFFS, VOLTCTRL_SEL_OFF_MASK,
+		val << __ffs(VOLTCTRL_SEL_OFF_MASK));
 
+	if (data->sys_off_mode) {
 		pname = "offmodesetup_time";
-		val = 0;
-		of_property_read_u32(nd, pname, &val);
-		/* set value in register even if it is 0 */
-		val = DIV_ROUND_UP(val * 32768, 1000000);
-		ret = regmap_update_bits(regmap, PRM_VOLTSETUP2_OFFS,
-				OFFMODESETUPTIME_MASK,
-				val << __ffs(OFFMODESETUPTIME_MASK));
-		if (ret)
-			goto fail_reg;
-	} else {
-		data->sys_off_mode = false;
-		/* set value in register even if it is 0 */
-		pname = "setup_time1";
-		val = 0;
-		of_property_read_u32(nd, pname, &val);
-		val = DIV_ROUND_UP_ULL((u64)val * data->sys_clk_rate, 8000000);
-		ret = regmap_update_bits(regmap, PRM_VOLTSETUP1_OFFS,
-			VOLTSETUP1_TIME1_MASK,
-			val << __ffs(VOLTSETUP1_TIME1_MASK));
-		pname = "setup_time2";
-		val = 0;
-		of_property_read_u32(nd, pname, &val);
-		val = DIV_ROUND_UP_ULL((u64)val * data->sys_clk_rate, 8000000);
-		ret = regmap_update_bits(regmap, PRM_VOLTSETUP1_OFFS,
-			VOLTSETUP1_TIME2_MASK,
-			val << __ffs(VOLTSETUP1_TIME2_MASK));
+		ret = of_property_read_u32(nd, pname, &val);
+		if (ret || !val)
+			goto property_err;
+		data->offmodesetup_cnt = DIV_ROUND_UP(val * 32768, 1000000);
+		/* ~1 32K tick by default */
+		val = clksetup_time > val ? clksetup_time - val : 30;
+		data->offoffset_cnt = DIV_ROUND_UP(val * 32768, 1000000);
 	}
 
-	if (ret)
-		goto fail_reg;
-
-	ret = regmap_update_bits(regmap, PRM_CLKSRC_CTRL_OFFS,
+	pname = "autoextclkmode";
+	of_property_read_u32(nd, pname, &val);
+	ret = regmap_update_bits(rmap, PRM_CLKSRC_CTRL_OFFS,
 		CLKSRC_CTRL_AUTOEXTCLKMODE_MASK,
-		clkmode << __ffs(CLKSRC_CTRL_AUTOEXTCLKMODE_MASK));
-	if (ret)
-		goto fail_reg;
-
-	val = DIV_ROUND_UP(data->clksetup_time * 32768, 1000000);
-	ret = regmap_update_bits(regmap, PRM_CLKSETUP_OFFS, CLKSETUP_MASK,
-		val << __ffs(CLKSETUP_MASK));
+		val << __ffs(CLKSRC_CTRL_AUTOEXTCLKMODE_MASK));
 	if (ret)
 		goto fail_reg;
 
@@ -400,17 +340,11 @@ fail_reg:
 	return ret;
 }
 
-static const struct dev_pm_ops omap3_prm_dev_pm_ops = {
-	.suspend_noirq = omap3_prm_suspend_noirq,
-	.resume_noirq = omap3_prm_resume_noirq,
-};
-
 static struct platform_driver omap3_prm_voltsetup_driver = {
 	.driver = {
 		.name = DRIVER_NAME,
 		.owner = THIS_MODULE,
 		.of_match_table = of_match_ptr(omap3_prm_voltsetup_match_tbl),
-		.pm = &omap3_prm_dev_pm_ops,
 		},
 	.probe = omap3_prm_voltsetup_probe,
 };

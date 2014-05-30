@@ -315,7 +315,9 @@ void omap_sram_idle(bool in_suspend)
 
 			omap2_prm_set_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK,
 						   WKUP_MOD, PM_WKEN);
-		}
+			omap_prm_configure(true);
+		} else
+			omap_prm_configure(false);
 	}
 
 	omap3_intc_prepare_idle();
