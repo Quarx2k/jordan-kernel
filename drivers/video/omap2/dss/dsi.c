@@ -338,6 +338,7 @@ struct dsi_data {
 #endif
 	int debug_read;
 	int debug_write;
+	atomic_t update_pending;
 
 #ifdef CONFIG_OMAP2_DSS_COLLECT_IRQ_STATS
 	spinlock_t irq_stats_lock;
@@ -2523,19 +2524,21 @@ static int dsi_sync_vc_vp(struct platform_device *dsidev, int channel)
 
 	/* Wait for completion only if TE_EN/TE_START is still set */
 	if (REG_GET(dsidev, DSI_VC_TE(channel), bit, bit)) {
-		if (wait_for_completion_timeout(&completion,
+		u32 ts_last = REG_GET(dsidev, DSI_VC_TE(channel), 23, 0);
+		while (wait_for_completion_timeout(&completion,
 				msecs_to_jiffies(10)) == 0) {
-			DSSERR("Failed to complete previous frame transfer\n");
-			r = -EIO;
-			goto err1;
+			u32 ts = REG_GET(dsidev, DSI_VC_TE(channel), 23, 0);
+			if (!ts)
+				break;
+			if (ts == ts_last) {
+				DSSERR("Failed to complete previous frame transfer\n");
+				r = -EIO;
+				break;
+			}
+			ts_last = ts;
 		}
 	}
 
-	dsi_unregister_isr_vc(dsidev, channel, dsi_packet_sent_handler_vp,
-		&vp_data, DSI_VC_IRQ_PACKET_SENT);
-
-	return 0;
-err1:
 	dsi_unregister_isr_vc(dsidev, channel, dsi_packet_sent_handler_vp,
 		&vp_data, DSI_VC_IRQ_PACKET_SENT);
 err0:
@@ -4230,6 +4233,9 @@ static void dsi_update_screen_dispc(struct platform_device *dsidev)
 
 	DSSDBG("dsi_update_screen_dispc(%dx%d)\n", w, h);
 
+	WARN_ON(atomic_read(&dsi->update_pending) != 0);
+	atomic_inc(&dsi->update_pending);
+
 	dsi_vc_config_source(dsidev, channel, DSI_VC_SOURCE_VP);
 
 	bytespp	= dsi_get_pixel_size(dsi->pix_fmt) / 8;
@@ -4287,11 +4293,19 @@ static void dsi_update_screen_dispc(struct platform_device *dsidev)
 		mod_timer(&dsi->te_timer, jiffies + msecs_to_jiffies(250));
 #endif
 	}
-	/* Start timer at bottom to avoid dispc update start delayed sometimes
+	/* When kernel is busy, it will be delayed between update and timer.
+	 * So it moves start timer after update started to avoid wrong time out
+	 * of frame updating, but it still occurs another problem as the frame
+	 * event might be called before start timer called, either it will miss
+	 * cacel_delayed_work in frame done isr, or get wrong time out if there
+	 * is not follow updates. To fix it, call cancel_delayed_work first.
 	 */
-	r = schedule_delayed_work(&dsi->framedone_timeout_work,
-		msecs_to_jiffies(250));
-	BUG_ON(r == 0);
+	if (atomic_read(&dsi->update_pending) > 0) {
+		cancel_delayed_work(&dsi->framedone_timeout_work);
+		r = schedule_delayed_work(&dsi->framedone_timeout_work,
+					  msecs_to_jiffies(250));
+		WARN_ON(r == 0);
+	}
 }
 
 #ifdef DSI_CATCH_MISSING_TE
@@ -4304,6 +4318,12 @@ static void dsi_te_timeout(unsigned long arg)
 static void dsi_handle_framedone(struct platform_device *dsidev, int error)
 {
 	struct dsi_data *dsi = dsi_get_dsidrv_data(dsidev);
+
+	if (atomic_dec_return(&dsi->update_pending) < 0) {
+		atomic_inc(&dsi->update_pending);
+		DSSERR("Unmatched Frame Done!\n");
+		return;
+	}
 
 	/* SIDLEMODE back to smart-idle */
 	dispc_enable_sidle();
