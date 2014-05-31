@@ -150,9 +150,17 @@ static int tusb_enable(struct tusb_usb *tusb, bool enable)
 
 static int tusb_phy_reset(struct usb_phy *x, int enable)
 {
+	int retval = 0;
 	struct tusb_usb	*tusb = dev_get_drvdata(x->dev);
+	bool vbus_state = gpio_get_value(tusb->irq_gpio);
 
-	return tusb_enable(tusb, (bool)enable);
+	dev_info(tusb->dev, "USB: VBUS state %d\n", vbus_state);
+
+	/* only do this when  vbus is on */
+	if (vbus_state)
+		retval = tusb_enable(tusb, (bool)enable);
+
+	return retval;
 }
 
 static int tusb_usb_set_vbus(struct usb_otg *otg, bool enabled)
