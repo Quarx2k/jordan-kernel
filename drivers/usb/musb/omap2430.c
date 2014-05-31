@@ -540,7 +540,7 @@ static const struct musb_platform_ops omap2430_ops = {
 	.set_mode	= omap2430_musb_set_mode,
 	.try_idle	= omap2430_musb_try_idle,
 
-	.set_vbus	= 0,//omap2430_musb_set_vbus,
+	.set_vbus	= omap2430_musb_set_vbus,
 	.enable		= omap2430_musb_enable,
 	.disable	= omap2430_musb_disable,
 };
