@@ -47,17 +47,19 @@ struct cpufreq_interactive_cpuinfo {
 	u64 cputime_speedadj_timestamp;
 	struct cpufreq_policy *policy;
 	struct cpufreq_frequency_table *freq_table;
+	spinlock_t target_freq_lock; /*protects target freq */
 	unsigned int target_freq;
 	unsigned int floor_freq;
+	unsigned int max_freq;
+	unsigned int timer_rate;
+	int timer_slack_val;
+	unsigned int min_sample_time;
 	u64 floor_validate_time;
 	u64 hispeed_validate_time;
 	struct rw_semaphore enable_sem;
 	int governor_enabled;
 	int prev_load;
-	bool limits_changed;
 };
-
-#define MIN_TIMER_JIFFIES 1UL
 
 static DEFINE_PER_CPU(struct cpufreq_interactive_cpuinfo, cpuinfo);
 
@@ -68,14 +70,15 @@ static spinlock_t speedchange_cpumask_lock;
 static struct mutex gov_lock;
 
 /* Hi speed to bump to from lo speed when load burst (default max) */
-static unsigned int hispeed_freq;
+static unsigned int hispeed_freq = 800000;
 
 /* Go to hi speed when CPU load at or above this value. */
-#define DEFAULT_GO_HISPEED_LOAD 99
+#define DEFAULT_GO_HISPEED_LOAD 90
 static unsigned long go_hispeed_load = DEFAULT_GO_HISPEED_LOAD;
 
 /* Sampling down factor to be applied to min_sample_time at max freq */
-static unsigned int sampling_down_factor;
+#define DEFAULT_SAMPLING_DOWN_FACTOR 4
+static unsigned int sampling_down_factor = DEFAULT_SAMPLING_DOWN_FACTOR;
 
 /* Target load.  Lower values result in higher CPU speeds. */
 #define DEFAULT_TARGET_LOAD 90
@@ -87,14 +90,20 @@ static int ntarget_loads = ARRAY_SIZE(default_target_loads);
 /*
  * The minimum amount of time to spend at a frequency before we can ramp down.
  */
-#define DEFAULT_MIN_SAMPLE_TIME (80 * USEC_PER_MSEC)
-static unsigned long min_sample_time = DEFAULT_MIN_SAMPLE_TIME;
+#define DEFAULT_MIN_SAMPLE_TIME (60 * USEC_PER_MSEC)
+static unsigned int default_min_sample_time[] = {DEFAULT_MIN_SAMPLE_TIME};
+static spinlock_t min_sample_time_lock;
+static unsigned int *min_sample_times = default_min_sample_time;
+static int nmin_sample_times = ARRAY_SIZE(default_min_sample_time);
 
 /*
  * The sample rate of the timer used to increase frequency
  */
-#define DEFAULT_TIMER_RATE (20 * USEC_PER_MSEC)
-static unsigned long timer_rate = DEFAULT_TIMER_RATE;
+#define DEFAULT_TIMER_RATE (40 * USEC_PER_MSEC)
+static unsigned int default_timer_rate[] = { DEFAULT_TIMER_RATE };
+static spinlock_t timer_rate_lock;
+static unsigned int *timer_rates = default_timer_rate;
+static int ntimer_rates = ARRAY_SIZE(default_timer_rate);
 
 /* Busy SDF parameters*/
 #define MIN_BUSY_TIME (100 * USEC_PER_MSEC)
@@ -110,31 +119,44 @@ static spinlock_t above_hispeed_delay_lock;
 static unsigned int *above_hispeed_delay = default_above_hispeed_delay;
 static int nabove_hispeed_delay = ARRAY_SIZE(default_above_hispeed_delay);
 
-/* Non-zero means indefinite speed boost active */
-static int boost_val;
+/* 1000ms - 1s */
+#define DEFAULT_BOOSTPULSE_DURATION 500000
 /* Duration of a boot pulse in usecs */
-static int boostpulse_duration_val = DEFAULT_MIN_SAMPLE_TIME;
-/* End time of boost pulse in ktime converted to usecs */
-static u64 boostpulse_endtime;
+static int boostpulse_duration_val = DEFAULT_BOOSTPULSE_DURATION;
 
 /*
  * Max additional time to wait in idle, beyond timer_rate, at speeds above
  * minimum before wakeup to reduce speed, or -1 if unnecessary.
  */
-#define DEFAULT_TIMER_SLACK (4 * DEFAULT_TIMER_RATE)
-static int timer_slack_val = DEFAULT_TIMER_SLACK;
+#define DEFAULT_TIMER_SLACK (40000)
+static int default_timer_slack_val[] = { DEFAULT_TIMER_SLACK };
+static spinlock_t timer_slack_lock;
+static int *timer_slack_vals = default_timer_slack_val;
+static int ntimer_slack_vals = ARRAY_SIZE(default_timer_slack_val);
 
-static bool io_is_busy;
+static bool io_is_busy = true;
+
+/*
+ * The CPU will be boosted to this frequency when the screen is
+ * touched. input_boost needs to be enabled.
+ */
+#define DEFAULT_INPUT_BOOST_FREQ 800000
+int input_boost_freq = DEFAULT_INPUT_BOOST_FREQ;
+extern u64 last_input_time;
+
+#define CPU_SYNC_FREQ 600000
 
 /*
  * If the max load among other CPUs is higher than up_threshold_any_cpu_load
- * and if the highest frequency among the other CPUs is higher than
+ * or if the highest frequency among the other CPUs is higher than
  * up_threshold_any_cpu_freq then do not let the frequency to drop below
  * sync_freq
  */
-static unsigned int up_threshold_any_cpu_load;
-static unsigned int sync_freq;
-static unsigned int up_threshold_any_cpu_freq;
+
+static unsigned int up_threshold_any_cpu_load = 70;
+static unsigned int sync_freq = CPU_SYNC_FREQ;
+static unsigned int up_threshold_any_cpu_freq = 1000000;
+
 
 static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 		unsigned int event);
@@ -148,65 +170,6 @@ struct cpufreq_governor cpufreq_gov_interactive = {
 	.max_transition_latency = 10000000,
 	.owner = THIS_MODULE,
 };
-/*
-static inline cputime64_t get_cpu_idle_time_jiffy(unsigned int cpu,
-						  cputime64_t *wall)
-{
-	u64 idle_time;
-	u64 cur_wall_time;
-	u64 busy_time;
-
-	cur_wall_time = jiffies64_to_cputime64(get_jiffies_64());
-
-	busy_time  = kcpustat_cpu(cpu).cpustat[CPUTIME_USER];
-	busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_SYSTEM];
-	busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_IRQ];
-	busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_SOFTIRQ];
-	busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_STEAL];
-	busy_time += kcpustat_cpu(cpu).cpustat[CPUTIME_NICE];
-
-	idle_time = cur_wall_time - busy_time;
-	if (wall)
-		*wall = jiffies_to_usecs(cur_wall_time);
-
-	return jiffies_to_usecs(idle_time);
-}
-*/
-static inline cputime64_t get_cpu_idle_time_jiffy(unsigned int cpu,
-              cputime64_t *wall)
-{
-	u64 idle_time;
-	u64 cur_wall_time;
-	u64 busy_time;
-
-	cur_wall_time = jiffies64_to_cputime64(get_jiffies_64());
-
-	busy_time  = kstat_cpu(cpu).cpustat.user;
-	busy_time += kstat_cpu(cpu).cpustat.system;
-	busy_time += kstat_cpu(cpu).cpustat.irq;
-	busy_time += kstat_cpu(cpu).cpustat.softirq;
-	busy_time += kstat_cpu(cpu).cpustat.steal;
-	busy_time += kstat_cpu(cpu).cpustat.nice;
-
-	idle_time = cur_wall_time - busy_time;
-	if (wall)
-		*wall = jiffies_to_usecs(cur_wall_time);
-
-	return jiffies_to_usecs(idle_time);
-}
-
-static inline cputime64_t get_cpu_idle_time(unsigned int cpu,
-					    cputime64_t *wall)
-{
-	u64 idle_time = get_cpu_idle_time_us(cpu, wall);
-
-	if (idle_time == -1ULL)
-		idle_time = get_cpu_idle_time_jiffy(cpu, wall);
-	else if (!io_is_busy)
-		idle_time += get_cpu_iowait_time_us(cpu, wall);
-
-	return idle_time;
-}
 
 static void cpufreq_interactive_timer_resched(
 	struct cpufreq_interactive_cpuinfo *pcpu)
@@ -217,14 +180,14 @@ static void cpufreq_interactive_timer_resched(
 	spin_lock_irqsave(&pcpu->load_lock, flags);
 	pcpu->time_in_idle =
 		get_cpu_idle_time(smp_processor_id(),
-				     &pcpu->time_in_idle_timestamp);
+				     &pcpu->time_in_idle_timestamp, io_is_busy);
 	pcpu->cputime_speedadj = 0;
 	pcpu->cputime_speedadj_timestamp = pcpu->time_in_idle_timestamp;
-	expires = jiffies + usecs_to_jiffies(timer_rate);
+	expires = jiffies + usecs_to_jiffies(pcpu->timer_rate);
 	mod_timer_pinned(&pcpu->cpu_timer, expires);
 
-	if (timer_slack_val >= 0 && pcpu->target_freq > pcpu->policy->min) {
-		expires += usecs_to_jiffies(timer_slack_val);
+	if (pcpu->timer_slack_val >= 0 && pcpu->target_freq > pcpu->policy->min) {
+		expires += usecs_to_jiffies(pcpu->timer_slack_val);
 		mod_timer_pinned(&pcpu->cpu_slack_timer, expires);
 	}
 
@@ -235,27 +198,23 @@ static void cpufreq_interactive_timer_resched(
  * The cpu_timer and cpu_slack_timer must be deactivated when calling this
  * function.
  */
-static void cpufreq_interactive_timer_start(int cpu, int time_override)
+static void cpufreq_interactive_timer_start(int cpu)
 {
 	struct cpufreq_interactive_cpuinfo *pcpu = &per_cpu(cpuinfo, cpu);
+	unsigned long expires = jiffies + usecs_to_jiffies(pcpu->timer_rate);
 	unsigned long flags;
-	unsigned long expires;
-	if (time_override)
-		expires = jiffies + time_override;
-	else
-		expires = jiffies + usecs_to_jiffies(timer_rate);
 
 	pcpu->cpu_timer.expires = expires;
 	add_timer_on(&pcpu->cpu_timer, cpu);
-	if (timer_slack_val >= 0 && pcpu->target_freq > pcpu->policy->min) {
-		expires += usecs_to_jiffies(timer_slack_val);
+	if (pcpu->timer_slack_val >= 0 && pcpu->target_freq > pcpu->policy->min) {
+		expires += usecs_to_jiffies(pcpu->timer_slack_val);
 		pcpu->cpu_slack_timer.expires = expires;
 		add_timer_on(&pcpu->cpu_slack_timer, cpu);
 	}
 
 	spin_lock_irqsave(&pcpu->load_lock, flags);
 	pcpu->time_in_idle =
-		get_cpu_idle_time(cpu, &pcpu->time_in_idle_timestamp);
+		get_cpu_idle_time(cpu, &pcpu->time_in_idle_timestamp, io_is_busy);
 	pcpu->cputime_speedadj = 0;
 	pcpu->cputime_speedadj_timestamp = pcpu->time_in_idle_timestamp;
 	spin_unlock_irqrestore(&pcpu->load_lock, flags);
@@ -293,6 +252,55 @@ static unsigned int freq_to_targetload(unsigned int freq)
 
 	ret = target_loads[i];
 	spin_unlock_irqrestore(&target_loads_lock, flags);
+	return ret;
+}
+
+static unsigned int freq_to_timer_rate(unsigned int freq)
+{
+	int i;
+	unsigned int ret;
+	unsigned long flags;
+
+	spin_lock_irqsave(&timer_rate_lock, flags);
+
+	for (i = 0; i < ntimer_rates - 1 && freq >= timer_rates[i+1]; i += 2)
+		;
+
+	ret = timer_rates[i];
+	spin_unlock_irqrestore(&timer_rate_lock, flags);
+	return ret;
+}
+
+static unsigned int freq_to_timer_slack(unsigned int freq)
+{
+	int i, ret;
+	unsigned long flags;
+
+	spin_lock_irqsave(&timer_slack_lock, flags);
+
+	for (i = 0; i < ntimer_slack_vals - 1 &&
+			freq >= timer_slack_vals[i+1]; i += 2)
+		;
+
+	ret = timer_slack_vals[i];
+	spin_unlock_irqrestore(&timer_slack_lock, flags);
+	return ret;
+}
+
+static unsigned int freq_to_min_sample_time(unsigned int freq)
+{
+	int i;
+	unsigned int ret;
+	unsigned long flags;
+
+	spin_lock_irqsave(&min_sample_time_lock, flags);
+
+	for (i = 0; i < nmin_sample_times - 1 &&
+			freq >= min_sample_times[i+1]; i += 2)
+		;
+
+	ret = min_sample_times[i];
+	spin_unlock_irqrestore(&min_sample_time_lock, flags);
 	return ret;
 }
 
@@ -396,7 +404,7 @@ static u64 update_load(int cpu)
 	unsigned int delta_time;
 	u64 active_time;
 
-	now_idle = get_cpu_idle_time(cpu, &now);
+	now_idle = get_cpu_idle_time(cpu, &now, io_is_busy);
 	delta_idle = (unsigned int)(now_idle - pcpu->time_in_idle);
 	delta_time = (unsigned int)(now - pcpu->time_in_idle_timestamp);
 
@@ -428,6 +436,7 @@ static void cpufreq_interactive_timer(unsigned long data)
 	unsigned long mod_min_sample_time;
 	int i, max_load;
 	unsigned int max_freq;
+	unsigned int boosted_freq;
 	struct cpufreq_interactive_cpuinfo *picpu;
 
 	if (!down_read_trylock(&pcpu->enable_sem))
@@ -444,22 +453,28 @@ static void cpufreq_interactive_timer(unsigned long data)
 	if (WARN_ON_ONCE(!delta_time))
 		goto rearm;
 
+	spin_lock_irqsave(&pcpu->target_freq_lock, flags);
 	do_div(cputime_speedadj, delta_time);
 	loadadjfreq = (unsigned int)cputime_speedadj * 100;
 	cpu_load = loadadjfreq / pcpu->target_freq;
 	pcpu->prev_load = cpu_load;
-	boosted = boost_val || now < boostpulse_endtime;
+	boosted = now < (last_input_time + boostpulse_duration_val);
+	boosted_freq = max(hispeed_freq, pcpu->policy->min);
 
-	if (cpu_load >= go_hispeed_load || boosted) {
-		if (pcpu->target_freq < hispeed_freq) {
-			new_freq = hispeed_freq;
-		} else {
+	if (cpu_load >= go_hispeed_load)
+	{
+		if (pcpu->target_freq < boosted_freq)
+			new_freq = boosted_freq;
+		else
+		{
 			new_freq = choose_freq(pcpu, loadadjfreq);
 
-			if (new_freq < hispeed_freq)
-				new_freq = hispeed_freq;
+			if (new_freq < boosted_freq)
+				new_freq = boosted_freq;
 		}
-	} else {
+	}
+	else
+	{
 		new_freq = choose_freq(pcpu, loadadjfreq);
 
 		if (sync_freq && new_freq < sync_freq) {
@@ -484,13 +499,24 @@ static void cpufreq_interactive_timer(unsigned long data)
 		}
 	}
 
-	if (pcpu->target_freq >= hispeed_freq &&
+	if (boosted)
+	{
+		if (new_freq < input_boost_freq)
+			new_freq = input_boost_freq;
+	}
+
+	pcpu->timer_rate = freq_to_timer_rate(new_freq);
+	pcpu->timer_slack_val = freq_to_timer_slack(new_freq);
+	pcpu->min_sample_time = freq_to_min_sample_time(new_freq);
+
+	if (pcpu->target_freq >= boosted_freq &&
 	    new_freq > pcpu->target_freq &&
 	    now - pcpu->hispeed_validate_time <
 	    freq_to_above_hispeed_delay(pcpu->target_freq)) {
 		trace_cpufreq_interactive_notyet(
 			data, cpu_load, pcpu->target_freq,
 			pcpu->policy->cur, new_freq);
+		spin_unlock_irqrestore(&pcpu->target_freq_lock, flags);
 		goto rearm;
 	}
 
@@ -498,8 +524,10 @@ static void cpufreq_interactive_timer(unsigned long data)
 
 	if (cpufreq_frequency_table_target(pcpu->policy, pcpu->freq_table,
 					   new_freq, CPUFREQ_RELATION_L,
-					   &index))
+					   &index)) {
+		spin_unlock_irqrestore(&pcpu->target_freq_lock, flags);
 		goto rearm;
+	}
 
 	new_freq = pcpu->freq_table[index].frequency;
 
@@ -508,23 +536,16 @@ static void cpufreq_interactive_timer(unsigned long data)
 	 * floor frequency for the minimum sample time since last validated.
 	 */
 	if (sampling_down_factor && pcpu->policy->cur == pcpu->policy->max)
-		mod_min_sample_time = sampling_down_factor;
-	else
-		mod_min_sample_time = min_sample_time;
-
-	if (pcpu->limits_changed) {
-		if (sampling_down_factor &&
-			(pcpu->policy->cur != pcpu->policy->max))
-			mod_min_sample_time = 0;
-
-		pcpu->limits_changed = false;
-	}
+ 		mod_min_sample_time = sampling_down_factor;
+ 	else
+ 		mod_min_sample_time = 1;
 
 	if (new_freq < pcpu->floor_freq) {
-		if (now - pcpu->floor_validate_time < mod_min_sample_time) {
+		if (now - pcpu->floor_validate_time < (pcpu->min_sample_time * mod_min_sample_time)) {
 			trace_cpufreq_interactive_notyet(
 				data, cpu_load, pcpu->target_freq,
 				pcpu->policy->cur, new_freq);
+			spin_unlock_irqrestore(&pcpu->target_freq_lock, flags);
 			goto rearm;
 		}
 	}
@@ -532,12 +553,12 @@ static void cpufreq_interactive_timer(unsigned long data)
 	/*
 	 * Update the timestamp for checking whether speed has been held at
 	 * or above the selected frequency for a minimum of min_sample_time,
-	 * if not boosted to hispeed_freq.  If boosted to hispeed_freq then we
+	 * if not boosted to boosted_freq.  If boosted to boosted_freq then we
 	 * allow the speed to drop as soon as the boostpulse duration expires
 	 * (or the indefinite boost is turned off).
 	 */
 
-	if (!boosted || new_freq > hispeed_freq) {
+	if (!boosted || new_freq > boosted_freq) {
 		pcpu->floor_freq = new_freq;
 		pcpu->floor_validate_time = now;
 	}
@@ -546,6 +567,7 @@ static void cpufreq_interactive_timer(unsigned long data)
 		trace_cpufreq_interactive_already(
 			data, cpu_load, pcpu->target_freq,
 			pcpu->policy->cur, new_freq);
+		spin_unlock_irqrestore(&pcpu->target_freq_lock, flags);
 		goto rearm_if_notmax;
 	}
 
@@ -553,6 +575,7 @@ static void cpufreq_interactive_timer(unsigned long data)
 					 pcpu->policy->cur, new_freq);
 
 	pcpu->target_freq = new_freq;
+	spin_unlock_irqrestore(&pcpu->target_freq_lock, flags);
 	spin_lock_irqsave(&speedchange_cpumask_lock, flags);
 	cpumask_set_cpu(data, &speedchange_cpumask);
 	spin_unlock_irqrestore(&speedchange_cpumask_lock, flags);
@@ -589,9 +612,12 @@ static void cpufreq_interactive_idle_start(void)
 		return;
 	}
 
+	now = ktime_to_us(ktime_get());
 	pending = timer_pending(&pcpu->cpu_timer);
 
-	if (pcpu->target_freq != pcpu->policy->min) {
+	if (pcpu->target_freq > pcpu->policy->min ||
+	    (pcpu->target_freq == pcpu->policy->min &&
+	    now < (last_input_time + boostpulse_duration_val))) {
 		/*
 		 * Entering idle while not at lowest speed.  On some
 		 * platforms this can hold the other CPU(s) at that speed
@@ -603,7 +629,6 @@ static void cpufreq_interactive_idle_start(void)
 		if (!pending) {
 			cpufreq_interactive_timer_resched(pcpu);
 
-			now = ktime_to_us(ktime_get());
 			if ((pcpu->policy->cur == pcpu->policy->max) &&
 				(now - pcpu->hispeed_validate_time) >
 							MIN_BUSY_TIME) {
@@ -702,41 +727,6 @@ static int cpufreq_interactive_speedchange_task(void *data)
 	return 0;
 }
 
-static void cpufreq_interactive_boost(void)
-{
-	int i;
-	int anyboost = 0;
-	unsigned long flags;
-	struct cpufreq_interactive_cpuinfo *pcpu;
-
-	spin_lock_irqsave(&speedchange_cpumask_lock, flags);
-
-	for_each_online_cpu(i) {
-		pcpu = &per_cpu(cpuinfo, i);
-
-		if (pcpu->target_freq < hispeed_freq) {
-			pcpu->target_freq = hispeed_freq;
-			cpumask_set_cpu(i, &speedchange_cpumask);
-			pcpu->hispeed_validate_time =
-				ktime_to_us(ktime_get());
-			anyboost = 1;
-		}
-
-		/*
-		 * Set floor freq and (re)start timer for when last
-		 * validated.
-		 */
-
-		pcpu->floor_freq = hispeed_freq;
-		pcpu->floor_validate_time = ktime_to_us(ktime_get());
-	}
-
-	spin_unlock_irqrestore(&speedchange_cpumask_lock, flags);
-
-	if (anyboost)
-		wake_up_process(speedchange_task);
-}
-
 static int cpufreq_interactive_notifier(
 	struct notifier_block *nb, unsigned long val, void *data)
 {
@@ -786,7 +776,7 @@ static unsigned int *get_tokenized_data(const char *buf, int *num_tokens)
 	const char *cp;
 	int i;
 	int ntokens = 1;
-	unsigned int *tokenized_data;
+	int *tokenized_data;
 	int err = -EINVAL;
 
 	cp = buf;
@@ -796,7 +786,7 @@ static unsigned int *get_tokenized_data(const char *buf, int *num_tokens)
 	if (!(ntokens & 0x1))
 		goto err;
 
-	tokenized_data = kmalloc(ntokens * sizeof(unsigned int), GFP_KERNEL);
+	tokenized_data = kmalloc(ntokens * sizeof(int), GFP_KERNEL);
 	if (!tokenized_data) {
 		err = -ENOMEM;
 		goto err;
@@ -805,7 +795,7 @@ static unsigned int *get_tokenized_data(const char *buf, int *num_tokens)
 	cp = buf;
 	i = 0;
 	while (i < ntokens) {
-		if (sscanf(cp, "%u", &tokenized_data[i++]) != 1)
+		if (sscanf(cp, "%d", &tokenized_data[i++]) != 1)
 			goto err_kfree;
 
 		cp = strpbrk(cp, " :");
@@ -985,20 +975,40 @@ static struct global_attr go_hispeed_load_attr = __ATTR(go_hispeed_load, 0644,
 static ssize_t show_min_sample_time(struct kobject *kobj,
 				struct attribute *attr, char *buf)
 {
-	return sprintf(buf, "%lu\n", min_sample_time);
+	int i;
+	ssize_t ret = 0;
+	unsigned long flags;
+
+	spin_lock_irqsave(&min_sample_time_lock, flags);
+
+	for (i = 0; i < nmin_sample_times; i++)
+		ret += sprintf(buf + ret, "%u%s", min_sample_times[i],
+			       i & 0x1 ? ":" : " ");
+
+	ret += sprintf(buf + --ret, "\n");
+	spin_unlock_irqrestore(&min_sample_time_lock, flags);
+	return ret;
 }
 
 static ssize_t store_min_sample_time(struct kobject *kobj,
 			struct attribute *attr, const char *buf, size_t count)
 {
-	int ret;
-	unsigned long val;
+	int ntokens;
+	unsigned int *new_min_sample_time = NULL;
+	unsigned long flags;
 
-	ret = strict_strtoul(buf, 0, &val);
-	if (ret < 0)
-		return ret;
-	min_sample_time = val;
+	new_min_sample_time = get_tokenized_data(buf, &ntokens);
+	if (IS_ERR(new_min_sample_time))
+		return PTR_RET(new_min_sample_time);
+
+	spin_lock_irqsave(&min_sample_time_lock, flags);
+	if (min_sample_times != default_min_sample_time)
+		kfree(min_sample_times);
+	min_sample_times = new_min_sample_time;
+	nmin_sample_times = ntokens;
+	spin_unlock_irqrestore(&min_sample_time_lock, flags);
 	return count;
+
 }
 
 static struct global_attr min_sample_time_attr = __ATTR(min_sample_time, 0644,
@@ -1007,11 +1017,50 @@ static struct global_attr min_sample_time_attr = __ATTR(min_sample_time, 0644,
 static ssize_t show_timer_rate(struct kobject *kobj,
 			struct attribute *attr, char *buf)
 {
-	return sprintf(buf, "%lu\n", timer_rate);
+	int i;
+	ssize_t ret = 0;
+	unsigned long flags;
+
+	spin_lock_irqsave(&timer_rate_lock, flags);
+
+	for (i = 0; i < ntimer_rates; i++)
+		ret += sprintf(buf + ret, "%u%s", timer_rates[i],
+			       i & 0x1 ? ":" : " ");
+
+	ret += sprintf(buf + --ret, "\n");
+	spin_unlock_irqrestore(&timer_rate_lock, flags);
+	return ret;
 }
 
 static ssize_t store_timer_rate(struct kobject *kobj,
 			struct attribute *attr, const char *buf, size_t count)
+{
+	int ntokens;
+	unsigned int *new_timer_rate = NULL;
+	unsigned long flags;
+
+	new_timer_rate = get_tokenized_data(buf, &ntokens);
+	if (IS_ERR(new_timer_rate))
+		return PTR_RET(new_timer_rate);
+
+	spin_lock_irqsave(&timer_rate_lock, flags);
+	if (timer_rates != default_timer_rate)
+		kfree(timer_rates);
+	timer_rates = new_timer_rate;
+	ntimer_rates = ntokens;
+	spin_unlock_irqrestore(&timer_rate_lock, flags);
+	return count;
+
+}
+
+static ssize_t show_input_boost_freq(struct kobject *kobj, struct attribute *attr,
+                                     char *buf)
+{
+	return sprintf(buf, "%d\n", input_boost_freq);
+}
+
+static ssize_t store_input_boost_freq(struct kobject *kobj, struct attribute *attr,
+                                      const char *buf, size_t count)
 {
 	int ret;
 	unsigned long val;
@@ -1019,9 +1068,14 @@ static ssize_t store_timer_rate(struct kobject *kobj,
 	ret = strict_strtoul(buf, 0, &val);
 	if (ret < 0)
 		return ret;
-	timer_rate = val;
+
+	input_boost_freq = val;
 	return count;
+
 }
+
+static struct global_attr input_boost_freq_attr = __ATTR(input_boost_freq, 0644,
+								show_input_boost_freq, store_input_boost_freq);
 
 static struct global_attr timer_rate_attr = __ATTR(timer_rate, 0644,
 		show_timer_rate, store_timer_rate);
@@ -1029,74 +1083,43 @@ static struct global_attr timer_rate_attr = __ATTR(timer_rate, 0644,
 static ssize_t show_timer_slack(
 	struct kobject *kobj, struct attribute *attr, char *buf)
 {
-	return sprintf(buf, "%d\n", timer_slack_val);
+	int i;
+	ssize_t ret = 0;
+	unsigned long flags;
+
+	spin_lock_irqsave(&timer_slack_lock, flags);
+
+	for (i = 0; i < ntimer_slack_vals; i++)
+		ret += sprintf(buf + ret, "%d%s", timer_slack_vals[i],
+			       i & 0x1 ? ":" : " ");
+
+	ret += sprintf(buf + --ret, "\n");
+	spin_unlock_irqrestore(&timer_slack_lock, flags);
+	return ret;
 }
 
 static ssize_t store_timer_slack(
 	struct kobject *kobj, struct attribute *attr, const char *buf,
 	size_t count)
 {
-	int ret;
-	unsigned long val;
+	int ntokens;
+	int *new_timer_slack_val = NULL;
+	unsigned long flags;
 
-	ret = kstrtol(buf, 10, &val);
-	if (ret < 0)
-		return ret;
+	new_timer_slack_val = get_tokenized_data(buf, &ntokens);
+	if (IS_ERR(new_timer_slack_val))
+		return PTR_RET(new_timer_slack_val);
 
-	timer_slack_val = val;
+	spin_lock_irqsave(&timer_slack_lock, flags);
+	if (timer_slack_vals != default_timer_slack_val)
+		kfree(timer_slack_vals);
+	timer_slack_vals = new_timer_slack_val;
+	ntimer_slack_vals = ntokens;
+	spin_unlock_irqrestore(&timer_slack_lock, flags);
 	return count;
 }
 
 define_one_global_rw(timer_slack);
-
-static ssize_t show_boost(struct kobject *kobj, struct attribute *attr,
-			  char *buf)
-{
-	return sprintf(buf, "%d\n", boost_val);
-}
-
-static ssize_t store_boost(struct kobject *kobj, struct attribute *attr,
-			   const char *buf, size_t count)
-{
-	int ret;
-	unsigned long val;
-
-	ret = kstrtoul(buf, 0, &val);
-	if (ret < 0)
-		return ret;
-
-	boost_val = val;
-
-	if (boost_val) {
-		trace_cpufreq_interactive_boost("on");
-		cpufreq_interactive_boost();
-	} else {
-		trace_cpufreq_interactive_unboost("off");
-	}
-
-	return count;
-}
-
-define_one_global_rw(boost);
-
-static ssize_t store_boostpulse(struct kobject *kobj, struct attribute *attr,
-				const char *buf, size_t count)
-{
-	int ret;
-	unsigned long val;
-
-	ret = kstrtoul(buf, 0, &val);
-	if (ret < 0)
-		return ret;
-
-	boostpulse_endtime = ktime_to_us(ktime_get()) + boostpulse_duration_val;
-	trace_cpufreq_interactive_boost("pulse");
-	cpufreq_interactive_boost();
-	return count;
-}
-
-static struct global_attr boostpulse =
-	__ATTR(boostpulse, 0200, NULL, store_boostpulse);
 
 static ssize_t show_boostpulse_duration(
 	struct kobject *kobj, struct attribute *attr, char *buf)
@@ -1220,9 +1243,8 @@ static struct attribute *interactive_attributes[] = {
 	&go_hispeed_load_attr.attr,
 	&min_sample_time_attr.attr,
 	&timer_rate_attr.attr,
+	&input_boost_freq_attr.attr,
 	&timer_slack.attr,
-	&boost.attr,
-	&boostpulse.attr,
 	&boostpulse_duration.attr,
 	&io_is_busy_attr.attr,
 	&sampling_down_factor_attr.attr,
@@ -1264,7 +1286,7 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 	unsigned int j;
 	struct cpufreq_interactive_cpuinfo *pcpu;
 	struct cpufreq_frequency_table *freq_table;
-	unsigned long expire_time;
+	unsigned long flags;
 
 	switch (event) {
 	case CPUFREQ_GOV_START:
@@ -1285,10 +1307,11 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 				ktime_to_us(ktime_get());
 			pcpu->hispeed_validate_time =
 				pcpu->floor_validate_time;
+			pcpu->max_freq = policy->max;
 			down_write(&pcpu->enable_sem);
 			del_timer_sync(&pcpu->cpu_timer);
 			del_timer_sync(&pcpu->cpu_slack_timer);
-			cpufreq_interactive_timer_start(j, 0);
+			cpufreq_interactive_timer_start(j);
 			pcpu->governor_enabled = 1;
 			up_write(&pcpu->enable_sem);
 		}
@@ -1351,51 +1374,39 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 		for_each_cpu(j, policy->cpus) {
 			pcpu = &per_cpu(cpuinfo, j);
 
-			/* hold write semaphore to avoid race */
-			down_write(&pcpu->enable_sem);
+			down_read(&pcpu->enable_sem);
 			if (pcpu->governor_enabled == 0) {
-				up_write(&pcpu->enable_sem);
+				up_read(&pcpu->enable_sem);
 				continue;
 			}
 
-			/* update target_freq firstly */
+			spin_lock_irqsave(&pcpu->target_freq_lock, flags);
 			if (policy->max < pcpu->target_freq)
 				pcpu->target_freq = policy->max;
-			/*
-			 * Delete and reschedule timer.
-			 * Else the timer callback may return without
-			 * re-arming the timer when it fails to acquire
-			 * the semaphore. This race condition may cause the
-			 * timer to stop unexpectedly.
-			 */
-			del_timer_sync(&pcpu->cpu_timer);
-			del_timer_sync(&pcpu->cpu_slack_timer);
-			if (policy->min >= pcpu->target_freq) {
+			else if (policy->min > pcpu->target_freq) {
 				pcpu->target_freq = policy->min;
-				/*
-				 * Reschedule timer.
-				 * The governor needs more time to evaluate
-				 * the load after changing policy parameters.
-				 */
-				cpufreq_interactive_timer_start(j, 0);
-			} else {
-				/*
-				 * Reschedule timer with variable duration.
-				 * No boost was applied so the governor
-				 * doesn't need extra time to evaluate load.
-				 * The timer can be set to fire quicker if it
-				 * was already going to expire soon.
-				 */
-				expire_time = pcpu->cpu_timer.expires - jiffies;
-				expire_time = min(usecs_to_jiffies(timer_rate),
-						  expire_time);
-				expire_time = max(MIN_TIMER_JIFFIES,
-						  expire_time);
-
-				cpufreq_interactive_timer_start(j, expire_time);
+				pcpu->floor_freq = policy->min;
+				pcpu->floor_validate_time = ktime_to_us(ktime_get());
 			}
-			pcpu->limits_changed = true;
-			up_write(&pcpu->enable_sem);
+
+			spin_unlock_irqrestore(&pcpu->target_freq_lock, flags);
+			up_read(&pcpu->enable_sem);
+
+			/* Reschedule timer only if policy->max is raised.
+			 * Delete the timers, else the timer callback may
+			 * return without re-arm the timer when failed
+			 * acquire the semaphore. This race may cause timer
+			 * stopped unexpectedly.
+			 */
+			if (policy->max > pcpu->max_freq) {
+				down_write(&pcpu->enable_sem);
+				del_timer_sync(&pcpu->cpu_timer);
+				del_timer_sync(&pcpu->cpu_slack_timer);
+				cpufreq_interactive_timer_start(j);
+				up_write(&pcpu->enable_sem);
+			}
+
+			pcpu->max_freq = policy->max;
 		}
 		break;
 	}
@@ -1421,6 +1432,7 @@ static int __init cpufreq_interactive_init(void)
 		init_timer(&pcpu->cpu_slack_timer);
 		pcpu->cpu_slack_timer.function = cpufreq_interactive_nop_timer;
 		spin_lock_init(&pcpu->load_lock);
+		spin_lock_init(&pcpu->target_freq_lock);
 		init_rwsem(&pcpu->enable_sem);
 	}
 
