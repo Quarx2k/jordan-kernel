@@ -31,6 +31,9 @@
 #include <linux/slab.h>
 #include <linux/kernel_stat.h>
 #include <asm/cputime.h>
+#ifdef CONFIG_HAS_EARLYSUSPEND
+#include <linux/earlysuspend.h>
+#endif
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/cpufreq_interactive.h>
@@ -68,6 +71,17 @@ static struct task_struct *speedchange_task;
 static cpumask_t speedchange_cpumask;
 static spinlock_t speedchange_cpumask_lock;
 static struct mutex gov_lock;
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+/* Suspend/Resume flag */
+static bool suspend_state = false;
+
+/* Suspend Optimization Enabled ? */
+static bool suspend_enabled = true;
+
+/* Suspend Frequency */
+static unsigned int suspend_freq = 600000;
+#endif
 
 /* Hi speed to bump to from lo speed when load burst (default max) */
 static unsigned int hispeed_freq = 800000;
@@ -712,10 +726,20 @@ static int cpufreq_interactive_speedchange_task(void *data)
 					max_freq = pjcpu->target_freq;
 			}
 
-			if (max_freq != pcpu->policy->cur)
+			if (max_freq != pcpu->policy->cur) {
+#ifdef CONFIG_HAS_EARLYSUSPEND
+				if (!suspend_state || (suspend_state && max_freq <= suspend_freq))
+					__cpufreq_driver_target(pcpu->policy,
+								max_freq,
+								CPUFREQ_RELATION_H);
+#else
 				__cpufreq_driver_target(pcpu->policy,
-							max_freq,
-							CPUFREQ_RELATION_H);
+								max_freq,
+								CPUFREQ_RELATION_H);
+#endif
+
+			}
+
 			trace_cpufreq_interactive_setspeed(cpu,
 						     pcpu->target_freq,
 						     pcpu->policy->cur);
@@ -726,6 +750,48 @@ static int cpufreq_interactive_speedchange_task(void *data)
 
 	return 0;
 }
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static void interactive_suspend(int suspend)
+{
+	struct cpufreq_interactive_cpuinfo *pcpu;    
+	int cpu;	
+	pcpu = &per_cpu(cpuinfo, cpu);  
+
+        if (!suspend_enabled) 
+		return;
+
+        if (!suspend) { 
+                suspend_state = 0;
+                __cpufreq_driver_target(pcpu->policy, pcpu->policy->max, CPUFREQ_RELATION_H);
+                printk("[interactive]: awake at %d\n", pcpu->policy->cur);
+        } else {
+		/* Going in suspend, take saved suspend_freq */
+                suspend_state = 1;
+                __cpufreq_driver_target(pcpu->policy, suspend_freq, CPUFREQ_RELATION_L);
+                printk("[interactive]: suspended at %d\n", pcpu->policy->cur);
+        }
+}
+
+static void interactive_early_suspend(struct early_suspend *handler)
+{
+	int i;
+	for_each_online_cpu(i)
+		interactive_suspend(1);
+}
+
+static void interactive_late_resume(struct early_suspend *handler)
+{
+	int i;
+	for_each_online_cpu(i)
+		interactive_suspend(0);
+}
+
+static struct early_suspend interactive_suspend_handler  = {
+	.suspend 	= interactive_early_suspend,
+	.resume 	= interactive_late_resume,
+};
+#endif
 
 static int cpufreq_interactive_notifier(
 	struct notifier_block *nb, unsigned long val, void *data)
@@ -1166,6 +1232,56 @@ static ssize_t store_io_is_busy(struct kobject *kobj,
 static struct global_attr io_is_busy_attr = __ATTR(io_is_busy, 0644,
 		show_io_is_busy, store_io_is_busy);
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+static ssize_t show_suspend_freq(struct kobject *kobj,
+				 struct attribute *attr, char *buf)
+{
+	return sprintf(buf, "%u\n", suspend_freq);
+}
+
+static ssize_t store_suspend_freq(struct kobject *kobj,
+				  struct attribute *attr, const char *buf,
+				  size_t count)
+{
+	int ret;
+	long unsigned int val;
+
+	ret = strict_strtoul(buf, 0, &val);
+	if (ret < 0)
+		return ret;
+	suspend_freq = val;
+	return count;
+}
+
+static struct global_attr suspend_freq_attr = __ATTR(suspend_freq, 0644,
+		show_suspend_freq, store_suspend_freq);
+
+static ssize_t show_suspend_enabled(struct kobject *kobj,
+				    struct attribute *attr, char *buf)
+{
+	return sprintf(buf, "%u\n", suspend_enabled);
+}
+
+static ssize_t store_suspend_enabled(struct kobject *kobj,
+			struct attribute *attr, const char *buf, size_t count)
+{
+	int ret;
+	unsigned long val;
+
+	ret = strict_strtoul(buf, 0, &val);
+
+	if (ret < 0)
+		return ret;
+
+	suspend_enabled = val;
+
+	return count;
+}
+
+static struct global_attr suspend_enabled_attr = __ATTR(suspend_enabled, 0644,
+		show_suspend_enabled, store_suspend_enabled);
+#endif
+
 static ssize_t show_sync_freq(struct kobject *kobj,
 			struct attribute *attr, char *buf)
 {
@@ -1245,6 +1361,10 @@ static struct attribute *interactive_attributes[] = {
 	&timer_rate_attr.attr,
 	&input_boost_freq_attr.attr,
 	&timer_slack.attr,
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	&suspend_enabled_attr.attr,
+	&suspend_freq_attr.attr,
+#endif
 	&boostpulse_duration.attr,
 	&io_is_busy_attr.attr,
 	&sampling_down_factor_attr.attr,
@@ -1422,6 +1542,11 @@ static int __init cpufreq_interactive_init(void)
 	unsigned int i;
 	struct cpufreq_interactive_cpuinfo *pcpu;
 	struct sched_param param = { .sched_priority = MAX_RT_PRIO-1 };
+
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	/* suspend/resume call */
+	register_early_suspend(&interactive_suspend_handler);
+#endif
 
 	/* Initalize per-cpu timers */
 	for_each_possible_cpu(i) {
