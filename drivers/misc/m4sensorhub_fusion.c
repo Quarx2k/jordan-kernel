@@ -308,6 +308,27 @@ m4fus_create_iiodev_exit:
 	return err;
 }
 
+static void m4fus_panic_restore(struct m4sensorhub_data *m4sensorhub,
+				void *data)
+{
+	int size, err;
+	struct m4fus_driver_data *dd = (struct m4fus_driver_data *)data;
+
+	if (dd == NULL) {
+		m4als_err("%s: Driver data is null, unable to restore\n");
+		return;
+	}
+	size = m4sensorhub_reg_getsize(dd->m4, M4SH_REG_FUSION_SAMPLERATE);
+	err = m4sensorhub_reg_write(dd->m4, M4SH_REG_FUSION_SAMPLERATE,
+				   (char *)&dd->samplerate, m4sh_no_mask);
+	if (err < 0) {
+		m4fus_err("%s: Failed to set sample rate.\n", __func__);
+	} else if (err != size) {
+		m4fus_err("%s:  Wrote %d bytes instead of %d.\n",
+			  __func__, err, size);
+	}
+}
+
 static int m4fus_driver_init(struct init_calldata *p_arg)
 {
 	struct iio_dev *iio = p_arg->p_data;
@@ -329,6 +350,11 @@ static int m4fus_driver_init(struct init_calldata *p_arg)
 		m4fus_err("%s: Failed to register M4 IRQ.\n", __func__);
 		goto m4fus_driver_init_fail;
 	}
+
+	err = m4sensorhub_panic_register(dd->m4, PANICHDL_FUSION_RESTORE,
+					 m4fus_panic_restore, dd);
+	if (err < 0)
+		KDEBUG(M4SH_ERROR, "Fusion panic callback register failed\n");
 
 	goto m4fus_driver_init_exit;
 

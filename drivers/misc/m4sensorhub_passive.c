@@ -405,6 +405,26 @@ m4pas_create_iiodev_exit:
 	return err;
 }
 
+static void m4pas_panic_restore(struct m4sensorhub_data *m4sensorhub,
+				void *data)
+{
+	int err;
+	char en;
+	struct m4pas_driver_data *dd = (struct m4pas_driver_data *)data;
+
+	if (dd == NULL) {
+		m4als_err("%s: Driver data is null, unable to restore\n");
+		return;
+	}
+
+	en = (dd->samplerate >= 0) ? 1 : 0;
+	err = m4sensorhub_reg_write_1byte(dd->m4, M4SH_REG_PASSIVE_ENABLE,
+					  en, 0xFF);
+	if (err != 1)
+		m4pas_err("%s: Failed to enable with %d.\n",
+			  __func__, err);
+}
+
 static int m4pas_driver_init(struct init_calldata *p_arg)
 {
 	struct iio_dev *iio = p_arg->p_data;
@@ -427,6 +447,10 @@ static int m4pas_driver_init(struct init_calldata *p_arg)
 		goto m4pas_driver_init_fail;
 	}
 
+	err = m4sensorhub_panic_register(dd->m4, PANICHDL_PASSIVE_RESTORE,
+					 m4pas_panic_restore, dd);
+	if (err < 0)
+		KDEBUG(M4SH_ERROR, "Passive panic callback register failed\n");
 	goto m4pas_driver_init_exit;
 
 m4pas_driver_init_fail:

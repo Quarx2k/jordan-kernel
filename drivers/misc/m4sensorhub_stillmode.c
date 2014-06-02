@@ -347,7 +347,6 @@ destroy_wakelock:
 	input_unregister_device(stillmode_client_data->input_dev);
 free_memory:
 	platform_set_drvdata(pdev, NULL);
-	m4sensorhub->pdev->stillmode_exit = NULL;
 	stillmode_client_data->m4sensorhub = NULL;
 	kfree(stillmode_client_data);
 	g_stillmode_data = NULL;
@@ -371,7 +370,6 @@ static int __exit stillmode_client_remove(struct platform_device *pdev)
 	m4sensorhub_unregister_initcall(stillmode_driver_init);
 	input_unregister_device(stillmode_client_data->input_dev);
 	platform_set_drvdata(pdev, NULL);
-	m4sensorhub->pdev->stillmode_exit = NULL;
 	stillmode_client_data->m4sensorhub = NULL;
 	kfree(stillmode_client_data);
 	g_stillmode_data = NULL;

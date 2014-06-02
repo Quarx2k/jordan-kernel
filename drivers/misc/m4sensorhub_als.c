@@ -268,6 +268,29 @@ m4als_create_m4eventdev_fail:
 	return err;
 }
 
+static void m4als_panic_restore(struct m4sensorhub_data *m4sensorhub,
+				void *data)
+{
+	int size, err;
+	struct m4als_driver_data *dd = (struct m4als_driver_data *)data;
+	
+	if (dd == NULL) {
+		m4als_err("%s: Driver data is null, unable to restore\n");
+		return;
+	}
+
+	size = m4sensorhub_reg_getsize(dd->m4,
+				       M4SH_REG_LIGHTSENSOR_SAMPLERATE);
+	err = m4sensorhub_reg_write(dd->m4, M4SH_REG_LIGHTSENSOR_SAMPLERATE,
+				   (char *)&dd->samplerate, m4sh_no_mask);
+	if (err < 0) {
+		m4als_err("%s: Failed to set sample rate.\n", __func__);
+	} else if (err != size) {
+		m4als_err("%s: Wrote %d bytes instead of %d.\n",
+			  __func__, err, size);
+	}
+}
+
 static int m4als_driver_init(struct init_calldata *p_arg)
 {
 	struct m4als_driver_data *dd = p_arg->p_data;
@@ -294,6 +317,10 @@ static int m4als_driver_init(struct init_calldata *p_arg)
 		goto m4als_driver_init_irq_fail;
 	}
 
+	err = m4sensorhub_panic_register(dd->m4, PANICHDL_ALS_RESTORE,
+					 m4als_panic_restore, dd);
+	if (err < 0)
+		KDEBUG(M4SH_ERROR, "Als panic callback register failed\n");
 	goto m4als_driver_init_exit;
 
 m4als_driver_init_irq_fail:

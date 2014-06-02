@@ -475,7 +475,6 @@ static int __exit display_client_remove(struct platform_device *pdev)
 	struct display_client *display_data =
 						platform_get_drvdata(pdev);
 
-	display_data->m4sensorhub->pdev->set_display_control = NULL;
 	m4sensorhub_unregister_initcall(display_driver_init);
 	misc_deregister(&display_client_miscdrv);
 	global_display_data = NULL;

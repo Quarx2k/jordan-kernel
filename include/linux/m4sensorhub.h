@@ -67,6 +67,11 @@ enum m4sensorhub_bootmode {
  */
 enum m4sensorhub_panichdl_index {
 	PANICHDL_DISPLAY_RESTORE,
+	PANICHDL_HEARTRATE_RESTORE,
+	PANICHDL_PASSIVE_RESTORE,
+	PANICHDL_FUSION_RESTORE,
+	PANICHDL_ALS_RESTORE,
+	PANICHDL_MPU9150_RESTORE,
 	/*
 	 * Please add enum before PANICHDL_IRQ_RESTORE
 	 * to make sure IRQ restore will be called last.
@@ -89,16 +94,6 @@ struct init_calldata {
 	void *p_data;
 };
 
-struct m4sensorhub_platform_data {
-	int (*hw_init)(struct m4sensorhub_data *);
-	void (*hw_free)(struct m4sensorhub_data *);
-	void (*hw_reset)(struct m4sensorhub_data *);
-	int (*set_bootmode)(struct m4sensorhub_data *,
-			    enum m4sensorhub_bootmode);
-	int (*stillmode_exit)(void);
-	int (*set_display_control)(int m4_ctrl, int gpio_mipi_mux);
-};
-
 struct m4sensorhub_hwconfig {
 	int irq_gpio;
 	int reset_gpio;
@@ -113,7 +108,6 @@ struct m4sensorhub_data {
 	void *irqdata;
 	void *panicdata;
 	enum m4sensorhub_mode mode;
-	struct m4sensorhub_platform_data *pdev;
 	struct m4sensorhub_hwconfig hwconfig;
 	char *filename;
 	u16 fw_version;

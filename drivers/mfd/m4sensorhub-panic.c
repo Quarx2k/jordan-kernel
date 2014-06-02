@@ -34,6 +34,11 @@
 static const char *callback_name[PANICHDL_MAX] = {
 	[PANICHDL_DISPLAY_RESTORE] = "display_restore",
 	[PANICHDL_IRQ_RESTORE] = "irq_restore",
+	[PANICHDL_HEARTRATE_RESTORE] = "heartrate_restore",
+	[PANICHDL_PASSIVE_RESTORE] = "passive_restore",
+	[PANICHDL_ALS_RESTORE] = "als_restore",
+	[PANICHDL_FUSION_RESTORE] = "fusion_restore",
+	[PANICHDL_MPU9150_RESTORE] = "mpu9150_restore",
 };
 
 struct m4sensorhub_panic_callback {
@@ -288,19 +293,16 @@ void m4sensorhub_panic_process(struct m4sensorhub_data *m4sensorhub)
 	}
 
 	KDEBUG(M4SH_ERROR, "%s: Detected M4 panic, reset M4!\n", __func__);
-	m4sensorhub->pdev->hw_reset(m4sensorhub);
 	msleep(100);
 	if (m4sensorhub->i2c_client->addr == 0x39)
 		ret = m4sensorhub_401_load_firmware(m4sensorhub, 0, NULL);
 	else
 		ret = m4sensorhub_load_firmware(m4sensorhub, 0, NULL);
-
 	if (ret < 0) {
 		KDEBUG(M4SH_ERROR, "%s: Failed to restart M4, ret = %d\n",
 			__func__, ret);
 		BUG();
 	}
-
 	m4sensorhub_reg_access_unlock();
 
 	for (i = 0; i < PANICHDL_MAX; i++) {

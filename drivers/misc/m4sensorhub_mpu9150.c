@@ -646,13 +646,38 @@ static int mpu9150_irq_enable_disable(struct mpu9150_client *mpu9150_client_data
 	return ret;
 }
 
+static void mpu9150_panic_restore(struct m4sensorhub_data *m4sensorhub,
+				void *data)
+{
+	struct mpu9150_client *dd = (struct mpu9150_client *)data;
+
+	if (dd == NULL) {
+		m4als_err("%s: Driver data is null, unable to restore\n");
+		return;
+	}
+	KDEBUG(M4SH_INFO, "Executing mpu9150 panic restore\n");
+	m4_set_mpu9150_delay(dd, dd->samplerate[TYPE_ACCEL], TYPE_ACCEL);
+	m4_set_mpu9150_delay(dd, dd->samplerate[TYPE_GYRO], TYPE_GYRO);
+	m4_set_mpu9150_delay(dd, dd->samplerate[TYPE_COMPASS], TYPE_COMPASS);
+}
+
 static int mpu9150_driver_init(struct init_calldata *p_arg)
 {
 	int ret;
 	ret = mpu9150_irq_init(misc_mpu9150_data);
-
-	if (ret < 0)
+	if (ret < 0) {
 		KDEBUG(M4SH_ERROR, "mpu9150 irq init failed\n");
+		goto driver_init_exit;
+	}
+
+	ret = m4sensorhub_panic_register(misc_mpu9150_data->m4sensorhub,
+					 PANICHDL_MPU9150_RESTORE,
+					 mpu9150_panic_restore,
+					 misc_mpu9150_data);
+	if (ret < 0)
+		KDEBUG(M4SH_ERROR, "HR panic callback register failed\n");
+
+driver_init_exit:
 	return ret;
 }
 

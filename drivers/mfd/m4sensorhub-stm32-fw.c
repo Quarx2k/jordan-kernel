@@ -125,6 +125,8 @@ int m4sensorhub_load_firmware(struct m4sensorhub_data *m4sensorhub,
 		goto done;
 	}
 
+	m4sensorhub_hw_reset(m4sensorhub);
+
 	buf = kzalloc(MAX_TRANSFER_SIZE+8, GFP_KERNEL);
 	if (!buf) {
 		KDEBUG(M4SH_ERROR, "%s: Failed to allocate buf\n", __func__);
