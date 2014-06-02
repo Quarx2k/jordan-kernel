@@ -167,16 +167,22 @@ static int rtc_sensorhub_rtc_read_time(struct device *p_dev,
 		if ((p_priv_data->sys_seconds_cached != 0) &&
 		(p_priv_data->sys_boot_cached != 0)) {
 			dev_err(p_dev,
-				"Using saved set RTC time (hardware not ready)\n");
+				"Using saved set RTC time (%lu)\n",
+				p_priv_data->sys_seconds_cached +
+				get_seconds() - p_priv_data->sys_boot_cached);
 			/* Use saved settime request (will go to M4) */
 			rtc_time_to_tm(p_priv_data->sys_seconds_cached +
-				get_seconds() - p_priv_data->sys_boot_cached, p_tm);
+				get_seconds() - p_priv_data->sys_boot_cached,
+				p_tm);
 		} else {
 			dev_err(p_dev,
-				"Using cached M4 RTC time (hardware not ready)\n");
+				"Using cached M4 RTC time (%lu)\n",
+				p_priv_data->m4_seconds_cached +
+				get_seconds() - p_priv_data->m4_boot_cached);
 			/* Use cached time from M4 */
 			rtc_time_to_tm(p_priv_data->m4_seconds_cached +
-				get_seconds() - p_priv_data->m4_boot_cached, p_tm);
+				get_seconds() - p_priv_data->m4_boot_cached,
+				p_tm);
 		}
 		return 0;
 	}
@@ -203,7 +209,7 @@ static int rtc_sensorhub_rtc_set_time(struct device *p_dev,
 
 	if (!(p_m4_drvdata)) {
 		dev_err(p_dev,
-			"Saving set time request (hardware not ready)\n");
+			"Saving set time request (%lu)\n", sec);
 		p_priv_data->sys_seconds_cached = sec;
 		p_priv_data->sys_boot_cached = get_seconds();
 		return 0;
@@ -236,6 +242,8 @@ static int rtc_sensorhub_preflash(struct init_calldata *p_arg)
 	int size = 0;
 	struct rtc_sensorhub_private_data *rtcpd = NULL;
 	struct m4sensorhub_data *m4 = NULL;
+	struct timespec tv = {.tv_sec = 0, .tv_nsec = 0};
+	struct rtc_time rtc;
 
 	if (p_arg == NULL) {
 		pr_err("%s: No callback data received.\n", __func__);
@@ -272,6 +280,21 @@ static int rtc_sensorhub_preflash(struct init_calldata *p_arg)
 	rtcpd->m4_seconds_cached = seconds;
 	rtcpd->m4_boot_cached = get_seconds();
 
+	/* Set the time of day (external processes rely on it) */
+	tv.tv_sec = seconds;
+	err = do_settimeofday(&tv);
+	if (err < 0) {
+		pr_err("%s: Failed to set time of day (err=%d)\n",
+			__func__, err);
+	} else {
+		rtc_time_to_tm(seconds, &rtc);
+		pr_info("%s: %s %d-%02d-%02d %02d:%02d:%02d UTC (%u)\n",
+			__func__, "setting system clock to",
+			rtc.tm_year + 1900, rtc.tm_mon + 1, rtc.tm_mday,
+			rtc.tm_hour, rtc.tm_min, rtc.tm_sec,
+			(unsigned int) tv.tv_sec);
+	}
+
 rtc_sensorhub_preflash_fail:
 	return err;
 }
@@ -290,7 +313,7 @@ static int rtc_sensorhub_init(struct init_calldata *p_arg)
 {
 	struct rtc_time rtc;
 	int err;
-	struct timespec tv;
+	struct timespec tv = {.tv_sec = 0, .tv_nsec = 0};
 	struct rtc_sensorhub_private_data *p_priv_data =
 			(struct rtc_sensorhub_private_data *)(p_arg->p_data);
 	uint32_t seconds = 0;
@@ -326,18 +349,17 @@ static int rtc_sensorhub_init(struct init_calldata *p_arg)
 		}
 	}
 
-	tv.tv_nsec = 0;  /* Initialize variable or do_settimeofday will fail */
 	rtc_tm_to_time(&rtc, &tv.tv_sec);
-
 	err = do_settimeofday(&tv);
-	if (err)
+	if (err) {
 		pr_err("%s: settimeofday failed (err=%d)\n", DRIVER_NAME, err);
-
-	pr_info("%s %d-%02d-%02d %02d:%02d:%02d UTC (%u)\n",
-		"setting system clock to",
-		rtc.tm_year + 1900, rtc.tm_mon + 1, rtc.tm_mday,
-		rtc.tm_hour, rtc.tm_min, rtc.tm_sec,
-		(unsigned int) tv.tv_sec);
+	} else {
+		pr_info("%s: %s %d-%02d-%02d %02d:%02d:%02d UTC (%u)\n",
+			__func__, "setting system clock to",
+			rtc.tm_year + 1900, rtc.tm_mon + 1, rtc.tm_mday,
+			rtc.tm_hour, rtc.tm_min, rtc.tm_sec,
+			(unsigned int) tv.tv_sec);
+	}
 
 	/* register an irq handler*/
 	err = m4sensorhub_irq_register(p_priv_data->p_m4sensorhub_data,
