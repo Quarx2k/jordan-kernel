@@ -25,6 +25,7 @@
 
 struct m4sensorhub_heartrate_iio_data {
 	uint16_t        heartrate;
+	uint8_t         confidence;
 	long long       timestamp;
 } __packed;
 
