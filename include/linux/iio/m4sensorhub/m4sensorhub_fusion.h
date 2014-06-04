@@ -25,6 +25,7 @@
 
 enum m4sensorhub_fusion_iio_type {
 	FUSION_TYPE_ROTATION = 0,
+	FUSION_TYPE_ORIENTATION = 1,
 };
 
 struct m4sensorhub_fusion_iio_data {
@@ -36,5 +37,7 @@ struct m4sensorhub_fusion_iio_data {
 #define M4FUS_DRIVER_NAME           "m4sensorhub_fusion"
 #define M4FUS_DATA_STRUCT_SIZE_BITS \
 	(sizeof(struct m4sensorhub_fusion_iio_data) * 8)
+
+#define M4FUS_NUM_FUSION_BUFFERS   2
 
 #endif /* _M4SENSORHUB_FUSION_IIO_H */

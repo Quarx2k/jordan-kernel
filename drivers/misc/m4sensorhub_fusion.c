@@ -44,7 +44,7 @@ struct m4fus_driver_data {
 	struct m4sensorhub_data     *m4;
 	struct mutex                mutex; /* controls driver entry points */
 
-	struct m4sensorhub_fusion_iio_data   iiodat;
+	struct m4sensorhub_fusion_iio_data   iiodat[M4FUS_NUM_FUSION_BUFFERS];
 	int16_t         samplerate;
 	uint16_t        status;
 };
@@ -59,14 +59,14 @@ static void m4fus_isr(enum m4sensorhub_irqs int_event, void *handle)
 
 	mutex_lock(&(dd->mutex));
 	size = m4sensorhub_reg_getsize(dd->m4, M4SH_REG_FUSION_ROTATIONVECTOR);
-	if (size > (sizeof(int32_t) * ARRAY_SIZE(dd->iiodat.values))) {
+	if (size > (sizeof(int32_t) * ARRAY_SIZE(dd->iiodat[0].values))) {
 		m4fus_err("%s: M4 register is too large.\n", __func__);
 		err = -EOVERFLOW;
 		goto m4fus_isr_fail;
 	}
 
 	err = m4sensorhub_reg_read(dd->m4, M4SH_REG_FUSION_ROTATIONVECTOR,
-		(char *)&(dd->iiodat.values[0]));
+		(char *)&(dd->iiodat[0].values[0]));
 	if (err < 0) {
 		m4fus_err("%s: Failed to read rotation data.\n", __func__);
 		goto m4fus_isr_fail;
@@ -77,9 +77,57 @@ static void m4fus_isr(enum m4sensorhub_irqs int_event, void *handle)
 		goto m4fus_isr_fail;
 	}
 
-	dd->iiodat.type = FUSION_TYPE_ROTATION;
-	dd->iiodat.timestamp = iio_get_time_ns();
-	iio_push_to_buffers(iio, (unsigned char *)&(dd->iiodat));
+	dd->iiodat[0].type = FUSION_TYPE_ROTATION;
+	dd->iiodat[0].timestamp = iio_get_time_ns();
+
+	size = m4sensorhub_reg_getsize(dd->m4, M4SH_REG_FUSION_EULERPITCH);
+	err = m4sensorhub_reg_read(dd->m4, M4SH_REG_FUSION_EULERPITCH,
+		(char *)&(dd->iiodat[1].values[0]));
+	if (err < 0) {
+		m4fus_err("%s: Failed to read euler_pitch data.\n", __func__);
+		goto m4fus_isr_fail;
+	} else if (err != size) {
+		m4fus_err("%s: Read %d bytes instead of %d for %s.\n",
+			  __func__, err, size, "euler_pitch");
+		err = -EBADE;
+		goto m4fus_isr_fail;
+	}
+
+	size = m4sensorhub_reg_getsize(dd->m4, M4SH_REG_FUSION_EULERROLL);
+	err = m4sensorhub_reg_read(dd->m4, M4SH_REG_FUSION_EULERROLL,
+		(char *)&(dd->iiodat[1].values[1]));
+	if (err < 0) {
+		m4fus_err("%s: Failed to read euler_roll data.\n", __func__);
+		goto m4fus_isr_fail;
+	} else if (err != size) {
+		m4fus_err("%s: Read %d bytes instead of %d for %s.\n",
+			  __func__, err, size, "euler_roll");
+		err = -EBADE;
+		goto m4fus_isr_fail;
+	}
+
+	size = m4sensorhub_reg_getsize(dd->m4, M4SH_REG_FUSION_HEADING);
+	err = m4sensorhub_reg_read(dd->m4, M4SH_REG_FUSION_HEADING,
+		(char *)&(dd->iiodat[1].values[2]));
+	if (err < 0) {
+		m4fus_err("%s: Failed to read heading data.\n", __func__);
+		goto m4fus_isr_fail;
+	} else if (err != size) {
+		m4fus_err("%s: Read %d bytes instead of %d for %s.\n",
+			  __func__, err, size, "heading");
+		err = -EBADE;
+		goto m4fus_isr_fail;
+	}
+
+	dd->iiodat[1].type = FUSION_TYPE_ORIENTATION;
+	dd->iiodat[1].timestamp = iio_get_time_ns();
+
+	/*
+	 * For some reason, IIO knows we are sending an array,
+	 * so all FUSION_TYPE_* indicies will be sent
+	 * in this one call (see the M4 passive driver).
+	 */
+	iio_push_to_buffers(iio, (unsigned char *)&(dd->iiodat[0]));
 
 m4fus_isr_fail:
 	if (err < 0)
@@ -209,11 +257,15 @@ static ssize_t m4fus_iiodata_show(struct device *dev,
 	ssize_t size = 0;
 
 	mutex_lock(&(dd->mutex));
-	size = snprintf(buf, PAGE_SIZE, "%s%d\n%s%d\n%s%d\n%s%d\n",
-		"rotation[0]: ", dd->iiodat.values[0],
-		"rotation[1]: ", dd->iiodat.values[1],
-		"rotation[2]: ", dd->iiodat.values[2],
-		"rotation[3]: ", dd->iiodat.values[3]);
+	size = snprintf(buf, PAGE_SIZE,
+		"%s%d\n%s%d\n%s%d\n%s%d\n%s%d\n%s%d\n%s%hd\n",
+		"rotation[0]: ", dd->iiodat[0].values[0],
+		"rotation[1]: ", dd->iiodat[0].values[1],
+		"rotation[2]: ", dd->iiodat[0].values[2],
+		"rotation[3]: ", dd->iiodat[0].values[3],
+		"euler_pitch: ", dd->iiodat[1].values[0],
+		"euler_roll: ", dd->iiodat[1].values[1],
+		"heading: ", dd->iiodat[1].values[2]);
 	mutex_unlock(&(dd->mutex));
 	return size;
 }
