@@ -487,7 +487,8 @@ static void m4hrt_panic_restore(struct m4sensorhub_data *m4sensorhub,
 	struct m4hrt_driver_data *dd = (struct m4hrt_driver_data *)data;
 
 	if (dd == NULL) {
-		m4als_err("%s: Driver data is null, unable to restore\n");
+		m4hrt_err("%s: Driver data is null, unable to restore\n",
+			  __func__);
 		return;
 	}
 	size = m4sensorhub_reg_getsize(dd->m4,

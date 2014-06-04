@@ -413,7 +413,8 @@ static void m4pas_panic_restore(struct m4sensorhub_data *m4sensorhub,
 	struct m4pas_driver_data *dd = (struct m4pas_driver_data *)data;
 
 	if (dd == NULL) {
-		m4als_err("%s: Driver data is null, unable to restore\n");
+		m4pas_err("%s: Driver data is null, unable to restore\n",
+			  __func__);
 		return;
 	}
 

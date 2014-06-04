@@ -652,7 +652,8 @@ static void mpu9150_panic_restore(struct m4sensorhub_data *m4sensorhub,
 	struct mpu9150_client *dd = (struct mpu9150_client *)data;
 
 	if (dd == NULL) {
-		m4als_err("%s: Driver data is null, unable to restore\n");
+		KDEBUG(M4SH_INFO, "%s: Driver data is null,unable to restore\n",
+		       __func__);
 		return;
 	}
 	KDEBUG(M4SH_INFO, "Executing mpu9150 panic restore\n");

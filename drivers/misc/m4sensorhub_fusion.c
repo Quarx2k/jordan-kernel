@@ -315,7 +315,8 @@ static void m4fus_panic_restore(struct m4sensorhub_data *m4sensorhub,
 	struct m4fus_driver_data *dd = (struct m4fus_driver_data *)data;
 
 	if (dd == NULL) {
-		m4als_err("%s: Driver data is null, unable to restore\n");
+		m4fus_err("%s: Driver data is null, unable to restore\n",
+			  __func__);
 		return;
 	}
 	size = m4sensorhub_reg_getsize(dd->m4, M4SH_REG_FUSION_SAMPLERATE);

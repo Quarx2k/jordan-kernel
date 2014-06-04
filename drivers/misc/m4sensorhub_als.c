@@ -275,7 +275,8 @@ static void m4als_panic_restore(struct m4sensorhub_data *m4sensorhub,
 	struct m4als_driver_data *dd = (struct m4als_driver_data *)data;
 	
 	if (dd == NULL) {
-		m4als_err("%s: Driver data is null, unable to restore\n");
+		m4als_err("%s: Driver data is null, unable to restore\n",
+			  __func__);
 		return;
 	}
 
