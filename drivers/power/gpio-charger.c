@@ -304,8 +304,15 @@ static int gpio_charger_resume(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct gpio_charger *gpio_charger = platform_get_drvdata(pdev);
+	const struct gpio_charger_platform_data *pdata;
 
-	power_supply_changed(&gpio_charger->charger);
+	if (gpio_charger != NULL) {
+		pdata = gpio_charger->pdata;
+		if ((pdata != NULL) &&
+		    (gpio_charger->sdev != NULL) &&
+		    (gpio_charger->sdev->state != gpio_state(pdata)))
+				power_supply_changed(&gpio_charger->charger);
+	}
 
 	return 0;
 }
