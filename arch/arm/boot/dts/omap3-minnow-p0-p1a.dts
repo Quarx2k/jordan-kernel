@@ -36,8 +36,8 @@
 
 &tps65912_0 {
 		register-init-data = <
-			0x25 0xF1 /* DEVCTRL2: enable SLEEP, INT push/pull
-					       2ms TSLOT, INT active high */
+			0x25 0xD1 /* DEVCTRL2: enable SLEEP, INT push/pull
+					       200us TSLOT, INT active high */
 			0x26 0x49 /* I2C_SPI_CFG: AVS ADDR = 0x13,
 					DCDC1, DCDC4 is AVS ctrl */
 			0x29 0x10 /* SET_OFF1: LDO5 */
