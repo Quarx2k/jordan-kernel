@@ -27,27 +27,26 @@ static int tps65912_spi_write(struct tps65912 *tps65912, u8 addr,
 							int bytes, void *src)
 {
 	struct spi_device *spi = tps65912->control_data;
-	u8 *data = (u8 *) src;
-	int ret;
 	/* bit 23 is the read/write bit */
-	unsigned long spi_data = 1 << 23 | addr << 15 | *data;
+	u32 tx = 1 << 23 | addr << 15 | *(u8 *)src;
 	struct spi_transfer xfer;
 	struct spi_message msg;
-	u32 tx_buf, rx_buf;
 
-	tx_buf = spi_data;
-	rx_buf = 0;
+	if ((spi == NULL) || (bytes == 0))
+		return -ENODATA;
 
-	xfer.tx_buf	= &tx_buf;
-	xfer.rx_buf	= NULL;
-	xfer.len	= sizeof(unsigned long);
+	if (bytes > 1)
+		dev_err(tps65912->dev, "too many bytes to write %d\n", bytes);
+
+	memset(&xfer, 0, sizeof(xfer));
+	/* Do not setup the bits per transfer or the speed, as this causes the
+	   driver to re-initialize, which wastes time. */
+	xfer.tx_buf = &tx;
+	xfer.len = sizeof(tx);
 	xfer.bits_per_word = 24;
-
 	spi_message_init(&msg);
 	spi_message_add_tail(&xfer, &msg);
-
-	ret = spi_sync(spi, &msg);
-	return ret;
+	return spi_sync(spi, &msg);
 }
 
 static int tps65912_spi_read(struct tps65912 *tps65912, u8 addr,
@@ -55,30 +54,30 @@ static int tps65912_spi_read(struct tps65912 *tps65912, u8 addr,
 {
 	struct spi_device *spi = tps65912->control_data;
 	/* bit 23 is the read/write bit */
-	unsigned long spi_data = 0 << 23 | addr << 15;
+	u32 tx = 0 << 23 | addr << 15;
 	struct spi_transfer xfer;
 	struct spi_message msg;
+	u32 rx;
 	int ret;
-	u8 *data = (u8 *) dest;
-	u32 tx_buf, rx_buf;
 
-	tx_buf = spi_data;
-	rx_buf = 0;
+	if ((spi == NULL) || (bytes == 0))
+		return -ENODATA;
 
-	xfer.tx_buf	= &tx_buf;
-	xfer.rx_buf	= &rx_buf;
-	xfer.len	= sizeof(unsigned long);
+	if (bytes > 1)
+		dev_err(tps65912->dev, "too many bytes to read %d\n", bytes);
+
+	memset(&xfer, 0, sizeof(xfer));
+	/* Do not setup the bits per transfer or the speed, as this causes the
+	   driver to re-initialize, which wastes time. */
+	xfer.tx_buf = &tx;
+	xfer.rx_buf = &rx;
+	xfer.len = sizeof(tx);
 	xfer.bits_per_word = 24;
-
 	spi_message_init(&msg);
 	spi_message_add_tail(&xfer, &msg);
-
-	if (spi == NULL)
-		return 0;
-
 	ret = spi_sync(spi, &msg);
-	if (ret == 0)
-		*data = (u8) (rx_buf & 0xFF);
+	if (!ret)
+		*(u8 *)dest = (u8)rx & 0xff;
 	return ret;
 }
 
