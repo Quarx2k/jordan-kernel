@@ -381,7 +381,7 @@ tps65912_0: tps65912 {
 
 		compatible = "ti,tps65912";
 		reg = <0>; /* CS 0 */
-		spi-max-frequency = <1000000>;
+		spi-max-frequency = <15000000>;
 		spi-cs-high;
 
 		register-init-data = <
