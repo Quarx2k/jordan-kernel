@@ -361,8 +361,33 @@ static int c55_ctrl_remove(struct platform_device *pdev)
 static int c55_ctrl_suspend(struct platform_device *dev, pm_message_t state)
 {
 	struct c55_ctrl_data *cdata = dev_get_drvdata(&dev->dev);
+	struct m4sensorhub_data *m4sensorhub = m4sensorhub_client_get_drvdata();
 
-	pinctrl_select_state(cdata->pctrl, cdata->states[C55_OFF]);
+	if (cdata->c55_mode != C55_OFF) {
+		dev_warn(&dev->dev, "C55 still ON when going into suspend\n");
+
+		/* Disable C55->AP IRQ when turning off C55 */
+		if (cdata->c55_ap_int_enabled) {
+			disable_irq_nosync(
+				__gpio_to_irq(cdata->c55_ap_int_gpio));
+			cdata->c55_ap_int_enabled = 0;
+		}
+
+		if (m4sensorhub_reg_write_1byte
+		    (m4sensorhub, M4SH_REG_USERSETTINGS_SCREENSTATUS, 0x00, 0xFF
+				) != 1) {
+			dev_err(&dev->dev,
+				"Unable to set screen status to 0x00\n");
+		}
+
+		/* AP->C55 interrupt needs to be set low when C55 is off
+		 * for current drain reasons */
+		gpio_set_value(cdata->ap_c55_int_gpio, 0);
+
+		pinctrl_select_state(cdata->pctrl, cdata->states[C55_OFF]);
+
+		cdata->c55_mode = C55_OFF;
+	}
 
 	return 0;
 }
