@@ -384,10 +384,10 @@ static int c55_ctrl_suspend(struct platform_device *dev, pm_message_t state)
 		 * for current drain reasons */
 		gpio_set_value(cdata->ap_c55_int_gpio, 0);
 
-		pinctrl_select_state(cdata->pctrl, cdata->states[C55_OFF]);
-
 		cdata->c55_mode = C55_OFF;
 	}
+
+	pinctrl_select_state(cdata->pctrl, cdata->states[C55_OFF]);
 
 	return 0;
 }
