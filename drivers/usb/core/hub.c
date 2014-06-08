@@ -40,7 +40,9 @@
 #define CONFIG_USB_ANNOUNCE_NEW_DEVICES
 #endif
 #endif
-
+#ifdef CONFIG_MAPPHONE_2NDBOOT
+static int w3g_hack_done = 0;
+#endif
 struct usb_hub {
 	struct device		*intfdev;	/* the "interface" device */
 	struct usb_device	*hdev;
@@ -2605,8 +2607,9 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 #ifdef CONFIG_MAPPHONE_2NDBOOT
 	// do not reset first USB bus (modem) on 2ndboot,
 	// but reset on device connect in host mode
-	if (hdev->bus->busnum == 1)
+	if (hdev->bus->busnum == 1 && !w3g_hack_done)
 		do_reset = false;
+
 #endif
 
 	/* root hub ports have a slightly longer reset period
@@ -2753,13 +2756,24 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 				buf->bMaxPacketSize0 = 0;
 #ifndef CONFIG_MAPPHONE_2NDBOOT
 				r = usb_control_msg(udev, usb_rcvaddr0pipe(),
-#else
-				r = usb_control_msg(udev, (PIPE_CONTROL << 30) | (0x02 << 8) | USB_DIR_IN,
-#endif
 					USB_REQ_GET_DESCRIPTOR, USB_DIR_IN,
 					USB_DT_DEVICE << 8, 0,
 					buf, GET_DESCRIPTOR_BUFSIZE,
 					initial_descriptor_timeout);
+#else
+				if (do_reset)
+					r = usb_control_msg(udev, usb_rcvaddr0pipe(),
+						USB_REQ_GET_DESCRIPTOR, USB_DIR_IN,
+						USB_DT_DEVICE << 8, 0,
+						buf, GET_DESCRIPTOR_BUFSIZE,
+						initial_descriptor_timeout);
+				else
+					r = usb_control_msg(udev, (PIPE_CONTROL << 30) | (0x02 << 8) | USB_DIR_IN,
+						USB_REQ_GET_DESCRIPTOR, USB_DIR_IN,
+						USB_DT_DEVICE << 8, 0,
+						buf, GET_DESCRIPTOR_BUFSIZE,
+						initial_descriptor_timeout);
+#endif
 				switch (buf->bMaxPacketSize0) {
 				case 8: case 16: case 32: case 64: case 255:
 					if (buf->bDescriptorType ==
@@ -2822,6 +2836,7 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 				usb_set_device_state(udev, USB_STATE_ADDRESS);
 				usb_ep0_reinit(udev);
 				retval = 0;
+				w3g_hack_done = 1;
 			}
 			
 			if (retval < 0) {
