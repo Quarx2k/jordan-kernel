@@ -224,11 +224,12 @@ static struct wl12xx_platform_data mapphone_wlan_data __initdata = {
 int wifi_set_power(struct device *dev, int slot, int power_on, int vdd)
 {
 	static int power_state;
-	printk("Powering %s wifi\n", (power_on ? "on" : "off"));
-	if (power_on == power_state) {
+
+	if (power_on == power_state)
 		return 0;
-	}
+
 	power_state = power_on;
+
 	if (power_on) {
 		gpio_set_value(MAPPHONE_WIFI_PMENA_GPIO, 1);
 	} else {
