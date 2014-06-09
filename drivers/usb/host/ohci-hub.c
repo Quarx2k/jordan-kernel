@@ -356,7 +356,10 @@ static void ohci_finish_controller_resume(struct usb_hcd *hcd)
 		msleep(20);
 	}
 
-	usb_hcd_resume_root_hub(hcd);
+	/* Does the root hub have a port wakeup pending? */
+	if (ohci_readl(ohci, &ohci->regs->intrstatus) &
+			(OHCI_INTR_RD | OHCI_INTR_RHSC))
+		usb_hcd_resume_root_hub(hcd);
 }
 
 /* Carry out polling-, autostop-, and autoresume-related state changes */
@@ -489,9 +492,6 @@ ohci_hub_status_data (struct usb_hcd *hcd, char *buf)
 	int		any_connected = 0;
 	int		rhsc_status;
 	unsigned long	flags;
-
-	if (!HC_IS_RUNNING(hcd->state))
-		return 0;
 
 	spin_lock_irqsave (&ohci->lock, flags);
 	if (!HCD_HW_ACCESSIBLE(hcd))

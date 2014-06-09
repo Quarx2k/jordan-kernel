@@ -133,7 +133,7 @@ void __init usb_musb_init(struct omap_musb_board_data *musb_board_data)
 	 * REVISIT: This line can be removed once all the platforms using
 	 * musb_core.c have been converted to use use clkdev.
 	 */
-	musb_plat.clock = "ick";
+	musb_plat.clock = "ick"; //hsotgusb_ick
 	musb_plat.board_data = board_data;
 	musb_plat.power = board_data->power >> 1;
 	musb_plat.mode = board_data->mode;
@@ -141,6 +141,11 @@ void __init usb_musb_init(struct omap_musb_board_data *musb_board_data)
 
 	if (cpu_is_omap44xx())
 		omap4430_phy_init(dev); /* power down the phy */
+
+	if(cpu_is_omap34xx()) {
+	printk("MUSB mux init\n");
+	usb_musb_mux_init(board_data);
+	}
 
 	if (cpu_is_omap3517() || cpu_is_omap3505()) {
 		oh_name = "am35x_otg_hs";

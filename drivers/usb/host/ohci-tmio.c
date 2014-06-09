@@ -244,7 +244,7 @@ static int __devinit ohci_hcd_tmio_drv_probe(struct platform_device *dev)
 	ohci = hcd_to_ohci(hcd);
 	ohci_hcd_init(ohci);
 
-	ret = usb_add_hcd(hcd, irq, 0);
+	ret = usb_add_hcd(hcd, irq, IRQF_DISABLED);
 	if (ret)
 		goto err_add_hcd;
 

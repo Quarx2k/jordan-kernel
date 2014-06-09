@@ -1639,7 +1639,7 @@ static int __devinit isp116x_probe(struct platform_device *pdev)
 		goto err6;
 	}
 
-	ret = usb_add_hcd(hcd, irq, irqflags);
+	ret = usb_add_hcd(hcd, irq, irqflags | IRQF_DISABLED);
 	if (ret)
 		goto err6;
 

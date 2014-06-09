@@ -748,13 +748,11 @@ static int usb_ipc_probe(struct usb_interface *intf,
 MODULE_DEVICE_TABLE(usb, usb_ipc_id_table);
 
 #ifdef CONFIG_PM
-extern int mapphone_usb_modem_suspend(int on);
 static int usb_ipc_suspend(struct usb_interface *iface,
 			   pm_message_t message)
 {
 	DEBUG("%s:sleeping=%d working=%d\n", __func__,
 	      usb_ipc_data_param.sleeping, usb_ipc_data_param.working);
-	mapphone_usb_modem_suspend(1);
 	spin_lock_bh(&usb_ipc_data_param.pm_lock);
 	if (!usb_ipc_data_param.allow_suspend) {
 		spin_unlock_bh(&usb_ipc_data_param.pm_lock);
@@ -790,7 +788,7 @@ static int usb_ipc_resume(struct usb_interface *iface)
 	int ret;
 	DEBUG("%s:sleeping=%d working=%d\n", __func__,
 	      usb_ipc_data_param.sleeping, usb_ipc_data_param.working);
-	mapphone_usb_modem_suspend(0);
+
 	spin_lock_bh(&usb_ipc_data_param.pm_lock);
 	usb_ipc_data_param.allow_suspend = 0;
 	if (iface->cur_altsetting->desc.bInterfaceNumber

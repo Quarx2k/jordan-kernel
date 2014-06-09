@@ -47,6 +47,7 @@ struct usbnet {
 	u32			xid;
 	u32			hard_mtu;	/* count any extra framing */
 	size_t			rx_urb_size;	/* size for rx urbs */
+	bool			custom_rx_urb_size; /* set in bind() */
 	struct mii_if_info	mii;
 
 	/* various kinds of pending driver work */
@@ -138,6 +139,10 @@ struct driver_info {
 	struct sk_buff	*(*tx_fixup)(struct usbnet *dev,
 				struct sk_buff *skb, gfp_t flags);
 
+	/* protocol fix up */
+	__be16 (*prot_type_trans)(struct usbnet *usbnet, struct sk_buff *skb,
+				struct net_device *dev);
+
 	/* early initialization code, can sleep. This is for minidrivers
 	 * having 'subminidrivers' that need to do extra initialization
 	 * right after minidriver have initialized hardware. */
@@ -191,8 +196,7 @@ extern void usbnet_cdc_status(struct usbnet *, struct urb *);
 enum skb_state {
 	illegal = 0,
 	tx_start, tx_done,
-	rx_start, rx_done, rx_cleanup,
-	unlink_start
+	rx_start, rx_done, rx_cleanup
 };
 
 struct skb_data {	/* skb->cb is one of these */

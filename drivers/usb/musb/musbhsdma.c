@@ -144,11 +144,6 @@ static void configure_channel(struct dma_channel *channel,
 				? (1 << MUSB_HSDMA_TRANSMIT_SHIFT)
 				: 0);
 
-	if (musb_channel->transmit)
-		controller->tx_active |= (1 << bchannel);
-	else
-		controller->rx_active |= (1 << bchannel);
-
 	/* address/count */
 	musb_write_hsdma_addr(mbase, bchannel, dma_addr);
 	musb_write_hsdma_count(mbase, bchannel, len);
@@ -171,12 +166,11 @@ static int dma_channel_program(struct dma_channel *channel,
 		musb_channel->epnum,
 		musb_channel->transmit ? "Tx" : "Rx",
 		packet_sz, dma_addr, len, mode);
-
 	BUG_ON(channel->status == MUSB_DMA_STATUS_UNKNOWN ||
 		channel->status == MUSB_DMA_STATUS_BUSY);
 
 	/* Let targets check/tweak the arguments */
-	if (musb->ops->adjust_channel_params) {
+	if ((musb->ops) && (musb->ops->adjust_channel_params)) {
 		int ret = musb->ops->adjust_channel_params(channel,
 			packet_sz, &mode, &dma_addr, &len);
 		if (ret)
@@ -194,20 +188,6 @@ static int dma_channel_program(struct dma_channel *channel,
 	 */
 	if ((musb->hwvers >= MUSB_HWVERS_1800) && (dma_addr % 4))
 		return false;
-
-	/* In version 1.4 and 1.8, if two DMA channels are simultaneously
-	 * enabled in opposite directions, there is a chance that
-	 * the DMA controller will hang. However, it is safe to
-	 * have multiple DMA channels enabled in the same direction
-	 * at the same time.
-	 */
-	if (musb->hwvers == MUSB_HWVERS_1400 ||
-		musb->hwvers == MUSB_HWVERS_1800) {
-		if (musb_channel->transmit && controller->rx_active)
-			return false;
-		else if (!musb_channel->transmit && controller->tx_active)
-			return false;
-	}
 
 	channel->actual_len = 0;
 	musb_channel->start_addr = dma_addr;
@@ -260,11 +240,6 @@ static int dma_channel_abort(struct dma_channel *channel)
 		musb_write_hsdma_addr(mbase, bchannel, 0);
 		musb_write_hsdma_count(mbase, bchannel, 0);
 		channel->status = MUSB_DMA_STATUS_FREE;
-
-		if (musb_channel->transmit)
-			musb_channel->controller->tx_active &= ~(1 << bchannel);
-		else
-			musb_channel->controller->rx_active &= ~(1 << bchannel);
 	}
 
 	return 0;
@@ -325,6 +300,10 @@ static irqreturn_t dma_controller_irq(int irq, void *private_data)
 					&(controller->channel[bchannel]);
 			channel = &musb_channel->channel;
 
+			/* dma channel has already been released */
+			if (channel->status == MUSB_DMA_STATUS_UNKNOWN)
+				continue;
+
 			csr = musb_readw(mbase,
 					MUSB_HSDMA_CHANNEL_OFFSET(bchannel,
 							MUSB_HSDMA_CONTROL));
@@ -351,13 +330,6 @@ static irqreturn_t dma_controller_irq(int irq, void *private_data)
 				devctl = musb_readb(mbase, MUSB_DEVCTL);
 
 				channel->status = MUSB_DMA_STATUS_FREE;
-
-				if (musb_channel->transmit)
-					controller->tx_active &=
-							~(1 << bchannel);
-				else
-					controller->rx_active &=
-							~(1 << bchannel);
 
 				/* completed */
 				if ((devctl & MUSB_DEVCTL_HM)
@@ -439,7 +411,7 @@ dma_controller_create(struct musb *musb, void __iomem *base)
 	controller->controller.channel_program = dma_channel_program;
 	controller->controller.channel_abort = dma_channel_abort;
 
-	if (request_irq(irq, dma_controller_irq, 0,
+	if (request_irq(irq, dma_controller_irq, IRQF_DISABLED,
 			dev_name(musb->controller), &controller->controller)) {
 		dev_err(dev, "request_irq %d failed!\n", irq);
 		dma_controller_destroy(&controller->controller);

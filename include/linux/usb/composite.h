@@ -36,7 +36,7 @@
 
 #include <linux/usb/ch9.h>
 #include <linux/usb/gadget.h>
-
+#include <linux/if_ether.h>
 /*
  * USB function drivers should return USB_GADGET_DELAYED_STATUS if they
  * wish to delay the data/status stages of the control transfer till they
@@ -381,4 +381,56 @@ extern int usb_string_ids_n(struct usb_composite_dev *c, unsigned n);
 #define INFO(d, fmt, args...) \
 	dev_info(&(d)->gadget->dev , fmt , ## args)
 
+/* Platform data for "usb_mass_storage" driver. */
+struct usb_mass_storage_platform_data {
+	/* Contains values for the SC_INQUIRY SCSI command. */
+	char *vendor;
+	char *product;
+	int release;
+
+	/* number of LUNS */
+	int nluns;
+	int cdrom_lun_num;
+};
+
+/* Platform data for USB ethernet driver. */
+struct usb_ether_platform_data {
+	u8	ethaddr[ETH_ALEN];
+	u32	vendorID;
+	const char *vendorDescr;
+};
+
+/* Platform data for ACM driver. */
+struct acm_platform_data {
+	u8      num_inst;
+	u8      use_iads;
+};
+
+#ifdef CONFIG_MOT_FEAT_SPY
+#define MAX_DEVICE_TYPE_NUM   31
+#else
+#define MAX_DEVICE_TYPE_NUM   30
+#endif
+#define MAX_DEVICE_NAME_SIZE  45
+#define MAX_USB_SERIAL_NUM		17
+extern void android_usb_set_connected(int on, unsigned int accy);
+extern void android_usb_set_pid(char *fname, u16 usb_pid);
+
+struct device_pid {
+	char *name;
+	int pid;
+};
+
+struct android_usb_platform_data {
+	char *vendor;
+	char *product_name;
+	struct device_pid *android_pid;
+	char device_serial[MAX_USB_SERIAL_NUM];
+	int bp_tools_mode;
+	/* number of LUNS */
+	int nluns;
+	int cdrom_lun_num;
+	/* boost cpu speed*/
+	void (*performance_mode)(struct device *dev, bool enabled);
+};
 #endif	/* __LINUX_USB_COMPOSITE_H */

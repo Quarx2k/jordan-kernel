@@ -417,9 +417,6 @@ static void twl4030_phy_resume(struct twl4030_usb *twl)
 {
 	if (!twl->asleep)
 		return;
-	/* Check the link status before enabling */
-	if (twl4030_usb_linkstat(twl) == USB_EVENT_NONE)
-		return;
 	__twl4030_phy_resume(twl);
 	twl->asleep = 0;
 	dev_dbg(twl->dev, "%s\n", __func__);

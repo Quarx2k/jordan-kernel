@@ -153,6 +153,15 @@
 
 
 /*-------------------------------------------------------------------------*/
+#ifdef CONFIG_USB_MOT_ANDROID
+static int cdrom_enable ;
+static int cdrom_allow_switch = 1;
+
+module_param_named(cdrom, cdrom_enable, bool, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(cdrom, "true to emulate cdrom instead of disk");
+module_param_named(cdrom_switch, cdrom_allow_switch, bool, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(cdrom_switch, "true to allow switching USB mode when eject is sent");
+#endif
 
 /* Bulk-only data structures */
 
@@ -188,7 +197,9 @@ struct bulk_cs_wrap {
 /* Bulk-only class specific requests */
 #define USB_BULK_RESET_REQUEST		0xff
 #define USB_BULK_GET_MAX_LUN_REQUEST	0xfe
-
+#ifdef CONFIG_USB_MOT_ANDROID
+#define USB_BULK_GET_ENCAP_RESPONSE     0x02
+#endif
 
 /* CBI Interrupt data structure */
 struct interrupt_data {
@@ -220,6 +231,7 @@ struct interrupt_data {
 #define SS_UNRECOVERED_READ_ERROR		0x031100
 #define SS_WRITE_ERROR				0x030c02
 #define SS_WRITE_PROTECTED			0x072700
+
 
 #define SK(x)		((u8) ((x) >> 16))	/* Sense Key byte, etc. */
 #define ASC(x)		((u8) ((x) >> 8))

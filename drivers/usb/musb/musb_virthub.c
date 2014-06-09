@@ -41,6 +41,7 @@
 #include <linux/timer.h>
 
 #include <asm/unaligned.h>
+#include <asm/mach-types.h>
 
 #include "musb_core.h"
 
@@ -134,28 +135,6 @@ static void musb_port_reset(struct musb *musb, bool do_reset)
 	 */
 	power = musb_readb(mbase, MUSB_POWER);
 	if (do_reset) {
-#ifdef CONFIG_ARCH_OMAP3
-		/*
-		 Errata ID: i624
-		 When the HS USB OTG module is acting as a host (A-Dev) and the
-		 software initiates a suspend transition
-		 (by setting POWER[1]:Suspend_Mode), then the bus will enter
-		 the suspend state.
-		 If the software then tries to issue a USB reset
-		 (POWER[3]:Reset), the HS USB OTG module will not initiate
-		 the USB reset on the bus, and will remain in suspend state.
-		 This issue exists only when HS USB OTG is acting as a host.
-		 In device mode, suspend to reset detection is possible.
-
-		 WORKAROUND
-		 The workaround consists in resuming the bus (POWER[2]:Resume)
-		 before resetting it (POWER[3]:Reset).
-		 */
-		if (power & MUSB_POWER_SUSPENDM) {
-			musb_port_suspend(musb, false);
-			power = musb_readb(mbase, MUSB_POWER);
-		}
-#endif /* CONFIG_ARCH_OMAP3 */
 
 		/*
 		 * If RESUME is set, we must make sure it stays minimum 20 ms.
@@ -394,7 +373,8 @@ int musb_hub_control(
 			 * initialization logic, e.g. for OTG, or change any
 			 * logic relating to VBUS power-up.
 			 */
-			if (!(is_otg_enabled(musb) && hcd->self.is_b_host))
+			if (!machine_is_mapphone() &&
+			!(is_otg_enabled(musb) && hcd->self.is_b_host))
 				musb_start(musb);
 			break;
 		case USB_PORT_FEAT_RESET:

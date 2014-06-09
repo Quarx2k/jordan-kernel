@@ -1012,10 +1012,50 @@ static int gs_break_ctl(struct tty_struct *tty, int duration)
 	return status;
 }
 
+#ifdef CONFIG_USB_MOT_ANDROID
+/* Add TIOCMSET which is used by ATCMD */
+static int gs_tiocmset(struct tty_struct *tty,
+	unsigned int set, unsigned int clear)
+{
+	struct gs_port  *port = tty->driver_data;
+	int             status = 0;
+	struct gserial  *gser;
+
+	pr_vdebug("gs_tiocmset: ttyGS%d, set = (%d), clear = (%d) \n",
+			port->port_num, set, clear);
+	spin_lock_irq(&port->port_lock);
+	gser = port->port_usb;
+	if (gser && gser->tiocmset)
+		status = gser->tiocmset(gser, set, clear);
+	spin_unlock_irq(&port->port_lock);
+
+	return status;
+}
+
+static int gs_tiocmget(struct tty_struct *tty)
+{
+	struct gs_port  *port = tty->driver_data;
+	int             status = 0;
+	struct gserial  *gser;
+
+	pr_vdebug("gs_tiocmget: ttyGS%d\n", port->port_num);
+	spin_lock_irq(&port->port_lock);
+	gser = port->port_usb;
+	if (gser && gser->tiocmget)
+		status = gser->tiocmget(gser);
+	spin_unlock_irq(&port->port_lock);
+
+	return status;
+}
+#endif
 static const struct tty_operations gs_tty_ops = {
 	.open =			gs_open,
 	.close =		gs_close,
 	.write =		gs_write,
+#ifdef CONFIG_USB_MOT_ANDROID
+	.tiocmset =             gs_tiocmset,
+	.tiocmget =             gs_tiocmget,
+#endif
 	.put_char =		gs_put_char,
 	.flush_chars =		gs_flush_chars,
 	.write_room =		gs_write_room,

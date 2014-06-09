@@ -14,7 +14,7 @@
  * This file is licenced under the GPL.
  */
 
-#include <linux/signal.h>
+#include <linux/signal.h>	/* IRQF_DISABLED */
 #include <linux/jiffies.h>
 #include <linux/platform_device.h>
 #include <linux/clk.h>
@@ -363,7 +363,7 @@ static int usb_hcd_omap_probe (const struct hc_driver *driver,
 		retval = -ENXIO;
 		goto err3;
 	}
-	retval = usb_add_hcd(hcd, irq, 0);
+	retval = usb_add_hcd(hcd, irq, IRQF_DISABLED);
 	if (retval)
 		goto err3;
 

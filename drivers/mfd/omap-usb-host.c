@@ -134,10 +134,6 @@
 
 #define	OMAP_UHH_DEBUG_CSR				(0x44)
 
-#define	OHCI_BASE_ADDR		0x48064400
-#define	OHCI_HC_CONTROL		(OHCI_BASE_ADDR + 0x4)
-#define	OHCI_HC_CTRL_SUSPEND	(3 << 6)
-
 /* Values of UHH_REVISION - Note: these are not given in the TRM */
 #define OMAP_USBHS_REV1		0x00000010	/* OMAP3 */
 #define OMAP_USBHS_REV2		0x50700100	/* OMAP4 */
@@ -204,6 +200,7 @@ static struct platform_device *omap_usbhs_alloc_child(const char *name,
 {
 	struct platform_device	*child;
 	int			ret;
+
 	child = platform_device_alloc(name, 0);
 
 	if (!child) {
@@ -253,6 +250,7 @@ static int omap_usbhs_alloc_children(struct platform_device *pdev)
 	struct resource				*res;
 	struct resource				resources[2];
 	int					ret;
+
 	omap = platform_get_drvdata(pdev);
 	ehci_data = omap->platdata.ehci_data;
 	ohci_data = omap->platdata.ohci_data;
@@ -329,6 +327,7 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
 	struct resource			*res;
 	int				ret = 0;
 	int				i;
+
 	if (!pdata) {
 		dev_err(dev, "Missing platform data\n");
 		ret = -ENOMEM;
@@ -474,12 +473,13 @@ static int __devinit usbhs_omap_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, omap);
 
-	omap_usbhs_init(dev);
 	ret = omap_usbhs_alloc_children(pdev);
 	if (ret) {
 		dev_err(dev, "omap_usbhs_alloc_children failed\n");
 		goto err_alloc;
 	}
+
+	omap_usbhs_init(dev);
 
 	goto end_probe;
 
@@ -534,6 +534,7 @@ static void omap_usbhs_deinit(struct device *dev);
 static int __devexit usbhs_omap_remove(struct platform_device *pdev)
 {
 	struct usbhs_hcd_omap *omap = platform_get_drvdata(pdev);
+
 	omap_usbhs_deinit(&pdev->dev);
 	iounmap(omap->tll_base);
 	iounmap(omap->uhh_base);
@@ -621,6 +622,7 @@ static void usbhs_omap_tll_init(struct device *dev, u8 tll_channel_count)
 	struct usbhs_omap_platform_data	*pdata = dev->platform_data;
 	unsigned			reg;
 	int				i;
+
 	/* Program Common TLL register */
 	reg = usbhs_read(omap->tll_base, OMAP_TLL_SHARED_CONF);
 	reg |= (OMAP_TLL_SHARED_CONF_FCLK_IS_ON
@@ -640,10 +642,11 @@ static void usbhs_omap_tll_init(struct device *dev, u8 tll_channel_count)
 				<< OMAP_TLL_CHANNEL_CONF_FSLSMODE_SHIFT;
 			reg |= OMAP_TLL_CHANNEL_CONF_CHANMODE_FSLS;
 		} else if (pdata->port_mode[i] == OMAP_EHCI_PORT_MODE_TLL) {
+
 			/* Disable AutoIdle, BitStuffing and use SDR Mode */
 			reg &= ~(OMAP_TLL_CHANNEL_CONF_UTMIAUTOIDLE
 #ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
-				| OMAP_TLL_CHANNEL_CONF_ULPINOBITSTUFF);
+				| OMAP_TLL_CHANNEL_CONF_ULPINOBITSTUFF
 #endif
 				| OMAP_TLL_CHANNEL_CONF_ULPIDDRMODE);
 
@@ -663,7 +666,7 @@ static int usbhs_runtime_resume(struct device *dev)
 {
 	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
 	struct usbhs_omap_platform_data	*pdata = &omap->platdata;
-	printk("%s\n",__func__);
+
 	dev_dbg(dev, "usbhs_runtime_resume\n");
 
 	if (!pdata) {
@@ -719,6 +722,7 @@ static void omap_usbhs_init(struct device *dev)
 	struct usbhs_omap_platform_data	*pdata = &omap->platdata;
 	unsigned long			flags = 0;
 	unsigned			reg;
+
 	dev_dbg(dev, "starting TI HSUSB Controller\n");
 
 	pm_runtime_get_sync(dev);
@@ -747,11 +751,6 @@ static void omap_usbhs_init(struct device *dev)
 	omap->usbhs_rev = usbhs_read(omap->uhh_base, OMAP_UHH_REVISION);
 	dev_dbg(dev, "OMAP UHH_REVISION 0x%x\n", omap->usbhs_rev);
 
-	/* We need to suspend OHCI in order for the usbhost
-	 * domain to go standby.
-	 * OHCI would never be resumed for UMTS modem */
-	omap_writel(OHCI_HC_CTRL_SUSPEND, OHCI_HC_CONTROL);
-
 	/*
 	 * Really enable the port clocks
 	 * first call of pm_runtime_get_sync does not enable these
@@ -769,13 +768,14 @@ static void omap_usbhs_init(struct device *dev)
 	/* Keep ENA_INCR_ALIGN = 0: Known to cause OCP delays */
 	reg &= ~OMAP_UHH_HOSTCONFIG_INCRX_ALIGN_EN;
 
-	if (is_omap_usbhs_rev1(omap)) { 
+	if (is_omap_usbhs_rev1(omap)) {
 		if (pdata->port_mode[0] == OMAP_USBHS_PORT_MODE_UNUSED)
 			reg &= ~OMAP_UHH_HOSTCONFIG_P1_CONNECT_STATUS;
 		if (pdata->port_mode[1] == OMAP_USBHS_PORT_MODE_UNUSED)
 			reg &= ~OMAP_UHH_HOSTCONFIG_P2_CONNECT_STATUS;
 		if (pdata->port_mode[2] == OMAP_USBHS_PORT_MODE_UNUSED)
 			reg &= ~OMAP_UHH_HOSTCONFIG_P3_CONNECT_STATUS;
+
 		/* Bypass the TLL module for PHY mode operation */
 		if (cpu_is_omap3430() && (omap_rev() <= OMAP3430_REV_ES2_1)) {
 			dev_dbg(dev, "OMAP3 ES version <= ES2.1\n");
@@ -818,7 +818,6 @@ static void omap_usbhs_init(struct device *dev)
 			reg |= OMAP4_P2_MODE_HSIC;
 	}
 
-
 	usbhs_write(omap->uhh_base, OMAP_UHH_HOSTCONFIG, reg);
 	dev_dbg(dev, "UHH setup done, uhh_hostconfig=%x\n", reg);
 
@@ -828,12 +827,12 @@ static void omap_usbhs_init(struct device *dev)
 		(is_ohci_port(pdata->port_mode[0])) ||
 		(is_ohci_port(pdata->port_mode[1])) ||
 		(is_ohci_port(pdata->port_mode[2]))) {
+
 		/* Enable UTMI mode for required TLL channels */
-		if (is_omap_usbhs_rev2(omap)) {
+		if (is_omap_usbhs_rev2(omap))
 			usbhs_omap_tll_init(dev, OMAP_REV2_TLL_CHANNEL_COUNT);
-		} else {
+		else
 			usbhs_omap_tll_init(dev, OMAP_TLL_CHANNEL_COUNT);
-		}
 	}
 
 	if (pdata->ehci_data->phy_reset) {

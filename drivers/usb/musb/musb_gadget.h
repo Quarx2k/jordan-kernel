@@ -51,7 +51,6 @@ struct musb_request {
 	u8 tx;			/* endpoint direction */
 	u8 epnum;
 	enum buffer_map_state map_state;
-	u8 mapped;
 };
 
 static inline struct musb_request *to_musb_request(struct usb_request *req)

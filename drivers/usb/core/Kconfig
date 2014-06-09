@@ -148,3 +148,7 @@ config USB_OTG_BLACKLIST_HUB
 	  and software costs by not supporting external hubs.  So
 	  are "Embedded Hosts" that don't offer OTG support.
 
+config USB_DISABLE_ASYNC_SUSPEND
+	bool "Disable Async suspend"
+	depends on USB_SUSPEND
+	default n

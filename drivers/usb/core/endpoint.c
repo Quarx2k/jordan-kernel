@@ -197,7 +197,9 @@ int usb_create_ep_devs(struct device *parent,
 	if (retval)
 		goto error_register;
 
+#ifndef CONFIG_USB_DISABLE_ASYNC_SUSPEND
 	device_enable_async_suspend(&ep_dev->dev);
+#endif
 	endpoint->ep_dev = ep_dev;
 	return retval;
 

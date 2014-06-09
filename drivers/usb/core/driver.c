@@ -1047,9 +1047,12 @@ static int usb_resume_device(struct usb_device *udev, pm_message_t msg)
 	 * companion high-speed root hub, in case a handoff is needed.
 	 */
 	if (!(msg.event & PM_EVENT_AUTO) && udev->parent &&
-			udev->bus->hs_companion)
+			udev->bus->hs_companion) {
+		dev_dbg(&udev->dev, "Wait for Root hub to resume for %s\n",
+			udev->product);
 		device_pm_wait_for_dev(&udev->dev,
 				&udev->bus->hs_companion->root_hub->dev);
+	}
 
 	if (udev->quirks & USB_QUIRK_RESET_RESUME)
 		udev->reset_resume = 1;
@@ -1310,6 +1313,9 @@ int usb_suspend(struct device *dev, pm_message_t msg)
 {
 	struct usb_device	*udev = to_usb_device(dev);
 
+	dev_vdbg(&udev->dev, "Suspending %s, PM Message = %d\n",
+		udev->product ? udev->product : "unknown", msg.event);
+
 	do_unbind_rebind(udev, DO_UNBIND);
 	choose_wakeup(udev, msg);
 	return usb_suspend_both(udev, msg);
@@ -1331,23 +1337,10 @@ int usb_resume(struct device *dev, pm_message_t msg)
 	 * tell the PM core in case it was autosuspended previously.
 	 * Unbind the interfaces that will need rebinding later.
 	 */
-	} else {
-		/* If a device aborts suspend, usb_resume may be called on a
-		 * device whose parent has been auto-suspended but its dpm power
-		 * state in_suspend==false. So dpm doesn't try to resume the
-		 * parent and the device doesn't wait for the parent to resume.
-		 * Recursively resume the parents when this happens.
-		 */
-		if (udev->parent && msg.event == PM_EVENT_RESUME
-			    && udev->parent->state == USB_STATE_SUSPENDED) {
-			status = usb_resume(&udev->parent->dev, msg);
-			if (status) {
-				dev_err(dev, "%s: failed to resume parent\n",
-						__func__);
-				return status;
-			}
-		}
-
+	} else if (msg.event != PM_EVENT_RESUME) {
+		dev_vdbg(&udev->dev, "Resuming %s, PM Message = %d\n",
+			udev->product ? udev->product : "unknown",
+			msg.event);
 		status = usb_resume_both(udev, msg);
 		if (status == 0) {
 			pm_runtime_disable(dev);
@@ -1355,6 +1348,15 @@ int usb_resume(struct device *dev, pm_message_t msg)
 			pm_runtime_enable(dev);
 			do_unbind_rebind(udev, DO_REBIND);
 		}
+	} else {
+		status = 0;
+		dev_dbg(&udev->dev, "Skip Resuming %s, PM Msg = %d\n",
+			udev->product ? udev->product : "unknown",
+			msg.event);
+
+		pm_runtime_disable(dev);
+		pm_runtime_set_suspended(dev);
+		pm_runtime_enable(dev);
 	}
 
 	/* Avoid PM error messages for devices disconnected while suspended
@@ -1599,7 +1601,7 @@ int usb_autopm_get_interface_async(struct usb_interface *intf)
 	dev_vdbg(&intf->dev, "%s: cnt %d -> %d\n",
 			__func__, atomic_read(&intf->dev.power.usage_count),
 			status);
-	if (status > 0 || status == -EINPROGRESS)
+	if (status > 0)
 		status = 0;
 	return status;
 }
@@ -1680,15 +1682,16 @@ int usb_runtime_suspend(struct device *dev)
 	 * checks.  Runtime suspend for a USB device means suspending all the
 	 * interfaces and then the device itself.
 	 */
-	if (autosuspend_check(udev) != 0)
+	if (autosuspend_check(udev) != 0) {
+		dev_dbg(&udev->dev, "Auto Suspend check failed: %s\n",
+			udev->product ? udev->product : "unknown");
 		return -EAGAIN;
+	}
+
+	dev_dbg(&udev->dev, "Auto Suspending %s\n",
+		udev->product ? udev->product : "unknown");
 
 	status = usb_suspend_both(udev, PMSG_AUTO_SUSPEND);
-
-	/* Allow a retry if autosuspend failed temporarily */
-	if (status == -EAGAIN || status == -EBUSY)
-		usb_mark_last_busy(udev);
-
 	/* The PM core reacts badly unless the return code is 0,
 	 * -EAGAIN, or -EBUSY, so always return -EBUSY on an error.
 	 */
@@ -1705,6 +1708,8 @@ int usb_runtime_resume(struct device *dev)
 	/* Runtime resume for a USB device means resuming both the device
 	 * and all its interfaces.
 	 */
+	dev_dbg(&udev->dev, "Auto Resuming %s\n",
+		udev->product ? udev->product : "unknown");
 	status = usb_resume_both(udev, PMSG_AUTO_RESUME);
 	return status;
 }

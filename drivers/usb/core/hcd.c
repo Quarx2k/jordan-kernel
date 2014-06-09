@@ -38,7 +38,6 @@
 #include <asm/unaligned.h>
 #include <linux/platform_device.h>
 #include <linux/workqueue.h>
-#include <linux/pm_runtime.h>
 
 #include <linux/usb.h>
 #include <linux/usb/hcd.h>
@@ -978,7 +977,10 @@ static int register_root_hub(struct usb_hcd *hcd)
 	if (retval) {
 		dev_err (parent_dev, "can't register root hub for %s, %d\n",
 				dev_name(&usb_dev->dev), retval);
-	} else {
+	}
+	mutex_unlock(&usb_bus_list_lock);
+
+	if (retval == 0) {
 		spin_lock_irq (&hcd_root_hub_lock);
 		hcd->rh_registered = 1;
 		spin_unlock_irq (&hcd_root_hub_lock);
@@ -987,54 +989,10 @@ static int register_root_hub(struct usb_hcd *hcd)
 		if (HCD_DEAD(hcd))
 			usb_hc_died (hcd);	/* This time clean up */
 	}
-	mutex_unlock(&usb_bus_list_lock);
 
 	return retval;
 }
 
-/*
- * usb_hcd_start_port_resume - a root-hub port is sending a resume signal
- * @bus: the bus which the root hub belongs to
- * @portnum: the port which is being resumed
- *
- * HCDs should call this function when they know that a resume signal is
- * being sent to a root-hub port.  The root hub will be prevented from
- * going into autosuspend until usb_hcd_end_port_resume() is called.
- *
- * The bus's private lock must be held by the caller.
- */
-void usb_hcd_start_port_resume(struct usb_bus *bus, int portnum)
-{
-	unsigned bit = 1 << portnum;
-
-	if (!(bus->resuming_ports & bit)) {
-		bus->resuming_ports |= bit;
-		pm_runtime_get_noresume(&bus->root_hub->dev);
-	}
-}
-EXPORT_SYMBOL_GPL(usb_hcd_start_port_resume);
-
-/*
- * usb_hcd_end_port_resume - a root-hub port has stopped sending a resume signal
- * @bus: the bus which the root hub belongs to
- * @portnum: the port which is being resumed
- *
- * HCDs should call this function when they know that a resume signal has
- * stopped being sent to a root-hub port.  The root hub will be allowed to
- * autosuspend again.
- *
- * The bus's private lock must be held by the caller.
- */
-void usb_hcd_end_port_resume(struct usb_bus *bus, int portnum)
-{
-	unsigned bit = 1 << portnum;
-
-	if (bus->resuming_ports & bit) {
-		bus->resuming_ports &= ~bit;
-		pm_runtime_put_noidle(&bus->root_hub->dev);
-	}
-}
-EXPORT_SYMBOL_GPL(usb_hcd_end_port_resume);
 
 /*-------------------------------------------------------------------------*/
 
@@ -1185,6 +1143,20 @@ int usb_hcd_check_unlink_urb(struct usb_hcd *hcd, struct urb *urb,
 	if (urb->unlinked)
 		return -EBUSY;
 	urb->unlinked = status;
+
+	/* IRQ setup can easily be broken so that USB controllers
+	 * never get completion IRQs ... maybe even the ones we need to
+	 * finish unlinking the initial failed usb_set_address()
+	 * or device descriptor fetch.
+	 */
+	if (!HCD_SAW_IRQ(hcd) && !is_root_hub(urb->dev)) {
+		dev_warn(hcd->self.controller, "Unlink after no-IRQ?  "
+			"Controller is probably using the wrong IRQ.\n");
+		set_bit(HCD_FLAG_SAW_IRQ, &hcd->flags);
+		if (hcd->shared_hcd)
+			set_bit(HCD_FLAG_SAW_IRQ, &hcd->shared_hcd->flags);
+	}
+
 	return 0;
 }
 EXPORT_SYMBOL_GPL(usb_hcd_check_unlink_urb);
@@ -1415,10 +1387,11 @@ int usb_hcd_map_urb_for_dma(struct usb_hcd *hcd, struct urb *urb,
 					ret = -EAGAIN;
 				else
 					urb->transfer_flags |= URB_DMA_MAP_SG;
-				urb->num_mapped_sgs = n;
-				if (n != urb->num_sgs)
+				if (n != urb->num_sgs) {
+					urb->num_sgs = n;
 					urb->transfer_flags |=
 							URB_DMA_SG_COMBINED;
+				}
 			} else if (urb->sg) {
 				struct scatterlist *sg = urb->sg;
 				urb->transfer_dma = dma_map_page(
@@ -1791,8 +1764,6 @@ int usb_hcd_alloc_bandwidth(struct usb_device *udev,
 		struct usb_interface *iface = usb_ifnum_to_if(udev,
 				cur_alt->desc.bInterfaceNumber);
 
-		if (!iface)
-			return -EINVAL;
 		if (iface->resetting_device) {
 			/*
 			 * The USB core just reset the device, so the xHCI host
@@ -2149,12 +2120,16 @@ irqreturn_t usb_hcd_irq (int irq, void *__hcd)
 	 */
 	local_irq_save(flags);
 
-	if (unlikely(HCD_DEAD(hcd) || !HCD_HW_ACCESSIBLE(hcd)))
+	if (unlikely(HCD_DEAD(hcd) || !HCD_HW_ACCESSIBLE(hcd))) {
 		rc = IRQ_NONE;
-	else if (hcd->driver->irq(hcd) == IRQ_NONE)
+	} else if (hcd->driver->irq(hcd) == IRQ_NONE) {
 		rc = IRQ_NONE;
-	else
+	} else {
+		set_bit(HCD_FLAG_SAW_IRQ, &hcd->flags);
+		if (hcd->shared_hcd)
+			set_bit(HCD_FLAG_SAW_IRQ, &hcd->shared_hcd->flags);
 		rc = IRQ_HANDLED;
+	}
 
 	local_irq_restore(flags);
 	return rc;
@@ -2459,10 +2434,8 @@ int usb_add_hcd(struct usb_hcd *hcd,
 			&& device_can_wakeup(&hcd->self.root_hub->dev))
 		dev_dbg(hcd->self.controller, "supports USB remote wakeup\n");
 
-	/* enable irqs just before we start the controller,
-	 * if the BIOS provides legacy PCI irqs.
-	 */
-	if (usb_hcd_is_primary_hcd(hcd) && irqnum) {
+	/* enable irqs just before we start the controller */
+	if (usb_hcd_is_primary_hcd(hcd)) {
 		retval = usb_hcd_request_irqs(hcd, irqnum, irqflags);
 		if (retval)
 			goto err_request_irq;

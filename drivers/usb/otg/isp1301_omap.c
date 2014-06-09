@@ -899,7 +899,7 @@ static int otg_bind(struct isp1301 *isp)
 
 	if (otg_dev)
 		status = request_irq(otg_dev->resource[1].start, omap_otg_irq,
-				0, DRIVER_NAME, isp);
+				IRQF_DISABLED, DRIVER_NAME, isp);
 	else
 		status = -ENODEV;
 

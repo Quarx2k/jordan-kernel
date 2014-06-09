@@ -526,6 +526,8 @@ int usb_add_config(struct usb_composite_dev *cdev,
 	config->next_interface_id = 0;
 	memset(config->interface, '\0', sizeof(config->interface));
 
+	/* reset ep autoconfig, before call bind() to autoconfig ep */
+	usb_ep_autoconfig_reset(cdev->gadget);
 	status = bind(config);
 	if (status < 0) {
 		list_del(&config->list);

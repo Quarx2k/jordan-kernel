@@ -98,7 +98,7 @@ static inline struct f_acm *port_to_acm(struct gserial *p)
 /* notification endpoint uses smallish and infrequent fixed-size messages */
 
 #define GS_LOG2_NOTIFY_INTERVAL		5	/* 1 << 5 == 32 msec */
-#define GS_NOTIFY_MAXPACKET		10	/* notification + 2 bytes */
+#define GS_NOTIFY_MAXPACKET		64	/* notification + 2 bytes */
 
 /* interface and class descriptors: */
 
@@ -536,6 +536,57 @@ static void acm_cdc_notify_complete(struct usb_ep *ep, struct usb_request *req)
 		acm_notify_serial_state(acm);
 }
 
+#ifdef CONFIG_USB_MOT_ANDROID
+static int acm_tiocmset(struct gserial *port, int set, int clear)
+{
+	struct f_acm            *acm = port_to_acm(port);
+
+	if (set & TIOCM_DTR)
+		acm->serial_state |= ACM_CTRL_DCD;
+	if (clear & TIOCM_DTR)
+		acm->serial_state &= ~ACM_CTRL_DCD;
+
+	if (set & TIOCM_DSR)
+		acm->serial_state |= ACM_CTRL_DSR;
+	if (clear & TIOCM_DSR)
+		acm->serial_state &= ~ACM_CTRL_DSR;
+
+	if (set & TIOCM_OUT1)
+		acm->serial_state |= ACM_CTRL_RI;
+	if (clear & TIOCM_OUT1)
+		acm->serial_state &= ~ACM_CTRL_RI;
+
+	if (set & TIOCM_OUT2)
+		acm->serial_state |= ACM_CTRL_OVERRUN;
+	if (clear & TIOCM_OUT2)
+		acm->serial_state &= ~ACM_CTRL_OVERRUN;
+
+	/*
+	 *  TODO:  configure DSR/DCD/OUT1, etc according to set/clear
+	 */
+	return acm_notify_serial_state(acm);
+}
+
+static int acm_tiocmget(struct gserial *port)
+{
+	struct f_acm            *acm = port_to_acm(port);
+	unsigned int result = 0;
+
+	if (acm->port_handshake_bits & ACM_CTRL_DTR)
+		result |= TIOCM_DTR;
+
+	if (acm->port_handshake_bits & ACM_CTRL_RTS)
+		result |= TIOCM_RTS;
+
+	if (acm->serial_state & TIOCM_CD)
+		result |= TIOCM_CD;
+
+	if (acm->serial_state & TIOCM_RI)
+		result |= TIOCM_RI;
+
+	return result;
+}
+#endif
 /* connect == the TTY link is open */
 
 static void acm_connect(struct gserial *port)
@@ -781,6 +832,11 @@ int acm_bind_config(struct usb_configuration *c, u8 port_num)
 	acm->port.func.set_alt = acm_set_alt;
 	acm->port.func.setup = acm_setup;
 	acm->port.func.disable = acm_disable;
+
+#ifdef CONFIG_USB_MOT_ANDROID
+	acm->port.tiocmset = acm_tiocmset;
+	acm->port.tiocmget = acm_tiocmget;
+#endif
 
 	status = usb_add_function(c, &acm->port.func);
 	if (status)

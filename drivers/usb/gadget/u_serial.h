@@ -42,6 +42,10 @@ struct gserial {
 	struct usb_cdc_line_coding port_line_coding;	/* 9600-8-N-1 etc */
 
 	/* notification callbacks */
+#ifdef CONFIG_USB_MOT_ANDROID
+	int (*tiocmset)(struct gserial *p, int set, int clear);
+	int (*tiocmget)(struct gserial *p);
+#endif
 	void (*connect)(struct gserial *p);
 	void (*disconnect)(struct gserial *p);
 	int (*send_break)(struct gserial *p, int duration);
