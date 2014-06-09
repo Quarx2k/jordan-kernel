@@ -161,7 +161,7 @@ static int cpcap_usb_connected_probe(struct platform_device *pdev)
 static int cpcap_usb_connected_remove(struct platform_device *pdev)
 {
 	printk("USB Disconnected!\n");
-	android_usb_set_connected(0,3); //None
+	android_usb_set_connected(0,0); //None
 	cpcap_musb_notifier_call(USB_EVENT_NONE);
 	return 0;
 }

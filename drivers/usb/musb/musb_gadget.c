@@ -1726,9 +1726,9 @@ int musb_gadget_pullup(struct usb_gadget *gadget, int is_on)
 			musb->softconnect = 1;
 			musb_pullup(musb, is_on);
 		}
-	} else
+	} else  {
 		stop_activity(musb, musb->gadget_driver);
-
+	}
 	spin_unlock_irqrestore(&musb->lock, flags);
 
 	pm_runtime_put(musb->controller);

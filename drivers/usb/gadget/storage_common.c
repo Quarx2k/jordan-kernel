@@ -776,6 +776,7 @@ static ssize_t fsg_store_file(struct device *dev, struct device_attribute *attr,
 	int		rc = 0;
 
 
+#ifndef CONFIG_USB_MOT_ANDROID
 #ifndef CONFIG_USB_ANDROID_MASS_STORAGE
 	/* disabled in android because we need to allow closing the backing file
 	 * if the media was removed
@@ -784,6 +785,7 @@ static ssize_t fsg_store_file(struct device *dev, struct device_attribute *attr,
 		LDBG(curlun, "eject attempt prevented\n");
 		return -EBUSY;				/* "Door is locked" */
 	}
+#endif
 #endif
 
 	/* Remove a trailing newline */

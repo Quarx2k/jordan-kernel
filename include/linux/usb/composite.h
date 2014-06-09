@@ -406,11 +406,7 @@ struct acm_platform_data {
 	u8      use_iads;
 };
 
-#ifdef CONFIG_MOT_FEAT_SPY
-#define MAX_DEVICE_TYPE_NUM   31
-#else
 #define MAX_DEVICE_TYPE_NUM   30
-#endif
 #define MAX_DEVICE_NAME_SIZE  45
 #define MAX_USB_SERIAL_NUM		17
 extern void android_usb_set_connected(int on, unsigned int accy);

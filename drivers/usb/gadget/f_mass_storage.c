@@ -667,7 +667,7 @@ static int fsg_ctrlrequest(struct usb_composite_dev *cdev,
 		break;
 #endif
 	}
-	VDBG(cdev,
+	printk(KERN_INFO
 	       "unknown class-specific control req %02x.%02x v%04x i%04x l%u\n",
 	       ctrl->bRequestType, ctrl->bRequest,
 	       le16_to_cpu(ctrl->wValue), w_index, w_length);

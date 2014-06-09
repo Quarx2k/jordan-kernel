@@ -67,6 +67,11 @@
 #define USB_INT_EN_FALL_CLR_1				0x4A062912
 #define OTG_CTRL_SET_0					0x4A06280B
 #define OTG_CTRL_SET_1					0x4A06290B
+
+#define	OHCI_BASE_ADDR		0x48064400
+#define	OHCI_HC_CONTROL		(OHCI_BASE_ADDR + 0x4)
+#define	OHCI_HC_CTRL_SUSPEND	(3 << 6)
+#define	OHCI_HC_CTRL_RESUME	(1 << 6)
 /*-------------------------------------------------------------------------*/
 
 static struct hc_driver ehci_omap_hc_driver;
@@ -760,7 +765,7 @@ again:
 	}
 	return status;
 }
-
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 static void omap_ehci_soft_phy_reset(struct platform_device *pdev, u8 port)
 {
 	struct usb_hcd	*hcd = dev_get_drvdata(&pdev->dev);
@@ -790,7 +795,7 @@ static void omap_ehci_soft_phy_reset(struct platform_device *pdev, u8 port)
 		}
 	}
 }
-
+#endif
 static void omap_ehci_intr_vbus_valid_clear(struct platform_device *pdev,
 									u8 port)
 {
@@ -935,12 +940,14 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 	ehci_write(regs, EHCI_INSNREG04,
 				EHCI_INSNREG04_DISABLE_UNSUSPEND);
 
+
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	/* Soft reset the PHY using PHY reset command over ULPI */
 	if (pdata->port_mode[0] == OMAP_EHCI_PORT_MODE_PHY)
 		omap_ehci_soft_phy_reset(pdev, 0);
 	if (pdata->port_mode[1] == OMAP_EHCI_PORT_MODE_PHY)
 		omap_ehci_soft_phy_reset(pdev, 1);
-
+#endif
 	if (cpu_is_omap44xx()) {
 		/*
 		 * Undocumented HW Errata for OMAP4 TLL
@@ -982,8 +989,10 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 	omap_ehci->regs = hcd->regs
 		+ HC_LENGTH(ehci, readl(&omap_ehci->caps->hc_capbase));
 
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	dbg_hcs_params(omap_ehci, "reset");
 	dbg_hcc_params(omap_ehci, "reset");
+#endif
 
 	/* cache this readonly data; minimize chip reads */
 	omap_ehci->hcs_params = readl(&omap_ehci->caps->hcs_params);
@@ -1004,6 +1013,27 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 		if (udev)
 			udev->lazy_resume = 1;
 	}
+
+#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+	/* We need to suspend OHCI in order for the usbhost
+	 * domain to go standby.
+	 * OHCI would never be resumed for UMTS modem */
+	omap_writel(OHCI_HC_CTRL_SUSPEND, OHCI_HC_CONTROL);
+
+	/* Refer ISSUE2: LINK assumes external charge pump */
+	/* use Port1 VBUS to charge externally Port2:
+	 *      So for PHY mode operation use Port2 only */
+	ehci_write(hcd->regs, EHCI_INSNREG05_ULPI,
+		(0xA << EHCI_INSNREG05_ULPI_REGADD_SHIFT) |/* OTG ctrl reg*/
+		(2 << EHCI_INSNREG05_ULPI_OPSEL_SHIFT) |/*   Write */
+		(2 << EHCI_INSNREG05_ULPI_PORTSEL_SHIFT) |/* Port1 */
+		(1 << EHCI_INSNREG05_ULPI_CONTROL_SHIFT) |/* Start */
+		(0x26));
+	while (!(ehci_read(hcd->regs, EHCI_INSNREG05_ULPI) &
+		(1<<EHCI_INSNREG05_ULPI_CONTROL_SHIFT))) {
+		cpu_relax();
+	}
+#endif
 
 	/* root ports should always stay powered */
 	ehci_port_power(omap_ehci, 1);
