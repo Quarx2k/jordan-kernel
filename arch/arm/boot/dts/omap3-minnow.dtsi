@@ -823,12 +823,27 @@ tps65912_0: tps65912 {
 	power = <50>;
 
 };
-
+/* c55 */
 &uart1 {
 	flags = <0x00200000>;
+	wakeup-capable;
+	open_close_pm;
+	autosuspend-delay = <50>; /* ms */
 };
-
+/* bluetooth */
 &uart2 {
 	flags = <0x00200000>;
 	ti,no-pm-qos;
+	wakeup-capable;
+	autosuspend-delay = <50>; /* ms */
+};
+/* serial console */
+&uart3 {
+	wakeup-capable;
+	autosuspend-delay = <3000>; /* ms */
+};
+/* m4 debug */
+&uart4 {
+	wakeup-capable;
+	autosuspend-delay = <50>; /* ms */
 };
