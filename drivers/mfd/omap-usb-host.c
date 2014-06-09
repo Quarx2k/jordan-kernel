@@ -642,14 +642,17 @@ static void usbhs_omap_tll_init(struct device *dev, u8 tll_channel_count)
 				<< OMAP_TLL_CHANNEL_CONF_FSLSMODE_SHIFT;
 			reg |= OMAP_TLL_CHANNEL_CONF_CHANMODE_FSLS;
 		} else if (pdata->port_mode[i] == OMAP_EHCI_PORT_MODE_TLL) {
-
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 			/* Disable AutoIdle, BitStuffing and use SDR Mode */
 			reg &= ~(OMAP_TLL_CHANNEL_CONF_UTMIAUTOIDLE
-#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
-				| OMAP_TLL_CHANNEL_CONF_ULPINOBITSTUFF
-#endif
-				| OMAP_TLL_CHANNEL_CONF_ULPIDDRMODE);
 
+				| OMAP_TLL_CHANNEL_CONF_ULPINOBITSTUFF
+
+				| OMAP_TLL_CHANNEL_CONF_ULPIDDRMODE);
+#else
+			reg |= OMAP_TLL_CHANNEL_CONF_UTMIAUTOIDLE | OMAP_TLL_CHANNEL_CONF_ULPINOBITSTUFF;
+			reg &= ~OMAP_TLL_CHANNEL_CONF_ULPIDDRMODE;
+#endif
 		} else
 			continue;
 
