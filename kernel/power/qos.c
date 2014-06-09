@@ -358,8 +358,8 @@ void pm_qos_update_request(struct pm_qos_request *req,
 		WARN(1, KERN_ERR "pm_qos_update_request() called for unknown object\n");
 		return;
 	}
-
-	cancel_delayed_work_sync(&req->work);
+	if (req->timeout_enabled)
+		cancel_delayed_work_sync(&req->work);
 
 	if (new_value != req->node.prio)
 		pm_qos_update_target(
@@ -367,6 +367,27 @@ void pm_qos_update_request(struct pm_qos_request *req,
 			&req->node, PM_QOS_UPDATE_REQ, new_value);
 }
 EXPORT_SYMBOL_GPL(pm_qos_update_request);
+
+/**
+ * pm_qos_add_request_timeout - inserts new qos request into the list
+ * @req: pointer to a preallocated handle
+ * @pm_qos_class: identifies which list of qos request to use
+ * @value: defines the qos request
+ *
+ * This function inserts a new entry in the pm_qos_class list of requested qos
+ * performance characteristics and allows to update this request with timeout by
+ * function pm_qos_update_request_timeout.  It recomputes the aggregate QoS
+ * expectations for the pm_qos_class of parameters and initializes
+ * the pm_qos_request handle.  Caller needs to save this handle for later use
+ * in updates and removal.
+ */
+
+void pm_qos_add_request_timeout(struct pm_qos_request *req, int pm_qos_class,
+			s32 value)
+{
+	req->timeout_enabled = true;
+	pm_qos_add_request(req, pm_qos_class, value);
+}
 
 /**
  * pm_qos_update_request_timeout - modifies an existing qos request temporarily.
@@ -383,6 +404,9 @@ void pm_qos_update_request_timeout(struct pm_qos_request *req, s32 new_value,
 		return;
 	if (WARN(!pm_qos_request_active(req),
 		 "%s called for unknown object.", __func__))
+		return;
+	if (WARN(!req->timeout_enabled,
+		 "%s called for non-timeout request.", __func__))
 		return;
 
 	cancel_delayed_work_sync(&req->work);
@@ -414,7 +438,8 @@ void pm_qos_remove_request(struct pm_qos_request *req)
 		return;
 	}
 
-	cancel_delayed_work_sync(&req->work);
+	if (req->timeout_enabled)
+		cancel_delayed_work_sync(&req->work);
 
 	pm_qos_update_target(pm_qos_array[req->pm_qos_class]->constraints,
 			     &req->node, PM_QOS_REMOVE_REQ,

@@ -40,6 +40,7 @@ enum pm_qos_flags_status {
 struct pm_qos_request {
 	struct plist_node node;
 	int pm_qos_class;
+	bool timeout_enabled;
 	struct delayed_work work; /* for pm_qos_update_request_timeout */
 };
 
@@ -114,6 +115,8 @@ void pm_qos_add_request(struct pm_qos_request *req, int pm_qos_class,
 			s32 value);
 void pm_qos_update_request(struct pm_qos_request *req,
 			   s32 new_value);
+void pm_qos_add_request_timeout(struct pm_qos_request *req, int pm_qos_class,
+			s32 value);
 void pm_qos_update_request_timeout(struct pm_qos_request *req,
 				   s32 new_value, unsigned long timeout_us);
 void pm_qos_remove_request(struct pm_qos_request *req);
