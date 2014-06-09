@@ -206,24 +206,22 @@
 		};
 	};
 
-	gpio-charger {
-		compatible = "gpio-charger";
-		pinctrl-names = "default";
-		pinctrl-0 = <&charge_startb_pin>;	/* gpio-176 pin */
-		gpio = <&gpio6 16 0>;			/* gpio-176 */
-		charger-type = <8>;			/* POWER_SUPPLY_TYPE_WIRELESS */
+	bq5105x-detect {
+		compatible = "mmi,bq5105x-detect";
+		charge-gpio = <&gpio6 16 0>;	/* gpio-176 */
+		detect-gpio = <&gpio1 22 0x1>;	/* gpio-22  */
+		undocked-delay,ms = <1500>;
 		charger-name = "wireless";
-		supplied_to = "max170xx_battery";
 		switch-name = "dock";
+		uevent-wakelock-timeout,ms = <2000>;
+		supplied_to = "max170xx_battery";
 	};
 
 	bq5105x-ctrl {
 		reg = <0 0>;
 		compatible = "ti,bq5105x-control";
-		gpios = <&gpio1 22 0x1>, /* gpio-22  GPIOF_DIR_IN */
-			<&gpio3 14 0x0>; /* gpio-72  GPIOF_DIR_OUT|GPIOF_INIT_LOW */
-		gpio-names = "charge_detect",
-			     "charge_terminate";
+		gpios = <&gpio3 14 0x0>; /* gpio-72  GPIOF_DIR_OUT|GPIOF_INIT_LOW */
+		gpio-names = "charge_terminate";
 	};
 
 	pad-wkup {
@@ -243,7 +241,8 @@
 		             <0x0e6 211>, /* touch             */
 		             <0x13c 252>, /* battery           */
 		             <0x140 254>, /* USB               */
-		             <0x1a2 288>; /* gpio-charger      */
+		             <0x1a2 288>, /* bq5105x charger   */
+		             <0x5bc 134>; /* bq5105x charger   */
 	};
 };
 
@@ -629,6 +628,7 @@ tps65912_0: tps65912 {
 			0x19c 0x100	/* MCSPI1_SOMI, MODE0 | INPUT */
 			0x19e 0x000	/* MCSPI1_CS0, MODE0 | OUTPUT */
 			0x1a0 0x000	/* MCSPI1_CS1, MODE0 | OUTPUT */
+			0x1a2 0x4104	/* MCSPI1_CS2, MODE4 | INPUT | OFFWAKEUP */
 			0x1a4 0x004	/* MCSPI1_CS3, MODE4 | OUTPUT */
 			0x1ae 0x004	/* MCSPI2_CS1, MODE4 | OUTPUT */
 			0x1b0 0x4104	/* SYS_NIRQ, MODE4 | INPUT | OFFWAKEUP */
@@ -640,7 +640,7 @@ tps65912_0: tps65912 {
 			0x5b6 0x11a	/* ETK_D5, MODE2 | INPUT_PULLUP */
 			0x5b8 0x11a	/* ETK_D6, MODE2 | INPUT_PULLUP */
 			0x5ba 0x004	/* ETK_D7, MODE4 | OUTPUT */
-			0x5bc 0x11c	/* ETK_D8, MODE4 | INPUT | INPUT_PULLUP */
+			0x5bc 0x411c	/* ETK_D8, MODE4 | INPUT | INPUT_PULLUP | OFFWAKEUP */
 			0x5c0 0x004	/* ETK_D10, MODE4 | OUTPUT */
 			0x5c8 0x004	/* ETK_D14, MODE4 | OUTPUT */
 		>;
@@ -731,12 +731,6 @@ tps65912_0: tps65912 {
 	cc_alert_pin: pinmax_cc_alert_pin {
 		pinctrl-single,pins = <
 			0x13c 0x411c	/* MCBSP3_DX, MODE4 | INPUT | INPUT_PULLUP | OFFWAKEUP */
-		>;
-	};
-
-	charge_startb_pin: pinmax_charge_startb_pin {
-		pinctrl-single,pins = <
-			0x1a2 0x4104     /* MCSPI1_CS2, MODE4 | INPUT | OFFWAKEUP */
 		>;
 	};
 
