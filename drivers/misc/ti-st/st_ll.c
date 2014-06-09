@@ -30,16 +30,20 @@
 static void send_ll_cmd(struct st_data_s *st_data,
 	unsigned char cmd)
 {
+	struct kim_data_s *kim_plat_data;
+	struct ti_st_plat_data	*pdata;
 
 	pr_debug("%s: writing %x\n", __func__, cmd);
 
+	kim_plat_data = (struct kim_data_s *)st_data->kim_data;
+	pdata = kim_plat_data->kim_pdev->dev.platform_data;
 	if (cmd == LL_WAKE_UP_IND || cmd == LL_WAKE_UP_ACK)
-		st_pm_qos_update(st_data, 1);
+		omap_serial_runtime_get(pdata->port_index);
 
 	st_int_write(st_data, &cmd, 1);
 
 	if (cmd == LL_SLEEP_ACK)
-		st_pm_qos_update(st_data, 0);
+		omap_serial_runtime_put(pdata->port_index);
 	return;
 }
 

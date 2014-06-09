@@ -86,7 +86,7 @@ static struct omap3_idle_statedata omap3_idle_data[] = {
 	{
 		.mpu_state = PWRDM_POWER_RET,
 		.core_state = PWRDM_POWER_RET,
-		.per_min_state = PWRDM_POWER_OFF,
+		.per_min_state = PWRDM_POWER_RET,
 	},
 	{
 		.mpu_state = PWRDM_POWER_OFF,

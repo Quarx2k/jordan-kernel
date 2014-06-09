@@ -401,6 +401,8 @@ void st_ll_disable(struct st_data_s *);
 unsigned long st_ll_getstate(struct st_data_s *);
 unsigned long st_ll_sleep_state(struct st_data_s *, unsigned char);
 void st_ll_wakeup(struct st_data_s *);
+void omap_serial_runtime_get(int port_index);
+void omap_serial_runtime_put(int port_index);
 
 /*
  * header information used by st_core.c for FM and GPS
@@ -455,6 +457,7 @@ struct ti_st_plat_data {
 	int (*chip_disable) (struct kim_data_s *);
 	int (*chip_asleep) (struct kim_data_s *);
 	int (*chip_awake) (struct kim_data_s *);
+	int port_index;
 };
 
 #endif /* TI_WILINK_ST_H */

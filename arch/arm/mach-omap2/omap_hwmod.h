@@ -703,4 +703,6 @@ extern int am33xx_hwmod_init(void);
 
 extern int __init omap_hwmod_register_links(struct omap_hwmod_ocp_if **ois);
 
+void _reconfigure_io_chain(void);
+
 #endif

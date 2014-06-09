@@ -2015,7 +2015,7 @@ static int _reset(struct omap_hwmod *oh)
  * XXX When the PRM code is moved to drivers, this function can be removed,
  * as the PRM infrastructure should abstract this.
  */
-static void _reconfigure_io_chain(void)
+void _reconfigure_io_chain(void)
 {
 	unsigned long flags;
 

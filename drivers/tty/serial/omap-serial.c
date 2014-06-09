@@ -61,6 +61,7 @@
 #define OMAP_UART_SCR_RX_TRIG_GRANU1_MASK		(1 << 7)
 #define OMAP_UART_SCR_TX_TRIG_GRANU1_MASK		(1 << 6)
 #define OMAP_UART_SCR_TX_EMPTY			(1 << 3)
+#define OMAP_UART_SCR_RX_CTS_WU_EN			(1 << 4)
 
 /* FCR register bitmasks */
 #define OMAP_UART_FCR_RX_FIFO_TRIG_MASK			(0x3 << 6)
@@ -150,19 +151,21 @@ struct uart_omap_port {
 	unsigned long		port_activity;
 	int			context_loss_cnt;
 	u32			errata;
-	u8			wakeups_enabled;
 
 	int			DTR_gpio;
 	int			DTR_inverted;
 	int			DTR_active;
 
-	bool			pm_qos_disabled;
 	struct pm_qos_request	pm_qos_request;
 	u32			latency;
 	u32			calc_latency;
 	struct work_struct	qos_work;
 	struct pinctrl		*pins;
 	bool			is_suspending;
+	bool			in_transmit;
+	int			ext_rt_cnt;
+	bool			open_close_pm;
+	int (*get_context_loss_count)(struct device *);
 };
 
 #define to_uart_omap_port(p)	((container_of((p), struct uart_omap_port, port)))
@@ -172,7 +175,44 @@ static struct uart_omap_port *ui[OMAP_MAX_HSUART_PORTS];
 /* Forward declaration of functions */
 static void serial_omap_mdr1_errataset(struct uart_omap_port *up, u8 mdr1);
 
-static struct workqueue_struct *serial_omap_uart_wq;
+
+void omap_serial_runtime_get(int port_index)
+{
+	struct uart_omap_port *up;
+	int ext_rt_cnt;
+
+	if (port_index >= OMAP_MAX_HSUART_PORTS)
+		return;
+	up = ui[port_index];
+
+	spin_lock(&up->port.lock);
+	ext_rt_cnt = up->ext_rt_cnt;
+	up->ext_rt_cnt = 1;
+	spin_unlock(&up->port.lock);
+
+	if (up->dev && !ext_rt_cnt)
+		pm_runtime_get_sync(up->dev);
+}
+
+void omap_serial_runtime_put(int port_index)
+{
+	struct uart_omap_port *up;
+	int ext_rt_cnt;
+
+	if (port_index >= OMAP_MAX_HSUART_PORTS)
+		return;
+	up = ui[port_index];
+
+	spin_lock(&up->port.lock);
+	ext_rt_cnt = up->ext_rt_cnt;
+	up->ext_rt_cnt = 0;
+	spin_unlock(&up->port.lock);
+
+	if (up->dev && ext_rt_cnt) {
+		pm_runtime_mark_last_busy(up->dev);
+		pm_runtime_put_autosuspend(up->dev);
+	}
+}
 
 static inline unsigned int serial_in(struct uart_omap_port *up, int offset)
 {
@@ -196,22 +236,9 @@ static inline void serial_omap_clear_fifos(struct uart_omap_port *up)
 
 static int serial_omap_get_context_loss_count(struct uart_omap_port *up)
 {
-	struct omap_uart_port_info *pdata = up->dev->platform_data;
-
-	if (!pdata || !pdata->get_context_loss_count)
+	if (!up->get_context_loss_count)
 		return 0;
-
-	return pdata->get_context_loss_count(up->dev);
-}
-
-static void serial_omap_enable_wakeup(struct uart_omap_port *up, bool enable)
-{
-	struct omap_uart_port_info *pdata = up->dev->platform_data;
-
-	if (!pdata || !pdata->enable_wakeup)
-		return;
-
-	pdata->enable_wakeup(up->dev, enable);
+	return up->get_context_loss_count(up->dev);
 }
 
 /*
@@ -272,12 +299,31 @@ static void serial_omap_enable_ms(struct uart_port *port)
 
 static void serial_omap_stop_tx(struct uart_port *port)
 {
+	int cnt;
 	struct uart_omap_port *up = to_uart_omap_port(port);
 
 	pm_runtime_get_sync(up->dev);
 	if (up->ier & UART_IER_THRI) {
 		up->ier &= ~UART_IER_THRI;
 		serial_out(up, UART_IER, up->ier);
+		/*
+		* wait for empty fifo before release pm runtime
+		* 2500 * 200 = 500mS delay. If external devices holding
+		* transmission so long, then asume it is dead and clear FIFO
+		*/
+		cnt  = 2500;
+		while (!(serial_in(up, UART_LSR) & UART_LSR_TEMT) && cnt) {
+			udelay(200); /* about 3 bytes with 115.2 */
+			cnt--;
+		}
+		if (!cnt)
+			serial_out(up, UART_FCR, up->fcr | UART_FCR_CLEAR_XMIT);
+
+		if (up->in_transmit) {
+			pm_runtime_mark_last_busy(up->dev);
+			pm_runtime_put_autosuspend(up->dev);
+			up->in_transmit = false;
+		}
 	}
 
 	pm_runtime_mark_last_busy(up->dev);
@@ -302,14 +348,27 @@ static void transmit_chars(struct uart_omap_port *up, unsigned int lsr)
 	int count;
 
 	if (up->port.x_char) {
+		if (!up->in_transmit) {
+			up->in_transmit = true;
+			pm_runtime_get_sync(up->dev);
+		}
 		serial_out(up, UART_TX, up->port.x_char);
 		up->port.icount.tx++;
 		up->port.x_char = 0;
 		return;
 	}
 	if (uart_circ_empty(xmit) || uart_tx_stopped(&up->port)) {
+		if (up->in_transmit) {
+			pm_runtime_mark_last_busy(up->dev);
+			pm_runtime_put_autosuspend(up->dev);
+			up->in_transmit = false;
+		}
 		serial_omap_stop_tx(&up->port);
 		return;
+	}
+	if (!up->in_transmit) {
+		up->in_transmit = true;
+		pm_runtime_get_sync(up->dev);
 	}
 	count = up->port.fifosize / 4;
 	do {
@@ -596,17 +655,19 @@ static void serial_omap_set_mctrl(struct uart_port *port, unsigned int mctrl)
 		     UART_MCR_DTR | UART_MCR_RTS);
 	up->mcr = old_mcr | mcr;
 	serial_out(up, UART_MCR, up->mcr);
-	pm_runtime_mark_last_busy(up->dev);
-	pm_runtime_put_autosuspend(up->dev);
 
 	if (gpio_is_valid(up->DTR_gpio) &&
 	    !!(mctrl & TIOCM_DTR) != up->DTR_active) {
 		up->DTR_active = !up->DTR_active;
-		if (gpio_cansleep(up->DTR_gpio))
-			schedule_work(&up->qos_work);
-		else
+		if (gpio_cansleep(up->DTR_gpio)) {
+			pm_runtime_mark_last_busy(up->dev);
+			pm_runtime_put_autosuspend(up->dev);
+		} else
 			gpio_set_value(up->DTR_gpio,
 				       up->DTR_active != up->DTR_inverted);
+	} else {
+		pm_runtime_mark_last_busy(up->dev);
+		pm_runtime_put_autosuspend(up->dev);
 	}
 }
 
@@ -728,12 +789,9 @@ static void serial_omap_shutdown(struct uart_port *port)
 	free_irq(up->port.irq, up);
 }
 
-static void serial_omap_uart_qos_work(struct work_struct *work)
+static void serial_omap_uart_qos(struct uart_omap_port *up)
 {
-	struct uart_omap_port *up = container_of(work, struct uart_omap_port,
-						qos_work);
-	if (!up->pm_qos_disabled)
-		pm_qos_update_request(&up->pm_qos_request, up->latency);
+	pm_qos_update_request(&up->pm_qos_request, up->latency);
 
 	if (gpio_is_valid(up->DTR_gpio))
 		gpio_set_value_cansleep(up->DTR_gpio,
@@ -784,7 +842,6 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 	/* calculate wakeup latency constraint */
 	up->calc_latency = (USEC_PER_SEC * up->port.fifosize) / (baud / 8);
 	up->latency = up->calc_latency;
-	schedule_work(&up->qos_work);
 
 	up->dll = quot & 0xff;
 	up->dlh = quot >> 8;
@@ -867,6 +924,7 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 	/* FIFO ENABLE, DMA MODE */
 
 	up->scr |= OMAP_UART_SCR_RX_TRIG_GRANU1_MASK;
+
 	/*
 	 * NOTE: Setting OMAP_UART_SCR_RX_TRIG_GRANU1_MASK
 	 * sets Enables the granularity of 1 for TRIGGER RX
@@ -1000,15 +1058,6 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 	dev_dbg(up->port.dev, "serial_omap_set_termios+%d\n", up->port.line);
 }
 
-static int serial_omap_set_wake(struct uart_port *port, unsigned int state)
-{
-	struct uart_omap_port *up = to_uart_omap_port(port);
-
-	serial_omap_enable_wakeup(up, state);
-
-	return 0;
-}
-
 static void
 serial_omap_pm(struct uart_port *port, unsigned int state,
 	       unsigned int oldstate)
@@ -1029,12 +1078,10 @@ serial_omap_pm(struct uart_port *port, unsigned int state,
 	serial_out(up, UART_EFR, efr);
 	serial_out(up, UART_LCR, 0);
 
-	if (!device_may_wakeup(up->dev)) {
-		if (!state)
-			pm_runtime_forbid(up->dev);
-		else
-			pm_runtime_allow(up->dev);
-	}
+	if (!state && (up->open_close_pm || !device_may_wakeup(up->dev)))
+		pm_runtime_forbid(up->dev);
+	else if (state && (up->open_close_pm || !device_may_wakeup(up->dev)))
+		pm_runtime_allow(up->dev);
 
 	pm_runtime_mark_last_busy(up->dev);
 	pm_runtime_put_autosuspend(up->dev);
@@ -1271,7 +1318,6 @@ static struct uart_ops serial_omap_pops = {
 	.shutdown	= serial_omap_shutdown,
 	.set_termios	= serial_omap_set_termios,
 	.pm		= serial_omap_pm,
-	.set_wake	= serial_omap_set_wake,
 	.type		= serial_omap_type,
 	.release_port	= serial_omap_release_port,
 	.request_port	= serial_omap_request_port,
@@ -1313,7 +1359,6 @@ static int serial_omap_suspend(struct device *dev)
 	struct uart_omap_port *up = dev_get_drvdata(dev);
 
 	uart_suspend_port(&serial_omap_reg, &up->port);
-	flush_work(&up->qos_work);
 
 	return 0;
 }
@@ -1396,9 +1441,12 @@ static struct omap_uart_port_info *of_get_uart_port_info(struct device *dev)
 					 &omap_up_info->uartclk);
 	of_property_read_u32(dev->of_node, "flags",
 					 &omap_up_info->flags);
-	omap_up_info->pm_qos_disabled = of_property_read_bool(dev->of_node,
-				"ti,no-pm-qos");
-
+	omap_up_info->wakeup_capable = of_property_read_bool(dev->of_node,
+			"wakeup-capable");
+	of_property_read_u32(dev->of_node, "autosuspend-delay",
+			     &omap_up_info->autosuspend_timeout);
+	omap_up_info->open_close_pm = of_property_read_bool(dev->of_node,
+			"open_close_pm");
 	return omap_up_info;
 }
 
@@ -1502,13 +1550,11 @@ static int serial_omap_probe(struct platform_device *pdev)
 
 	up->latency = PM_QOS_CPU_DMA_LAT_DEFAULT_VALUE;
 	up->calc_latency = PM_QOS_CPU_DMA_LAT_DEFAULT_VALUE;
-	up->pm_qos_disabled = omap_up_info->pm_qos_disabled;
 	pm_qos_add_request(&up->pm_qos_request,
 		PM_QOS_CPU_DMA_LATENCY, up->latency);
-	serial_omap_uart_wq = create_singlethread_workqueue(up->name);
-	INIT_WORK(&up->qos_work, serial_omap_uart_qos_work);
 
 	platform_set_drvdata(pdev, up);
+
 	pm_runtime_enable(&pdev->dev);
 	pm_runtime_use_autosuspend(&pdev->dev);
 	pm_runtime_set_autosuspend_delay(&pdev->dev,
@@ -1516,6 +1562,9 @@ static int serial_omap_probe(struct platform_device *pdev)
 
 	pm_runtime_irq_safe(&pdev->dev);
 	pm_runtime_get_sync(&pdev->dev);
+
+	if (omap_up_info->wakeup_capable)
+		device_init_wakeup(&pdev->dev, true);
 
 	omap_serial_fill_features_erratas(up);
 
@@ -1525,6 +1574,9 @@ static int serial_omap_probe(struct platform_device *pdev)
 	ret = uart_add_one_port(&serial_omap_reg, &up->port);
 	if (ret != 0)
 		goto err_add_port;
+
+	up->open_close_pm = omap_up_info->open_close_pm;
+	up->get_context_loss_count = omap_pm_get_dev_context_loss_count;
 
 	pm_runtime_mark_last_busy(up->dev);
 	pm_runtime_put_autosuspend(up->dev);
@@ -1619,7 +1671,6 @@ static void serial_omap_restore_context(struct uart_omap_port *up)
 static int serial_omap_runtime_suspend(struct device *dev)
 {
 	struct uart_omap_port *up = dev_get_drvdata(dev);
-	struct omap_uart_port_info *pdata = dev->platform_data;
 
 	/*
 	* When using 'no_console_suspend', the console UART must not be
@@ -1634,26 +1685,14 @@ static int serial_omap_runtime_suspend(struct device *dev)
 	if (!up)
 		return -EINVAL;
 
-	if (!pdata)
-		goto qos;
-
 	up->context_loss_cnt = serial_omap_get_context_loss_count(up);
 
 	if (device_may_wakeup(dev)) {
-		if (!up->wakeups_enabled) {
-			serial_omap_enable_wakeup(up, true);
-			up->wakeups_enabled = true;
-		}
-	} else {
-		if (up->wakeups_enabled) {
-			serial_omap_enable_wakeup(up, false);
-			up->wakeups_enabled = false;
-		}
+		up->scr |= OMAP_UART_SCR_RX_CTS_WU_EN;
+		serial_out(up, UART_OMAP_SCR, up->scr);
 	}
-
-qos:
 	up->latency = PM_QOS_CPU_DMA_LAT_DEFAULT_VALUE;
-	schedule_work(&up->qos_work);
+	serial_omap_uart_qos(up);
 
 	return 0;
 }
@@ -1663,17 +1702,17 @@ static int serial_omap_runtime_resume(struct device *dev)
 	struct uart_omap_port *up = dev_get_drvdata(dev);
 
 	int loss_cnt = serial_omap_get_context_loss_count(up);
-
 	if (loss_cnt < 0) {
-		dev_err(dev, "serial_omap_get_context_loss_count failed : %d\n",
-			loss_cnt);
 		serial_omap_restore_context(up);
 	} else if (up->context_loss_cnt != loss_cnt) {
 		serial_omap_restore_context(up);
 	}
+	if (device_may_wakeup(dev)) {
+		up->scr &= ~OMAP_UART_SCR_RX_CTS_WU_EN;
+		serial_out(up, UART_OMAP_SCR, up->scr);
+	}
 	up->latency = up->calc_latency;
-	schedule_work(&up->qos_work);
-
+	serial_omap_uart_qos(up);
 	return 0;
 }
 #endif

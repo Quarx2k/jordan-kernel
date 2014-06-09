@@ -183,10 +183,12 @@ static void tusb_usb_work_func(struct work_struct *work)
 		atomic_notifier_call_chain(&tusb->phy.notifier,
 			USB_EVENT_VBUS, NULL);
 		tusb->phy.last_event = USB_EVENT_VBUS;
+		omap_musb_mailbox(OMAP_MUSB_VBUS_VALID);
 	} else {
 		atomic_notifier_call_chain(&tusb->phy.notifier,
 			USB_EVENT_NONE, NULL);
 		tusb->phy.last_event = USB_EVENT_NONE;
+		omap_musb_mailbox(OMAP_MUSB_VBUS_OFF);
 	}
 
 	power_supply_changed(&tusb->psy);

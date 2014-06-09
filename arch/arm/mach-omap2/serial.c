@@ -81,7 +81,7 @@ static struct omap_uart_port_info omap_serial_default_info[] __initdata = {
 };
 
 #ifdef CONFIG_PM
-static void omap_uart_enable_wakeup(struct device *dev, bool enable)
+void omap_uart_enable_wakeup(struct device *dev, bool enable)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct omap_device *od = to_omap_device(pdev);
@@ -96,7 +96,7 @@ static void omap_uart_enable_wakeup(struct device *dev, bool enable)
 }
 
 #else
-static void omap_uart_enable_wakeup(struct device *dev, bool enable)
+void omap_uart_enable_wakeup(struct device *dev, bool enable)
 {}
 #endif /* CONFIG_PM */
 

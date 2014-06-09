@@ -30,6 +30,7 @@
 #include <linux/slab.h>
 #include <linux/omap-dma.h>
 #include <linux/platform_data/gpio-omap.h>
+#include <linux/pm_runtime.h>
 
 #include <trace/events/power.h>
 
@@ -53,6 +54,7 @@
 #include "control.h"
 #include "pm-debug-regs.h"
 #include "iomap.h"
+#include "omap_device.h"
 
 #include "pad_wkup.h"
 
@@ -77,6 +79,7 @@ void (*omap3_do_wfi_sram)(void);
 static struct powerdomain *mpu_pwrdm, *neon_pwrdm;
 static struct powerdomain *core_pwrdm, *per_pwrdm;
 static struct powerdomain *dss_pwrdm;
+static struct omap_hwmod *wd_hwmod;
 
 static void omap3_core_save_context(void)
 {
@@ -151,6 +154,7 @@ static void omap3_save_secure_ram_context(void)
  */
 static int prcm_clear_mod_irqs(s16 module, u8 regs, u32 ignore_bits)
 {
+	static struct clk *per_dpll_clk;
 	u32 wkst, fclk, iclk, clken;
 	u16 wkst_off = (regs == 3) ? OMAP3430ES2_PM_WKST3 : PM_WKST1;
 	u16 fclk_off = (regs == 3) ? OMAP3430ES2_CM_FCLKEN3 : CM_FCLKEN1;
@@ -163,6 +167,16 @@ static int prcm_clear_mod_irqs(s16 module, u8 regs, u32 ignore_bits)
 	wkst &= omap2_prm_read_mod_reg(module, grpsel_off);
 	wkst &= ~ignore_bits;
 	if (wkst) {
+		if (module != WKUP_MOD) {
+			if (per_dpll_clk == NULL) {
+				per_dpll_clk = clk_get(NULL, "dpll4_ck");
+				if (per_dpll_clk == NULL) {
+					pr_emerg("Unable to get dpll4_ck\n");
+					BUG();
+				}
+			}
+			clk_enable(per_dpll_clk);
+		}
 		iclk = omap2_cm_read_mod_reg(module, iclk_off);
 		fclk = omap2_cm_read_mod_reg(module, fclk_off);
 		while (wkst) {
@@ -191,6 +205,8 @@ static int prcm_clear_mod_irqs(s16 module, u8 regs, u32 ignore_bits)
 		}
 		omap2_cm_write_mod_reg(iclk, module, iclk_off);
 		omap2_cm_write_mod_reg(fclk, module, fclk_off);
+		if (module != WKUP_MOD)
+			clk_disable(per_dpll_clk);
 	}
 
 	return c;
@@ -200,6 +216,7 @@ static irqreturn_t _prcm_int_handle_io(int irq, void *unused)
 {
 	int c;
 
+	_reconfigure_io_chain();
 	c = prcm_clear_mod_irqs(WKUP_MOD, 1,
 		~(OMAP3430_ST_IO_MASK | OMAP3430_ST_IO_CHAIN_MASK));
 
@@ -309,6 +326,10 @@ void omap_sram_idle(bool in_suspend)
 
 	/* CORE */
 	if (core_next_state < PWRDM_POWER_ON) {
+		_reconfigure_io_chain();
+		if (!in_suspend && wd_hwmod != NULL)
+			platform_pm_suspend(&wd_hwmod->od->pdev->dev);
+
 		if (core_next_state == PWRDM_POWER_OFF) {
 			omap3_core_save_context();
 			omap3_cm_save_context();
@@ -360,6 +381,9 @@ void omap_sram_idle(bool in_suspend)
 
 	/* CORE */
 	if (core_next_state < PWRDM_POWER_ON) {
+		if (!in_suspend && wd_hwmod != NULL)
+			platform_pm_resume(&wd_hwmod->od->pdev->dev);
+
 		core_prev_state = pwrdm_read_prev_pwrst(core_pwrdm);
 		if (core_prev_state == PWRDM_POWER_OFF) {
 			omap3_core_restore_context();
@@ -750,6 +774,7 @@ int __init omap3_pm_init(void)
 		ret = -EINVAL;
 		goto err3;
 	}
+	wd_hwmod = omap_hwmod_lookup("wd_timer2");
 
 	neon_pwrdm = pwrdm_lookup("neon_pwrdm");
 	per_pwrdm = pwrdm_lookup("per_pwrdm");

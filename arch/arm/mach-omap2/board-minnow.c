@@ -45,6 +45,7 @@ static const char *omap3_gp_boards_compat[] __initdata = {
 struct ti_st_plat_data wilink_pdata = {
 	.nshutdown_gpio = 83,
 	.dev_name = "/dev/ttyO1",
+	.port_index = 1,
 	.flow_cntrl = 1,
 	.baud_rate = 3000000,
 	.suspend = platform_wilink_kim_suspend,
