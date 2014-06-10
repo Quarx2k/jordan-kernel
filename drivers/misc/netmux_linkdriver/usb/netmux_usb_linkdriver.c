@@ -159,7 +159,7 @@ static char LDLogState[LDLOG_COMMAND_LEN];
 
 static DEFINE_SPINLOCK(ild_lock);
 
-USB_IPC_IFS_STRUCT usb_ipc_data_param;
+extern USB_IPC_IFS_STRUCT usb_ipc_data_param;
 /*
  * Define all the globals required.
  */
@@ -906,7 +906,7 @@ int init_module(void)
 	hw_ctrl_ipc_register(LDInit);
 	return 0;
 }
-
+device_initcall(init_module);
 
 /*
  * cleanup_module cleans up everything.
