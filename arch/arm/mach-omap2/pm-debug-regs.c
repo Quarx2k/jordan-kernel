@@ -134,6 +134,15 @@ static void pm_dbg_regset_store(u32 *ptr)
 	}
 }
 
+void pm_dbg_regs_copy(int tgt, int src)
+{
+	size_t sz = pm_dbg_get_regset_size();
+
+	pr_debug("saved reference copy %s(%d, %d) size = %u <- %pS\n",
+		__func__, tgt, src, sz, __builtin_return_address(0));
+	memcpy(pm_dbg_reg_set[tgt - 1], pm_dbg_reg_set[src - 1], sz);
+}
+
 void pm_dbg_regs_save(int reg_set)
 {
 	if (pm_dbg_reg_set[reg_set - 1] == NULL)
@@ -423,6 +432,50 @@ int pm_dbg_regs_dump(int reg_set)
 	return 0;
 }
 EXPORT_SYMBOL(pm_dbg_regs_dump);
+
+int pm_dbg_regs_dump_delta(int cur, int ref)
+{
+	int i, j;
+	unsigned long val_cur;
+	u32 *ptr_cur;
+	unsigned long val_ref;
+	u32 *ptr_ref;
+
+	if ((cur <= 0) || (cur > PM_DBG_MAX_REG_SETS) ||
+	    (ref <= 0) || (ref > PM_DBG_MAX_REG_SETS)) {
+		return -EINVAL;
+	}
+
+	ptr_cur = pm_dbg_reg_set[cur - 1];
+	ptr_ref = pm_dbg_reg_set[ref - 1];
+
+	i = 0;
+
+	pr_debug("   module      ( address) reg        %d          %d\n",
+			cur, ref);
+	while (pm_dbg_reg_modules[i].name[0] != 0) {
+		bool cm = pm_dbg_reg_modules[i].type == MOD_CM;
+		uint32_t addr = (u32)(OMAP3430_CM_BASE +
+				pm_dbg_reg_modules[i].offset);
+
+		for (j = pm_dbg_reg_modules[i].low;
+		     j <= pm_dbg_reg_modules[i].high; j += 4) {
+			val_cur = *(ptr_cur++);
+			val_ref = *(ptr_ref++);
+			if (val_cur != val_ref) {
+				pr_debug("MOD: %s_%-4s %s(%08x) "
+					"%02x => 0x%08lx 0x%08lx\n",
+					cm ? "CM_" : "PRM_",
+					pm_dbg_reg_modules[i].name,
+					cm ? " " : "",
+					addr, j, val_cur, val_ref);
+			}
+		}
+		i++;
+	}
+	return 0;
+}
+EXPORT_SYMBOL(pm_dbg_regs_dump_delta);
 
 static void __init pm_dbg_regset_init(void)
 {

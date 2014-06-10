@@ -20,12 +20,16 @@
 extern int  pm_dbg_regs_init(struct dentry *d);
 extern void pm_dbg_regs_save(int reg_set);
 extern void pm_dbg_regs_dump(int reg_set);
+extern void pm_dbg_regs_dump_delta(int cur, int rfr);
 extern void pm_dbg_show_wakeup_source(void);
+extern void pm_dbg_regs_copy(int tgt, int src);
 #else
 static inline int pm_dbg_regs_init(struct dentry *d) { return 0; }
 static inline void pm_dbg_regs_save(int reg_set) {};
 static inline void pm_dbg_regs_dump(int reg_set) {};
+static inline void pm_dbg_regs_dump_delta(int current, int ref) {}
 static inline void pm_dbg_show_wakeup_source(void) {};
+static inline void pm_dbg_regs_copy(int tgt, int src) {};
 #endif
 
 #endif

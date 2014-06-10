@@ -62,6 +62,7 @@
 /* pm34xx errata defined in pm.h */
 u16 pm34xx_errata;
 bool suspend_debug;
+bool suspend_offmode_ref_saved;
 
 struct power_state {
 	struct powerdomain *pwrdm;
@@ -391,6 +392,12 @@ void omap_sram_idle(bool in_suspend)
 			omap3_cm_restore_context();
 			omap3_sram_restore_context();
 			omap2_sms_restore_context();
+
+			if (unlikely(!suspend_offmode_ref_saved)) {
+				suspend_offmode_ref_saved = true;
+				pm_dbg_regs_copy(3, 1);
+				pm_dbg_regs_copy(4, 2);
+			}
 		}
 		if (core_next_state == PWRDM_POWER_OFF) {
 			omap2_prm_clear_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK,
@@ -457,8 +464,13 @@ restore:
 	}
 	if (ret) {
 		pr_err("Could not enter target state in pm_suspend\n");
-		pm_dbg_regs_dump(1);
-		pm_dbg_regs_dump(2);
+		if (suspend_offmode_ref_saved) {
+			pm_dbg_regs_dump_delta(1, 3);
+			pm_dbg_regs_dump_delta(2, 4);
+		} else {
+			pm_dbg_regs_dump(1);
+			pm_dbg_regs_dump(2);
+		}
 	} else
 		pr_info("Successfully put all powerdomains to target state\n");
 
