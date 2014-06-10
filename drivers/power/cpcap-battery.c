@@ -43,16 +43,11 @@
 #define CPCAP_BATT_IRQ_ADCDONE 0x08
 #define CPCAP_BATT_IRQ_MACRO   0x10
 
-//#define USE_OWN_CALCULATE_METHOD
-
-#ifdef USE_OWN_CALCULATE_METHOD
 static u32 battery_old_cap = -1;
-#define USE_OWN_CHARGING_METHOD
 //#define BATTERY_DEBUG
 #include "cpcap_charge_table.h"
-#endif
-#ifndef USE_OWN_CHARGING_METHOD
 
+static int own_charger_enabled;
 static long cpcap_batt_ioctl(struct file *file,
 			    unsigned int cmd,
 			    unsigned long arg);
@@ -60,10 +55,27 @@ static unsigned int cpcap_batt_poll(struct file *file, poll_table *wait);
 static int cpcap_batt_open(struct inode *inode, struct file *file);
 static ssize_t cpcap_batt_read(struct file *file, char *buf, size_t count,
 			       loff_t *ppos);
-#endif
 static int cpcap_batt_probe(struct platform_device *pdev);
 static int cpcap_batt_remove(struct platform_device *pdev);
 static int cpcap_batt_resume(struct platform_device *pdev);
+
+static int __init cpcap_charger_enabled(char *s)
+{
+	if (s == NULL) {
+		own_charger_enabled = 0;
+		return 1;
+	}
+
+	if (!strcmp(s,"y")) {
+		own_charger_enabled = 1;
+	} else {
+		own_charger_enabled = 0;
+	}
+
+	return 1;
+}
+__setup("cpcap_charger_enabled=", cpcap_charger_enabled);
+
 struct cpcap_batt_ps {
 	struct power_supply batt;
 	struct power_supply ac;
@@ -80,11 +92,9 @@ struct cpcap_batt_ps {
 	char async_req_pending;
 	unsigned long last_run_time;
 	bool no_update;
-#ifdef USE_OWN_CALCULATE_METHOD
 	unsigned int battery_stats_counter[4]; /* Battery stats for past seconds */
-#endif
 };
-#ifndef USE_OWN_CHARGING_METHOD
+
 static const struct file_operations batt_fops = {
 	.owner = THIS_MODULE,
 	.open = cpcap_batt_open,
@@ -98,7 +108,7 @@ static struct miscdevice batt_dev = {
 	.name	= "cpcap_batt",
 	.fops	= &batt_fops,
 };
-#endif
+
 static enum power_supply_property cpcap_batt_props[] = {
 	POWER_SUPPLY_PROP_STATUS,
 	POWER_SUPPLY_PROP_HEALTH,
@@ -135,12 +145,12 @@ static struct platform_driver cpcap_batt_driver = {
 };
 
 static struct cpcap_batt_ps *cpcap_batt_sply;
-#ifdef USE_OWN_CALCULATE_METHOD
+
 static struct task_struct * batt_task;
 static int cpcap_batt_status(struct cpcap_batt_ps *sply);
 static int cpcap_batt_counter(struct cpcap_batt_ps *sply);
 static int cpcap_batt_value(struct cpcap_batt_ps *sply, int value);
-#endif
+
 
 void cpcap_batt_irq_hdlr(enum cpcap_irqs irq, void *data)
 {
@@ -196,7 +206,7 @@ void cpcap_batt_adc_hdlr(struct cpcap_device *cpcap, void *data)
 
 	wake_up_interruptible(&sply->wait);
 }
-#ifndef USE_OWN_CHARGING_METHOD
+
 static int cpcap_batt_open(struct inode *inode, struct file *file)
 {
 	file->private_data = cpcap_batt_sply;
@@ -257,9 +267,7 @@ static long cpcap_batt_ioctl(struct file *file,
 
 	switch (cmd) {
 	case CPCAP_IOCTL_BATT_DISPLAY_UPDATE:
-#ifndef USE_OWN_CALCULATE_METHOD
 		if (sply->no_update)
-#endif
 			return 0;
 		if (copy_from_user((void *)&sply->batt_state,
 				   (void *)arg, sizeof(struct cpcap_batt_data)))
@@ -337,7 +345,7 @@ static long cpcap_batt_ioctl(struct file *file,
 
 	return ret;
 }
-#endif
+
 static char *cpcap_batt_ac_models[] = {
 	"none", "charger"
 };
@@ -405,11 +413,11 @@ static int cpcap_batt_get_property(struct power_supply *psy,
 
 	switch (psp) {
 	case POWER_SUPPLY_PROP_STATUS:
-#ifdef USE_OWN_CALCULATE_METHOD
+	if (own_charger_enabled) {
 		val->intval = cpcap_batt_status(sply);
-#else
+	} else {
 		val->intval = sply->batt_state.status;
-#endif
+	}
 		break;
 
 	case POWER_SUPPLY_PROP_HEALTH:
@@ -425,27 +433,27 @@ static int cpcap_batt_get_property(struct power_supply *psy,
 		break;
 
 	case POWER_SUPPLY_PROP_CAPACITY:
-#ifdef USE_OWN_CALCULATE_METHOD
+	if (own_charger_enabled) {
 		val->intval = cpcap_batt_counter(sply);
-#else
+	} else {
 		val->intval = sply->batt_state.capacity;
-#endif
+	}
 		break;
 
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
-#ifdef USE_OWN_CALCULATE_METHOD
+	if (own_charger_enabled) {
 		val->intval = cpcap_batt_value(sply, CPCAP_ADC_BATTP)*1000;
-#else
+	} else {
 		val->intval = sply->batt_state.batt_volt;
-#endif
+	}
 		break;
 
 	case POWER_SUPPLY_PROP_TEMP:
-#ifdef USE_OWN_CALCULATE_METHOD
+	if (own_charger_enabled) {
 		val->intval = (cpcap_batt_value(sply, CPCAP_ADC_AD3)-273)*10;
-#else
+	} else {
 		val->intval = sply->batt_state.batt_temp;
-#endif
+	}
 		break;
 
 	case POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN:
@@ -453,11 +461,11 @@ static int cpcap_batt_get_property(struct power_supply *psy,
 		break;
 
 	case POWER_SUPPLY_PROP_CHARGE_COUNTER:
-#ifdef USE_OWN_CALCULATE_METHOD
+	if (own_charger_enabled) {
 		val->intval = cpcap_batt_counter(sply);
-#else
+	} else {
 		val->intval = sply->batt_state.batt_capacity_one;
-#endif
+	}
 		break;
 
 	default:
@@ -467,18 +475,16 @@ static int cpcap_batt_get_property(struct power_supply *psy,
 
 	return ret;
 }
-#ifdef USE_OWN_CALCULATE_METHOD
+
 static int cpcap_batt_status(struct cpcap_batt_ps *sply) {
 	int amperage = 0;
 
 	amperage = cpcap_batt_value(sply, CPCAP_ADC_CHG_ISENSE);
 	if (sply->usb_state.online == 1 || sply->ac_state.online == 1) {
-#ifdef USE_OWN_CHARGING_METHOD
 		cpcap_regacc_write(sply->cpcap, CPCAP_REG_CRM, 949, 949);
 		cpcap_regacc_write(sply->cpcap, CPCAP_REG_ADCD0, 186, 186);
 		cpcap_regacc_write(sply->cpcap, CPCAP_REG_ADCC2 , 16758, 16758);
 		cpcap_regacc_write(sply->cpcap, CPCAP_REG_UCTM, 0, CPCAP_BIT_UCTM);
-#endif
 		if (amperage < 100 && amperage > 50) {
 			printk("Your charger not powerful, try reconnect or change charger, %d mA\n", amperage);
 			return POWER_SUPPLY_STATUS_DISCHARGING;
@@ -488,12 +494,10 @@ static int cpcap_batt_status(struct cpcap_batt_ps *sply) {
 		else
 			return POWER_SUPPLY_STATUS_CHARGING;
         } else {
-#ifdef USE_OWN_CHARGING_METHOD
 		cpcap_regacc_write(sply->cpcap, CPCAP_REG_CRM, 944, 944);
 		cpcap_regacc_write(sply->cpcap, CPCAP_REG_ADCC2 , 310, 310);
 		cpcap_regacc_write(sply->cpcap, CPCAP_REG_ADCD0, 0, 0);
 		cpcap_regacc_write(sply->cpcap, CPCAP_REG_UCTM, 0, CPCAP_BIT_UCTM);
-#endif
 		return POWER_SUPPLY_STATUS_DISCHARGING;
 	}
 }
@@ -566,8 +570,7 @@ void delay_ms(__u32 t)
     schedule_timeout(timeout);
 }
 
-#endif
-#ifdef USE_OWN_CHARGING_METHOD
+
 static void cpcap_batt_phasing(void) {
 	struct cpcap_batt_ps *sply = cpcap_batt_sply;
         struct cpcap_adc_phase phase;
@@ -610,7 +613,7 @@ static void cpcap_batt_phasing(void) {
 	cpcap_regacc_write(sply->cpcap, CPCAP_REG_ADCD0, 0, 0); // Charger off == 0, Charger on = 186/187
 	cpcap_regacc_write(sply->cpcap, CPCAP_REG_UCTM, 0, CPCAP_BIT_UCTM);  /* UC Turbo Mode - Always Disabled in battd*/  
 }
-#endif
+
 #ifdef BATTERY_DEBUG
 static void cpcap_batt_dump(struct cpcap_batt_ps *sply) {
 	int i;
@@ -684,7 +687,6 @@ CPCAP_ADC_BATTI_ADC:%d\n CPCAP_ADC_USB_ID:%d\n CPCAP_ADC_AD0_BATTDETB:%d\n",
 }
 #endif
 
-#ifdef USE_OWN_CALCULATE_METHOD
 static int cpcap_batt_update(void* arg) {
 	struct cpcap_batt_ps *sply = cpcap_batt_sply;
 	while(1) {
@@ -696,7 +698,7 @@ static int cpcap_batt_update(void* arg) {
 	}
 	return 0;
 }
-#endif
+
 static int cpcap_batt_probe(struct platform_device *pdev)
 {
 	int ret = 0;
@@ -763,11 +765,11 @@ static int cpcap_batt_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, sply);
 	sply->cpcap->battdata = sply;
 	cpcap_batt_sply = sply;
-#ifndef USE_OWN_CHARGING_METHOD
-	ret = misc_register(&batt_dev);
-	if (ret)
-		goto unregmisc_exit;
-#endif
+	if (!own_charger_enabled) {
+		ret = misc_register(&batt_dev);
+		if (ret)
+			goto unregmisc_exit;
+	}
 	ret = cpcap_irq_register(sply->cpcap, CPCAP_IRQ_VBUSOV,
 				 cpcap_batt_irq_hdlr, sply);
 	if (ret)
@@ -828,24 +830,22 @@ unregirq_exit:
 	cpcap_irq_free(sply->cpcap, CPCAP_IRQ_UC_PRIMACRO_9);
 	cpcap_irq_free(sply->cpcap, CPCAP_IRQ_UC_PRIMACRO_10);
 	cpcap_irq_free(sply->cpcap, CPCAP_IRQ_UC_PRIMACRO_11);
-#ifndef USE_OWN_CHARGING_METHOD
 unregmisc_exit:
-	misc_deregister(&batt_dev);
+	if (!own_charger_enabled) {
+		misc_deregister(&batt_dev);
+	}
 	power_supply_unregister(&sply->usb);
-#endif
 unregbatt_exit:
 	power_supply_unregister(&sply->batt);
 unregac_exit:
 	power_supply_unregister(&sply->ac);
 
 prb_exit:
-#ifdef USE_OWN_CALCULATE_METHOD
-#ifdef USE_OWN_CHARGING_METHOD
-	cpcap_batt_phasing();
-#endif
-        batt_task = kthread_create(cpcap_batt_update, (void*)0, "cpcap_batt_update");
-	wake_up_process(batt_task);
-#endif
+	if (own_charger_enabled) {
+		cpcap_batt_phasing();
+  	      	batt_task = kthread_create(cpcap_batt_update, (void*)0, "cpcap_batt_update");
+		wake_up_process(batt_task);
+	}
 	return ret;
 }
 
