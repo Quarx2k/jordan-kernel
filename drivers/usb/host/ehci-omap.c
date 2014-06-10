@@ -1216,7 +1216,9 @@ static struct hc_driver ehci_omap_hc_driver = {
 	.bus_resume		= ehci_omap_bus_resume,
 
 	.clear_tt_buffer_complete = ehci_clear_tt_buffer_complete,
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	.update_device_disconnect = omap4_ehci_update_device_disconnect,
+#endif
 };
 
 MODULE_ALIAS("platform:omap-ehci");
