@@ -59,7 +59,7 @@
 #include "debug.h"
 #include <linux/sched.h>
 
-#define DEBUG_NETMUX_AUDIO
+//#define DEBUG_NETMUX_AUDIO
 
 /*
  * major_list keeps track of a list of major numbers

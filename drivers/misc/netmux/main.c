@@ -125,5 +125,5 @@ static void __exit netmux_exit(void)
 	class_destroy(netmux_class);
 }
 
-module_init(netmux_init);
+device_initcall(netmux_init);
 module_exit(netmux_exit);
