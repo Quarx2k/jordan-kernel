@@ -87,6 +87,7 @@ static inline u32 ehci_read(void __iomem *base, u32 reg)
 	return __raw_readl(base + reg);
 }
 
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 /* For ISP1703 phy on OMAP4430 port 1, we need to force the PHY
  * to resume immediately after clearing PORTSC, to avoid disconnect.
  */
@@ -648,6 +649,7 @@ static int omap4_ehci_tll_hub_control(
 	spin_unlock_irqrestore(&ehci->lock, flags);
 	return retval;
 }
+#endif
 
 static int omap_ehci_hub_control(
 	struct usb_hcd	*hcd,
@@ -657,7 +659,9 @@ static int omap_ehci_hub_control(
 	char		*buf,
 	u16		wLength
 ) {
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	struct device *dev = hcd->self.controller;
+
 	struct ehci_hcd_omap_platform_data	*pdata = dev->platform_data;
 
 	if (cpu_is_omap44xx() && (omap_rev() <= OMAP4430_REV_ES2_2) &&
@@ -695,7 +699,7 @@ static int omap_ehci_hub_control(
 						wIndex, buf, wLength);
 		}
 	}
-
+#endif
 	return ehci_hub_control(hcd, typeReq, wValue, wIndex, buf, wLength);
 }
 
@@ -1093,13 +1097,13 @@ static int ehci_omap_bus_suspend(struct usb_hcd *hcd)
 	dev_dbg(dev, "ehci_omap_bus_suspend\n");
 
 	ret = ehci_bus_suspend(hcd);
-
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	if (hcd->self.connection_change) {
 		dev_err(dev, "Connection state changed\n");
-		//save_usb_sar_regs(); //this may be omap4 only, hack it out for now
+		save_usb_sar_regs();
 		hcd->self.connection_change = 0;
 	}
-
+#endif
 	if (ret != 0) {
 		dev_dbg(dev, "ehci_omap_bus_suspend failed %d\n", ret);
 		return ret;

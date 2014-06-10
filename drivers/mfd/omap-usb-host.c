@@ -625,11 +625,13 @@ static void usbhs_omap_tll_init(struct device *dev, u8 tll_channel_count)
 
 	/* Program Common TLL register */
 	reg = usbhs_read(omap->tll_base, OMAP_TLL_SHARED_CONF);
+
 	reg |= (OMAP_TLL_SHARED_CONF_FCLK_IS_ON
 		| OMAP_TLL_SHARED_CONF_USB_DIVRATION);
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	reg &= ~OMAP_TLL_SHARED_CONF_USB_90D_DDR_EN;
 	reg &= ~OMAP_TLL_SHARED_CONF_USB_180D_SDR_EN;
-
+#endif
 	usbhs_write(omap->tll_base, OMAP_TLL_SHARED_CONF, reg);
 
 	/* Enable channels now */
@@ -837,7 +839,7 @@ static void omap_usbhs_init(struct device *dev)
 		else
 			usbhs_omap_tll_init(dev, OMAP_TLL_CHANNEL_COUNT);
 	}
-
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	if (pdata->ehci_data->phy_reset) {
 		/* Hold the PHY in RESET for enough time till
 		 * PHY is settled and ready
@@ -852,18 +854,19 @@ static void omap_usbhs_init(struct device *dev)
 			gpio_set_value
 				(pdata->ehci_data->reset_gpio_port[1], 1);
 	}
-
+#endif
 	spin_unlock_irqrestore(&omap->lock, flags);
 	pm_runtime_put_sync(dev);
 }
 
 static void omap_usbhs_deinit(struct device *dev)
 {
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
 	struct usbhs_omap_platform_data	*pdata = &omap->platdata;
-
+#endif
 	dev_dbg(dev, "stopping TI HSUSB Controller\n");
-
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	if (pdata->ehci_data->phy_reset) {
 		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[0]))
 			gpio_free(pdata->ehci_data->reset_gpio_port[0]);
@@ -871,6 +874,7 @@ static void omap_usbhs_deinit(struct device *dev)
 		if (gpio_is_valid(pdata->ehci_data->reset_gpio_port[1]))
 			gpio_free(pdata->ehci_data->reset_gpio_port[1]);
 	}
+#endif
 }
 
 static const struct dev_pm_ops usbhsomap_dev_pm_ops = {
