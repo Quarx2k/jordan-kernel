@@ -63,6 +63,7 @@
 u16 pm34xx_errata;
 bool suspend_debug;
 bool suspend_offmode_ref_saved;
+static struct timespec suspend_time_before;
 
 struct power_state {
 	struct powerdomain *pwrdm;
@@ -431,6 +432,7 @@ static int omap3_pm_suspend(void)
 {
 	struct power_state *pwrst;
 	int state, ret = 0;
+	struct timespec after;
 
 	suspend_debug = true;
 
@@ -445,6 +447,8 @@ static int omap3_pm_suspend(void)
 			goto restore;
 	}
 
+	read_persistent_clock(&suspend_time_before);
+
 	omap3_intc_suspend();
 
 	omap_sram_idle(true);
@@ -452,6 +456,9 @@ static int omap3_pm_suspend(void)
 	prcm_handle_pad_wkup();
 
 restore:
+	read_persistent_clock(&after);
+	after = timespec_sub(after, suspend_time_before);
+
 	/* Restore next_pwrsts */
 	list_for_each_entry(pwrst, &pwrst_list, node) {
 		state = pwrdm_read_prev_pwrst(pwrst->pwrdm);
@@ -463,7 +470,10 @@ restore:
 		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->saved_state);
 	}
 	if (ret) {
-		pr_err("Could not enter target state in pm_suspend\n");
+		pr_err("Could not enter target state in pm_suspend "
+			"for %lu.%03lu seconds\n", after.tv_sec,
+			after.tv_nsec / NSEC_PER_MSEC);
+
 		if (suspend_offmode_ref_saved) {
 			pm_dbg_regs_dump_delta(1, 3);
 			pm_dbg_regs_dump_delta(2, 4);
@@ -472,7 +482,9 @@ restore:
 			pm_dbg_regs_dump(2);
 		}
 	} else
-		pr_info("Successfully put all powerdomains to target state\n");
+		pr_info("Successfully put all powerdomains to target state "
+			"for %lu.%03lu seconds\n", after.tv_sec,
+			after.tv_nsec / NSEC_PER_MSEC);
 
 	pm_dbg_show_wakeup_source();
 
