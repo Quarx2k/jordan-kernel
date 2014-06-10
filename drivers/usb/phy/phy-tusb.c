@@ -36,6 +36,7 @@
 #include <linux/module.h>
 #include <linux/clk.h>
 #include <linux/power_supply.h>
+#include <linux/usb/musb-omap.h>
 
 static bool factory_override;
 
