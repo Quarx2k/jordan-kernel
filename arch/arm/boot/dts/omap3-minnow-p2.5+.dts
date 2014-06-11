@@ -14,6 +14,7 @@
 	mmi,hwrev = <
 		0x07   /* Minnow P2-5 portable (Rev A) */
 		0x08   /* Minnow P2-5 wingboard (issue 04) */
+		0xF0   /* Minnow P2-5 portable (Rev A) with 512MB */
 	>;
 
 	Display@0 {
