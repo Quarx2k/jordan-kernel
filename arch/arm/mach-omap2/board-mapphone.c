@@ -120,7 +120,7 @@ MACHINE_START(MAPPHONE, "mapphone_")
 	.reserve	= omap_reserve,
 	.map_io		= omap3_map_io,
 	.init_early	= omap_mapphone_init_early,
-	.init_irq	= omap3_init_irq,
+	.init_irq	= omap_intc_of_init,
 	.handle_irq	= omap3_intc_handle_irq,
 	.init_machine	= omap_mapphone_init,
 	.init_late	= omap3630_init_late,
