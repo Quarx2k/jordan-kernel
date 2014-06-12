@@ -35,6 +35,7 @@
 #include <trace/events/power.h>
 
 #include <asm/fncpy.h>
+#include <asm/setup.h>
 #include <asm/suspend.h>
 #include <asm/system_misc.h>
 
@@ -721,6 +722,9 @@ static void __init pm_errata_configure(void)
 #ifndef CONFIG_DISABLE_OMAP_ERRATA_i583
 			pm34xx_errata |= PM_SDRC_WAKEUP_ERRATUM_i583;
 #endif
+		if (meminfo.bank[0].size > 256 * (1024 * 1024))
+			pm34xx_errata |= PM_SDRC_WAKEUP_ERRATUM_i583;
+
 	} else if (cpu_is_omap34xx()) {
 		pm34xx_errata |= PM_PER_MEMORIES_ERRATUM_i582;
 	}
