@@ -43,6 +43,7 @@
 #include <linux/slab.h>
 #include <linux/i2c-omap.h>
 #include <linux/pm_runtime.h>
+#include <linux/pm_qos.h>
 #include <linux/pinctrl/consumer.h>
 
 /* I2C controller revisions */
@@ -188,9 +189,8 @@ struct omap_i2c_dev {
 	int			reg_shift;      /* bit shift for I2C register addresses */
 	struct completion	cmd_complete;
 	struct resource		*ioarea;
-	u32			latency;	/* maximum mpu wkup latency */
-	void			(*set_mpu_wkup_lat)(struct device *dev,
-						    long latency);
+	u32                     latency;        /* maximum mpu wkup latency */
+	struct pm_qos_request	pm_qos_request;
 	u32			speed;		/* Speed of bus in kHz */
 	u32			flags;
 	u16			cmd_err;
@@ -504,9 +504,7 @@ static void omap_i2c_resize_fifo(struct omap_i2c_dev *dev, u8 size, bool is_rx)
 		dev->b_hw = 1; /* Enable hardware fixes */
 
 	/* calculate wakeup latency constraint for MPU */
-	if (dev->set_mpu_wkup_lat != NULL)
-		dev->latency = (1000000 * dev->threshold) /
-			(1000 * dev->speed / 8);
+	dev->latency = (1000000 * dev->threshold) / (1000 * dev->speed >> 3);
 }
 
 /*
@@ -645,8 +643,13 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	if (r < 0)
 		goto out;
 
-	if (dev->set_mpu_wkup_lat != NULL)
-		dev->set_mpu_wkup_lat(dev->dev, dev->latency);
+	/*
+	 * When waiting for completion of a i2c transfer, we need to
+	 * set a wake up latency constraint for the MPU. This is to
+	 * ensure quick enough wakeup from idle, when transfer
+	 * completes.
+	 */
+	pm_qos_update_request(&dev->pm_qos_request, dev->latency);
 
 	for (i = 0; i < num; i++) {
 		r = omap_i2c_xfer_msg(adap, &msgs[i], (i == (num - 1)));
@@ -659,8 +662,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 
 	omap_i2c_wait_for_bb(dev);
 
-	if (dev->set_mpu_wkup_lat != NULL)
-		dev->set_mpu_wkup_lat(dev->dev, -1);
+	pm_qos_update_request(&dev->pm_qos_request,
+			      PM_QOS_CPU_DMA_LAT_DEFAULT_VALUE);
 
 out:
 	pm_runtime_mark_last_busy(dev->dev);
@@ -1120,7 +1123,6 @@ omap_i2c_probe(struct platform_device *pdev)
 	} else if (pdata != NULL) {
 		dev->speed = pdata->clkrate;
 		dev->flags = pdata->flags;
-		dev->set_mpu_wkup_lat = pdata->set_mpu_wkup_lat;
 	}
 
 	dev->pins = devm_pinctrl_get_select_default(&pdev->dev);
@@ -1150,6 +1152,9 @@ omap_i2c_probe(struct platform_device *pdev)
 	r = pm_runtime_get_sync(dev->dev);
 	if (IS_ERR_VALUE(r))
 		goto err_free_mem;
+
+	pm_qos_add_request(&dev->pm_qos_request, PM_QOS_CPU_DMA_LATENCY,
+			   PM_QOS_CPU_DMA_LAT_DEFAULT_VALUE);
 
 	/*
 	 * Read the Rev hi bit-[15:14] ie scheme this is 1 indicates ver2.
@@ -1206,9 +1211,8 @@ omap_i2c_probe(struct platform_device *pdev)
 			dev->b_hw = 1; /* Enable hardware fixes */
 
 		/* calculate wakeup latency constraint for MPU */
-		if (dev->set_mpu_wkup_lat != NULL)
-			dev->latency = (1000000 * dev->fifo_size) /
-				       (1000 * dev->speed / 8);
+		dev->latency = (1000000 * dev->fifo_size) /
+			       (1000 * dev->speed >> 3);
 	}
 
 	/* reset ASAP, clearing any IRQs */
@@ -1257,6 +1261,7 @@ omap_i2c_probe(struct platform_device *pdev)
 
 err_unuse_clocks:
 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+	pm_qos_remove_request(&dev->pm_qos_request);
 	pm_runtime_put(dev->dev);
 	pm_runtime_disable(&pdev->dev);
 err_free_mem:
@@ -1275,6 +1280,7 @@ static int omap_i2c_remove(struct platform_device *pdev)
 		return ret;
 
 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+	pm_qos_remove_request(&dev->pm_qos_request);
 	pm_runtime_put(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
 	return 0;
