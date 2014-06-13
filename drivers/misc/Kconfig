@@ -572,6 +572,15 @@ config BQ5105X_CTRL
 	  user space use.
 	default n
 
+config BQ5105X_DETECT
+	tristate "TI BQ5105X Detection driver"
+	depends on OF
+	help
+	  This option enables support to detect when device with TI BQ5105X IC
+	  is placed on a wireless charger.  This is not a generic driver, some
+	  assumptions are made on how the IC is hooked to the host device.
+	default n
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
