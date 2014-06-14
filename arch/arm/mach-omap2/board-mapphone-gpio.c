@@ -304,7 +304,7 @@ void __init mapphone_gpio_mapping_init(void)
 		if (j == GPIO_MAP_SIZE)
 			pr_err("Unable to write gpio_map_table\n");
 		else
-			pr_debug("GPIO mapping write: pin = %d, name = %s\n",
+			printk("GPIO mapping write: pin = %d, name = %s\n",
 						gpio_map_table[j].pin_num,
 						gpio_map_table[j].name);
 
