@@ -1336,7 +1336,7 @@ static struct clk modem_fck = {
 
 static struct clk sad2d_ick = {
 	.name		= "sad2d_ick",
-	.ops		= &clkops_omap2_iclk_dflt_wait,
+	.ops		= &clkops_omap2_dflt_wait,
 	.parent		= &l3_ick,
 	.enable_reg	= OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
 	.enable_bit	= OMAP3430_EN_SAD2D_SHIFT,
