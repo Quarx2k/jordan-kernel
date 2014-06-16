@@ -43,6 +43,7 @@ struct omap_uart_port_info {
 	int			DTR_present;
 	bool			wakeup_capable;
 	bool			open_close_pm;
+	unsigned int		rx_trig;
 
 	int (*get_context_loss_count)(struct device *);
 	void (*enable_wakeup)(struct device *, bool);
