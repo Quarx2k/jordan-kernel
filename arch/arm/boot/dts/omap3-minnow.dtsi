@@ -820,7 +820,6 @@ tps65912_0: tps65912 {
 /* c55 */
 &uart1 {
 	flags = <0x00200000>;
-	wakeup-capable;
 	open_close_pm;
 	autosuspend-delay = <50>; /* ms */
 };
