@@ -79,7 +79,7 @@
 		/* declare it if ext_te enable */
 		//gpio_te = <&gpio1 0 0>;       /* EXT_TE gpio-0 */
 		//pins = <0 1 2 3>;             /* DSI Pin config */
-		//esd_interval = <0>;           /* ESD_INTERVAL */
+		esd_interval = <8000>;          /* ESD_INTERVAL */
 		//pixel_clock = <4608>;         /* kHZ = 320*240*60/1000*/
 		/* 0: RGB888
 		 * 1: RGB666

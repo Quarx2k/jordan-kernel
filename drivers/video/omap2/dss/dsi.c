@@ -46,6 +46,7 @@
 #include "dss_features.h"
 
 #define DSI_CATCH_MISSING_TE
+#define DSI_DISABLE_LP_RX_TO
 
 struct dsi_reg { u16 idx; };
 
@@ -339,6 +340,7 @@ struct dsi_data {
 	int debug_read;
 	int debug_write;
 	atomic_t update_pending;
+	atomic_t runtime_active;
 
 #ifdef CONFIG_OMAP2_DSS_COLLECT_IRQ_STATS
 	spinlock_t irq_stats_lock;
@@ -1098,9 +1100,14 @@ int dsi_runtime_get(struct platform_device *dsidev)
 	struct dsi_data *dsi = dsi_get_dsidrv_data(dsidev);
 
 	DSSDBG("dsi_runtime_get\n");
-
-	r = pm_runtime_get_sync(&dsi->pdev->dev);
-	WARN_ON(r < 0);
+	r = atomic_xchg(&dsi->runtime_active, 1);
+	if (!r) {
+		r = pm_runtime_get_sync(&dsi->pdev->dev);
+		if (r < 0) {
+			atomic_set(&dsi->runtime_active, 0);
+			WARN(1, "dsi_runtime_get ret = %d\n", r);
+		}
+	}
 	return r < 0 ? r : 0;
 }
 
@@ -1110,9 +1117,11 @@ void dsi_runtime_put(struct platform_device *dsidev)
 	int r;
 
 	DSSDBG("dsi_runtime_put\n");
-
-	r = pm_runtime_put_sync(&dsi->pdev->dev);
-	WARN_ON(r < 0 && r != -ENOSYS);
+	r = atomic_xchg(&dsi->runtime_active, 0);
+	if (r) {
+		r = pm_runtime_put_sync(&dsi->pdev->dev);
+		WARN(r < 0 && r != -ENOSYS, "dsi_runtime_put ret = %d\n", r);
+	}
 }
 
 /* source clock for DSI PLL. this could also be PCLKFREE */
@@ -2832,6 +2841,8 @@ int dsi_vc_send_bta_sync(struct omap_dss_device *dssdev, int channel)
 	int r = 0;
 	u32 err;
 
+	dsi_sync_vc(dsidev, channel);
+
 	r = dsi_register_isr_vc(dsidev, channel, dsi_completion_handler,
 			&completion, DSI_VC_IRQ_BTA);
 	if (r)
@@ -2847,7 +2858,7 @@ int dsi_vc_send_bta_sync(struct omap_dss_device *dssdev, int channel)
 		goto err2;
 
 	if (wait_for_completion_timeout(&completion,
-				msecs_to_jiffies(500)) == 0) {
+				msecs_to_jiffies(50)) == 0) {
 		DSSERR("Failed to receive BTA\n");
 		r = -EIO;
 		goto err2;
@@ -3526,7 +3537,11 @@ static void dsi_set_lp_rx_timeout(struct platform_device *dsidev,
 	fck = dsi_fclk_rate(dsidev);
 
 	r = dsi_read_reg(dsidev, DSI_TIMING2);
+#ifdef	DSI_DISABLE_LP_RX_TO
+	r = FLD_MOD(r, 0, 15, 15);	/* LP_RX_TO */
+#else
 	r = FLD_MOD(r, 1, 15, 15);	/* LP_RX_TO */
+#endif
 	r = FLD_MOD(r, x16 ? 1 : 0, 14, 14);	/* LP_RX_TO_X16 */
 	r = FLD_MOD(r, x4 ? 1 : 0, 13, 13);	/* LP_RX_TO_X4 */
 	r = FLD_MOD(r, ticks, 12, 0);	/* LP_RX_COUNTER */
@@ -4283,9 +4298,11 @@ static void dsi_update_screen_dispc(struct platform_device *dsidev)
 	dss_mgr_start_update(mgr);
 
 	if (dsi->te_enabled) {
+#ifndef	DSI_DISABLE_LP_RX_TO
 		/* disable LP_RX_TO, so that we can receive TE.  Time to wait
 		 * for TE is longer than the timer allows */
 		REG_FLD_MOD(dsidev, DSI_TIMING2, 0, 15, 15); /* LP_RX_TO */
+#endif
 
 		dsi_vc_send_bta(dsidev, channel);
 
@@ -4329,8 +4346,10 @@ static void dsi_handle_framedone(struct platform_device *dsidev, int error)
 	dispc_enable_sidle();
 
 	if (dsi->te_enabled) {
+#ifndef	DSI_DISABLE_LP_RX_TO
 		/* enable LP_RX_TO again after the TE */
 		REG_FLD_MOD(dsidev, DSI_TIMING2, 1, 15, 15); /* LP_RX_TO */
+#endif
 	}
 
 	dsi->framedone_callback(error, dsi->framedone_data);
@@ -4592,7 +4611,10 @@ static void dsi_display_uninit_dsi(struct platform_device *dsidev,
 
 static int dsi_soft_reset(struct platform_device *dsidev)
 {
-	int i = 5;
+	struct dsi_data *dsi = dsi_get_dsidrv_data(dsidev);
+	int i = 10;
+
+	dss_select_dsi_clk_source(dsi->module_id, OMAP_DSS_CLK_SRC_FCK);
 	/* enable DSI soft reset */
 	REG_FLD_MOD(dsidev, DSI_SYSCONFIG, 1, 1, 1);
 	/* waiting for DSI soft reset done*/
@@ -4665,19 +4687,30 @@ void omapdss_dsi_display_disable(struct omap_dss_device *dssdev,
 	WARN_ON(!dsi_bus_is_locked(dsidev));
 
 	mutex_lock(&dsi->lock);
+	/*do nothing if it did not enabled */
+	if (!atomic_read(&dsi->runtime_active))
+		goto exit;
 
-	dsi_sync_vc(dsidev, 0);
-	dsi_sync_vc(dsidev, 1);
-	dsi_sync_vc(dsidev, 2);
-	dsi_sync_vc(dsidev, 3);
+	/* special fast rest DSI for disconnect_lanes/enter_ulps all true
+	 * it will save 150 ms
+	 */
+	if (disconnect_lanes && enter_ulps) {
+		dsi_soft_reset(dsidev);
+		dsi_cio_uninit(dsidev);
+		dsi_pll_uninit(dsidev, true);
+	} else {
+		dsi_sync_vc(dsidev, 0);
+		dsi_sync_vc(dsidev, 1);
+		dsi_sync_vc(dsidev, 2);
+		dsi_sync_vc(dsidev, 3);
 
-	dsi_display_uninit_dsi(dsidev, disconnect_lanes, enter_ulps);
-
+		dsi_display_uninit_dsi(dsidev, disconnect_lanes, enter_ulps);
+	}
 	dsi_runtime_put(dsidev);
 	dsi_enable_pll_clock(dsidev, 0);
 
 	omap_dss_stop_device(dssdev);
-
+exit:
 	mutex_unlock(&dsi->lock);
 }
 EXPORT_SYMBOL(omapdss_dsi_display_disable);
