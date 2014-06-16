@@ -1470,6 +1470,7 @@ void mmc_set_driver_type(struct mmc_host *host, unsigned int drv_type)
 static void mmc_power_up(struct mmc_host *host)
 {
 	int bit;
+	int signal_voltage;
 
 	if (host->ios.power_mode == MMC_POWER_ON)
 		return;
@@ -1493,6 +1494,7 @@ static void mmc_power_up(struct mmc_host *host)
 	host->ios.timing = MMC_TIMING_LEGACY;
 	mmc_set_ios(host);
 
+	signal_voltage = host->ios.signal_voltage;
 	/* Set signal voltage to 3.3V */
 	__mmc_set_signal_voltage(host, MMC_SIGNAL_VOLTAGE_330);
 
@@ -1500,7 +1502,8 @@ static void mmc_power_up(struct mmc_host *host)
 	 * This delay should be sufficient to allow the power supply
 	 * to reach the minimum voltage.
 	 */
-	mmc_delay(10);
+	if (signal_voltage != host->ios.signal_voltage)
+		mmc_delay(10);
 
 	host->ios.clock = host->f_init;
 
@@ -1511,7 +1514,8 @@ static void mmc_power_up(struct mmc_host *host)
 	 * This delay must be at least 74 clock sizes, or 1 ms, or the
 	 * time required to reach a stable voltage.
 	 */
-	mmc_delay(10);
+	if (host->caps & MMC_CAP_POWER_OFF_CARD)
+		mmc_delay(10);
 
 	mmc_host_clk_release(host);
 }
