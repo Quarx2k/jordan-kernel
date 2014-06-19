@@ -1217,7 +1217,7 @@ static int atmxt_request_irq(struct atmxt_driver_data *dd)
 	}
 
 	err = request_threaded_irq(dd->client->irq, NULL, atmxt_isr,
-			IRQF_TRIGGER_FALLING | IRQF_ONESHOT, ATMXT_I2C_NAME, dd);
+			IRQF_TRIGGER_LOW | IRQF_ONESHOT, ATMXT_I2C_NAME, dd);
 	if (err < 0) {
 		printk(KERN_ERR "%s: IRQ request failed.\n", __func__);
 		goto atmxt_request_irq_fail;
