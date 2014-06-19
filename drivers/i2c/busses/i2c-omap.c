@@ -890,35 +890,12 @@ static int omap_i2c_transmit_data(struct omap_i2c_dev *dev, u8 num_bytes,
 }
 
 static irqreturn_t
-omap_i2c_isr(int irq, void *dev_id)
+omap_i2c_isr_handler(struct omap_i2c_dev *dev)
 {
-	struct omap_i2c_dev *dev = dev_id;
-	irqreturn_t ret = IRQ_HANDLED;
-	u16 mask;
-	u16 stat;
-
-	spin_lock(&dev->lock);
-	mask = omap_i2c_read_reg(dev, OMAP_I2C_IE_REG);
-	stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
-
-	if (stat & mask)
-		ret = IRQ_WAKE_THREAD;
-
-	spin_unlock(&dev->lock);
-
-	return ret;
-}
-
-static irqreturn_t
-omap_i2c_isr_thread(int this_irq, void *dev_id)
-{
-	struct omap_i2c_dev *dev = dev_id;
-	unsigned long flags;
 	u16 bits;
 	u16 stat;
 	int err = 0, count = 0;
 
-	spin_lock_irqsave(&dev->lock, flags);
 	do {
 		bits = omap_i2c_read_reg(dev, OMAP_I2C_IE_REG);
 		stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
@@ -1041,9 +1018,47 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
 	omap_i2c_complete_cmd(dev, err);
 
 out:
+	return IRQ_HANDLED;
+}
+
+#if (NR_CPUS != 1)
+static irqreturn_t
+omap_i2c_isr_thread(int this_irq, void *dev_id)
+{
+	struct omap_i2c_dev *dev = dev_id;
+	unsigned long flags;
+	irqreturn_t ret;
+
+	spin_lock_irqsave(&dev->lock, flags);
+	ret = omap_i2c_isr_handler(dev);
 	spin_unlock_irqrestore(&dev->lock, flags);
 
-	return IRQ_HANDLED;
+	return ret;
+}
+#endif
+
+static irqreturn_t
+omap_i2c_isr(int irq, void *dev_id)
+{
+	struct omap_i2c_dev *dev = dev_id;
+	irqreturn_t ret = IRQ_HANDLED;
+	u16 mask;
+	u16 stat;
+
+	spin_lock(&dev->lock);
+	mask = omap_i2c_read_reg(dev, OMAP_I2C_IE_REG);
+	stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
+
+	if (stat & mask)
+#if (NR_CPUS == 1)
+		ret = omap_i2c_isr_handler(dev);
+#else
+		ret = IRQ_WAKE_THREAD;
+#endif
+
+	spin_unlock(&dev->lock);
+
+	return ret;
 }
 
 static const struct i2c_algorithm omap_i2c_algo = {
@@ -1235,10 +1250,16 @@ omap_i2c_probe(struct platform_device *pdev)
 		r = devm_request_irq(&pdev->dev, dev->irq, omap_i2c_omap1_isr,
 				IRQF_NO_SUSPEND, pdev->name, dev);
 	else
+#if (NR_CPUS == 1)
+		r = devm_request_irq(&pdev->dev, dev->irq, omap_i2c_isr,
+				IRQF_NO_SUSPEND | IRQF_ONESHOT,
+				pdev->name, dev);
+#else
 		r = devm_request_threaded_irq(&pdev->dev, dev->irq,
 				omap_i2c_isr, omap_i2c_isr_thread,
 				IRQF_NO_SUSPEND | IRQF_ONESHOT,
 				pdev->name, dev);
+#endif
 
 	if (r) {
 		dev_err(dev->dev, "failure requesting irq %i\n", dev->irq);
