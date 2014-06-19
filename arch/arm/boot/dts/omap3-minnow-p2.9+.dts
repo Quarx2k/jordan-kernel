@@ -1,0 +1,43 @@
+/*
+ * Copyright (C) 2014 Motorola Mobility LLC
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+/dts-v1/;
+
+/include/ "omap3-minnow.dtsi"
+
+/ {
+	mmi,revision = "p2";
+	mmi,hwrev = <
+		0x09   /* Minnow P2-9 portable (Rev B) */
+	>;
+
+	regulators {
+		disp_bridge: gpio-regulator@86 {
+			regulator-boot-on;
+			compatible = "regulator-fixed";
+			regulator-min-microvolt = <1200000>;
+			regulator-max-microvolt = <1200000>;
+			regulator-name = "disp_bridge";
+			gpio = <&gpio3 22 0>; /* GPIO-86 */
+			enable-active-high;
+		};
+
+	};
+
+	Display@0 {
+		gpio_vio_en = <&gpio2 10 0>;    /* VDDIO gpio-42 */
+		gpio_mem_en = <&gpio3 23 0>;    /* MEM_EN gpio-87 */
+		bridge-supply = <&disp_bridge>;
+	};
+
+};
+
+&i2c2{
+	m4sensorhub@39 {
+		mot,fw-filename = "m4sensorhub-p2_5_minnow.bin";
+	};
+};

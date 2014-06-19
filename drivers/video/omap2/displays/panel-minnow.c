@@ -275,6 +275,7 @@ struct minnow_panel_data {
 	int reset_gpio[MINNOW_COMPONENT_MAX];
 	int ext_te_gpio;
 	int vio_en_gpio;
+	int mem_en_gpio;
 	struct minnow_panel_hw_reset hw_reset[MINNOW_COMPONENT_MAX];
 	struct regulator *regulators[MINNOW_COMPONENT_MAX];
 	struct clk *clk_in;
@@ -1543,8 +1544,17 @@ static int minnow_panel_set_regulators(struct minnow_panel_data *mpd,
 
 static void minnow_panel_enable_vio(struct minnow_panel_data *mpd, bool enable)
 {
-	if (gpio_is_valid(mpd->vio_en_gpio))
-		gpio_set_value(mpd->vio_en_gpio, enable ? 0 : 1);
+	if (enable) {
+		if (gpio_is_valid(mpd->vio_en_gpio))
+			gpio_set_value(mpd->vio_en_gpio, 0);
+		if (gpio_is_valid(mpd->mem_en_gpio))
+			gpio_set_value(mpd->mem_en_gpio, 1);
+	} else {
+		if (gpio_is_valid(mpd->mem_en_gpio))
+			gpio_set_value(mpd->mem_en_gpio, 0);
+		if (gpio_is_valid(mpd->vio_en_gpio))
+			gpio_set_value(mpd->vio_en_gpio, 1);
+	}
 }
 
 static int minnow_panel_enable_clkin(struct minnow_panel_data *mpd,
@@ -1645,6 +1655,8 @@ static int minnow_panel_dt_init(struct minnow_panel_data *mpd)
 	DTINFO("gpio_te = %d\n", mpd->ext_te_gpio);
 	mpd->vio_en_gpio = of_get_named_gpio(dt_node, "gpio_vio_en", 0);
 	DTINFO("gpio_vio_en = %d\n", mpd->vio_en_gpio);
+	mpd->mem_en_gpio = of_get_named_gpio(dt_node, "gpio_mem_en", 0);
+	DTINFO("gpio_mem_en = %d\n", mpd->mem_en_gpio);
 	clkin = (char *)of_get_property(dt_node, "clk_in", NULL);
 	if (clkin) {
 		mpd->clk_in = clk_get(NULL, clkin);
@@ -1811,6 +1823,20 @@ static int minnow_panel_probe(struct omap_dss_device *dssdev)
 		if (r) {
 			dev_err(&dssdev->dev,
 				"failed to request panel vio_en gpio\n");
+			return r;
+		}
+	}
+
+	if (gpio_is_valid(mpd->mem_en_gpio)) {
+		r = devm_gpio_request_one(&dssdev->dev, mpd->mem_en_gpio,
+					  mpd->skip_first_init
+					  ? GPIOF_OUT_INIT_HIGH
+					  : GPIOF_OUT_INIT_LOW,
+					  "minnow-panel mem_en");
+		if (r) {
+			dev_err(&dssdev->dev,
+				"failed to request panel mem_en gpio %d\n",
+				mpd->mem_en_gpio);
 			return r;
 		}
 	}
