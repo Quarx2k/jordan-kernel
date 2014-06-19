@@ -840,4 +840,5 @@ tps65912_0: tps65912 {
 &uart4 {
 	wakeup-capable;
 	autosuspend-delay = <50>; /* ms */
+	rx_trig = <32>;
 };
