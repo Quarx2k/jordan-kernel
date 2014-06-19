@@ -455,17 +455,18 @@ int pm_dbg_regs_dump_delta(int cur, int ref)
 			cur, ref);
 	while (pm_dbg_reg_modules[i].name[0] != 0) {
 		bool cm = pm_dbg_reg_modules[i].type == MOD_CM;
+		u32 base_addr = cm ?  OMAP3430_CM_BASE : OMAP3430_PRM_BASE;
 
 		for (j = pm_dbg_reg_modules[i].low;
 		     j <= pm_dbg_reg_modules[i].high; j += 4) {
-			uint32_t addr = (u32)(OMAP3430_CM_BASE +
-					pm_dbg_reg_modules[i].offset);
+			u32 addr = (u32)(base_addr + pm_dbg_reg_modules[i].offset);
+
 			val_cur = *(ptr_cur++);
 			val_ref = *(ptr_ref++);
 			if (val_cur != val_ref) {
 				pr_debug("MOD: %s_%-4s %s(%08x) "
 					"%02x => 0x%08lx 0x%08lx\n",
-					cm ? "CM_" : "PRM_",
+					cm ? "CM" : "PRM",
 					pm_dbg_reg_modules[i].name,
 					cm ? " " : "",
 					addr, j, val_cur, val_ref);
