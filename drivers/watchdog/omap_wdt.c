@@ -251,8 +251,8 @@ static void autopet_init(struct watchdog_device *wdog)
 }
 #else
 static inline void autopet_init(struct watchdog_device *wdog) {}
-static inline void autopet_stop(struct omap_wdt_dev *wdev) {}
-static inline void autopet_start(struct omap_wdt_dev *wdev) {}
+static inline void autopet_stop(struct watchdog_device *wdog) {}
+static inline void autopet_start(struct watchdog_device *wdog) {}
 #endif
 
 static int omap_wdt_probe(struct platform_device *pdev)
