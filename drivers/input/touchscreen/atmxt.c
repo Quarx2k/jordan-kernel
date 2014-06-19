@@ -97,7 +97,13 @@ static int atmxt_save_data8(struct atmxt_driver_data *dd,
 		uint8_t *entry, uint8_t *reg);
 static int atmxt_save_data9(struct atmxt_driver_data *dd,
 		uint8_t *entry, uint8_t *reg);
+static int atmxt_save_data40(struct atmxt_driver_data *dd,
+		uint8_t *entry, uint8_t *reg);
+static int atmxt_save_data42(struct atmxt_driver_data *dd,
+		uint8_t *entry, uint8_t *reg);
 static int atmxt_save_data46(struct atmxt_driver_data *dd,
+		uint8_t *entry, uint8_t *reg);
+static int atmxt_save_data62(struct atmxt_driver_data *dd,
 		uint8_t *entry, uint8_t *reg);
 static void atmxt_compute_checksum(struct atmxt_driver_data *dd);
 static void atmxt_compute_partial_checksum(uint8_t *byte1, uint8_t *byte2,
@@ -2097,7 +2103,10 @@ static int atmxt_save_internal_data(struct atmxt_driver_data *dd)
 	bool chk_7 = false;
 	bool chk_8 = false;
 	bool chk_9 = false;
+	bool chk_40 = false;
+	bool chk_42 = false;
 	bool chk_46 = false;
+	bool chk_62 = false;
 
 	for (i = 0; i < dd->info_blk->size; i += 6) {
 		switch (dd->info_blk->data[i+0]) {
@@ -2143,9 +2152,33 @@ static int atmxt_save_internal_data(struct atmxt_driver_data *dd)
 			usr_start_seen = true;
 			break;
 
+		case 40:
+			chk_40 = true;
+			err = atmxt_save_data40(dd, &(dd->info_blk->data[i+0]),
+				&(dd->nvm->data[nvm_iter]));
+			if (err < 0)
+				goto atmxt_save_internal_data_fail;
+			break;
+
+		case 42:
+			chk_42 = true;
+			err = atmxt_save_data42(dd, &(dd->info_blk->data[i+0]),
+				&(dd->nvm->data[nvm_iter]));
+			if (err < 0)
+				goto atmxt_save_internal_data_fail;
+			break;
+
 		case 46:
 			chk_46 = true;
 			err = atmxt_save_data46(dd, &(dd->info_blk->data[i+0]),
+				&(dd->nvm->data[nvm_iter]));
+			if (err < 0)
+				goto atmxt_save_internal_data_fail;
+			break;
+
+		case 62:
+			chk_62 = true;
+			err = atmxt_save_data62(dd, &(dd->info_blk->data[i+0]),
 				&(dd->nvm->data[nvm_iter]));
 			if (err < 0)
 				goto atmxt_save_internal_data_fail;
@@ -2186,8 +2219,23 @@ static int atmxt_save_internal_data(struct atmxt_driver_data *dd)
 		err = -ENODATA;
 	}
 
+	if (!chk_40) {
+		pr_err("%s: Object 40 is missing.\n", __func__);
+		err = -ENODATA;
+	}
+
+	if (!chk_42) {
+		pr_err("%s: Object 42 is missing.\n", __func__);
+		err = -ENODATA;
+	}
+
 	if (!chk_46) {
 		pr_err("%s: Object 46 is missing.\n", __func__);
+		err = -ENODATA;
+	}
+
+	if (!chk_62) {
+		pr_err("%s: Object 62 is missing.\n", __func__);
 		err = -ENODATA;
 	}
 
@@ -2318,7 +2366,59 @@ static int atmxt_save_data9(struct atmxt_driver_data *dd,
 			dd->data->res[1] = true;
 	}
 
+	dd->addr->ors[0] = entry[1] + 1;
+	dd->addr->ors[1] = entry[2];
+	if (dd->addr->ors[0] < entry[1]) /* Check for 16-bit addr overflow */
+		dd->addr->ors[1]++;
+
+	dd->data->ors[0] = reg[1];
+	dd->data->ors[1] = reg[2];
+	dd->data->ors[2] = reg[3];
+	dd->data->ors[3] = reg[4];
+
 atmxt_save_data9_fail:
+	return err;
+}
+
+static int atmxt_save_data40(struct atmxt_driver_data *dd,
+		uint8_t *entry, uint8_t *reg)
+{
+	int err = 0;
+
+	if (entry[3] < 1) {
+		pr_err("%s: Grip suppression object is too small.\n",
+		       __func__);
+		err = -ENODATA;
+		goto atmxt_save_data40_fail;
+	}
+
+	dd->addr->gse[0] = entry[1];
+	dd->addr->gse[1] = entry[2];
+
+	dd->data->gse = reg[0];
+
+atmxt_save_data40_fail:
+	return err;
+}
+
+static int atmxt_save_data42(struct atmxt_driver_data *dd,
+		uint8_t *entry, uint8_t *reg)
+{
+	int err = 0;
+
+	if (entry[3] < 1) {
+		pr_err("%s: Touch suppression object is too small.\n",
+		       __func__);
+		err = -ENODATA;
+		goto atmxt_save_data42_fail;
+	}
+
+	dd->addr->tse[0] = entry[1];
+	dd->addr->tse[1] = entry[2];
+
+	dd->data->tse = reg[0];
+
+atmxt_save_data42_fail:
 	return err;
 }
 
@@ -2328,7 +2428,7 @@ static int atmxt_save_data46(struct atmxt_driver_data *dd,
 	int err = 0;
 
 	if (entry[3] < 3) {
-		pr_err("%s: Power object is too small.\n", __func__);
+		pr_err("%s: CTE object is too small.\n", __func__);
 		err = -ENODATA;
 		goto atmxt_save_data46_fail;
 	}
@@ -2342,6 +2442,28 @@ static int atmxt_save_data46(struct atmxt_driver_data *dd,
 	dd->data->adx[1] = reg[3];
 
 atmxt_save_data46_fail:
+	return err;
+}
+
+static int atmxt_save_data62(struct atmxt_driver_data *dd,
+		uint8_t *entry, uint8_t *reg)
+{
+	int err = 0;
+
+	if (entry[3] < 25) {
+		pr_err("%s: Noise object is too small.\n", __func__);
+		err = -ENODATA;
+		goto atmxt_save_data62_fail;
+	}
+
+	dd->addr->mxd[0] = entry[1] + 24;
+	dd->addr->mxd[1] = entry[2];
+	if (dd->addr->mxd[0] < entry[1]) /* Check for 16-bit addr overflow */
+		dd->addr->mxd[1]++;
+
+	dd->data->mxd = reg[24];
+
+atmxt_save_data62_fail:
 	return err;
 }
 
@@ -3370,8 +3492,12 @@ static ssize_t atmxt_drv_interactivemode_store(struct device *dev,
 	unsigned long value = 0;
 	struct atmxt_driver_data *dd = dev_get_drvdata(dev);
 	int err;
-	uint8_t sleep_cmd[4] =  {0xFE, 0xFE, 0x19, 0x00};
-	uint8_t adx_cmd[2] =  {0x08, 0x08};
+	uint8_t sleep_cmd[4] = {0x32, 0x32, 0x19, 0x00};
+	uint8_t adx_cmd[2] = {0x08, 0x08};
+	uint8_t ors_cmd[4] = {0x03, 0x00, 0x03, 0x08};
+	uint8_t gse_cmd = 0x00;
+	uint8_t tse_cmd = 0x00;
+	uint8_t mxd_cmd = 0x08;
 
 	err = kstrtoul(buf, 10, &value);
 	if (err < 0) {
@@ -3403,6 +3529,34 @@ static ssize_t atmxt_drv_interactivemode_store(struct device *dev,
 			pr_err("%s: Failed to restore adx.\n", __func__);
 			goto atmxt_drv_interactivemode_store_fail;
 		}
+		err = atmxt_i2c_write(dd,
+			dd->addr->ors[0], dd->addr->ors[1],
+			&(dd->data->ors[0]), 4);
+		if (err < 0) {
+			pr_err("%s: Failed to restore screen.\n", __func__);
+			goto atmxt_drv_interactivemode_store_fail;
+		}
+		err = atmxt_i2c_write(dd,
+			dd->addr->gse[0], dd->addr->gse[1],
+			&(dd->data->gse), 1);
+		if (err < 0) {
+			pr_err("%s: Failed to restore gse.\n", __func__);
+			goto atmxt_drv_interactivemode_store_fail;
+		}
+		err = atmxt_i2c_write(dd,
+			dd->addr->tse[0], dd->addr->tse[1],
+			&(dd->data->tse), 1);
+		if (err < 0) {
+			pr_err("%s: Failed to restore tse.\n", __func__);
+			goto atmxt_drv_interactivemode_store_fail;
+		}
+		err = atmxt_i2c_write(dd,
+			dd->addr->mxd[0], dd->addr->mxd[1],
+			&(dd->data->mxd), 1);
+		if (err < 0) {
+			pr_err("%s: Failed to restore mxd.\n", __func__);
+			goto atmxt_drv_interactivemode_store_fail;
+		}
 		atmxt_set_ic_state(dd, ATMXT_IC_ACTIVE);
 		err = size;
 	} else if (value == 0) {
@@ -3419,6 +3573,34 @@ static ssize_t atmxt_drv_interactivemode_store(struct device *dev,
 			&(adx_cmd[0]), 2);
 		if (err < 0) {
 			pr_err("%s: Failed to reduce adx.\n", __func__);
+			goto atmxt_drv_interactivemode_store_fail;
+		}
+		err = atmxt_i2c_write(dd,
+			dd->addr->ors[0], dd->addr->ors[1],
+			&(ors_cmd[0]), 4);
+		if (err < 0) {
+			pr_err("%s: Failed to reduce screen.\n", __func__);
+			goto atmxt_drv_interactivemode_store_fail;
+		}
+		err = atmxt_i2c_write(dd,
+			dd->addr->gse[0], dd->addr->gse[1],
+			&gse_cmd, 1);
+		if (err < 0) {
+			pr_err("%s: Failed to disable gse.\n", __func__);
+			goto atmxt_drv_interactivemode_store_fail;
+		}
+		err = atmxt_i2c_write(dd,
+			dd->addr->tse[0], dd->addr->tse[1],
+			&tse_cmd, 1);
+		if (err < 0) {
+			pr_err("%s: Failed to disable tse.\n", __func__);
+			goto atmxt_drv_interactivemode_store_fail;
+		}
+		err = atmxt_i2c_write(dd,
+			dd->addr->mxd[0], dd->addr->mxd[1],
+			&mxd_cmd, 1);
+		if (err < 0) {
+			pr_err("%s: Failed to reduce mxd.\n", __func__);
 			goto atmxt_drv_interactivemode_store_fail;
 		}
 		atmxt_set_ic_state(dd, ATMXT_IC_SLEEP);

@@ -131,6 +131,10 @@ struct atmxt_addr {
 	uint8_t         cal[2];
 	uint8_t         acq[2];
 	uint8_t         adx[2];
+	uint8_t         ors[2];
+	uint8_t         gse[2];
+	uint8_t         tse[2];
+	uint8_t         mxd[2];
 } __packed;
 
 struct atmxt_data {
@@ -140,6 +144,10 @@ struct atmxt_data {
 	bool            res[2];
 	uint8_t         acq[6];
 	uint8_t         adx[2];
+	uint8_t         ors[4];
+	uint8_t         gse;
+	uint8_t         tse;
+	uint8_t         mxd;
 	unsigned long   timer;
 	uint8_t         last_stat;
 } __packed;
