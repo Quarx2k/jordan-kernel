@@ -36,6 +36,7 @@
 #include <linux/stat.h>
 #include <linux/string.h>
 #include <linux/firmware.h>
+#include <linux/input/mt.h>
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
 #endif
@@ -1156,6 +1157,8 @@ static int atmxt_register_inputs(struct atmxt_driver_data *dd,
 	dd->in_dev->name = ATMXT_I2C_NAME;
 	input_set_drvdata(dd->in_dev, dd);
 	set_bit(INPUT_PROP_DIRECT, dd->in_dev->propbit);
+
+	input_mt_init_slots(dd->in_dev, ATMXT_MAX_TOUCHES, 0);
 
 	/* Need for palm detection */
 	set_bit(KEY_SLEEP, dd->in_dev->keybit);
@@ -2705,10 +2708,14 @@ static void atmxt_report_touches(struct atmxt_driver_data *dd)
 	dd->rdat->active_touches = 0;
 
 	for (i = 0; i < ATMXT_MAX_TOUCHES; i++) {
+		input_mt_slot(dd->in_dev, i);
+		input_mt_report_slot_state(dd->in_dev, MT_TOOL_FINGER,
+			dd->rdat->tchdat[i].active);
+
 		if (!(dd->rdat->tchdat[i].active))
 			continue;
 
-		id =  dd->rdat->tchdat[i].id;
+		id = dd->rdat->tchdat[i].id;
 		x = dd->rdat->tchdat[i].x;
 		y = dd->rdat->tchdat[i].y;
 		p = dd->rdat->tchdat[i].p;
@@ -2742,11 +2749,7 @@ static void atmxt_report_touches(struct atmxt_driver_data *dd)
 					dd->rdat->axis[j], rval);
 			}
 		}
-		input_mt_sync(dd->in_dev);
 	}
-
-	if (dd->rdat->active_touches == 0)
-		input_mt_sync(dd->in_dev);
 
 	input_sync(dd->in_dev);
 
