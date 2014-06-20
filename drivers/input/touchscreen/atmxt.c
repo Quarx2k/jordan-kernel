@@ -1217,7 +1217,8 @@ static int atmxt_request_irq(struct atmxt_driver_data *dd)
 	}
 
 	err = request_threaded_irq(dd->client->irq, NULL, atmxt_isr,
-			IRQF_TRIGGER_LOW | IRQF_ONESHOT, ATMXT_I2C_NAME, dd);
+			IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+			ATMXT_I2C_NAME, dd);
 	if (err < 0) {
 		printk(KERN_ERR "%s: IRQ request failed.\n", __func__);
 		goto atmxt_request_irq_fail;
@@ -2366,16 +2367,6 @@ static int atmxt_save_data9(struct atmxt_driver_data *dd,
 			dd->data->res[1] = true;
 	}
 
-	dd->addr->ors[0] = entry[1] + 1;
-	dd->addr->ors[1] = entry[2];
-	if (dd->addr->ors[0] < entry[1]) /* Check for 16-bit addr overflow */
-		dd->addr->ors[1]++;
-
-	dd->data->ors[0] = reg[1];
-	dd->data->ors[1] = reg[2];
-	dd->data->ors[2] = reg[3];
-	dd->data->ors[3] = reg[4];
-
 atmxt_save_data9_fail:
 	return err;
 }
@@ -3494,7 +3485,6 @@ static ssize_t atmxt_drv_interactivemode_store(struct device *dev,
 	int err;
 	uint8_t sleep_cmd[4] = {0x32, 0x32, 0x19, 0x00};
 	uint8_t adx_cmd[2] = {0x08, 0x08};
-	uint8_t ors_cmd[4] = {0x03, 0x00, 0x03, 0x08};
 	uint8_t gse_cmd = 0x00;
 	uint8_t tse_cmd = 0x00;
 	uint8_t mxd_cmd = 0x08;
@@ -3527,13 +3517,6 @@ static ssize_t atmxt_drv_interactivemode_store(struct device *dev,
 			&(dd->data->adx[0]), 2);
 		if (err < 0) {
 			pr_err("%s: Failed to restore adx.\n", __func__);
-			goto atmxt_drv_interactivemode_store_fail;
-		}
-		err = atmxt_i2c_write(dd,
-			dd->addr->ors[0], dd->addr->ors[1],
-			&(dd->data->ors[0]), 4);
-		if (err < 0) {
-			pr_err("%s: Failed to restore screen.\n", __func__);
 			goto atmxt_drv_interactivemode_store_fail;
 		}
 		err = atmxt_i2c_write(dd,
@@ -3573,13 +3556,6 @@ static ssize_t atmxt_drv_interactivemode_store(struct device *dev,
 			&(adx_cmd[0]), 2);
 		if (err < 0) {
 			pr_err("%s: Failed to reduce adx.\n", __func__);
-			goto atmxt_drv_interactivemode_store_fail;
-		}
-		err = atmxt_i2c_write(dd,
-			dd->addr->ors[0], dd->addr->ors[1],
-			&(ors_cmd[0]), 4);
-		if (err < 0) {
-			pr_err("%s: Failed to reduce screen.\n", __func__);
 			goto atmxt_drv_interactivemode_store_fail;
 		}
 		err = atmxt_i2c_write(dd,
