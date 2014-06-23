@@ -309,6 +309,7 @@ static int omap_wdt_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, omap_wdt);
 
 	pm_runtime_enable(wdev->dev);
+	pm_runtime_irq_safe(wdev->dev);
 	pm_runtime_get_sync(wdev->dev);
 
 	if (pdata && pdata->read_reset_sources)
