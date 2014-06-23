@@ -425,6 +425,35 @@ static irqreturn_t omap_hwmod_mux_handle_irq(int irq, void *unused)
 	return IRQ_HANDLED;
 }
 
+/**
+ * _omap_hwmod_mux_count
+ *
+ * Increment data if given hwmod has a mux configured
+ */
+static int _omap_hwmod_mux_count(struct omap_hwmod *oh, void *data)
+{
+	int *count = (int *)data;
+
+	if (oh->mux)
+		(*count)++;
+
+	return 0;
+}
+
+/**
+ * omap_hwmod_mux_count
+ *
+ * Count the total number of muxes configured.
+ */
+static int omap_hwmod_mux_count(void)
+{
+	int count = 0;
+
+	omap_hwmod_for_each(_omap_hwmod_mux_count, &count);
+
+	return count;
+}
+
 /* Assumes the calling function takes care of locking */
 void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state)
 {
@@ -811,12 +840,17 @@ int __init omap_mux_late_init(void)
 		}
 	}
 
-	ret = request_irq(omap_prcm_event_to_irq("io"),
-		omap_hwmod_mux_handle_irq, IRQF_SHARED | IRQF_NO_SUSPEND,
-			"hwmod_io", omap_mux_late_init);
+	/* setup io interrupt handler if we have any configured mux'es */
+	if (omap_hwmod_mux_count()) {
+		ret = request_irq(omap_prcm_event_to_irq("io"),
+				omap_hwmod_mux_handle_irq,
+				IRQF_SHARED | IRQF_NO_SUSPEND,
+				"hwmod_io", omap_mux_late_init);
 
-	if (ret)
-		pr_warning("mux: Failed to setup hwmod io irq %d\n", ret);
+		if (ret)
+			pr_warning("mux: Failed to setup hwmod io irq %d\n",
+					ret);
+	}
 
 	omap_mux_dbg_init();
 
