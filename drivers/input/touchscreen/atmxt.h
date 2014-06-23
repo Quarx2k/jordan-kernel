@@ -62,6 +62,7 @@
 
 #define ATMXT_I2C_ATTEMPTS          10
 #define ATMXT_I2C_WAIT_TIME         50
+#define ATMXT_I2C_WAIT_TIME_MAX     75
 #define ATMXT_MAX_TOUCHES           10
 #define ATMXT_ABS_RESERVED          0xFFFF
 #define ATMXT_IC_RESET_HOLD_TIME    1000

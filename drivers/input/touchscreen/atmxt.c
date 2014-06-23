@@ -2040,7 +2040,7 @@ static int atmxt_i2c_write(struct atmxt_driver_data *dd,
 			break;
 		}
 
-		udelay(ATMXT_I2C_WAIT_TIME);
+		usleep_range(ATMXT_I2C_WAIT_TIME, ATMXT_I2C_WAIT_TIME_MAX);
 	}
 
 	if (err < 0)
@@ -2080,7 +2080,7 @@ static int atmxt_i2c_read(struct atmxt_driver_data *dd, uint8_t *buf, int size)
 			break;
 		}
 
-		udelay(ATMXT_I2C_WAIT_TIME);
+		usleep_range(ATMXT_I2C_WAIT_TIME, ATMXT_I2C_WAIT_TIME_MAX);
 	}
 
 	if (err < 0)
