@@ -327,7 +327,8 @@ static int c55_ctrl_probe(struct platform_device *pdev)
 	else if (regulator_enable(cdata->reg_vddldo))
 		dev_err(&pdev->dev, "regulator_enable failed for vddldo\n");
 
-	cdata->c55_mode = C55_OFF;
+	/* M4 by default has C55 ON at power up */
+	cdata->c55_mode = C55_ON;
 
 	ret = device_create_file(&pdev->dev, &dev_attr_enable);
 	if (ret) {
