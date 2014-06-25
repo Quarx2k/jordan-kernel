@@ -25,7 +25,7 @@
 
 static struct wl12xx_platform_data *platform_data;
 
-int __init wl12xx_set_platform_data(const struct wl12xx_platform_data *data)
+int wl12xx_set_platform_data(const struct wl12xx_platform_data *data)
 {
 	if (platform_data)
 		return -EBUSY;
