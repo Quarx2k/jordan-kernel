@@ -82,7 +82,7 @@ static struct regmap_config regmap_cfg = {
 };
 static struct omap_prm_voltsetup_data *prm_voltsetup_data;
 
-static const struct of_device_id omap3_prm_voltsetup_match_tbl[] __initdata = {
+static const struct of_device_id omap3_prm_voltsetup_match_tbl[] = {
 	{.compatible = "ti,omap3-glbl-prm"},
 	{},
 };
