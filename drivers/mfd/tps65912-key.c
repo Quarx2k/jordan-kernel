@@ -29,7 +29,7 @@ struct tps65912_key_data {
 	struct tps65912 *tps65912;
 };
 
-static int __init tps65912_key_probe(struct platform_device *pdev)
+static int tps65912_key_probe(struct platform_device *pdev)
 {
 	int err;
 	struct tps65912_key_data *key;
