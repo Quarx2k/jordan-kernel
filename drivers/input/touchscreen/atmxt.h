@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2012 Motorola Mobility, Inc.
+ * Copyright (C) 2010-2014 Motorola Mobility, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -27,9 +27,6 @@
 #include <linux/mutex.h>
 #include <linux/workqueue.h>
 #include <linux/wakelock.h>
-#ifdef CONFIG_HAS_EARLYSUSPEND
-#include <linux/earlysuspend.h>
-#endif
 
 #define ATMXT_DRIVER_VERSION        "YN-04-01"
 #define ATMXT_DRIVER_DATE           "2012-06-28"
@@ -89,6 +86,7 @@ enum atmxt_ic_state {
 	ATMXT_IC_UNKNOWN,
 	ATMXT_IC_BOOTLOADER,
 	ATMXT_IC_PRESENT,
+	ATMXT_IC_AOT,
 };
 static const char * const atmxt_ic_state_string[] = {
 	"ACTIVE",
@@ -96,6 +94,7 @@ static const char * const atmxt_ic_state_string[] = {
 	"UNKNOWN",
 	"BOOTLOADER",
 	"PRESENT",
+	"AOT",
 };
 
 
@@ -144,8 +143,6 @@ struct atmxt_data {
 	bool            res[2];
 	uint8_t         acq[6];
 	uint8_t         adx[2];
-	uint8_t         gse;
-	uint8_t         tse;
 	uint8_t         mxd;
 	unsigned long   timer;
 	uint8_t         last_stat;
@@ -179,9 +176,7 @@ struct atmxt_driver_data {
 	struct i2c_client           *client;
 	struct mutex                *mutex;
 	struct input_dev            *in_dev;
-#ifdef CONFIG_HAS_EARLYSUSPEND
-	struct early_suspend        es;
-#endif
+	struct wake_lock            timed_lock;
 
 	enum atmxt_driver_state     drv_stat;
 	enum atmxt_ic_state         ic_stat;
@@ -195,9 +190,6 @@ struct atmxt_driver_data {
 
 	uint16_t        status;
 	uint16_t        settings;
-	struct workqueue_struct *workqueue;
-	struct work_struct work;
-	struct wake_lock wake_lock;
 } __packed;
 
 #endif /* _LINUX_ATMXT_H */

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2012 Motorola Mobility, Inc.
+ * Copyright (C) 2010-2014 Motorola Mobility, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -37,21 +37,14 @@
 #include <linux/string.h>
 #include <linux/firmware.h>
 #include <linux/input/mt.h>
-#ifdef CONFIG_HAS_EARLYSUSPEND
-#include <linux/earlysuspend.h>
-#endif
-
-#define FAMILY_ID 0x82
 
 static int atmxt_probe(struct i2c_client *client,
 		const struct i2c_device_id *id);
 static int atmxt_remove(struct i2c_client *client);
 static int atmxt_suspend(struct i2c_client *client, pm_message_t message);
 static int atmxt_resume(struct i2c_client *client);
-#ifdef CONFIG_HAS_EARLYSUSPEND
-static void atmxt_early_suspend(struct early_suspend *handler);
-static void atmxt_late_resume(struct early_suspend *handler);
-#endif
+static int atmxt_enter_aot(struct atmxt_driver_data *dd);
+static int atmxt_exit_aot(struct atmxt_driver_data *dd);
 static int atmxt_init(void);
 static void atmxt_exit(void);
 static void atmxt_free(struct atmxt_driver_data *dd);
@@ -82,7 +75,6 @@ static int atmxt_copy_platform_data(uint8_t *reg, uint8_t *entry,
 		uint8_t *tsett);
 static int atmxt_check_settings(struct atmxt_driver_data *dd, bool *reset);
 static int atmxt_send_settings(struct atmxt_driver_data *dd, bool save_nvm);
-static int atmxt_recalibrate_ic(struct atmxt_driver_data *dd);
 static int atmxt_start_ic_calibration_fix(struct atmxt_driver_data *dd);
 static int atmxt_verify_ic_calibration_fix(struct atmxt_driver_data *dd);
 static int atmxt_stop_ic_calibration_fix(struct atmxt_driver_data *dd);
@@ -97,10 +89,6 @@ static int atmxt_save_data7(struct atmxt_driver_data *dd,
 static int atmxt_save_data8(struct atmxt_driver_data *dd,
 		uint8_t *entry, uint8_t *reg);
 static int atmxt_save_data9(struct atmxt_driver_data *dd,
-		uint8_t *entry, uint8_t *reg);
-static int atmxt_save_data40(struct atmxt_driver_data *dd,
-		uint8_t *entry, uint8_t *reg);
-static int atmxt_save_data42(struct atmxt_driver_data *dd,
 		uint8_t *entry, uint8_t *reg);
 static int atmxt_save_data46(struct atmxt_driver_data *dd,
 		uint8_t *entry, uint8_t *reg);
@@ -156,10 +144,8 @@ static struct i2c_driver atmxt_driver = {
 	.probe = atmxt_probe,
 	.remove = atmxt_remove,
 	.id_table = atmxt_id,
-#ifndef CONFIG_HAS_EARLYSUSPEND
 	.suspend = atmxt_suspend,
 	.resume = atmxt_resume,
-#endif
 };
 
 #ifdef CONFIG_OF
@@ -262,23 +248,6 @@ inline int atmxt_tdat_detect_snowflake(struct i2c_client *client,
 }
 #endif
 
-static void atmxt_irq_work_func(struct work_struct *work)
-{
-	struct atmxt_driver_data *dd = NULL;
-
-	dd = container_of(work, struct atmxt_driver_data, work);
-	if (dd == NULL) {
-		pr_err("%s: dd NULL, can't execute work\n", __func__);
-		goto err;
-	}
-	/* handle the interrupt, release wakelock*/
-	pr_info("executing touch related pending work\n");
-	atmxt_isr(1, dd);
-err:
-	dd->status = dd->status & ~(1 << ATMXT_RESUME_HANDLE_ISR);
-	wake_unlock(&dd->wake_lock);
-}
-
 static int atmxt_probe(struct i2c_client *client,
 		const struct i2c_device_id *id)
 {
@@ -363,13 +332,6 @@ static int atmxt_probe(struct i2c_client *client,
 	if (err < 0)
 		goto atmxt_probe_fail;
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
-	dd->es.level = EARLY_SUSPEND_LEVEL_DISABLE_FB;
-	dd->es.suspend = atmxt_early_suspend;
-	dd->es.resume = atmxt_late_resume;
-	register_early_suspend(&dd->es);
-#endif
-
 	err = atmxt_request_irq(dd);
 	if (err < 0)
 		goto atmxt_unreg_suspend;
@@ -377,6 +339,8 @@ static int atmxt_probe(struct i2c_client *client,
 	err = atmxt_request_tdat(dd);
 	if (err < 0)
 		goto atmxt_free_irq;
+
+	wake_lock_init(&dd->timed_lock, WAKE_LOCK_SUSPEND, "atmxt-timed-lock");
 
 	err = atmxt_create_sysfs_files(dd);
 	if (err < 0) {
@@ -386,20 +350,8 @@ static int atmxt_probe(struct i2c_client *client,
 		debugfail = true;
 	}
 
-	dd->workqueue = create_workqueue("atmxt-irq");
-	if (dd->workqueue == NULL) {
-		err = -ENOMEM;
-		dev_err(&client->dev, "failed creating workqueue\n");
-		goto atmxt_workqueue_fail;
-	}
-
-	INIT_WORK(&dd->work, atmxt_irq_work_func);
-	wake_lock_init(&dd->wake_lock, WAKE_LOCK_SUSPEND, "atmxt-irq");
-
 	goto atmxt_probe_pass;
 
-atmxt_workqueue_fail:
-	atmxt_remove_sysfs_files(dd);
 atmxt_free_irq:
 	free_irq(dd->client->irq, dd);
 atmxt_unreg_suspend:
@@ -427,12 +379,10 @@ static int atmxt_remove(struct i2c_client *client)
 
 	dd = i2c_get_clientdata(client);
 	if (dd != NULL) {
-		if (wake_lock_active(&dd->wake_lock))
-			wake_unlock(&dd->wake_lock);
+		if (wake_lock_active(&dd->timed_lock))
+			wake_unlock(&dd->timed_lock);
 
-		wake_lock_destroy(&dd->wake_lock);
-		cancel_work_sync(&dd->work);
-		destroy_workqueue(dd->workqueue);
+		wake_lock_destroy(&dd->timed_lock);
 		free_irq(dd->client->irq, dd);
 		atmxt_remove_sysfs_files(dd);
 		gpio_free(dd->pdata->gpio_reset);
@@ -450,8 +400,6 @@ static int atmxt_suspend(struct i2c_client *client, pm_message_t message)
 	int err = 0;
 	struct atmxt_driver_data *dd;
 	int drv_state;
-	int ic_state;
-	uint8_t sleep_cmd[2] = {0x00, 0x00};
 
 	dd = i2c_get_clientdata(client);
 	if (dd == NULL) {
@@ -465,51 +413,25 @@ static int atmxt_suspend(struct i2c_client *client, pm_message_t message)
 	atmxt_dbg(dd, ATMXT_DBG3, "%s: Suspending...\n", __func__);
 
 	drv_state = atmxt_get_drv_state(dd);
-	ic_state = atmxt_get_ic_state(dd);
-
 	switch (drv_state) {
 	case ATMXT_DRV_ACTIVE:
 	case ATMXT_DRV_IDLE:
-		switch (ic_state) {
-		case ATMXT_IC_ACTIVE:
-			atmxt_dbg(dd, ATMXT_DBG3,
-				"%s: Putting touch IC to sleep...\n", __func__);
-			dd->status = dd->status &
-				~(1 << ATMXT_FIXING_CALIBRATION);
-			err = atmxt_i2c_write(dd,
-				dd->addr->pwr[0], dd->addr->pwr[1],
-				&(sleep_cmd[0]), 2);
-			if (err < 0) {
-				printk(KERN_ERR
-					"%s: %s %s %d.\n", __func__,
-					"Failed to put touch IC to sleep",
-					"with error code", err);
-				goto atmxt_suspend_fail;
-			} else {
-				atmxt_set_ic_state(dd, ATMXT_IC_SLEEP);
-			}
-			break;
-		case ATMXT_IC_SLEEP:
-			pr_info("%s: current IC state is %s already", __func__,
-				atmxt_ic_state_string[ic_state]);
-			break;
-		default:
-			printk(KERN_ERR "%s: Driver %s, IC %s suspend.\n",
-				__func__, atmxt_driver_state_string[drv_state],
-				atmxt_ic_state_string[ic_state]);
-		}
+		atmxt_set_drv_state(dd, ATMXT_DRV_SUSPENDED);
+		break;
+
+	case ATMXT_DRV_SUSPENDED:
+		pr_err("%s: Driver has already suspended.\n", __func__);
 		break;
 
 	default:
-		printk(KERN_ERR "%s: Driver state \"%s\" suspend.\n",
+		pr_err("%s: Cannot suspend in driver state %s.\n",
 			__func__, atmxt_driver_state_string[drv_state]);
+		err = -EPERM;
+		break;
 	}
-
-	atmxt_set_drv_state(dd, ATMXT_DRV_SUSPENDED);
 
 	atmxt_dbg(dd, ATMXT_DBG3, "%s: Suspend complete.\n", __func__);
 
-atmxt_suspend_fail:
 	mutex_unlock(dd->mutex);
 
 atmxt_suspend_no_dd_fail:
@@ -521,7 +443,6 @@ static int atmxt_resume(struct i2c_client *client)
 	int err = 0;
 	struct atmxt_driver_data *dd;
 	int drv_state;
-	int ic_state;
 
 	dd = i2c_get_clientdata(client);
 	if (dd == NULL) {
@@ -535,6 +456,51 @@ static int atmxt_resume(struct i2c_client *client)
 	atmxt_dbg(dd, ATMXT_DBG3, "%s: Resuming...\n", __func__);
 
 	drv_state = atmxt_get_drv_state(dd);
+	switch (drv_state) {
+	case ATMXT_DRV_SUSPENDED:
+		if (dd->status & (1 << ATMXT_RESUME_HANDLE_ISR)) {
+			pr_info("%s: Enabling pending ISR...\n", __func__);
+			if (!(dd->status & (1 << ATMXT_IRQ_ENABLED_FLAG))) {
+				dd->status = dd->status |
+					(1 << ATMXT_IRQ_ENABLED_FLAG);
+				enable_irq(dd->client->irq);
+			}
+			dd->status = dd->status &
+				~(1 << ATMXT_RESUME_HANDLE_ISR);
+			atmxt_set_drv_state(dd, ATMXT_DRV_ACTIVE);
+		} else if (!(dd->status & (1 << ATMXT_IRQ_ENABLED_FLAG))) {
+			atmxt_set_drv_state(dd, ATMXT_DRV_IDLE);
+		} else {
+			atmxt_set_drv_state(dd, ATMXT_DRV_ACTIVE);
+		}
+		break;
+
+	default:
+		pr_err("%s: Resuming in driver state %s.\n", __func__,
+			atmxt_ic_state_string[drv_state]);
+		break;
+	}
+
+	atmxt_dbg(dd, ATMXT_DBG3, "%s: Resume complete.\n", __func__);
+
+	mutex_unlock(dd->mutex);
+
+atmxt_resume_no_dd_fail:
+	return (err < 0) ? err : 0;
+}
+
+static int atmxt_enter_aot(struct atmxt_driver_data *dd)
+{
+	int err = 0;
+	int drv_state = 0;
+	int ic_state = 0;
+	uint8_t sleep_cmd[4] = {0x32, 0x32, 0x19, 0x00};
+	uint8_t adx_cmd[2] = {0x08, 0x08};
+	uint8_t mxd_cmd = 0x08;
+
+	atmxt_dbg(dd, ATMXT_DBG3, "%s: Entering AOT...\n", __func__);
+
+	drv_state = atmxt_get_drv_state(dd);
 	ic_state = atmxt_get_ic_state(dd);
 
 	switch (drv_state) {
@@ -542,133 +508,143 @@ static int atmxt_resume(struct i2c_client *client)
 	case ATMXT_DRV_IDLE:
 		switch (ic_state) {
 		case ATMXT_IC_ACTIVE:
-			printk(KERN_ERR "%s: Driver %s, IC %s resume.\n",
+			err = atmxt_i2c_write(dd,
+				dd->addr->pwr[0], dd->addr->pwr[1],
+				&(sleep_cmd[0]), 4);
+			if (err < 0) {
+				pr_err("%s: Failed to reduce power.\n",
+					__func__);
+				goto atmxt_enter_aot_fail;
+			}
+
+			err = atmxt_i2c_write(dd,
+				dd->addr->adx[0], dd->addr->adx[1],
+				&(adx_cmd[0]), 2);
+			if (err < 0) {
+				pr_err("%s: Failed to reduce adx.\n",
+					__func__);
+				goto atmxt_enter_aot_fail;
+			}
+
+			err = atmxt_i2c_write(dd,
+				dd->addr->mxd[0], dd->addr->mxd[1],
+				&mxd_cmd, 1);
+			if (err < 0) {
+				pr_err("%s: Failed to reduce mxd.\n",
+					__func__);
+				goto atmxt_enter_aot_fail;
+			}
+
+			atmxt_set_ic_state(dd, ATMXT_IC_AOT);
+			break;
+
+		default:
+			pr_err("%s: Driver %s, IC %s enter AOT.\n",
 				__func__, atmxt_driver_state_string[drv_state],
 				atmxt_ic_state_string[ic_state]);
 			break;
-		case ATMXT_IC_SLEEP:
-			atmxt_dbg(dd, ATMXT_DBG3,
-				"%s: Waking touch IC...\n", __func__);
+		}
+		break;
+
+	default:
+		pr_err("%s: Trying to enter AOT in driver state %s.\n",
+			__func__, atmxt_driver_state_string[drv_state]);
+		break;
+	}
+
+	atmxt_dbg(dd, ATMXT_DBG3, "%s: Enter AOT complete.\n", __func__);
+
+atmxt_enter_aot_fail:
+	return err;
+}
+
+static int atmxt_exit_aot(struct atmxt_driver_data *dd)
+{
+	int err = 0;
+	int drv_state = 0;
+	int ic_state = 0;
+
+	atmxt_dbg(dd, ATMXT_DBG3, "%s: Exiting AOT...\n", __func__);
+
+	drv_state = atmxt_get_drv_state(dd);
+	ic_state = atmxt_get_ic_state(dd);
+
+	switch (drv_state) {
+	case ATMXT_DRV_ACTIVE:
+	case ATMXT_DRV_IDLE:
+		switch (ic_state) {
+		case ATMXT_IC_ACTIVE:
+			pr_err("%s: Driver %s, IC %s exit AOT.\n",
+				__func__, atmxt_driver_state_string[drv_state],
+				atmxt_ic_state_string[ic_state]);
+			break;
+
+		case ATMXT_IC_AOT:
 			err = atmxt_i2c_write(dd,
 				dd->addr->pwr[0], dd->addr->pwr[1],
-				&(dd->data->pwr[0]), 2);
+				&(dd->data->pwr[0]), 4);
 			if (err < 0) {
-				printk(KERN_ERR
-					"%s: Failed to wake touch IC %s %d.\n",
-					__func__, "with error code", err);
-				err = atmxt_resume_restart(dd);
-				if (err < 0) {
-					printk(KERN_ERR
-						"%s: %s %s %d.\n",
-						__func__,
-						"Failed restart after resume",
-						"with error code", err);
-				}
-				goto atmxt_resume_fail;
-			} else {
-				atmxt_set_ic_state(dd, ATMXT_IC_ACTIVE);
+				pr_err("%s: Failed to wake IC.\n", __func__);
+				goto atmxt_exit_aot_fail;
 			}
-			err = atmxt_start_ic_calibration_fix(dd);
+
+			err = atmxt_i2c_write(dd,
+				dd->addr->adx[0], dd->addr->adx[1],
+				&(dd->data->adx[0]), 2);
 			if (err < 0) {
-				printk(KERN_ERR "%s: %s %s %d.\n", __func__,
-					"Failed to start calibration fix",
-					"with error code", err);
-				goto atmxt_resume_fail;
+				pr_err("%s: Failed to restore adx.\n",
+					__func__);
+				goto atmxt_exit_aot_fail;
 			}
-			err = atmxt_recalibrate_ic(dd);
+
+			err = atmxt_i2c_write(dd,
+				dd->addr->mxd[0], dd->addr->mxd[1],
+				&(dd->data->mxd), 1);
 			if (err < 0) {
-				printk(KERN_ERR
-					"%s: Recalibration failed %s %d.\n",
-					__func__, "with error code", err);
-				goto atmxt_resume_fail;
+				pr_err("%s: Failed to restore mxd.\n",
+					__func__);
+				goto atmxt_exit_aot_fail;
 			}
-			atmxt_release_touches(dd);
+
+			atmxt_set_ic_state(dd, ATMXT_IC_ACTIVE);
 			break;
+
 		default:
-			printk(KERN_ERR "%s: Driver %s, IC %s resume--%s...\n",
+			pr_err("%s: Driver %s, IC %s exit AOT--%s...\n",
 				__func__, atmxt_driver_state_string[drv_state],
 				atmxt_ic_state_string[ic_state], "recovering");
 			err = atmxt_resume_restart(dd);
 			if (err < 0) {
 				printk(KERN_ERR "%s: Recovery failed %s %d.\n",
 					__func__, "with error code", err);
-				goto atmxt_resume_fail;
+				goto atmxt_exit_aot_fail;
 			}
 		}
-
-		break;
-
-	case ATMXT_DRV_SUSPENDED:
-			if (dd->status & (1 << ATMXT_RESUME_HANDLE_ISR)) {
-				pr_info("Resuming from suspend state, and ISR pending\n");
-				/* there is a pending interrupt
-				hold the wakelock, queue the work,
-				work when finished will release wakelock*/
-				wake_lock(&dd->wake_lock);
-				queue_work(dd->workqueue, &dd->work);
-			}
-			atmxt_set_drv_state(dd, ATMXT_DRV_ACTIVE);
 		break;
 
 	case ATMXT_DRV_INIT:
-		printk(KERN_ERR "%s: Driver state \"%s\" resume.\n",
+		pr_err("%s: Trying to leave AOT in driver state %s.\n",
 			__func__, atmxt_driver_state_string[drv_state]);
 		break;
 
 	default:
-		printk(KERN_ERR "%s: Driver %s, IC %s resume--%s...\n",
+		pr_err("%s: Driver %s, IC %s exit AOT--%s...\n",
 			__func__, atmxt_driver_state_string[drv_state],
 			atmxt_ic_state_string[ic_state], "recovering");
 		err = atmxt_resume_restart(dd);
 		if (err < 0) {
-			printk(KERN_ERR "%s: Recovery failed %s %d.\n",
+			pr_err("%s: Recovery failed %s %d.\n",
 				__func__, "with error code", err);
-			goto atmxt_resume_fail;
+			goto atmxt_exit_aot_fail;
 		}
 		break;
 	}
 
-	atmxt_dbg(dd, ATMXT_DBG3, "%s: Resume complete.\n", __func__);
+	atmxt_dbg(dd, ATMXT_DBG3, "%s: Exit AOT complete.\n", __func__);
 
-atmxt_resume_fail:
-	mutex_unlock(dd->mutex);
-
-atmxt_resume_no_dd_fail:
-	return (err < 0) ? err : 0;
+atmxt_exit_aot_fail:
+	return err;
 }
-
-#ifdef CONFIG_HAS_EARLYSUSPEND
-static void atmxt_early_suspend(struct early_suspend *handler)
-{
-	int err = 0;
-	struct atmxt_driver_data *dd;
-
-	dd = container_of(handler, struct atmxt_driver_data, es);
-
-	err = atmxt_suspend(dd->client, PMSG_SUSPEND);
-	if (err < 0) {
-		printk(KERN_ERR "%s: Suspend failed with error code %d",
-			__func__, err);
-	}
-
-	return;
-}
-static void atmxt_late_resume(struct early_suspend *handler)
-{
-	int err = 0;
-	struct atmxt_driver_data *dd;
-
-	dd = container_of(handler, struct atmxt_driver_data, es);
-
-	err = atmxt_resume(dd->client);
-	if (err < 0) {
-		printk(KERN_ERR "%s: Resume failed with error code %d",
-			__func__, err);
-	}
-
-	return;
-}
-#endif
 
 static int __init atmxt_init(void)
 {
@@ -689,10 +665,6 @@ static void atmxt_free(struct atmxt_driver_data *dd)
 	if (dd != NULL) {
 		dd->pdata = NULL;
 		dd->client = NULL;
-#ifdef CONFIG_HAS_EARLYSUSPEND
-		if (dd->es.link.prev != NULL && dd->es.link.next != NULL)
-			unregister_early_suspend(&dd->es);
-#endif
 
 		if (dd->mutex != NULL) {
 			kfree(dd->mutex);
@@ -1220,7 +1192,7 @@ static int atmxt_request_irq(struct atmxt_driver_data *dd)
 	}
 
 	err = request_threaded_irq(dd->client->irq, NULL, atmxt_isr,
-			IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+			IRQF_TRIGGER_LOW | IRQF_ONESHOT,
 			ATMXT_I2C_NAME, dd);
 	if (err < 0) {
 		printk(KERN_ERR "%s: IRQ request failed.\n", __func__);
@@ -1352,14 +1324,6 @@ atmxt_restart_ic_updatefw_start:
 			__func__);
 		update_complete = true;
 		goto atmxt_restart_ic_start;
-	}
-
-	if (dd->info_blk->header[0] != FAMILY_ID) {
-		printk(KERN_ERR "%s: Family ID mismatch:"
-			" expected 0x%02x actual is 0x%02x\n",
-			__func__, FAMILY_ID, dd->info_blk->header[0]);
-		err = -EIO;
-		goto atmxt_restart_ic_fail;
 	}
 
 	atmxt_set_ic_state(dd, ATMXT_IC_PRESENT);
@@ -1505,6 +1469,12 @@ static irqreturn_t atmxt_isr(int irq, void *handle)
 			atmxt_dbg(dd, ATMXT_DBG3,
 				"%s: Servicing IRQ during sleep...\n",
 				__func__);
+			atmxt_active_handler(dd);
+			break;
+		case ATMXT_IC_AOT:
+			atmxt_dbg(dd, ATMXT_DBG3,
+				"%s: Servicing AOT IRQ...\n",
+				__func__);
 		case ATMXT_IC_ACTIVE:
 			atmxt_active_handler(dd);
 			break;
@@ -1523,10 +1493,16 @@ static irqreturn_t atmxt_isr(int irq, void *handle)
 		break;
 
 	case ATMXT_DRV_SUSPENDED:
-			pr_err("%s:isr received while suspended\n", __func__);
-			dd->status = dd->status |
-						(1 << ATMXT_RESUME_HANDLE_ISR);
+		pr_info("%s: IRQ while suspended--%s.\n",
+			__func__, "will re-enable on resume");
+		dd->status = dd->status | (1 << ATMXT_RESUME_HANDLE_ISR);
+		if (dd->status & (1 << ATMXT_IRQ_ENABLED_FLAG)) {
+			disable_irq_nosync(dd->client->irq);
+			dd->status = dd->status &
+				~(1 << ATMXT_IRQ_ENABLED_FLAG);
+		}
 		break;
+
 	default:
 		printk(KERN_ERR "%s: Driver state \"%s\" IRQ received.\n",
 			__func__, atmxt_driver_state_string[drv_state]);
@@ -1903,25 +1879,6 @@ atmxt_send_settings_fail:
 	return err;
 }
 
-static int atmxt_recalibrate_ic(struct atmxt_driver_data *dd)
-{
-	int err = 0;
-	uint8_t cmd = 0x01;
-
-	atmxt_dbg(dd, ATMXT_DBG3, "%s: Asking touch IC to recalibrate...\n",
-		__func__);
-
-	err = atmxt_i2c_write(dd, dd->addr->cal[0], dd->addr->cal[1], &cmd, 1);
-	if (err < 0) {
-		printk(KERN_ERR "%s: Failed to send calibrate to touch IC.\n",
-			__func__);
-		goto atmxt_recalibrate_ic_fail;
-	}
-
-atmxt_recalibrate_ic_fail:
-	return err;
-}
-
 static int atmxt_start_ic_calibration_fix(struct atmxt_driver_data *dd)
 {
 	int err = 0;
@@ -2107,8 +2064,6 @@ static int atmxt_save_internal_data(struct atmxt_driver_data *dd)
 	bool chk_7 = false;
 	bool chk_8 = false;
 	bool chk_9 = false;
-	bool chk_40 = false;
-	bool chk_42 = false;
 	bool chk_46 = false;
 	bool chk_62 = false;
 
@@ -2154,22 +2109,6 @@ static int atmxt_save_internal_data(struct atmxt_driver_data *dd)
 
 		case 38:
 			usr_start_seen = true;
-			break;
-
-		case 40:
-			chk_40 = true;
-			err = atmxt_save_data40(dd, &(dd->info_blk->data[i+0]),
-				&(dd->nvm->data[nvm_iter]));
-			if (err < 0)
-				goto atmxt_save_internal_data_fail;
-			break;
-
-		case 42:
-			chk_42 = true;
-			err = atmxt_save_data42(dd, &(dd->info_blk->data[i+0]),
-				&(dd->nvm->data[nvm_iter]));
-			if (err < 0)
-				goto atmxt_save_internal_data_fail;
 			break;
 
 		case 46:
@@ -2220,16 +2159,6 @@ static int atmxt_save_internal_data(struct atmxt_driver_data *dd)
 
 	if (!chk_9) {
 		printk(KERN_ERR "%s: Object 9 is missing.\n", __func__);
-		err = -ENODATA;
-	}
-
-	if (!chk_40) {
-		pr_err("%s: Object 40 is missing.\n", __func__);
-		err = -ENODATA;
-	}
-
-	if (!chk_42) {
-		pr_err("%s: Object 42 is missing.\n", __func__);
 		err = -ENODATA;
 	}
 
@@ -2371,48 +2300,6 @@ static int atmxt_save_data9(struct atmxt_driver_data *dd,
 	}
 
 atmxt_save_data9_fail:
-	return err;
-}
-
-static int atmxt_save_data40(struct atmxt_driver_data *dd,
-		uint8_t *entry, uint8_t *reg)
-{
-	int err = 0;
-
-	if (entry[3] < 1) {
-		pr_err("%s: Grip suppression object is too small.\n",
-		       __func__);
-		err = -ENODATA;
-		goto atmxt_save_data40_fail;
-	}
-
-	dd->addr->gse[0] = entry[1];
-	dd->addr->gse[1] = entry[2];
-
-	dd->data->gse = reg[0];
-
-atmxt_save_data40_fail:
-	return err;
-}
-
-static int atmxt_save_data42(struct atmxt_driver_data *dd,
-		uint8_t *entry, uint8_t *reg)
-{
-	int err = 0;
-
-	if (entry[3] < 1) {
-		pr_err("%s: Touch suppression object is too small.\n",
-		       __func__);
-		err = -ENODATA;
-		goto atmxt_save_data42_fail;
-	}
-
-	dd->addr->tse[0] = entry[1];
-	dd->addr->tse[1] = entry[2];
-
-	dd->data->tse = reg[0];
-
-atmxt_save_data42_fail:
 	return err;
 }
 
@@ -2751,7 +2638,62 @@ static void atmxt_report_touches(struct atmxt_driver_data *dd)
 		}
 	}
 
+	if (dd->rdat->active_touches == 0) {
+		if (atmxt_get_ic_state(dd) == ATMXT_IC_AOT) {
+			/*
+			 * If there are no active touches, but we are
+			 * running this code, it can be because we saw
+			 * a press and release message at the same time,
+			 * so we need to generate an explicit press and
+			 * release to wake the device.
+			 */
+			input_mt_slot(dd->in_dev, 0);
+			input_mt_report_slot_state(dd->in_dev, MT_TOOL_FINGER,
+				true);
+
+			if (dd->rdat->axis[0] != ATMXT_ABS_RESERVED) {
+				input_report_abs(dd->in_dev,
+					dd->rdat->axis[0],
+					dd->rdat->tchdat[i].x);
+			}
+
+			if (dd->rdat->axis[1] != ATMXT_ABS_RESERVED) {
+				input_report_abs(dd->in_dev,
+					dd->rdat->axis[1],
+					dd->rdat->tchdat[i].y);
+			}
+
+			if (dd->rdat->axis[2] != ATMXT_ABS_RESERVED) {
+				input_report_abs(dd->in_dev,
+					dd->rdat->axis[2],
+					dd->rdat->tchdat[i].p);
+			}
+
+			if (dd->rdat->axis[3] != ATMXT_ABS_RESERVED) {
+				input_report_abs(dd->in_dev,
+					dd->rdat->axis[3],
+					dd->rdat->tchdat[i].w);
+			}
+
+			if (dd->rdat->axis[4] != ATMXT_ABS_RESERVED) {
+				input_report_abs(dd->in_dev,
+					dd->rdat->axis[4],
+					dd->rdat->tchdat[i].id);
+			}
+
+			input_sync(dd->in_dev);
+
+			/* The release sync is sent on the fall-through */
+			input_mt_slot(dd->in_dev, 0);
+			input_mt_report_slot_state(dd->in_dev, MT_TOOL_FINGER,
+				false);
+		}
+	}
+
 	input_sync(dd->in_dev);
+
+	/* Hold to allow events time to propagate up */
+	wake_lock_timeout(&dd->timed_lock, 0.5 * HZ);
 
 	return;
 }
@@ -2941,6 +2883,10 @@ static int atmxt_message_handler42(struct atmxt_driver_data *dd,
 		goto atmxt_message_handler42_fail;
 	}
 
+	/* Only send keys when the IC is active */
+	if (atmxt_get_ic_state(dd) != ATMXT_IC_ACTIVE)
+		goto atmxt_message_handler42_fail;
+
 	if (msg[1] & 0x01) {
 		atmxt_dbg(dd, ATMXT_DBG3,
 			 "%s: Touch suppression is active.\n",
@@ -2953,6 +2899,8 @@ static int atmxt_message_handler42(struct atmxt_driver_data *dd,
 		input_report_key(dd->in_dev, KEY_SLEEP, 0);
 	}
 
+	/* Hold to allow events time to propagate up */
+	wake_lock_timeout(&dd->timed_lock, 0.5 * HZ);
 	input_sync(dd->in_dev);
 
 atmxt_message_handler42_fail:
@@ -3485,12 +3433,7 @@ static ssize_t atmxt_drv_interactivemode_store(struct device *dev,
 {
 	unsigned long value = 0;
 	struct atmxt_driver_data *dd = dev_get_drvdata(dev);
-	int err;
-	uint8_t sleep_cmd[4] = {0x32, 0x32, 0x19, 0x00};
-	uint8_t adx_cmd[2] = {0x08, 0x08};
-	uint8_t gse_cmd = 0x00;
-	uint8_t tse_cmd = 0x00;
-	uint8_t mxd_cmd = 0x08;
+	int err = 0;
 
 	err = kstrtoul(buf, 10, &value);
 	if (err < 0) {
@@ -3500,95 +3443,20 @@ static ssize_t atmxt_drv_interactivemode_store(struct device *dev,
 
 	mutex_lock(dd->mutex);
 
-	if (!dd->data || !dd->addr) {
-		pr_err("%s: failed, data/addr is NULL.\n", __func__);
-		err = -ENODEV;
-		goto atmxt_drv_interactivemode_store_fail;
-	}
+	switch (value) {
+	case 0:
+		err = atmxt_enter_aot(dd);
+		break;
 
-	if (value == 1) {
-		/* interactive mode, lets bump up rate*/
-		err = atmxt_i2c_write(dd,
-			dd->addr->pwr[0], dd->addr->pwr[1],
-			&(dd->data->pwr[0]), 4);
-		if (err < 0) {
-			pr_err("%s: Failed to wake IC.\n", __func__);
-			goto atmxt_drv_interactivemode_store_fail;
-		}
-		err = atmxt_i2c_write(dd,
-			dd->addr->adx[0], dd->addr->adx[1],
-			&(dd->data->adx[0]), 2);
-		if (err < 0) {
-			pr_err("%s: Failed to restore adx.\n", __func__);
-			goto atmxt_drv_interactivemode_store_fail;
-		}
-		err = atmxt_i2c_write(dd,
-			dd->addr->gse[0], dd->addr->gse[1],
-			&(dd->data->gse), 1);
-		if (err < 0) {
-			pr_err("%s: Failed to restore gse.\n", __func__);
-			goto atmxt_drv_interactivemode_store_fail;
-		}
-		err = atmxt_i2c_write(dd,
-			dd->addr->tse[0], dd->addr->tse[1],
-			&(dd->data->tse), 1);
-		if (err < 0) {
-			pr_err("%s: Failed to restore tse.\n", __func__);
-			goto atmxt_drv_interactivemode_store_fail;
-		}
-		err = atmxt_i2c_write(dd,
-			dd->addr->mxd[0], dd->addr->mxd[1],
-			&(dd->data->mxd), 1);
-		if (err < 0) {
-			pr_err("%s: Failed to restore mxd.\n", __func__);
-			goto atmxt_drv_interactivemode_store_fail;
-		}
-		atmxt_set_ic_state(dd, ATMXT_IC_ACTIVE);
-		err = size;
-	} else if (value == 0) {
-		/* Non interactive mode, lets lower scan rate*/
-		err = atmxt_i2c_write(dd,
-			dd->addr->pwr[0], dd->addr->pwr[1],
-			&(sleep_cmd[0]), 4);
-		if (err < 0) {
-			pr_err("%s: Failed to reduce power.\n", __func__);
-			goto atmxt_drv_interactivemode_store_fail;
-		}
-		err = atmxt_i2c_write(dd,
-			dd->addr->adx[0], dd->addr->adx[1],
-			&(adx_cmd[0]), 2);
-		if (err < 0) {
-			pr_err("%s: Failed to reduce adx.\n", __func__);
-			goto atmxt_drv_interactivemode_store_fail;
-		}
-		err = atmxt_i2c_write(dd,
-			dd->addr->gse[0], dd->addr->gse[1],
-			&gse_cmd, 1);
-		if (err < 0) {
-			pr_err("%s: Failed to disable gse.\n", __func__);
-			goto atmxt_drv_interactivemode_store_fail;
-		}
-		err = atmxt_i2c_write(dd,
-			dd->addr->tse[0], dd->addr->tse[1],
-			&tse_cmd, 1);
-		if (err < 0) {
-			pr_err("%s: Failed to disable tse.\n", __func__);
-			goto atmxt_drv_interactivemode_store_fail;
-		}
-		err = atmxt_i2c_write(dd,
-			dd->addr->mxd[0], dd->addr->mxd[1],
-			&mxd_cmd, 1);
-		if (err < 0) {
-			pr_err("%s: Failed to reduce mxd.\n", __func__);
-			goto atmxt_drv_interactivemode_store_fail;
-		}
-		atmxt_set_ic_state(dd, ATMXT_IC_SLEEP);
-		err = size;
-	} else {
+	case 1:
+		err = atmxt_exit_aot(dd);
+		break;
+
+	default:
+		pr_err("%s: Invalid value %lu passed.\n", __func__, value);
 		err = -EINVAL;
 	}
 
-atmxt_drv_interactivemode_store_fail:
 	mutex_unlock(dd->mutex);
 	return err;
 }
@@ -3769,15 +3637,18 @@ static ssize_t atmxt_debug_ic_grpdata_show(struct device *dev,
 	mutex_lock(dd->mutex);
 
 	if ((atmxt_get_ic_state(dd) != ATMXT_IC_ACTIVE) &&
-		(atmxt_get_ic_state(dd) != ATMXT_IC_SLEEP)) {
-		printk(KERN_ERR "%s: %s %s or %s states.\n", __func__,
+		(atmxt_get_ic_state(dd) != ATMXT_IC_SLEEP) &&
+		(atmxt_get_ic_state(dd) != ATMXT_IC_AOT)) {
+		pr_err("%s: %s %s, %s, or %s states.\n", __func__,
 			"Group data can be read only in IC",
 			atmxt_ic_state_string[ATMXT_IC_ACTIVE],
-			atmxt_ic_state_string[ATMXT_IC_SLEEP]);
-		err = sprintf(buf, "%s %s or %s states.\n",
+			atmxt_ic_state_string[ATMXT_IC_SLEEP],
+			atmxt_ic_state_string[ATMXT_IC_AOT]);
+		err = sprintf(buf, "%s %s %s, or %s states.\n",
 			"Group data can be read only in IC",
 			atmxt_ic_state_string[ATMXT_IC_ACTIVE],
-			atmxt_ic_state_string[ATMXT_IC_SLEEP]);
+			atmxt_ic_state_string[ATMXT_IC_SLEEP],
+			atmxt_ic_state_string[ATMXT_IC_AOT]);
 		goto atmxt_debug_ic_grpdata_show_exit;
 	}
 
@@ -3881,11 +3752,13 @@ static ssize_t atmxt_debug_ic_grpdata_store(struct device *dev,
 	mutex_lock(dd->mutex);
 
 	if ((atmxt_get_ic_state(dd) != ATMXT_IC_ACTIVE) &&
-		(atmxt_get_ic_state(dd) != ATMXT_IC_SLEEP)) {
-		printk(KERN_ERR "%s: %s %s or %s states.\n", __func__,
+		(atmxt_get_ic_state(dd) != ATMXT_IC_SLEEP) &&
+		(atmxt_get_ic_state(dd) != ATMXT_IC_AOT)) {
+		pr_err("%s: %s %s, %s, or %s states.\n", __func__,
 			"Group data can be written only in IC",
 			atmxt_ic_state_string[ATMXT_IC_ACTIVE],
-			atmxt_ic_state_string[ATMXT_IC_SLEEP]);
+			atmxt_ic_state_string[ATMXT_IC_SLEEP],
+			atmxt_ic_state_string[ATMXT_IC_AOT]);
 		err = -EACCES;
 		goto atmxt_debug_ic_grpdata_store_exit;
 	}
