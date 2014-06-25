@@ -7,7 +7,7 @@
  *  xt_socket_put_sk(sk);
  *
  */
-#include "atomic.h"
+#include <linux/atomic.h>
 
 #include <linux/kernel.h>
 #include <linux/file.h>

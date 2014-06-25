@@ -12,9 +12,9 @@
  * There are run-time debug flags enabled via the debug_mask module param, or
  * via the DEFAULT_DEBUG_MASK. See xt_qtaguid_internal.h.
  */
-#define DEBUG
+//#define DEBUG
 
-#include "atomic.h"
+#include <linux/atomic.h>
 
 #include <linux/module.h>
 #include <linux/moduleparam.h>
