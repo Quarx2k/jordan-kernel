@@ -39,7 +39,7 @@ static int omap3_dpll4_set_rate(struct clk *clk, unsigned long rate);
 static int omap3_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate);
 
 /* Maximum DPLL multiplier, divider values for OMAP3 */
-#define OMAP3_MAX_DPLL_MULT		2047//2048
+#define OMAP3_MAX_DPLL_MULT		2048
 #define OMAP3_MAX_DPLL_DIV		128
 
 /*
