@@ -17,6 +17,7 @@
  */
 
 #include <linux/alarmtimer.h>
+#include <linux/debugfs.h>
 #include <linux/gpio.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
@@ -87,6 +88,12 @@ struct bq5105x_detect {
 	struct wake_lock undocked_wakelock;
 	/* Wakelock to allow user space process new docked state */
 	struct wake_lock uevent_wakelock;
+	/* Wakelock to prevent suspend while pulse is present on det_gpio */
+	struct wake_lock pulse_wakelock;
+	u32 disable_pulse_wakelock; /* for disabling via debugfs */
+#ifdef CONFIG_DEBUG_FS
+	struct dentry *debugfs_root;
+#endif
 };
 
 static enum power_supply_property bq5105x_detect_chg_prop[] = {
@@ -142,13 +149,14 @@ static void bq5105x_detect_chg_irq_work(struct work_struct *work)
 			chip->det_irq_enabled = false;
 		}
 		cancel_work_sync(&chip->det_irq_work);
+		wake_unlock(&chip->pulse_wakelock);
 		wake_unlock(&chip->det_irq_wakelock);
 		alarm_cancel(&chip->undocked_alarm);
 		cancel_work_sync(&chip->undocked_work);
 		wake_unlock(&chip->undocked_wakelock);
 		bq5105x_detect_set_docked(chip, true);
 	} else {
-		dev_dbg(&chip->pdev->dev, "not chgarging\n");
+		dev_dbg(&chip->pdev->dev, "not charging\n");
 		if (!chip->det_irq_enabled) {
 			enable_irq(chip->det_irq);
 			chip->det_irq_enabled = true;
@@ -175,6 +183,9 @@ static void bq5105x_detect_det_irq_work(struct work_struct *work)
 	if (alarm_cancel(&chip->undocked_alarm))
 		bq5105x_detect_set_docked(chip, true);
 	alarm_start_relative(&chip->undocked_alarm, chip->alarm_time);
+	/* Less power is drawn if wakelock is held while pulse is present */
+	if (!chip->disable_pulse_wakelock)
+		wake_lock(&chip->pulse_wakelock);
 	wake_unlock(&chip->det_irq_wakelock);
 }
 
@@ -192,6 +203,7 @@ static void bq5105x_detect_undocked_work(struct work_struct *work)
 						   undocked_work);
 	dev_dbg(&chip->pdev->dev, "no pulse\n");
 	bq5105x_detect_set_docked(chip, false);
+	wake_unlock(&chip->pulse_wakelock);
 	wake_unlock(&chip->undocked_wakelock);
 }
 
@@ -291,6 +303,27 @@ free:
 	return NULL;
 }
 
+#ifdef CONFIG_DEBUG_FS
+static int bq5105x_detect_debugfs_create(struct bq5105x_detect *chip)
+{
+	chip->debugfs_root = debugfs_create_dir(dev_name(&chip->pdev->dev),
+						NULL);
+	if (!chip->debugfs_root)
+		return -ENOMEM;
+
+	if (!debugfs_create_bool("disable_pulse_wakelock", S_IRUGO | S_IWUSR,
+				 chip->debugfs_root,
+				 &chip->disable_pulse_wakelock))
+		goto err_debugfs;
+
+	return 0;
+err_debugfs:
+	debugfs_remove_recursive(chip->debugfs_root);
+	chip->debugfs_root = NULL;
+	return -ENOMEM;
+}
+#endif
+
 static int bq5105x_detect_probe(struct platform_device *pdev)
 {
 	int i, ret;
@@ -379,10 +412,10 @@ static int bq5105x_detect_probe(struct platform_device *pdev)
 	wake_lock_init(&chip->chg_irq_wakelock, WAKE_LOCK_SUSPEND, "chg-irq");
 	wake_lock_init(&chip->det_irq_wakelock, WAKE_LOCK_SUSPEND, "det-irq");
 	wake_lock_init(&chip->undocked_wakelock, WAKE_LOCK_SUSPEND,
-		       "undocked-irq");
+		       "undocked-alarm");
 	wake_lock_init(&chip->uevent_wakelock, WAKE_LOCK_SUSPEND,
 		       "docked-state-uevent");
-
+	wake_lock_init(&chip->pulse_wakelock, WAKE_LOCK_SUSPEND, "det-pulse");
 	/*
 	 * Request det_irq before chg_irq to set det_irq_enabled flag before
 	 * it can be accessed from chg_irq work function. Use the flag to
@@ -408,6 +441,11 @@ static int bq5105x_detect_probe(struct platform_device *pdev)
 		goto err_chg_irq;
 	}
 
+#ifdef CONFIG_DEBUG_FS
+	if (bq5105x_detect_debugfs_create(chip))
+		dev_warn(&pdev->dev, "cannot create debugfs\n");
+#endif
+
 	platform_set_drvdata(pdev, chip);
 
 	/* Set initial state */
@@ -424,6 +462,7 @@ err_det_irq:
 	wake_lock_destroy(&chip->det_irq_wakelock);
 	wake_lock_destroy(&chip->undocked_wakelock);
 	wake_lock_destroy(&chip->uevent_wakelock);
+	wake_lock_destroy(&chip->pulse_wakelock);
 err_workqueue:
 	switch_dev_unregister(chip->sdev);
 err_switch:
@@ -442,7 +481,9 @@ static int bq5105x_detect_remove(struct platform_device *pdev)
 {
 	struct bq5105x_detect* chip = platform_get_drvdata(pdev);
 	int i;
-
+#ifdef CONFIG_DEBUG_FS
+	debugfs_remove_recursive(chip->debugfs_root);
+#endif
 	free_irq(chip->chg_irq, chip);
 	free_irq(chip->det_irq, chip);
 	alarm_cancel(&chip->undocked_alarm);
@@ -451,6 +492,7 @@ static int bq5105x_detect_remove(struct platform_device *pdev)
 	wake_lock_destroy(&chip->det_irq_wakelock);
 	wake_lock_destroy(&chip->undocked_wakelock);
 	wake_lock_destroy(&chip->uevent_wakelock);
+	wake_lock_destroy(&chip->pulse_wakelock);
 	switch_dev_unregister(chip->sdev);
 	power_supply_unregister(&chip->charger);
 	gpio_free(chip->dts_data->det_gpio);
