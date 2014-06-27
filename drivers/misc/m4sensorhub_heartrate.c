@@ -46,7 +46,7 @@ struct m4hrt_driver_data {
 	struct mutex                mutex; /* controls driver entry points */
 
 	struct m4sensorhub_heartrate_iio_data   iiodat;
-	int16_t         samplerate;
+	int32_t         samplerate;
 	uint16_t        status;
 
 	uint8_t         dbg_addr;
@@ -100,7 +100,7 @@ m4hrt_isr_fail:
 	return;
 }
 
-static int m4hrt_set_samplerate(struct iio_dev *iio, int16_t rate)
+static int m4hrt_set_samplerate(struct iio_dev *iio, int32_t rate)
 {
 	int err = 0;
 	struct m4hrt_driver_data *dd = iio_priv(iio);
@@ -164,7 +164,7 @@ static ssize_t m4hrt_setrate_show(struct device *dev,
 	ssize_t size = 0;
 
 	mutex_lock(&(dd->mutex));
-	size = snprintf(buf, PAGE_SIZE, "Current rate: %hd\n", dd->samplerate);
+	size = snprintf(buf, PAGE_SIZE, "Current rate: %d\n", dd->samplerate);
 	mutex_unlock(&(dd->mutex));
 	return size;
 }
