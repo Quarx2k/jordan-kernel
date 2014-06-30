@@ -1,4 +1,4 @@
-/*********************************************************************
+/**********************************************************************
 *
 *   Copyright (C) 2012 Motorola, Inc.
 *
@@ -9,12 +9,13 @@ Purpose :
 #ifndef __MEMMAP_LOG_H__
 #define __MEMMAP_LOG_H__
 /****************************** Defines *******************************/
-struct memMapLog {
+struct memMapLog
+{
   u64 logEnable;
   u8 isLogImmediate;
 };
 
-#define LOG_MAX 20
+#define LOG_MAX 24
 #define LOG_LEVELS_MAX 4
 
 static char acLogTags[LOG_MAX][40] = {
@@ -37,7 +38,10 @@ static char acLogTags[LOG_MAX][40] = {
   "LOG_AUDIO",
   "LOG_DISP",
   "LOG_WRIST",
-  "LOG_PASSIVE"
+  "LOG_PASSIVE",
+  "LOG_EMG"
+  "LOG_HR",
+  "LOG_ALS"
 };
 
 static char acLogLevels[LOG_LEVELS_MAX][15] = {

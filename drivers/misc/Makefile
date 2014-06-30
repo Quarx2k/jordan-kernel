@@ -57,7 +57,6 @@ obj-$(CONFIG_SRAM)		+= sram.o
 obj-$(CONFIG_MFD_M4SENSORHUB)   += m4sensorhub_mpu9150.o
 obj-$(CONFIG_MFD_M4SENSORHUB)   += m4sensorhub_pedometer.o
 obj-$(CONFIG_MFD_M4SENSORHUB)   += m4sensorhub_gesture.o
-obj-$(CONFIG_MFD_M4SENSORHUB)   += m4sensorhub_stillmode.o
 obj-$(CONFIG_MFD_M4SENSORHUB)   += m4sensorhub_passive.o
 obj-$(CONFIG_MFD_M4SENSORHUB)   += m4sensorhub_als.o
 obj-$(CONFIG_MFD_M4SENSORHUB)   += m4sensorhub_heartrate.o
