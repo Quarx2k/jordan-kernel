@@ -67,4 +67,4 @@ obj-$(CONFIG_MMI_FACTORY)       += mmi-factory.o
 obj-$(CONFIG_MOT_UTAG)          += utag/
 obj-$(CONFIG_BQ5105X_CTRL)      += bq5105x_ctrl.o
 obj-$(CONFIG_BQ5105X_DETECT)    += bq5105x_detect.o
-
+obj-$(CONFIG_WAKEUP_SOURCE_NOTIFY)	+= wakeup_source_notify.o

@@ -37,6 +37,7 @@
 #include <linux/string.h>
 #include <linux/firmware.h>
 #include <linux/input/mt.h>
+#include <linux/wakeup_source_notify.h>
 
 static int atmxt_probe(struct i2c_client *client,
 		const struct i2c_device_id *id);
@@ -2718,6 +2719,10 @@ static void atmxt_report_touches(struct atmxt_driver_data *dd)
 	}
 
 	input_sync(dd->in_dev);
+#ifdef CONFIG_WAKEUP_SOURCE_NOTIFY
+	if (atmxt_get_ic_state(dd) == ATMXT_IC_AOT)
+		wakeup_source_notify_subscriber(DISPLAY_WAKE_EVENT);
+#endif /* CONFIG_WAKEUP_SOURCE_NOTIFY */
 
 	/* Hold to allow events time to propagate up */
 	wake_lock_timeout(&dd->timed_lock, 0.5 * HZ);

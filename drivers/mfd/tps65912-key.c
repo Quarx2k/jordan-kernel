@@ -23,6 +23,7 @@
 #include <linux/input.h>
 #include <linux/gpio.h>
 #include <linux/mfd/tps65912.h>
+#include <linux/wakeup_source_notify.h>
 
 struct tps65912_key_data {
 	struct input_dev *input_dev;
@@ -100,6 +101,10 @@ void tps65912_broadcast_key_event(struct tps65912 *tps65912,
 		input_report_key(key->input_dev, code, value);
 		/*sync with input subsystem to solve the key cached problem*/
 		input_sync(key->input_dev);
+#ifdef CONFIG_WAKEUP_SOURCE_NOTIFY
+		if (value == PWRKEY_PRESS)
+			wakeup_source_notify_subscriber(DISPLAY_WAKE_EVENT);
+#endif /* CONFIG_WAKEUP_SOURCE_NOTIFY */
 	}
 }
 EXPORT_SYMBOL(tps65912_broadcast_key_event);

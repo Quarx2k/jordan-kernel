@@ -581,6 +581,11 @@ config BQ5105X_DETECT
 	  assumptions are made on how the IC is hooked to the host device.
 	default n
 
+config WAKEUP_SOURCE_NOTIFY
+        tristate "Notifier of wakeups"
+        help
+          Driver to allow early notification of wakeups
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"

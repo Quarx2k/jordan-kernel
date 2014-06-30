@@ -24,12 +24,6 @@
 #include <linux/mfd/tps65912.h>
 #include <linux/input.h>
 
-enum pwrkey_states {
-	PWRKEY_RELEASE,	/* Power key released state. */
-	PWRKEY_PRESS,	/* Power key pressed state. */
-	PWRKEY_UNKNOWN,	/* Unknown power key state. */
-};
-
 static inline int irq_to_tps65912_irq(struct tps65912 *tps65912,
 							int irq)
 {

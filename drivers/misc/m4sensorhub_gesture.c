@@ -34,6 +34,7 @@
 #include <linux/iio/buffer.h>
 #include <linux/iio/kfifo_buf.h>
 #include <linux/iio/m4sensorhub/m4sensorhub_gesture.h>
+#include <linux/wakeup_source_notify.h>
 
 #define m4ges_err(format, args...)  KDEBUG(M4SH_ERROR, format, ## args)
 
@@ -102,6 +103,9 @@ static void m4ges_isr(enum m4sensorhub_irqs int_event, void *handle)
 
 	dd->iiodat.timestamp = iio_get_time_ns();
 	iio_push_to_buffers(iio, (unsigned char *)&(dd->iiodat));
+#ifdef CONFIG_WAKEUP_SOURCE_NOTIFY
+	wakeup_source_notify_subscriber(DISPLAY_WAKE_EVENT);
+#endif /* CONFIG_WAKEUP_SOURCE_NOTIFY */
 
 m4ges_isr_fail:
 	if (err < 0)

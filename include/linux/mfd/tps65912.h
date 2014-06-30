@@ -278,6 +278,12 @@
 /* Number of total regulators available */
 #define TPS65912_NUM_REGULATOR		(TPS65912_NUM_DCDC + TPS65912_NUM_LDO)
 
+enum pwrkey_states {
+	PWRKEY_RELEASE, /* Power key released state. */
+	PWRKEY_PRESS,   /* Power key pressed state. */
+	PWRKEY_UNKNOWN, /* Unknown power key state. */
+};
+
 struct tps65912_register_init_data {
 	u8 addr;
 	u16 data;
