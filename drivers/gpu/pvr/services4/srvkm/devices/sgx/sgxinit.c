@@ -3333,7 +3333,11 @@ PVRSRV_ERROR SGXGetMiscInfoKM(PVRSRV_SGXDEV_INFO	*psDevInfo,
 			psSGXFeatures->ui32DDKVersion =
 				(PVRVERSION_MAJ << 16) |
 				(PVRVERSION_MIN << 8);
+#if	defined(MOT_BUILD)
+			psSGXFeatures->ui32DDKBuild = PVRVERSION_MOTBUILD;
+#else
 			psSGXFeatures->ui32DDKBuild = PVRVERSION_BUILD;
+#endif
 
 			/* Also report the kernel module build options -- used in SGXConnectionCheck() */
 			psSGXFeatures->ui32BuildOptions = (SGX_BUILD_OPTIONS);

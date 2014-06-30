@@ -10,6 +10,7 @@ ccflags-y = -Idrivers/video/omap2 \
 	-Idrivers/gpu/pvr/services4/srvkm/env/linux \
 	-Idrivers/gpu/pvr/services4/system/include \
 	-DLINUX -D__linux__ \
+	-DMOT_BUILD=3 \
 	-DANDROID \
 	-DPVR_BUILD_DIR="\"omap3630_android\"" \
 	-DSUPPORT_SGX \
@@ -24,7 +25,7 @@ ccflags-y = -Idrivers/video/omap2 \
 	-DSUPPORT_HW_RECOVERY \
 	-DSUPPORT_ACTIVE_POWER_MANAGEMENT \
 	-DSUPPORT_SGX_HWPERF \
-	-DSUPPORT_SGX_LOW_LATENCY_SCHEDULING \
+	-DSUPPORT_SGX_PRIORITY_SCHEDULING \
 	-DSUPPORT_MEMINFO_IDS \
 	-DSUPPORT_SGX_NEW_STATUS_VALS \
 	-DSUPPORT_DBGDRV_EVENT_OBJECTS \
