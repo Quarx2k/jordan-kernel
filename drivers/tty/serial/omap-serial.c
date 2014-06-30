@@ -1558,6 +1558,9 @@ static int serial_omap_probe(struct platform_device *pdev)
 
 	if (omap_up_info->wakeup_capable)
 		device_init_wakeup(&pdev->dev, true);
+	else
+		omap_uart_remove_wakeup(&pdev->dev);
+
 
 	omap_serial_fill_features_erratas(up);
 

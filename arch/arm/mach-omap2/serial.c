@@ -22,6 +22,7 @@
 #include <linux/clk.h>
 #include <linux/io.h>
 #include <linux/delay.h>
+#include <linux/spinlock.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
@@ -94,10 +95,35 @@ void omap_uart_enable_wakeup(struct device *dev, bool enable)
 	else
 		omap_hwmod_disable_wakeup(od->hwmods[0]);
 }
+void omap_uart_remove_wakeup(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct omap_device *od = to_omap_device(pdev);
+	struct omap_hwmod *oh = od->hwmods[0];
+	u16 offs;
+	unsigned long flags;
 
+	spin_lock_irqsave(&oh->_lock, flags);
+	omap_hwmod_disable_wakeup(oh);
+	if (oh->class->sysc)
+		oh->class->sysc->sysc_flags &= ~SYSC_HAS_ENAWAKEUP;
+	offs = (oh->prcm.omap2.prcm_reg_id == 3) ?
+					OMAP3430ES2_PM_WKEN3 : PM_WKEN1;
+	omap2_prm_clear_mod_reg_bits((1<<oh->prcm.omap2.module_bit),
+				     oh->prcm.omap2.module_offs, offs);
+	offs = (oh->prcm.omap2.prcm_reg_id == 3) ?
+					OMAP3430ES2_PM_WKST3 : PM_WKST1;
+	omap2_prm_set_mod_reg_bits((1<<oh->prcm.omap2.module_bit),
+				   oh->prcm.omap2.module_offs, offs);
+
+	spin_unlock_irqrestore(&oh->_lock, flags);
+}
 #else
 void omap_uart_enable_wakeup(struct device *dev, bool enable)
 {}
+void omap_uart_remove_wakeup(struct device *dev)
+{
+}
 #endif /* CONFIG_PM */
 
 #ifdef CONFIG_OMAP_MUX

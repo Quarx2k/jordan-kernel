@@ -49,6 +49,7 @@ struct omap_uart_port_info {
 	void (*enable_wakeup)(struct device *, bool);
 };
 
+extern void omap_uart_remove_wakeup(struct device *dev);
 extern void omap_uart_enable_wakeup(struct device *dev, bool enable);
 extern int omap_pm_get_dev_context_loss_count(struct device *dev);
 
