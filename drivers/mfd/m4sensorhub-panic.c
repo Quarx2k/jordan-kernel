@@ -39,6 +39,7 @@ static const char *callback_name[PANICHDL_MAX] = {
 	[PANICHDL_ALS_RESTORE] = "als_restore",
 	[PANICHDL_FUSION_RESTORE] = "fusion_restore",
 	[PANICHDL_MPU9150_RESTORE] = "mpu9150_restore",
+	[PANICHDL_PEDOMETER_RESTORE] = "pedometer_restore",
 };
 
 struct m4sensorhub_panic_callback {

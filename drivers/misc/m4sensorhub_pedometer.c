@@ -47,6 +47,8 @@ struct m4ped_driver_data {
 	struct m4sensorhub_pedometer_iio_data   iiodat;
 	int16_t         samplerate;
 	uint16_t        status;
+	struct m4sensorhub_pedometer_iio_data   base_dat;
+
 };
 
 static int m4ped_read_report_data(struct iio_dev *iio,
@@ -143,6 +145,12 @@ static int m4ped_read_report_data(struct iio_dev *iio,
 	}
 
 	dd->iiodat.timestamp = iio_get_time_ns();
+
+	dd->iiodat.total_distance += dd->base_dat.total_distance;
+	dd->iiodat.total_steps += dd->base_dat.total_steps;
+	dd->iiodat.healthy_minutes += dd->base_dat.healthy_minutes;
+	dd->iiodat.calories += dd->base_dat.calories;
+
 	iio_push_to_buffers(iio, (unsigned char *)&(dd->iiodat));
 
 m4ped_read_fail:
@@ -530,6 +538,24 @@ m4ped_create_iiodev_exit:
 	return err;
 }
 
+static void m4ped_panic_restore(struct m4sensorhub_data *m4sensorhub,
+				void *data)
+{
+	struct m4ped_driver_data *dd = (struct m4ped_driver_data *)data;
+	if (dd == NULL) {
+		m4ped_err("%s: Driver data is null, unable to restore\n",
+			  __func__);
+		return;
+	}
+	dd->base_dat.total_distance = dd->iiodat.total_distance;
+	dd->base_dat.total_steps = dd->iiodat.total_steps;
+	dd->base_dat.healthy_minutes = dd->iiodat.healthy_minutes;
+	dd->base_dat.calories = dd->iiodat.calories;
+	m4ped_err("%s: Pedometer bases after panic = %d %d %d %d", __func__,
+		  dd->base_dat.total_distance, dd->base_dat.total_steps,
+		  dd->base_dat.healthy_minutes, dd->base_dat.calories);
+}
+
 static int m4ped_driver_init(struct init_calldata *p_arg)
 {
 	struct iio_dev *iio = p_arg->p_data;
@@ -558,6 +584,11 @@ static int m4ped_driver_init(struct init_calldata *p_arg)
 		m4ped_err("%s: Failed to register M4 ACT IRQ.\n", __func__);
 		goto m4ped_driver_init_irq_act_fail;
 	}
+
+	err = m4sensorhub_panic_register(dd->m4, PANICHDL_PEDOMETER_RESTORE,
+					 m4ped_panic_restore, dd);
+	if (err < 0)
+		m4ped_err("Pedometer panic callbk register failed\n");
 
 	goto m4ped_driver_init_exit;
 
