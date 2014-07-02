@@ -212,25 +212,6 @@ static int omap2430_musb_set_mode(struct musb *musb, u8 musb_mode)
 	return 0;
 }
 
-static inline void omap2430_low_level_exit(struct musb *musb)
-{
-	u32 l;
-
-	/* in any role */
-	l = musb_readl(musb->mregs, OTG_FORCESTDBY);
-	l |= ENABLEFORCE;	/* enable MSTANDBY */
-	musb_writel(musb->mregs, OTG_FORCESTDBY, l);
-}
-
-static inline void omap2430_low_level_init(struct musb *musb)
-{
-	u32 l;
-
-	l = musb_readl(musb->mregs, OTG_FORCESTDBY);
-	l &= ~ENABLEFORCE;	/* disable MSTANDBY */
-	musb_writel(musb->mregs, OTG_FORCESTDBY, l);
-}
-
 void omap_musb_mailbox(enum omap_musb_vbus_id_status status)
 {
 	struct omap2430_glue	*glue = _glue;
@@ -458,8 +439,6 @@ static int omap2430_musb_exit(struct musb *musb)
 {
 	del_timer_sync(&musb_idle_timer);
 
-	omap2430_low_level_exit(musb);
-
 	return 0;
 }
 
@@ -617,10 +596,8 @@ static int omap2430_runtime_suspend(struct device *dev)
 		musb->context.otg_interfsel = musb_readl(musb->mregs,
 				OTG_INTERFSEL);
 
-		omap2430_low_level_exit(musb);
 		usb_phy_set_suspend(musb->xceiv, 1);
 	}
-
 	return 0;
 }
 
@@ -630,7 +607,6 @@ static int omap2430_runtime_resume(struct device *dev)
 	struct musb			*musb = glue_to_musb(glue);
 
 	if (musb) {
-		omap2430_low_level_init(musb);
 		musb_writel(musb->mregs, OTG_INTERFSEL,
 				musb->context.otg_interfsel);
 
