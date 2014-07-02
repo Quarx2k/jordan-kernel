@@ -2905,6 +2905,7 @@ _next_:
 		minnow_panel_queue_ulps_work(mpd);
 
 	dsi_bus_unlock(dssdev);
+	minnow_panel_queue_esd_work(mpd);
 	mutex_unlock(&mpd->lock);
 	return;
 
