@@ -40,6 +40,9 @@
  *      Y         N         Low        Periodic high pulse    High
  *      N         N/A       Low        Low                    High
  *
+ * For new h/w, if charging is stopped while the device is docked, det_gpio may
+ * stay high for some time before the periodic pulse starts.
+ *
  * For new h/w, the state of det_gpio alone is sufficinet to determine docked
  * state. We have to use state of chg_gpo for compatibality with old h/w.
  */
@@ -55,6 +58,7 @@
  *			is derived from	from the supplied_to array
  * uevent_wakelock_timeout	time to hold wake_lock to ensure user space has
  *				processed new docked state
+ * old_hw		h/w where det_gpio is always high
  */
 struct bq5105x_detect_dts {
 	int chg_gpio;
@@ -65,6 +69,7 @@ struct bq5105x_detect_dts {
 	char **supplied_to;
 	size_t num_supplicants;
 	unsigned long uevent_wakelock_timeout;
+	bool old_hw;
 };
 
 struct bq5105x_detect {
@@ -137,10 +142,11 @@ static void bq5105x_detect_chg_irq_work(struct work_struct *work)
 						   chg_irq_work);
 	/*
 	 * When chg_gpio is high, declare docked and do not monitor det_gpio
-	 * line. When chg_gpio is low, monitor pulses on det_gpio line. Detect
-	 * presense of a pulse by setting an alarm. If det_gpio goes high before
-	 * the alarm goes off, the pulse is present. If there is no pulse,
-	 * declare un-docked.
+	 * line. When chg_gpio is low, monitor pulses on det_gpio line after it
+	 * transitions to low unless old h/w is used. Detect presense of a pulse
+	 * by setting an alarm. If det_gpio goes from high to low before the
+	 * alarm goes off, the pulse is present. If there is no pulse, declare
+	 * un-docked.
 	 */
 	if (gpio_get_value_cansleep(chip->dts_data->chg_gpio)) {
 		dev_dbg(&chip->pdev->dev, "charging\n");
@@ -157,11 +163,26 @@ static void bq5105x_detect_chg_irq_work(struct work_struct *work)
 		bq5105x_detect_set_docked(chip, true);
 	} else {
 		dev_dbg(&chip->pdev->dev, "not charging\n");
-		if (!chip->det_irq_enabled) {
-			enable_irq(chip->det_irq);
-			chip->det_irq_enabled = true;
+		if (!chip->dts_data->old_hw) {
+			 /* Less power is drawn with wakelock when looking for a
+			  * pulse */
+			if (!chip->disable_pulse_wakelock)
+				wake_lock(&chip->pulse_wakelock);
+
+			if (!chip->det_irq_enabled) {
+				enable_irq(chip->det_irq);
+				chip->det_irq_enabled = true;
+			}
+			if (!gpio_get_value_cansleep(chip->dts_data->det_gpio)) {
+				alarm_start_relative(&chip->undocked_alarm,
+						     chip->alarm_time);
+			} else {
+				dev_dbg(&chip->pdev->dev,
+					"det_gpio is high, postponing timer\n");
+			}
+		} else {
+			bq5105x_detect_set_docked(chip, false);
 		}
-		alarm_start_relative(&chip->undocked_alarm, chip->alarm_time);
 	}
 
 	wake_unlock(&chip->chg_irq_wakelock);
@@ -179,9 +200,13 @@ static void bq5105x_detect_det_irq_work(struct work_struct *work)
 {
 	struct bq5105x_detect *chip = container_of(work, struct bq5105x_detect,
 						   det_irq_work);
-	dev_dbg(&chip->pdev->dev, "pulse\n");
-	if (alarm_cancel(&chip->undocked_alarm))
+	if (alarm_cancel(&chip->undocked_alarm)) {
+		dev_dbg(&chip->pdev->dev, "pulse\n");
 		bq5105x_detect_set_docked(chip, true);
+	} else {
+		dev_dbg(&chip->pdev->dev, "first pulse\n");
+	}
+
 	alarm_start_relative(&chip->undocked_alarm, chip->alarm_time);
 	/* Less power is drawn if wakelock is held while pulse is present */
 	if (!chip->disable_pulse_wakelock)
@@ -294,6 +319,8 @@ of_bq5105x_detect(struct platform_device *pdev)
 		goto free;
 	}
 	dts_data->uevent_wakelock_timeout = msecs_to_jiffies(val);
+
+	dts_data->old_hw = of_property_read_bool(np, "old-hw");
 
 	return dts_data;
 
@@ -416,19 +443,26 @@ static int bq5105x_detect_probe(struct platform_device *pdev)
 	wake_lock_init(&chip->uevent_wakelock, WAKE_LOCK_SUSPEND,
 		       "docked-state-uevent");
 	wake_lock_init(&chip->pulse_wakelock, WAKE_LOCK_SUSPEND, "det-pulse");
-	/*
-	 * Request det_irq before chg_irq to set det_irq_enabled flag before
-	 * it can be accessed from chg_irq work function. Use the flag to
-	 * ensure correct nesteness of enabling and disabling det_irq.
-	 */
-	chip->det_irq = gpio_to_irq(chip->dts_data->det_gpio);
-	chip->det_irq_enabled = true;
-	ret = request_any_context_irq(chip->det_irq, bq5105x_detect_det_irq,
-			IRQF_TRIGGER_RISING, dev_name(&pdev->dev), chip);
-	if (ret < 0) {
-		dev_err(&pdev->dev, "failed to request detect gpio irq: %d\n",
-			ret);
-		goto err_det_irq;
+
+	/* Do not enable det_gpio interrupt on old h/w. Moreover, if the IRQ got
+	 * processed on old h/w, the detection logic will be broken */
+	if (!chip->dts_data->old_hw) {
+		/*
+		 * Request det_irq before chg_irq to set det_irq_enabled flag
+		 * before it can be accessed from chg_irq work function. Use the
+		 * flag to ensure correct nesteness of enabling and disabling
+		 * det_irq.
+		 */
+		chip->det_irq = gpio_to_irq(chip->dts_data->det_gpio);
+		chip->det_irq_enabled = true;
+		ret = request_any_context_irq(chip->det_irq,
+			bq5105x_detect_det_irq,
+			IRQF_TRIGGER_FALLING, dev_name(&pdev->dev), chip);
+		if (ret < 0) {
+			dev_err(&pdev->dev,
+				"failed to request detect gpio irq: %d\n", ret);
+			goto err_det_irq;
+		}
 	}
 
 	chip->chg_irq = gpio_to_irq(chip->dts_data->chg_gpio);
@@ -454,7 +488,8 @@ static int bq5105x_detect_probe(struct platform_device *pdev)
 	return 0;
 
 err_chg_irq:
-	free_irq(chip->det_irq, chip);
+	if (!chip->dts_data->old_hw)
+		free_irq(chip->det_irq, chip);
 err_det_irq:
 	alarm_cancel(&chip->undocked_alarm);
 	destroy_workqueue(chip->wq);
