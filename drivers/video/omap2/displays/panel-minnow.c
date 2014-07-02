@@ -232,7 +232,7 @@ static struct minnow_panel_attr panel_attr_table[MINNOW_PANEL_MAX] = {
 		.xres = PANEL_WIDTH,
 		.yres = PANEL_HEIGHT,
 		.pixel_clock = DIV_ROUND_UP(PANEL_WIDTH *
-					    PANEL_HEIGHT * 60, 1000),
+					    PANEL_HEIGHT * 45, 1000),
 		.pixel_format = OMAP_DSS_DSI_FMT_RGB888,
 		.xoffset = 0,
 		.yoffset = 0,
