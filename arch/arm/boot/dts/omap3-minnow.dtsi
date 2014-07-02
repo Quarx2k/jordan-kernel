@@ -29,9 +29,10 @@
 			device_type = "cpu";
 			operating-points = <
 				/* kHz    uV */
-				300000   975000
-				600000  1150000
-				800000  1275000
+				 300000   975000
+				 600000  1150000
+				 800000  1275000
+				1000000  1337500
 			>;
 			cpu0-supply = <&omap_tps65912_dcdc1>;
 			/* OPP tolerance in percentage */
@@ -384,6 +385,7 @@ tps65912_0: tps65912 {
 		spi-cs-high;
 
 		register-init-data = <
+			0x06 0x7F /* DCDC1_LIMIT: 0.7V-1.4875V in 12.5mV steps */
 			0x25 0xD1 /* DEVCTRL2: enable SLEEP, INT push/pull
 					       200us TSLOT, INT active high */
 			0x26 0x49 /* I2C_SPI_CFG: AVS ADDR = 0x13,
@@ -414,8 +416,8 @@ tps65912_0: tps65912 {
 				reg = <0>;
 				regulator-compatible = "DCDC1";
 				regulator-name = "DCDC1";
-				regulator-min-microvolt = <500000>;
-				regulator-max-microvolt = <1287500>;
+				regulator-min-microvolt =  <700000>;
+				regulator-max-microvolt = <1487500>;
 				regulator-boot-on;
 				regulator-always-on;
 			};

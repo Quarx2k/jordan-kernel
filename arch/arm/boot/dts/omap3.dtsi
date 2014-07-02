@@ -592,7 +592,7 @@
 			ti,min-step-micro-volts = <10000>;
 			ti,max-step-micro-volts = <50000>;
 			ti,min-micro-volts = <800000>;
-			ti,max-micro-volts = <1330000>;
+			ti,max-micro-volts = <1380000>;
 		};
 
 		vp_core: vp@483072d0 {
