@@ -46,3 +46,7 @@
 		>;
 		ldo9_loadswitch_enabled;
 };
+
+&dock_detect {
+	old-hw;
+};

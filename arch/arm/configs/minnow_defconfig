@@ -467,7 +467,7 @@ CONFIG_ALIGNMENT_TRAP=y
 #
 CONFIG_USE_OF=y
 CONFIG_BUILD_ARM_APPENDED_DTB_IMAGE=y
-CONFIG_BUILD_ARM_APPENDED_DTB_IMAGE_NAMES="omap3-minnow-p0-p1a omap3-minnow-p1b omap3-minnow-p2-p2.4 omap3-minnow-p2.5+ omap3-minnow-p2.9+"
+CONFIG_BUILD_ARM_APPENDED_DTB_IMAGE_NAMES="omap3-minnow-p0-p1a omap3-minnow-p1b omap3-minnow-p2-p2.4 omap3-minnow-rev-a omap3-minnow-rev-a-512 omap3-minnow-rev-b+"
 CONFIG_ATAGS=y
 # CONFIG_DEPRECATED_PARAM_STRUCT is not set
 CONFIG_ZBOOT_ROM_TEXT=0x0

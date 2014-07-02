@@ -10,23 +10,20 @@
 /include/ "omap3-minnow.dtsi"
 
 / {
-	mmi,revision = "p1";
+	mmi,revision = "p2";
 	mmi,hwrev = <
-		0x05   /* Minnow P2A wing */
-		0x06   /* Minnow P2A portable */
+		0xF0   /* Minnow P2-5 portable (Rev A) with 512MB */
 	>;
 
 	Display@0 {
 		gpio_vio_en = <&gpio2 10 0>;    /* VDDIO gpio-42 */
 	};
+
 };
 
-&i2c1 {
-	atmxt@4a {
-		support-snowflake = <0>;
+&i2c2{
+	m4sensorhub@39 {
+		mot,fw-filename = "m4sensorhub-p2_5_minnow.bin";
 	};
 };
 
-&dock_detect {
-	old-hw;
-};

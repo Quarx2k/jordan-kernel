@@ -206,7 +206,7 @@
 		};
 	};
 
-	bq5105x-detect {
+	dock_detect: bq5105x-detect {
 		compatible = "mmi,bq5105x-detect";
 		charge-gpio = <&gpio6 16 0>;	/* gpio-176 */
 		detect-gpio = <&gpio1 22 0x1>;	/* gpio-22  */
