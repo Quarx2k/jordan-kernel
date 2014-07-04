@@ -204,16 +204,15 @@ static int m4ped_set_samplerate(struct iio_dev *iio, int16_t rate)
 			}
 
 			dd->status = dd->status | (1 << M4PED_IRQ_ENABLED_BIT);
-			/* When an app registers, there is no data reported
-			unless the user starts walking. But the application
-			would like to have atleast one set of data sent
-			immediately following the register */
-			err = m4ped_read_report_data(iio, dd);
-			if (err < 0) {
-				m4ped_err("%s: Failed to report pedo data\n",
-					  __func__);
-				goto m4ped_set_samplerate_fail;
-			}
+		}
+		/* When an app registers, there is no data reported
+		unless the user starts walking. But the application
+		would like to have atleast one set of data sent
+		immediately following the register */
+		err = m4ped_read_report_data(iio, dd);
+		if (err < 0) {
+			m4ped_err("%s:Failed to report pedo data\n", __func__);
+			goto m4ped_set_samplerate_fail;
 		}
 	} else {
 		/* Disable the IRQ if necessary */
