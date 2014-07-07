@@ -46,6 +46,8 @@ struct m4ped_driver_data {
 
 	struct m4sensorhub_pedometer_iio_data   iiodat;
 	int16_t         samplerate;
+	int16_t         latest_samplerate;
+
 	uint16_t        status;
 	struct m4sensorhub_pedometer_iio_data   base_dat;
 
@@ -182,7 +184,9 @@ static int m4ped_set_samplerate(struct iio_dev *iio, int16_t rate)
 	 * Currently, there is no concept of setting a sample rate for this
 	 * sensor, so this function only enables/disables interrupt reporting.
 	 */
-	dd->samplerate = rate;
+	dd->latest_samplerate = rate;
+	if (rate == dd->samplerate)
+		goto m4ped_set_samplerate_fail;
 
 	if (rate >= 0) {
 		/* Enable the IRQ if necessary */
@@ -204,15 +208,7 @@ static int m4ped_set_samplerate(struct iio_dev *iio, int16_t rate)
 			}
 
 			dd->status = dd->status | (1 << M4PED_IRQ_ENABLED_BIT);
-		}
-		/* When an app registers, there is no data reported
-		unless the user starts walking. But the application
-		would like to have atleast one set of data sent
-		immediately following the register */
-		err = m4ped_read_report_data(iio, dd);
-		if (err < 0) {
-			m4ped_err("%s:Failed to report pedo data\n", __func__);
-			goto m4ped_set_samplerate_fail;
+			dd->samplerate = rate;
 		}
 	} else {
 		/* Disable the IRQ if necessary */
@@ -234,6 +230,7 @@ static int m4ped_set_samplerate(struct iio_dev *iio, int16_t rate)
 			}
 
 			dd->status = dd->status & ~(1 << M4PED_IRQ_ENABLED_BIT);
+			dd->samplerate = rate;
 		}
 	}
 
@@ -282,6 +279,17 @@ static ssize_t m4ped_setrate_store(struct device *dev,
 	if (err < 0) {
 		m4ped_err("%s: Failed to set sample rate.\n", __func__);
 		goto m4ped_enable_store_exit;
+	}
+	if (value >= 0) {
+		/* When an app registers, there is no data reported
+		unless the user starts walking. But the application
+		would like to have atleast one set of data sent
+		immediately following the register */
+		err = m4ped_read_report_data(iio, dd);
+		if (err < 0) {
+			m4ped_err("%s:Failed to report pedo data\n", __func__);
+			goto m4ped_enable_store_exit;
+		}
 	}
 
 m4ped_enable_store_exit:
@@ -618,6 +626,7 @@ static int m4ped_probe(struct platform_device *pdev)
 	mutex_init(&(dd->mutex));
 	platform_set_drvdata(pdev, iio);
 	dd->samplerate = -1; /* We always start disabled */
+	dd->latest_samplerate = dd->samplerate;
 
 	err = m4ped_create_iiodev(iio); /* iio and dd are freed on fail */
 	if (err < 0) {
@@ -671,6 +680,17 @@ m4ped_remove_exit:
 	return 0;
 }
 
+static int m4ped_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	struct iio_dev *iio = platform_get_drvdata(pdev);
+	struct m4ped_driver_data *dd = iio_priv(iio);
+	mutex_lock(&(dd->mutex));
+	if (m4ped_set_samplerate(iio, dd->latest_samplerate) < 0)
+		m4ped_err("%s: setrate retry failed\n", __func__);
+	mutex_unlock(&(dd->mutex));
+	return 0;
+}
+
 static struct of_device_id m4pedometer_match_tbl[] = {
 	{ .compatible = "mot,m4pedometer" },
 	{},
@@ -680,7 +700,7 @@ static struct platform_driver m4ped_driver = {
 	.probe		= m4ped_probe,
 	.remove		= __exit_p(m4ped_remove),
 	.shutdown	= NULL,
-	.suspend	= NULL,
+	.suspend	= m4ped_suspend,
 	.resume		= NULL,
 	.driver		= {
 		.name	= M4PED_DRIVER_NAME,

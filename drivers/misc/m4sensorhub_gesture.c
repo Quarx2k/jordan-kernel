@@ -46,6 +46,7 @@ struct m4ges_driver_data {
 
 	struct m4sensorhub_gesture_iio_data   iiodat;
 	int16_t         samplerate;
+	int16_t         latest_samplerate;
 	uint16_t        status;
 };
 
@@ -120,7 +121,9 @@ static int m4ges_set_samplerate(struct iio_dev *iio, int16_t rate)
 	 * Currently, there is no concept of setting a sample rate for this
 	 * sensor, so this function only enables/disables interrupt reporting.
 	 */
-	dd->samplerate = rate;
+	dd->latest_samplerate = rate;
+	if (rate == dd->samplerate)
+		goto m4ges_set_samplerate_fail;
 
 	if (rate >= 0) {
 		/* Enable the IRQ if necessary */
@@ -133,6 +136,7 @@ static int m4ges_set_samplerate(struct iio_dev *iio, int16_t rate)
 				goto m4ges_set_samplerate_fail;
 			}
 			dd->status = dd->status | (1 << M4GES_IRQ_ENABLED_BIT);
+			dd->samplerate = rate;
 		}
 	} else {
 		/* Disable the IRQ if necessary */
@@ -145,6 +149,7 @@ static int m4ges_set_samplerate(struct iio_dev *iio, int16_t rate)
 				goto m4ges_set_samplerate_fail;
 			}
 			dd->status = dd->status & ~(1 << M4GES_IRQ_ENABLED_BIT);
+			dd->samplerate = rate;
 		}
 	}
 
@@ -365,6 +370,7 @@ static int m4ges_probe(struct platform_device *pdev)
 	mutex_init(&(dd->mutex));
 	platform_set_drvdata(pdev, iio);
 	dd->samplerate = -1; /* We always start disabled */
+	dd->latest_samplerate = dd->samplerate;
 
 	err = m4ges_create_iiodev(iio); /* iio and dd are freed on fail */
 	if (err < 0) {
@@ -414,6 +420,17 @@ m4ges_remove_exit:
 	return 0;
 }
 
+static int m4ges_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	struct iio_dev *iio = platform_get_drvdata(pdev);
+	struct m4ges_driver_data *dd = iio_priv(iio);
+	mutex_lock(&(dd->mutex));
+	if (m4ges_set_samplerate(iio, dd->latest_samplerate) < 0)
+		m4ges_err("%s: setrate retry failed\n", __func__);
+	mutex_unlock(&(dd->mutex));
+	return 0;
+}
+
 static struct of_device_id m4gesture_match_tbl[] = {
 	{ .compatible = "mot,m4gesture" },
 	{},
@@ -423,7 +440,7 @@ static struct platform_driver m4ges_driver = {
 	.probe		= m4ges_probe,
 	.remove		= __exit_p(m4ges_remove),
 	.shutdown	= NULL,
-	.suspend	= NULL,
+	.suspend	= m4ges_suspend,
 	.resume		= NULL,
 	.driver		= {
 		.name	= M4GES_DRIVER_NAME,

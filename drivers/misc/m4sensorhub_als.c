@@ -43,7 +43,7 @@ struct m4als_driver_data {
 
 	uint16_t        luminosity;
 	int16_t         samplerate;
-
+	int16_t         latest_samplerate;
 	uint16_t        status;
 };
 
@@ -94,6 +94,10 @@ static int m4als_set_samplerate(struct m4als_driver_data *dd, int16_t rate)
 {
 	int err = 0;
 	int size = 0;
+
+	/* This variabled is to be always updated ireespective of the
+	   transaction status */
+	dd->latest_samplerate = rate;
 
 	if (rate == dd->samplerate)
 		goto m4als_change_interrupt_bit;
@@ -351,6 +355,7 @@ static int m4als_probe(struct platform_device *pdev)
 	mutex_init(&(dd->mutex));
 	platform_set_drvdata(pdev, dd);
 	dd->samplerate = -1; /* We always start disabled */
+	dd->latest_samplerate = dd->samplerate;
 
 	dd->m4 = m4sensorhub_client_get_drvdata();
 	if (dd->m4 == NULL) {
@@ -396,6 +401,16 @@ static int __exit m4als_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static int m4als_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	struct m4als_driver_data *dd = platform_get_drvdata(pdev);
+	mutex_lock(&(dd->mutex));
+	if (m4als_set_samplerate(dd, dd->latest_samplerate) < 0)
+		m4als_err("%s: setrate retry failed\n", __func__);
+	mutex_unlock(&(dd->mutex));
+	return 0;
+}
+
 static struct of_device_id m4als_match_tbl[] = {
 	{ .compatible = "mot,m4als" },
 	{},
@@ -405,8 +420,8 @@ static struct platform_driver m4als_driver = {
 	.probe		= m4als_probe,
 	.remove		= __exit_p(m4als_remove),
 	.shutdown	= NULL,
-	.suspend	= NULL,
-	.resume		= NULL,
+	.suspend        = m4als_suspend,
+	.resume         = NULL,
 	.driver		= {
 		.name	= M4ALS_DRIVER_NAME,
 		.owner	= THIS_MODULE,

@@ -72,6 +72,7 @@ struct mpu9150_client {
 	struct m4sensorhub_data *m4sensorhub;
 	struct input_dev *input_dev;
 	signed short samplerate[NUM_TYPES];
+	signed short latest_samplerate[NUM_TYPES];
 	struct mpu9150_accel_data accel_data;
 	struct mpu9150_gyro_data gyro_data;
 	struct mpu9150_compass_data compass_data;
@@ -145,6 +146,8 @@ static void m4_report_mpu9150_inputevent(
 static void m4_set_mpu9150_delay(struct mpu9150_client *mpu9150_client_data,
 			int delay, enum mpu9150_sensor type)
 {
+	mpu9150_client_data->latest_samplerate[type] = delay;
+
 	if (delay != mpu9150_client_data->samplerate[type]) {
 		switch (type) {
 		case TYPE_GYRO:
@@ -698,6 +701,15 @@ static int mpu9150_client_probe(struct platform_device *pdev)
 
 	mpu9150_client_data->m4sensorhub = m4sensorhub;
 	platform_set_drvdata(pdev, mpu9150_client_data);
+	mpu9150_client_data->samplerate[TYPE_ACCEL] = -1;
+	mpu9150_client_data->samplerate[TYPE_GYRO] = -1;
+	mpu9150_client_data->samplerate[TYPE_COMPASS] = -1;
+	mpu9150_client_data->latest_samplerate[TYPE_ACCEL] =
+			mpu9150_client_data->samplerate[TYPE_ACCEL];
+	mpu9150_client_data->latest_samplerate[TYPE_GYRO] =
+			mpu9150_client_data->samplerate[TYPE_GYRO];
+	mpu9150_client_data->latest_samplerate[TYPE_COMPASS] =
+			mpu9150_client_data->samplerate[TYPE_COMPASS];
 
 	mpu9150_client_data->input_dev = input_allocate_device();
 	if (!mpu9150_client_data->input_dev) {
@@ -795,6 +807,17 @@ static int __exit mpu9150_client_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static int mpu9150_client_suspend(struct platform_device *pdev,
+				  pm_message_t state)
+{
+	struct mpu9150_client *dd = platform_get_drvdata(pdev);
+	m4_set_mpu9150_delay(dd, dd->latest_samplerate[TYPE_ACCEL], TYPE_ACCEL);
+	m4_set_mpu9150_delay(dd, dd->latest_samplerate[TYPE_GYRO], TYPE_GYRO);
+	m4_set_mpu9150_delay(dd, dd->latest_samplerate[TYPE_COMPASS],
+			     TYPE_COMPASS);
+	return 0;
+}
+
 static struct of_device_id m4mpu9150_match_tbl[] = {
 	{ .compatible = "mot,m4mpu9150" },
 	{},
@@ -804,7 +827,7 @@ static struct platform_driver mpu9150_client_driver = {
 	.probe		= mpu9150_client_probe,
 	.remove		= __exit_p(mpu9150_client_remove),
 	.shutdown	= NULL,
-	.suspend	= NULL,
+	.suspend	= mpu9150_client_suspend,
 	.resume		= NULL,
 	.driver		= {
 		.name	= MPU9150_CLIENT_DRIVER_NAME,

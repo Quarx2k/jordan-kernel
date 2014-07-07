@@ -46,6 +46,7 @@ struct m4fus_driver_data {
 
 	struct m4sensorhub_fusion_iio_data   iiodat[M4FUS_NUM_FUSION_BUFFERS];
 	int16_t         samplerate;
+	int16_t         latest_samplerate;
 	uint16_t        status;
 };
 
@@ -144,6 +145,7 @@ static int m4fus_set_samplerate(struct iio_dev *iio, int16_t rate)
 	struct m4fus_driver_data *dd = iio_priv(iio);
 	int size = 0;
 
+	dd->latest_samplerate = rate;
 	if (rate == dd->samplerate)
 		goto m4fus_set_samplerate_irq_check;
 
@@ -436,6 +438,7 @@ static int m4fus_probe(struct platform_device *pdev)
 	mutex_init(&(dd->mutex));
 	platform_set_drvdata(pdev, iio);
 	dd->samplerate = -1; /* We always start disabled */
+	dd->latest_samplerate = dd->samplerate;
 
 	err = m4fus_create_iiodev(iio); /* iio and dd are freed on fail */
 	if (err < 0) {
@@ -483,6 +486,17 @@ m4fus_remove_exit:
 	return 0;
 }
 
+static int m4fus_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	struct iio_dev *iio = platform_get_drvdata(pdev);
+	struct m4fus_driver_data *dd = iio_priv(iio);
+	mutex_lock(&(dd->mutex));
+	if (m4fus_set_samplerate(iio, dd->latest_samplerate) < 0)
+		m4fus_err("%s: setrate retry failed\n", __func__);
+	mutex_unlock(&(dd->mutex));
+	return 0;
+}
+
 static struct of_device_id m4fusion_match_tbl[] = {
 	{ .compatible = "mot,m4fusion" },
 	{},
@@ -492,7 +506,7 @@ static struct platform_driver m4fus_driver = {
 	.probe		= m4fus_probe,
 	.remove		= __exit_p(m4fus_remove),
 	.shutdown	= NULL,
-	.suspend	= NULL,
+	.suspend	= m4fus_suspend,
 	.resume		= NULL,
 	.driver		= {
 		.name	= M4FUS_DRIVER_NAME,

@@ -47,6 +47,7 @@ struct m4hrt_driver_data {
 
 	struct m4sensorhub_heartrate_iio_data   iiodat;
 	int32_t         samplerate;
+	int32_t         latest_samplerate;
 	uint16_t        status;
 
 	uint8_t         dbg_addr;
@@ -105,6 +106,8 @@ static int m4hrt_set_samplerate(struct iio_dev *iio, int32_t rate)
 	int err = 0;
 	struct m4hrt_driver_data *dd = iio_priv(iio);
 	int size = 0;
+
+	dd->latest_samplerate = rate;
 
 	if (rate == dd->samplerate)
 		goto m4hrt_set_samplerate_irq_check;
@@ -558,6 +561,7 @@ static int m4hrt_probe(struct platform_device *pdev)
 	mutex_init(&(dd->mutex));
 	platform_set_drvdata(pdev, iio);
 	dd->samplerate = -1; /* We always start disabled */
+	dd->latest_samplerate = dd->samplerate;
 
 	err = m4hrt_create_iiodev(iio); /* iio and dd are freed on fail */
 	if (err < 0) {
@@ -607,6 +611,17 @@ m4hrt_remove_exit:
 	return 0;
 }
 
+static int m4hrt_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	struct iio_dev *iio = platform_get_drvdata(pdev);
+	struct m4hrt_driver_data *dd = iio_priv(iio);
+	mutex_lock(&(dd->mutex));
+	if (m4hrt_set_samplerate(iio, dd->latest_samplerate) < 0)
+		m4hrt_err("%s: setrate retry failed\n", __func__);
+	mutex_unlock(&(dd->mutex));
+	return 0;
+}
+
 static struct of_device_id m4heartrate_match_tbl[] = {
 	{ .compatible = "mot,m4heartrate" },
 	{},
@@ -616,7 +631,7 @@ static struct platform_driver m4hrt_driver = {
 	.probe		= m4hrt_probe,
 	.remove		= __exit_p(m4hrt_remove),
 	.shutdown	= NULL,
-	.suspend	= NULL,
+	.suspend	= m4hrt_suspend,
 	.resume		= NULL,
 	.driver		= {
 		.name	= M4HRT_DRIVER_NAME,
