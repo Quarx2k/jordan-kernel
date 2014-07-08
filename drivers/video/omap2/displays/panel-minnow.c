@@ -2928,6 +2928,26 @@ _munlock_:
 	mutex_unlock(&mpd->lock);
 }
 
+static int minnow_panel_pm_prepare(struct device *dev)
+{
+	struct minnow_panel_data *mpd = dev_get_drvdata(dev);
+	minnow_panel_cancel_esd_work(mpd);
+
+	return 0;
+}
+
+static void minnow_panel_pm_complete(struct device *dev)
+{
+	struct minnow_panel_data *mpd = dev_get_drvdata(dev);
+	minnow_panel_queue_esd_work(mpd);
+}
+
+
+static struct dev_pm_ops minnow_panel_pm_ops = {
+	.prepare =  minnow_panel_pm_prepare,
+	.complete = minnow_panel_pm_complete,
+};
+
 static struct omap_dss_driver minnow_panel_driver = {
 	.probe		= minnow_panel_probe,
 	.remove		= __exit_p(minnow_panel_remove),
@@ -2955,6 +2975,7 @@ static struct omap_dss_driver minnow_panel_driver = {
 	.driver         = {
 		.name   = "minnow-panel",
 		.owner  = THIS_MODULE,
+		.pm     = &minnow_panel_pm_ops,
 	},
 };
 
