@@ -291,6 +291,8 @@ static int  tusb_usb_probe(struct platform_device *pdev)
 	struct device_node *np;
 	struct power_supply *psy;
 	int i, ret, irqnum = -1;
+	int size, count;
+	const char *string;
 
 	np = pdev->dev.of_node;
 	if (!np) {
@@ -367,6 +369,35 @@ static int  tusb_usb_probe(struct platform_device *pdev)
 	psy->properties = tusb_psy_properties;
 	psy->num_properties = ARRAY_SIZE(tusb_psy_properties);
 	psy->get_property = tusb_get_property;
+
+	count = of_property_count_strings(np, "supplied_to");
+	if (count > 0) {
+		size = count * sizeof(*psy->supplied_to);
+		psy->supplied_to = devm_kzalloc(&pdev->dev, size,
+						     GFP_KERNEL);
+		if (!psy->supplied_to) {
+			dev_err(&pdev->dev, "Failed to alloc supplied_to\n");
+			goto remove_file;
+		}
+
+		/* Make copies of the DT strings for const-correctness */
+		for (i = 0; i < count; i++) {
+			if (of_property_read_string_index(np, "supplied_to", i,
+							  &string)) {
+				dev_err(&pdev->dev, "Failed to read supplied_to"
+					" supplied_to[%d]\n", i);
+				goto remove_file;
+			}
+			psy->supplied_to[i] = kstrdup(string,  GFP_KERNEL);
+			if (!psy->supplied_to[i]) {
+				dev_err(&pdev->dev, "Failed to alloc space for"
+					" supplied_to[%d]\n", i);
+				goto remove_file;
+			}
+		}
+		psy->num_supplicants = count;
+	}
+
 	ret = power_supply_register(&pdev->dev, psy);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "unable to register power supply\n");
