@@ -24,6 +24,7 @@
 			regulator-name = "disp_bridge";
 			gpio = <&gpio3 22 0>; /* GPIO-86 */
 			enable-active-high;
+			startup-delay-us=<150>;
 		};
 
 	};
