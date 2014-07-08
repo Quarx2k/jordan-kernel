@@ -18,7 +18,7 @@
 
 #ifndef _MINNOW_PANEL_COMMON_HEADER_
 
-#define	INIT_DATA_VERSION	(0x060614) /*MM/DD/YY*/
+#define	INIT_DATA_VERSION	(0x070714) /*MM/DD/YY*/
 /* This header file is used to sync Bootloader and Kernel Display Initialize
  * Structure/Data, please make sure sync it for both Bootloader/Kernel when
  * it changes some settings for Solomon/Orise. Bootloader should pass
@@ -88,15 +88,15 @@ static u8 panel_init_ssd2848_320x320[] = {
 /*n, type, data_0, data_1 ... data_n-1*/
 1, SWITCH_TO_PANEL, 0,
 /* SCM PLL Register[0x0008]
- *   POSTDIV = 5, MULT = 50, PLLOUT = 26 x 50 / (5+1) = 216.6 MHz
+ *   POSTDIV = 5, MULT = 50, PLLOUT = 26 x 50 / (3+1) = 325.0 MHz
  */
-6, SSD2848_CMD, 0x00, 0x08, 0x01, 0xF4, 0x05, 0x32,
+6, SSD2848_CMD, 0x00, 0x08, 0x01, 0xF4, 0x03, 0x32,
 /* SCM Clock Control Register[0x000C]
- *   MTXDIV = 0, MIPITX speed = 216.6 / (0 + 1) = 216.6 Mbps
- *               MIPITX clock = 216.6 / 2 = 108.3 MHz
- *   SYSDIV - 11, system clock = 216.6 / 2 / (11 + 1) = 9.0 MHz
+ *   MTXDIV = 1, MIPITX speed = 325.0 / (1 + 1) = 162.5 Mbps
+ *               MIPITX clock = 162.5 / 2 = 81.3 MHz
+ *   SYSDIV - 11, system clock = 325.0 / 2 / (11 + 1) = 13.5 MHz
  */
-6, SSD2848_CMD, 0x00, 0x0C, 0x00, 0x00, 0x00, 0x0B,
+6, SSD2848_CMD, 0x00, 0x0C, 0x00, 0x00, 0x00, 0x1B,
 /* SCM Miscellaneous Control Register[0x0014]
  *   MTXVPF = 3, MIPITX Video Pixel Format = 24bpp
  *   MRXLS = 0, MIPIRX Lane Select = 1 lane
@@ -115,13 +115,13 @@ static u8 panel_init_ssd2848_320x320[] = {
  */
 6, SSD2848_CMD, 0x20, 0x0C, 0x00, 0x00, 0x00, 0x02,
 /* VTCM Pixel Clock Frequency Ratio Register[0x0010]
- *   PCLKDEN = 247, PCLKNUM = 108,
- *     Pixel clock = 9.0 x 108 / 247 = 3.93 MHz
+ *   PCLKDEN = 23, PCLKNUM = 5,
+ *     Pixel clock = 13.5 x 5 / 23 = 2.93 MHz
  * since SSD2848 uses 48 bits bus, the actual pixel clock is
  *   depend on current pixel format setting(24 bpp now)
- *   actual pix_clk = 3.93 * 48 / 24 = 7.87 MHz
+ *   actual pix_clk = 2.93 * 48 / 24 = 5.86 MHz
  */
-6, SSD2848_CMD, 0x20, 0x10, 0x00, 0xF7, 0x00, 0x6C,
+6, SSD2848_CMD, 0x20, 0x10, 0x00, 0x17, 0x00, 0x05,
 /* VTCM Display Horizontal Configuration Register[0x0014]
  *   Horizontal Total = 392 = 20 + 42 + 320 + 10
  *   Horizontal Display Period Start = 42
@@ -157,10 +157,10 @@ static u8 panel_init_ssd2848_320x320[] = {
 5, DCS_WRITE_SYNC, 0x2A, 0x00, 0x00, 0x01, 0x3F,
 5, DCS_WRITE_SYNC, 0x2B, 0x00, 0x00, 0x01, 0x3F,
 /* DSITX Control Register[0x0008]
- *   LPD = 4, LP clock = 216.6 / 8 / (4 + 1) = 5.4 MHz
+ *   LPD = 1, LP clock = 162.5 / 8 / (1 + 1) = 10.15 MHz
  *   EOT = 1, EOT Packet Enable
  */
-6, SSD2848_CMD, 0x60, 0x08, 0x00, 0x04, 0x00, 0x0A,
+6, SSD2848_CMD, 0x60, 0x08, 0x00, 0x01, 0x00, 0x0A,
 /* DSITX Video Timing Control Register[0x000C]
  *   VBP = 10, HBP = 42, VSA = 2, HSA = 10
  */
@@ -264,6 +264,29 @@ static u8 panel_init_ssd2848_320x320[] = {
  * it needs the different timing setting that apply for panel 2.0 or above
  */
 static u8 panel_init_ssd2848_320x320_1[] = {
+/* SCM PLL Register[0x0008]
+ *   POSTDIV = 5, MULT = 50, PLLOUT = 26 x 50 / (5+1) = 216.6 MHz
+ */
+6, SSD2848_CMD, 0x00, 0x08, 0x01, 0xF4, 0x05, 0x32,
+/* SCM Clock Control Register[0x000C]
+ *   MTXDIV = 0, MIPITX speed = 216.6 / (0 + 1) = 216.6 Mbps
+ *               MIPITX clock = 216.6 / 2 = 108.3 MHz
+ *   SYSDIV - 11, system clock = 216.6 / 2 / (11 + 1) = 9.0 MHz
+ */
+6, SSD2848_CMD, 0x00, 0x0C, 0x00, 0x00, 0x00, 0x0B,
+/* VTCM Pixel Clock Frequency Ratio Register[0x0010]
+ *   PCLKDEN = 247, PCLKNUM = 108,
+ *     Pixel clock = 9.0 x 108 / 247 = 3.93 MHz
+ * since SSD2848 uses 48 bits bus, the actual pixel clock is
+ *   depend on current pixel format setting(24 bpp now)
+ *   actual pix_clk = 3.93 * 48 / 24 = 7.87 MHz
+ */
+6, SSD2848_CMD, 0x20, 0x10, 0x00, 0xF7, 0x00, 0x6C,
+/* DSITX Control Register[0x0008]
+ *   LPD = 4, LP clock = 216.6 / 8 / (4 + 1) = 5.4 MHz
+ *   EOT = 1, EOT Packet Enable
+ */
+6, SSD2848_CMD, 0x60, 0x08, 0x00, 0x04, 0x00, 0x0A,
 /* DSITX Delay Adjustment 2 Register[0x0044]
  * CPTD = 22, CPED = 4, HTD = 10, CTD = 10
  *   byte_clk = 1000 / (216.6 / 8) = 36.9 ns
