@@ -100,6 +100,7 @@ struct max17042_chip {
 	enum max170xx_chip_type chip_type;
 	struct max17042_platform_data *pdata;
 	struct work_struct work;
+	struct work_struct work_malicious_removed;
 	int    init_complete;
 	bool batt_undervoltage;
 #ifdef CONFIG_BATTERY_MAX17042_DEBUGFS
@@ -107,6 +108,9 @@ struct max17042_chip {
 	u8 debugfs_addr;
 	u8 debugfs_capacity;
 #endif
+	struct mutex lock;	/* lock to control access during reset */
+	struct power_supply *psy_malicious;
+	int malicious_online;
 };
 
 static int max17042_write_reg(struct i2c_client *client, u8 reg, u16 value)
@@ -188,16 +192,18 @@ static int max17042_get_property(struct power_supply *psy,
 {
 	struct max17042_chip *chip = container_of(psy,
 				struct max17042_chip, battery);
-	int ret;
+	int ret = 0;
 
 	if (!chip->init_complete)
 		return -EAGAIN;
+
+	mutex_lock(&chip->lock);
 
 	switch (psp) {
 	case POWER_SUPPLY_PROP_PRESENT:
 		ret = max17042_read_reg(chip->client, MAX17042_STATUS);
 		if (ret < 0)
-			return ret;
+			goto err;
 
 		if (ret & MAX17042_STATUS_BattAbsent)
 			val->intval = 0;
@@ -207,14 +213,14 @@ static int max17042_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_CYCLE_COUNT:
 		ret = max17042_read_reg(chip->client, MAX17042_Cycles);
 		if (ret < 0)
-			return ret;
+			goto err;
 
 		val->intval = ret;
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
 		ret = max17042_read_reg(chip->client, MAX17042_MinMaxVolt);
 		if (ret < 0)
-			return ret;
+			goto err;
 
 		val->intval = ret >> 8;
 		val->intval *= 20000; /* Units of LSB = 20mV */
@@ -225,7 +231,7 @@ static int max17042_get_property(struct power_supply *psy,
 		else
 			ret = max17042_read_reg(chip->client, MAX17047_V_empty);
 		if (ret < 0)
-			return ret;
+			goto err;
 
 		val->intval = ret >> 7;
 		val->intval *= 10000; /* Units of LSB = 10mV */
@@ -233,21 +239,21 @@ static int max17042_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
 		ret = max17042_read_reg(chip->client, MAX17042_VCELL);
 		if (ret < 0)
-			return ret;
+			goto err;
 
 		val->intval = ret * 625 / 8;
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_AVG:
 		ret = max17042_read_reg(chip->client, MAX17042_AvgVCELL);
 		if (ret < 0)
-			return ret;
+			goto err;
 
 		val->intval = ret * 625 / 8;
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_OCV:
 		ret = max17042_read_reg(chip->client, MAX17042_OCVInternal);
 		if (ret < 0)
-			return ret;
+			goto err;
 
 		val->intval = ret * 625 / 8;
 		break;
@@ -266,7 +272,7 @@ static int max17042_get_property(struct power_supply *psy,
 
 		ret = max17042_read_reg(chip->client, MAX17042_RepSOC);
 		if (ret < 0)
-			return ret;
+			goto err;
 
 		ret >>= 8;
 		if (ret == 0 &&
@@ -279,21 +285,21 @@ static int max17042_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_CHARGE_FULL:
 		ret = max17042_read_reg(chip->client, MAX17042_FullCAP);
 		if (ret < 0)
-			return ret;
+			goto err;
 
 		val->intval = ret * 1000 / 2;
 		break;
 	case POWER_SUPPLY_PROP_CHARGE_COUNTER:
 		ret = max17042_read_reg(chip->client, MAX17042_QH);
 		if (ret < 0)
-			return ret;
+			goto err;
 
 		val->intval = ret * 1000 / 2;
 		break;
 	case POWER_SUPPLY_PROP_TEMP:
 		ret = max17042_read_reg(chip->client, MAX17042_TEMP);
 		if (ret < 0)
-			return ret;
+			goto err;
 
 		val->intval = ret;
 		/* The value is signed. */
@@ -315,7 +321,7 @@ static int max17042_get_property(struct power_supply *psy,
 		if (chip->pdata->enable_current_sense) {
 			ret = max17042_read_reg(chip->client, MAX17042_Current);
 			if (ret < 0)
-				return ret;
+				goto err;
 
 			val->intval = ret;
 			if (val->intval & 0x8000) {
@@ -326,7 +332,7 @@ static int max17042_get_property(struct power_supply *psy,
 			}
 			val->intval *= 1562500 / chip->pdata->r_sns;
 		} else {
-			return -EINVAL;
+			ret = -EINVAL;
 		}
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_AVG:
@@ -334,7 +340,7 @@ static int max17042_get_property(struct power_supply *psy,
 			ret = max17042_read_reg(chip->client,
 						MAX17042_AvgCurrent);
 			if (ret < 0)
-				return ret;
+				goto err;
 
 			val->intval = ret;
 			if (val->intval & 0x8000) {
@@ -345,7 +351,7 @@ static int max17042_get_property(struct power_supply *psy,
 			}
 			val->intval *= 1562500 / chip->pdata->r_sns;
 		} else {
-			return -EINVAL;
+			ret = -EINVAL;
 		}
 		break;
 	case POWER_SUPPLY_PROP_STATUS:
@@ -355,9 +361,14 @@ static int max17042_get_property(struct power_supply *psy,
 				val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
 		break;
 	default:
-		return -EINVAL;
+		ret = -EINVAL;
 	}
-	return 0;
+
+	if (ret > 0)
+		ret = 0;
+err:
+	mutex_unlock(&chip->lock);
+	return ret;
 }
 
 static int max17042_write_verify_reg(struct i2c_client *client,
@@ -486,6 +497,52 @@ static int max17042_verify_model_lock(struct max17042_chip *chip)
 
 	kfree(temp_data);
 	return ret;
+}
+
+static int max17042_perform_soft_POR(struct max17042_chip *chip)
+{
+	int val;
+	int retries = 8;
+
+	do {
+		/* 1. Lock the model and clear the POR bit */
+		max10742_lock_model(chip);
+		val = max17042_read_reg(chip->client, MAX17042_STATUS);
+		max17042_write_reg(chip->client, MAX17042_STATUS,
+				   val & (~STATUS_POR_BIT));
+		/* 2. Verify model lock MLOCK1 = MLOCK2 = STATUS = 0 */
+		if (!max17042_read_reg(chip->client, MAX17042_MLOCKReg1) &&
+		    !max17042_read_reg(chip->client, MAX17042_MLOCKReg2) &&
+		    !max17042_read_reg(chip->client, MAX17042_MLOCKReg2))
+			break;
+	} while (--retries);
+
+	if (!retries) {
+		dev_err(&chip->client->dev, "Unable to lock model\n");
+		return -EINVAL;
+	}
+
+	retries = 8;
+
+	do {
+		/* 3. Send SoftPOR */
+		max17042_write_reg(chip->client, MAX17042_VFSOC0Enable,
+				   0x000F);
+		/* 4. Wait atleast 2ms */
+		usleep_range(2000, 4000);
+		/* 5. Verify POR bit is set */
+		if (max17042_read_reg(chip->client, MAX17042_STATUS) &
+		    STATUS_POR_BIT)
+			break;
+	} while (--retries);
+
+	if (!retries) {
+		dev_err(&chip->client->dev, "Unable to set POR bit\n");
+		return -EINVAL;
+	}
+	dev_dbg(&chip->client->dev, "Soft POR success\n");
+
+	return 0;
 }
 
 static void max17042_write_config_regs(struct max17042_chip *chip)
@@ -740,16 +797,35 @@ static void max17042_init_worker(struct work_struct *work)
 {
 	struct max17042_chip *chip = container_of(work,
 				struct max17042_chip, work);
-	int ret;
+	int ret = 0;
+
+	mutex_lock(&chip->lock);
 
 	/* Initialize registers according to values from the platform data */
 	if (chip->pdata->enable_por_init && chip->pdata->config_data) {
 		ret = max17042_init_chip(chip);
-		if (ret)
-			return;
 	}
 
-	chip->init_complete = 1;
+	if (!ret)
+		chip->init_complete = 1;
+
+	mutex_unlock(&chip->lock);
+}
+
+static void max17042_malicious_removed_worker(struct work_struct *work)
+{
+	struct max17042_chip *chip = container_of(work,
+				struct max17042_chip, work_malicious_removed);
+
+	mutex_lock(&chip->lock);
+
+	max17042_perform_soft_POR(chip);
+	max17042_init_chip(chip);
+	dev_info(&chip->client->dev, "malicious ps removed, chip re-inited\n");
+
+	mutex_unlock(&chip->lock);
+
+	power_supply_changed(&chip->battery);
 }
 
 #ifdef CONFIG_OF
@@ -1034,6 +1110,9 @@ max17042_get_pdata(struct device *dev)
 
 	pdata->tcnv = max17042_get_conv_table(dev);
 
+	of_property_read_string(np, "maxim,malicious_supply",
+				&pdata->malicious_supply);
+
 	return pdata;
 }
 #else
@@ -1110,6 +1189,28 @@ err_debugfs:
 }
 #endif
 
+static void max17042_external_power_changed(struct power_supply *psy)
+{
+	struct max17042_chip *chip;
+	union power_supply_propval val;
+
+	chip = container_of(psy, struct max17042_chip, battery);
+
+	if (!chip->psy_malicious)
+		return;
+
+	chip->psy_malicious->get_property(chip->psy_malicious,
+					  POWER_SUPPLY_PROP_ONLINE, &val);
+
+	if (chip->malicious_online != val.intval) {
+		chip->malicious_online = val.intval;
+		if (!chip->malicious_online) {
+			dev_dbg(&chip->client->dev, "malicious ps removed\n");
+			schedule_work(&chip->work_malicious_removed);
+		}
+	}
+}
+
 static int max17042_probe(struct i2c_client *client,
 			const struct i2c_device_id *id)
 {
@@ -1117,6 +1218,7 @@ static int max17042_probe(struct i2c_client *client,
 	struct max17042_chip *chip;
 	int ret;
 	int reg;
+	union power_supply_propval val;
 
 	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_WORD_DATA))
 		return -EIO;
@@ -1133,6 +1235,16 @@ static int max17042_probe(struct i2c_client *client,
 	}
 
 	i2c_set_clientdata(client, chip);
+
+	if (chip->pdata->malicious_supply) {
+		chip->psy_malicious = power_supply_get_by_name(
+			chip->pdata->malicious_supply);
+		if (!chip->psy_malicious) {
+			dev_warn(&client->dev,
+				 "malicious ps not found, deferring.\n");
+			return -EPROBE_DEFER;
+		}
+	}
 
 	ret = max17042_read_reg(chip->client, MAX17042_DevName);
 	if (ret == MAX17042_IC_VERSION) {
@@ -1151,6 +1263,7 @@ static int max17042_probe(struct i2c_client *client,
 	chip->battery.get_property	= max17042_get_property;
 	chip->battery.properties	= max17042_battery_props;
 	chip->battery.num_properties	= ARRAY_SIZE(max17042_battery_props);
+	chip->battery.external_power_changed = max17042_external_power_changed;
 
 	/* When current is not measured,
 	 * CURRENT_NOW and CURRENT_AVG properties should be invisible. */
@@ -1176,12 +1289,25 @@ static int max17042_probe(struct i2c_client *client,
 		return ret;
 	}
 
+	if (chip->psy_malicious) {
+		INIT_WORK(&chip->work_malicious_removed,
+			  max17042_malicious_removed_worker);
+		chip->psy_malicious->get_property(chip->psy_malicious,
+						  POWER_SUPPLY_PROP_ONLINE,
+						  &val);
+		chip->malicious_online = val.intval;
+		dev_dbg(&client->dev, "malicious_online = %d\n",
+			chip->malicious_online);
+	}
+
 	ret = gpio_request_array(chip->pdata->gpio_list,
 				 chip->pdata->num_gpio_list);
 	if (ret) {
 		dev_err(&client->dev, "cannot request GPIOs\n");
 		return ret;
 	}
+
+	mutex_init(&chip->lock);
 
 	if (client->irq) {
 		ret = request_threaded_irq(client->irq, NULL,
@@ -1230,6 +1356,7 @@ static int max17042_remove(struct i2c_client *client)
 
 	if (client->irq)
 		free_irq(client->irq, chip);
+	mutex_destroy(&chip->lock);
 	gpio_free_array(chip->pdata->gpio_list, chip->pdata->num_gpio_list);
 	power_supply_unregister(&chip->battery);
 	return 0;

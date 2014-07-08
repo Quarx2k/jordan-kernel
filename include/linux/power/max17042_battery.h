@@ -228,6 +228,14 @@ struct max17042_platform_data {
 	 * has fired.
 	 */
 	bool batt_undervoltage_zero_soc;
+	/*
+	 * Malicious power supply specification (Optional). Used if there is
+	 * is a power supply, other than a battery or charger, that might
+	 * confuse the fuel gauge. If specificed, once the power supply is
+	 * removed, the driver will perform a POR of the chip in an attempt
+	 * to remove any learned data when the power supply was enabled.
+	 */
+	const char *malicious_supply;
 };
 
 #endif /* __MAX17042_BATTERY_H_ */
