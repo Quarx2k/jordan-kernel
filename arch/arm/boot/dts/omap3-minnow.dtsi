@@ -121,6 +121,7 @@
 			     "tusb-csn";
 		clk_in = "periph_26mhz";  /* external 26MHz clock */
 		reg = <0 0>;
+		supplied_to = "max170xx_battery";
 	};
 
 	factory_support {
