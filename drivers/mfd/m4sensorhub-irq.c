@@ -522,8 +522,9 @@ int m4sensorhub_irq_disable(struct m4sensorhub_data *m4sensorhub,
 
 	/* Checking if the IRQ was previously disabled only to print an error */
 	if (!enabled) {
-		KDEBUG(M4SH_ERROR, "%s: IRQ %d is already disabled\n",
+		KDEBUG(M4SH_INFO, "%s: IRQ %d is already disabled\n",
 			__func__, irq);
+		retval = 0;
 		goto m4sensorhub_irq_disable_fail;
 	}
 
@@ -586,8 +587,9 @@ int m4sensorhub_irq_enable(struct m4sensorhub_data *m4sensorhub,
 
 	/* Checking if the IRQ was previously enabled only to print an error */
 	if (!disabled) {
-		KDEBUG(M4SH_ERROR, "%s: IRQ %d is already enabled\n",
+		KDEBUG(M4SH_INFO, "%s: IRQ %d is already enabled\n",
 			__func__, irq);
+		retval = 0;
 		goto m4sensorhub_irq_enable_fail;
 	}
 
