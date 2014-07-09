@@ -334,6 +334,10 @@ struct minnow_panel_data {
 	unsigned long last_ulps;
 	unsigned long last_update;
 #endif
+	int vsync_events_gpio;
+	struct sysfs_dirent *vsync_events_sysfs;
+	bool vsync_events_enabled;
+	ktime_t vsync_events_timestamp;
 #ifdef CONFIG_WAKEUP_SOURCE_NOTIFY
 	struct notifier_block displayenable_nb;
 	struct work_struct early_init_work;
@@ -1667,6 +1671,95 @@ static ssize_t minnow_panel_perftime_show(struct device *dev,
 }
 #endif
 
+static ssize_t minnow_panel_vsync_events_enabled_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct omap_dss_device *dssdev = to_dss_device(dev);
+	struct minnow_panel_data *mpd = dev_get_drvdata(&dssdev->dev);
+	bool vsync_events_enabled;
+
+	mutex_lock(&mpd->lock);
+	vsync_events_enabled = mpd->vsync_events_enabled;
+	mutex_unlock(&mpd->lock);
+
+	return snprintf(buf, PAGE_SIZE, "%d\n", vsync_events_enabled);
+}
+
+static int minnow_panel_vsync_events_init(struct minnow_panel_data *mpd)
+{
+	int r = 0;
+	if (gpio_is_valid(mpd->vsync_events_gpio)) {
+		r = devm_gpio_request_one(&mpd->dssdev->dev,
+			mpd->vsync_events_gpio, GPIOF_IN,
+			"minnow-panel vsync_events");
+		mpd->vsync_events_sysfs = sysfs_get_dirent(
+			mpd->dssdev->dev.kobj.sd, NULL, "vsync_events");
+	}
+	return r;
+}
+
+static irqreturn_t minnow_panel_vsync_events_isr(int irq, void *dev_id)
+{
+	struct minnow_panel_data *mpd = dev_id;
+	mpd->vsync_events_timestamp = ktime_get();
+	sysfs_notify_dirent(mpd->vsync_events_sysfs);
+	return IRQ_HANDLED;
+}
+
+static int minnow_panel_enable_vsync_events_mlocked(
+	struct minnow_panel_data *mpd, bool enabled)
+{
+	int r = 0;
+	if (!gpio_is_valid(mpd->vsync_events_gpio)) {
+		dev_err(&mpd->dssdev->dev,
+			"enable_vsync_events: store: gpio not valid");
+		r = -EINVAL;
+	} else if (enabled != mpd->vsync_events_enabled) {
+		if (enabled) {
+			r = devm_request_irq(&mpd->dssdev->dev,
+				gpio_to_irq(mpd->vsync_events_gpio),
+				minnow_panel_vsync_events_isr,
+				IRQF_TRIGGER_RISING,
+				"minnow-panel vsync_events",
+				mpd);
+		} else {
+			devm_free_irq(&mpd->dssdev->dev,
+				      gpio_to_irq(mpd->vsync_events_gpio),
+				      mpd);
+		}
+		mpd->vsync_events_enabled = enabled;
+	}
+	return r;
+}
+
+static ssize_t minnow_panel_vsync_events_enabled_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct omap_dss_device *dssdev = to_dss_device(dev);
+	struct minnow_panel_data *mpd = dev_get_drvdata(&dssdev->dev);
+	unsigned long t;
+	int r;
+
+	r = kstrtoul(buf, 10, &t);
+	if (!r) {
+		bool enabled = !!t;
+		mutex_lock(&mpd->lock);
+		r = minnow_panel_enable_vsync_events_mlocked(mpd, enabled);
+		mutex_unlock(&mpd->lock);
+	}
+
+	return r ? r : count;
+}
+
+static ssize_t minnow_panel_vsync_events_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct omap_dss_device *dssdev = to_dss_device(dev);
+	struct minnow_panel_data *mpd = dev_get_drvdata(&dssdev->dev);
+	return snprintf(buf, PAGE_SIZE, "%llu\n",
+			ktime_to_ns(mpd->vsync_events_timestamp));
+}
+
 static DEVICE_ATTR(errors, S_IRUGO, minnow_panel_errors_show, NULL);
 static DEVICE_ATTR(hw_revision, S_IRUGO, minnow_panel_hw_revision_show, NULL);
 static DEVICE_ATTR(esd_interval, S_IRUGO | S_IWUSR,
@@ -1692,6 +1785,11 @@ static DEVICE_ATTR(interactivemode, S_IRUGO | S_IWUSR,
 #ifdef	PANEL_PERF_TIME
 static DEVICE_ATTR(perftime, S_IRUGO, minnow_panel_perftime_show, NULL);
 #endif
+static DEVICE_ATTR(vsync_events_enabled, S_IRUGO | S_IWUSR,
+		   minnow_panel_vsync_events_enabled_show,
+		   minnow_panel_vsync_events_enabled_store);
+static DEVICE_ATTR(vsync_events, S_IRUGO,
+		   minnow_panel_vsync_events_show, NULL);
 
 static struct attribute *minnow_panel_attrs[] = {
 	&dev_attr_errors.attr,
@@ -1708,6 +1806,8 @@ static struct attribute *minnow_panel_attrs[] = {
 #ifdef	PANEL_PERF_TIME
 	&dev_attr_perftime.attr,
 #endif
+	&dev_attr_vsync_events_enabled.attr,
+	&dev_attr_vsync_events.attr,
 	NULL,
 };
 
@@ -1882,6 +1982,9 @@ static int minnow_panel_dt_init(struct minnow_panel_data *mpd)
 	DTINFO("gpio_vio_en = %d\n", mpd->vio_en_gpio);
 	mpd->mem_en_gpio = of_get_named_gpio(dt_node, "gpio_mem_en", 0);
 	DTINFO("gpio_mem_en = %d\n", mpd->mem_en_gpio);
+	mpd->vsync_events_gpio = of_get_named_gpio(dt_node,
+						   "gpio_vsync_events", 0);
+	DTINFO("gpio_vsync_events = %d\n", mpd->vsync_events_gpio);
 	clkin = (char *)of_get_property(dt_node, "clk_in", NULL);
 	if (clkin) {
 		mpd->clk_in = clk_get(NULL, clkin);
@@ -2233,6 +2336,12 @@ static int minnow_panel_probe(struct omap_dss_device *dssdev)
 	r = sysfs_create_group(&dssdev->dev.kobj, &minnow_panel_attr_group);
 	if (r) {
 		dev_err(&dssdev->dev, "failed to create sysfs files\n");
+		goto err_vc_id;
+	}
+
+	r = minnow_panel_vsync_events_init(mpd);
+	if (r) {
+		dev_err(&dssdev->dev, "failed to init vsync_events\n");
 		goto err_vc_id;
 	}
 
