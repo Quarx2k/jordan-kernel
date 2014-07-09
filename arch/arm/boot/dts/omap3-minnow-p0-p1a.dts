@@ -36,6 +36,7 @@
 
 &tps65912_0 {
 		register-init-data = <
+                        0x06 0x7F /* DCDC1_LIMIT: 0.7V-1.4875V in 12.5mV steps */
 			0x25 0xD1 /* DEVCTRL2: enable SLEEP, INT push/pull
 					       200us TSLOT, INT active high */
 			0x26 0x49 /* I2C_SPI_CFG: AVS ADDR = 0x13,
