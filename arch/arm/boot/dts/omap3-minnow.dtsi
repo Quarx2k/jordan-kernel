@@ -76,6 +76,7 @@
 		id_panel = <2>;
 		gpio_panel_reset = <&gpio1 14 0>;       /* RESET gpio-14 */
 		gpio_bridge_reset = <&gpio1 23 0>;      /* RESET gpio-23 */
+		gpio_vsync_events = <&gpio1 29 0>;      /* VSYNC gpio-29 */
 		clk_in = "periph_26mhz";        /* external 26MHz clock */
 		/* declare it if ext_te enable */
 		//gpio_te = <&gpio1 0 0>;       /* EXT_TE gpio-0 */
