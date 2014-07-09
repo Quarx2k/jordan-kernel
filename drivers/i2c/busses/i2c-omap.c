@@ -56,7 +56,7 @@
 #define OMAP_I2C_REV_ON_4430_PLUS	0x50400002
 
 /* timeout waiting for the controller to respond */
-#define OMAP_I2C_TIMEOUT (msecs_to_jiffies(1000))
+#define OMAP_I2C_TIMEOUT (msecs_to_jiffies(500))
 
 /* For OMAP3 I2C_IV has changed to I2C_WE (wakeup enable) */
 enum {
@@ -695,6 +695,13 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 		if (r < 0) {
 			dev_err(dev->dev, "Unable to recover i2c bus from bb\n");
 			goto out;
+		} else {
+			/* Even if bus successfully cleared up, return an error
+			 * and abort transfer, to allow the i2c client to retry
+			 * the transfer on its own terms.
+			 */
+			r = -EREMOTEIO;
+			goto out;
 		}
 	}
 
@@ -732,8 +739,6 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 
 	if (r == 0)
 		r = num;
-
-	omap_i2c_wait_for_bb(dev);
 
 	pm_qos_update_request(&dev->pm_qos_request,
 			      PM_QOS_CPU_DMA_LAT_DEFAULT_VALUE);
