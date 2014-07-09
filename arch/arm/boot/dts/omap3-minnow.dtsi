@@ -326,6 +326,7 @@
 		gpio-names = "cc-alert";
 		interrupt-parent = <&gpio5>;
 		interrupts = <12 0>;		/* gpio-140 IRQ */
+		maxim,malicious_supply = "ac";
 		maxim,enable_por_init;
 		maxim,configuration {
 			/* Required properties */
