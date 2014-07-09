@@ -423,12 +423,16 @@ static void m4pas_panic_restore(struct m4sensorhub_data *m4sensorhub,
 		return;
 	}
 
+	mutex_lock(&(dd->mutex));
+
 	en = (dd->samplerate >= 0) ? 1 : 0;
 	err = m4sensorhub_reg_write_1byte(dd->m4, M4SH_REG_PASSIVE_ENABLE,
 					  en, 0xFF);
 	if (err != 1)
 		m4pas_err("%s: Failed to enable with %d.\n",
 			  __func__, err);
+
+	mutex_unlock(&(dd->mutex));
 }
 
 static int m4pas_driver_init(struct init_calldata *p_arg)

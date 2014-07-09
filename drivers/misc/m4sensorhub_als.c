@@ -277,12 +277,14 @@ static void m4als_panic_restore(struct m4sensorhub_data *m4sensorhub,
 {
 	int size, err;
 	struct m4als_driver_data *dd = (struct m4als_driver_data *)data;
-	
+
 	if (dd == NULL) {
 		m4als_err("%s: Driver data is null, unable to restore\n",
 			  __func__);
 		return;
 	}
+
+	mutex_lock(&(dd->mutex));
 
 	size = m4sensorhub_reg_getsize(dd->m4,
 				       M4SH_REG_LIGHTSENSOR_SAMPLERATE);
@@ -294,6 +296,8 @@ static void m4als_panic_restore(struct m4sensorhub_data *m4sensorhub,
 		m4als_err("%s: Wrote %d bytes instead of %d.\n",
 			  __func__, err, size);
 	}
+
+	mutex_unlock(&(dd->mutex));
 }
 
 static int m4als_driver_init(struct init_calldata *p_arg)

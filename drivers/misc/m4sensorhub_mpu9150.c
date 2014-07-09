@@ -76,6 +76,7 @@ struct mpu9150_client {
 	struct mpu9150_accel_data accel_data;
 	struct mpu9150_gyro_data gyro_data;
 	struct mpu9150_compass_data compass_data;
+	struct mutex mutex; /* prevent concurrent thread access */
 };
 
 struct mpu9150_client *misc_mpu9150_data;
@@ -140,9 +141,6 @@ static void m4_report_mpu9150_inputevent(
 	}
 }
 
-/* TO DO
-***** implement the delay functionality when M4 changes will be ready
-*/
 static void m4_set_mpu9150_delay(struct mpu9150_client *mpu9150_client_data,
 			int delay, enum mpu9150_sensor type)
 {
@@ -228,12 +226,18 @@ static void m4_read_mpu9150_data(struct mpu9150_client *mpu9150_client_data,
 	}
 
 }
+
 static void m4_handle_mpu9150_gyro_irq(enum m4sensorhub_irqs int_event,
 					 void *mpu9150_data)
 {
 	struct mpu9150_client *mpu9150_client_data = mpu9150_data;
+
+	mutex_lock(&(mpu9150_client_data->mutex));
+
 	m4_read_mpu9150_data(mpu9150_client_data, TYPE_GYRO);
 	m4_report_mpu9150_inputevent(mpu9150_client_data, TYPE_GYRO);
+
+	mutex_unlock(&(mpu9150_client_data->mutex));
 }
 
 static void m4_handle_mpu9150_accel_irq(enum m4sensorhub_irqs int_event,
@@ -241,8 +245,12 @@ static void m4_handle_mpu9150_accel_irq(enum m4sensorhub_irqs int_event,
 {
 	struct mpu9150_client *mpu9150_client_data = mpu9150_data;
 
+	mutex_lock(&(mpu9150_client_data->mutex));
+
 	m4_read_mpu9150_data(mpu9150_client_data, TYPE_ACCEL);
 	m4_report_mpu9150_inputevent(mpu9150_client_data, TYPE_ACCEL);
+
+	mutex_unlock(&(mpu9150_client_data->mutex));
 }
 
 static void m4_handle_mpu9150_compass_irq(enum m4sensorhub_irqs int_event,
@@ -250,8 +258,12 @@ static void m4_handle_mpu9150_compass_irq(enum m4sensorhub_irqs int_event,
 {
 	struct mpu9150_client *mpu9150_client_data = mpu9150_data;
 
+	mutex_lock(&(mpu9150_client_data->mutex));
+
 	m4_read_mpu9150_data(mpu9150_client_data, TYPE_COMPASS);
 	m4_report_mpu9150_inputevent(mpu9150_client_data, TYPE_COMPASS);
+
+	mutex_unlock(&(mpu9150_client_data->mutex));
 }
 
 static ssize_t m4_mpu9150_write_accel_setdelay(struct device *dev,
@@ -273,6 +285,9 @@ static ssize_t m4_mpu9150_write_accel_setdelay(struct device *dev,
 			);
 		return -EINVAL;
 	}
+
+	mutex_lock(&(misc_mpu9150_data->mutex));
+
 	m4_set_mpu9150_delay(misc_mpu9150_data, scanresult, TYPE_ACCEL);
 
 	if (scanresult == -1) {
@@ -287,10 +302,11 @@ static ssize_t m4_mpu9150_write_accel_setdelay(struct device *dev,
 					);
 	}
 
+	mutex_unlock(&(misc_mpu9150_data->mutex));
+
 	return count;
 }
-
-static DEVICE_ATTR(accel_setdelay, S_IRUSR | S_IWUSR, NULL,
+static DEVICE_ATTR(accel_setdelay, S_IWUSR, NULL,
 				m4_mpu9150_write_accel_setdelay);
 
 static ssize_t m4_mpu9150_write_gyro_setdelay(struct device *dev,
@@ -312,6 +328,9 @@ static ssize_t m4_mpu9150_write_gyro_setdelay(struct device *dev,
 			);
 		return -EINVAL;
 	}
+
+	mutex_lock(&(misc_mpu9150_data->mutex));
+
 	m4_set_mpu9150_delay(misc_mpu9150_data, scanresult, TYPE_GYRO);
 	if (scanresult == -1) {
 		mpu9150_irq_enable_disable(
@@ -324,10 +343,12 @@ static ssize_t m4_mpu9150_write_gyro_setdelay(struct device *dev,
 					SENSOR_IRQ_ENABLE
 					);
 	}
+
+	mutex_unlock(&(misc_mpu9150_data->mutex));
+
 	return count;
 }
-
-static DEVICE_ATTR(gyro_setdelay, S_IRUSR | S_IWUSR, NULL,
+static DEVICE_ATTR(gyro_setdelay, S_IWUSR, NULL,
 				m4_mpu9150_write_gyro_setdelay);
 
 static ssize_t m4_mpu9150_write_compass_setdelay(struct device *dev,
@@ -349,6 +370,9 @@ static ssize_t m4_mpu9150_write_compass_setdelay(struct device *dev,
 			);
 		return -EINVAL;
 	}
+
+	mutex_lock(&(misc_mpu9150_data->mutex));
+
 	m4_set_mpu9150_delay(misc_mpu9150_data, scanresult, TYPE_COMPASS);
 	if (scanresult == -1) {
 		mpu9150_irq_enable_disable(
@@ -361,17 +385,20 @@ static ssize_t m4_mpu9150_write_compass_setdelay(struct device *dev,
 				SENSOR_IRQ_ENABLE
 			);
 	}
+
+	mutex_unlock(&(misc_mpu9150_data->mutex));
+
 	return count;
 }
-static DEVICE_ATTR(compass_setdelay, S_IRUSR | S_IWUSR, NULL,
+static DEVICE_ATTR(compass_setdelay, S_IWUSR, NULL,
 				m4_mpu9150_write_compass_setdelay);
+
 static struct attribute *mpu9150_control_attributes[] = {
 	&dev_attr_accel_setdelay.attr,
 	&dev_attr_gyro_setdelay.attr,
 	&dev_attr_compass_setdelay.attr,
 	NULL
 };
-
 
 static const struct attribute_group mpu9150_control_group = {
 	.attrs = mpu9150_control_attributes,
@@ -659,15 +686,23 @@ static void mpu9150_panic_restore(struct m4sensorhub_data *m4sensorhub,
 		       __func__);
 		return;
 	}
+
+	mutex_lock(&(dd->mutex));
+
 	KDEBUG(M4SH_INFO, "Executing mpu9150 panic restore\n");
 	m4_set_mpu9150_delay(dd, dd->samplerate[TYPE_ACCEL], TYPE_ACCEL);
 	m4_set_mpu9150_delay(dd, dd->samplerate[TYPE_GYRO], TYPE_GYRO);
 	m4_set_mpu9150_delay(dd, dd->samplerate[TYPE_COMPASS], TYPE_COMPASS);
+
+	mutex_unlock(&(dd->mutex));
 }
 
 static int mpu9150_driver_init(struct init_calldata *p_arg)
 {
 	int ret;
+
+	mutex_lock(&(misc_mpu9150_data->mutex));
+
 	ret = mpu9150_irq_init(misc_mpu9150_data);
 	if (ret < 0) {
 		KDEBUG(M4SH_ERROR, "mpu9150 irq init failed\n");
@@ -682,6 +717,7 @@ static int mpu9150_driver_init(struct init_calldata *p_arg)
 		KDEBUG(M4SH_ERROR, "HR panic callback register failed\n");
 
 driver_init_exit:
+	mutex_unlock(&(misc_mpu9150_data->mutex));
 	return ret;
 }
 
@@ -748,7 +784,10 @@ static int mpu9150_client_probe(struct platform_device *pdev)
 		KDEBUG(M4SH_ERROR, "Error registering %s driver\n", __func__);
 		goto unregister_input_device;
 	}
+
 	misc_mpu9150_data = mpu9150_client_data;
+	mutex_init(&(misc_mpu9150_data->mutex));
+
 	ret = m4sensorhub_register_initcall(mpu9150_driver_init,
 					mpu9150_client_data);
 	if (ret < 0) {
@@ -765,6 +804,7 @@ static int mpu9150_client_probe(struct platform_device *pdev)
 	if (ret)
 		goto unregister_control_group;
 #endif
+
 	KDEBUG(M4SH_INFO, "Initialized %s driver\n", __func__);
 	return 0;
 
@@ -775,6 +815,7 @@ unregister_control_group:
 unregister_initcall:
 	m4sensorhub_unregister_initcall(mpu9150_driver_init);
 unregister_misc_device:
+	mutex_destroy(&(misc_mpu9150_data->mutex));
 	misc_mpu9150_data = NULL;
 	misc_deregister(&mpu9150_client_miscdrv);
 unregister_input_device:
@@ -791,6 +832,11 @@ static int __exit mpu9150_client_remove(struct platform_device *pdev)
 {
 	struct mpu9150_client *mpu9150_client_data =
 						platform_get_drvdata(pdev);
+
+	if (mpu9150_client_data == NULL)
+		return 0;
+
+	mutex_lock(&(mpu9150_client_data->mutex));
 	sysfs_remove_group(&pdev->dev.kobj, &mpu9150_control_group);
 #ifdef MPU9150_DEBUG
 	sysfs_remove_group(&pdev->dev.kobj, &mpu9150_group);
@@ -802,6 +848,7 @@ static int __exit mpu9150_client_remove(struct platform_device *pdev)
 	input_unregister_device(mpu9150_client_data->input_dev);
 	platform_set_drvdata(pdev, NULL);
 	mpu9150_client_data->m4sensorhub = NULL;
+	mutex_destroy(&(mpu9150_client_data->mutex));
 	kfree(mpu9150_client_data);
 	mpu9150_client_data = NULL;
 	return 0;
@@ -811,10 +858,22 @@ static int mpu9150_client_suspend(struct platform_device *pdev,
 				  pm_message_t state)
 {
 	struct mpu9150_client *dd = platform_get_drvdata(pdev);
+
+	if (dd == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: Driver data is NULL--%s.\n",
+			__func__, "cannot suspend");
+		return 0;
+	}
+
+	mutex_lock(&(dd->mutex));
+
 	m4_set_mpu9150_delay(dd, dd->latest_samplerate[TYPE_ACCEL], TYPE_ACCEL);
 	m4_set_mpu9150_delay(dd, dd->latest_samplerate[TYPE_GYRO], TYPE_GYRO);
 	m4_set_mpu9150_delay(dd, dd->latest_samplerate[TYPE_COMPASS],
 			     TYPE_COMPASS);
+
+	mutex_unlock(&(dd->mutex));
+
 	return 0;
 }
 

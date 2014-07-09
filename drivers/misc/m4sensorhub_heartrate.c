@@ -494,9 +494,11 @@ static void m4hrt_panic_restore(struct m4sensorhub_data *m4sensorhub,
 			  __func__);
 		return;
 	}
+
+	mutex_lock(&(dd->mutex));
+
 	size = m4sensorhub_reg_getsize(dd->m4,
 				      M4SH_REG_HEARTRATE_APSAMPLERATE);
-
 	err = m4sensorhub_reg_write(dd->m4, M4SH_REG_HEARTRATE_APSAMPLERATE,
 				   (char *)&dd->samplerate, m4sh_no_mask);
 	if (err < 0) {
@@ -505,6 +507,8 @@ static void m4hrt_panic_restore(struct m4sensorhub_data *m4sensorhub,
 		m4hrt_err("%s:  Wrote %d bytes instead of %d.\n",
 			  __func__, err, size);
 	}
+
+	mutex_unlock(&(dd->mutex));
 }
 
 static int m4hrt_driver_init(struct init_calldata *p_arg)

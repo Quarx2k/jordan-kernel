@@ -549,11 +549,15 @@ static void m4ped_panic_restore(struct m4sensorhub_data *m4sensorhub,
 				void *data)
 {
 	struct m4ped_driver_data *dd = (struct m4ped_driver_data *)data;
+
 	if (dd == NULL) {
 		m4ped_err("%s: Driver data is null, unable to restore\n",
 			  __func__);
 		return;
 	}
+
+	mutex_lock(&(dd->mutex));
+
 	dd->base_dat.total_distance = dd->iiodat.total_distance;
 	dd->base_dat.total_steps = dd->iiodat.total_steps;
 	dd->base_dat.healthy_minutes = dd->iiodat.healthy_minutes;
@@ -561,6 +565,8 @@ static void m4ped_panic_restore(struct m4sensorhub_data *m4sensorhub,
 	m4ped_err("%s: Pedometer bases after panic = %d %d %d %d", __func__,
 		  dd->base_dat.total_distance, dd->base_dat.total_steps,
 		  dd->base_dat.healthy_minutes, dd->base_dat.calories);
+
+	mutex_unlock(&(dd->mutex));
 }
 
 static int m4ped_driver_init(struct init_calldata *p_arg)
