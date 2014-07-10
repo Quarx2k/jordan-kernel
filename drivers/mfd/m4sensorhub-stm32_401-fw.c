@@ -333,6 +333,56 @@ done:
 }
 EXPORT_SYMBOL_GPL(m4sensorhub_401_load_firmware);
 
+/* TODO: Restructure reflash code so that this function can go in the core */
+int m4sensorhub_test_m4_reboot(struct m4sensorhub_data *m4, bool reboot_first)
+{
+	int err = 0;
+	int i;
+	uint16_t version;
+
+	if (m4 == NULL) {
+		KDEBUG(M4SH_ERROR, "%s: M4 data is missing.\n", __func__);
+		err = -ENODATA;
+		goto m4sensorhub_test_m4_reboot_exit;
+	}
+
+	for (i = 0; i < 3; i++) {
+		if ((i > 0) || (reboot_first)) {
+			m4sensorhub_hw_reset(m4);
+			err = m4sensorhub_jump_to_user(m4);
+			if (err < 0) {
+				KDEBUG(M4SH_ERROR,
+					"%s: M4 reboot failed (retries=%d)\n",
+					__func__, i);
+				continue;
+			}
+		}
+
+		/* Wait progressively longer for M4 to become ready */
+		if (i > 0)
+			msleep(i * 100);
+
+		/* Read M4 register to test if M4 is ready */
+		err = m4sensorhub_reg_read(m4, M4SH_REG_GENERAL_VERSION,
+			(char *)&version);
+		if (err < 0) {
+			KDEBUG(M4SH_ERROR, "%s: %s (retries=%d).\n", __func__,
+				"Failed initial I2C read", i);
+			continue;
+		} else {
+			/* No failure so break loop */
+			err = 0;
+			break;
+		}
+	}
+
+	if (err < 0)
+		panic("%s: M4 has failed--forcing panic...\n", __func__);
+
+m4sensorhub_test_m4_reboot_exit:
+	return err;
+}
+EXPORT_SYMBOL_GPL(m4sensorhub_test_m4_reboot);
 
 /* -------------- Local Functions ----------------- */
 /* m4sensorhub_bl_ack()

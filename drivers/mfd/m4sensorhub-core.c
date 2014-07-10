@@ -61,7 +61,6 @@ static struct m4sensorhub_data m4sensorhub_misc_data;
 static DEFINE_MUTEX(m4sensorhub_driver_lock);
 static struct init_call *inithead;
 static struct init_call *preflash_head;
-static int firmware_download_status = -1;
 static char tcmd_exec_status;
 
 unsigned short force_upgrade;
@@ -459,8 +458,6 @@ static void m4sensorhub_initialize(const struct firmware *firmware,
 	int err = 0;
 	struct init_call *inc, *prev;
 	struct init_calldata arg;
-	int i;
-	uint16_t version;
 
 	if (firmware == NULL) {
 		KDEBUG(M4SH_ERROR, "%s: No firmware data recieved\n",
@@ -468,46 +465,30 @@ static void m4sensorhub_initialize(const struct firmware *firmware,
 		return;
 	}
 
-	/* initiate m4 firmware download */
-	for (i = 0; i < 3; i++) {
-		KDEBUG(M4SH_CRITICAL, "%s: Starting M4 download %s = %d\n",
-			__func__, "with force_upgrade", force_upgrade);
-		if (m4sensorhub_misc_data.i2c_client->addr == 0x39)
-			firmware_download_status =
-				m4sensorhub_401_load_firmware(
-					&m4sensorhub_misc_data,
-					force_upgrade, firmware);
-		else
-			firmware_download_status = m4sensorhub_load_firmware(
-				&m4sensorhub_misc_data,
-				force_upgrade, firmware);
+	/* Initiate M4 firmware download */
+	KDEBUG(M4SH_CRITICAL, "%s: Starting M4 download %s = %d\n",
+		__func__, "with force_upgrade", force_upgrade);
+	if (m4sensorhub_misc_data.i2c_client->addr == 0x39)
+		err = m4sensorhub_401_load_firmware(&m4sensorhub_misc_data,
+			force_upgrade, firmware);
+	else
+		err = m4sensorhub_load_firmware(&m4sensorhub_misc_data,
+			force_upgrade, firmware);
 
-		if (firmware_download_status < 0) {
-			KDEBUG(M4SH_ERROR, "%s: %s = %d\n",
-				__func__, "Failed to load M4 firmware", err);
-			/* Since download failed, return M4 to boot mode */
-			m4sensorhub_hw_reset(&m4sensorhub_misc_data);
-			return;
-		}
-
-		/* Wait progressively longer for M4 to become ready */
-		if (i > 0)
-			msleep(i * 100);
-
-		/* Read M4 register to test if M4 is ready */
-		err = m4sensorhub_reg_read(&m4sensorhub_misc_data,
-			M4SH_REG_GENERAL_VERSION, (char *)&version);
-		if (err < 0)
-			KDEBUG(M4SH_ERROR, "%s: %s (retries=%d).\n", __func__,
-				"Failed initial I2C read", i);
-		else  /* No failure */
-			break;
+	if (err < 0) {
+		KDEBUG(M4SH_ERROR, "%s: %s = %d\n",
+			__func__, "Failed to load M4 firmware", err);
+		/* Since download failed, return M4 to boot mode */
+		m4sensorhub_hw_reset(&m4sensorhub_misc_data);
+		return;
 	}
 
-	/* Check if we actually finished the loop */
-	if (i >= 3)
-		panic("%s: M4 has failed--forcing panic...\n",
-			__func__);
+	err = m4sensorhub_test_m4_reboot(&m4sensorhub_misc_data, false);
+	if (err < 0) {
+		/* Getting here is unlikely because failures normally panic */
+		KDEBUG(M4SH_ERROR, "%s: Testing M4 reboot failed.\n", __func__);
+		return;
+	}
 
 	err = m4sensorhub_irq_init(&m4sensorhub_misc_data);
 	if (err < 0) {

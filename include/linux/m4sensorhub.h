@@ -170,14 +170,19 @@ void m4sensorhub_reg_access_unlock(void);
 int m4sensorhub_i2c_write_read(struct m4sensorhub_data *m4sensorhub,
 				      u8 *buf, int writelen, int readlen);
 
+/*
+ * Functions for re-initializing M4
+ *
+ * In general, only m4sensorhub_test_m4_reboot() should ever
+ *   be called directly.
+ */
+int m4sensorhub_test_m4_reboot(struct m4sensorhub_data *m4, bool reboot_first);
 int m4sensorhub_load_firmware(struct m4sensorhub_data *m4sensorhub,
 	unsigned short force_upgrade,
 	const struct firmware *firmware);
-
 int m4sensorhub_401_load_firmware(struct m4sensorhub_data *m4sensorhub,
 	unsigned short force_upgrade,
 	const struct firmware *fm);
-
 void m4sensorhub_hw_reset(struct m4sensorhub_data *m4sensorhub);
 
 /* Interrupt handler */
@@ -198,6 +203,7 @@ int m4sensorhub_irq_enable_get(struct m4sensorhub_data *m4sensorhub,
 void m4sensorhub_irq_pm_dbg_suspend(void);
 void m4sensorhub_irq_pm_dbg_resume(void);
 
+/* M4 Panic Calls */
 int m4sensorhub_panic_init(struct m4sensorhub_data *m4sensorhub);
 void m4sensorhub_panic_shutdown(struct m4sensorhub_data *m4sensorhub);
 int m4sensorhub_panic_register(struct m4sensorhub_data *m4sensorhub,
@@ -207,6 +213,7 @@ int m4sensorhub_panic_register(struct m4sensorhub_data *m4sensorhub,
 int m4sensorhub_panic_unregister(struct m4sensorhub_data *m4sensorhub,
 				enum m4sensorhub_panichdl_index index);
 void m4sensorhub_panic_process(struct m4sensorhub_data *m4sensorhub);
+
 /* all M4 based drivers need to register an init call with the core,
  this callback will be executed once M4 core has properly set up FW
  on M4. For registration, a callback and a void* is passed in. When

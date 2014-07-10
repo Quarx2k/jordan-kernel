@@ -294,11 +294,8 @@ void m4sensorhub_panic_process(struct m4sensorhub_data *m4sensorhub)
 	}
 
 	KDEBUG(M4SH_ERROR, "%s: Detected M4 panic, reset M4!\n", __func__);
-	msleep(100);
-	if (m4sensorhub->i2c_client->addr == 0x39)
-		ret = m4sensorhub_401_load_firmware(m4sensorhub, 0, NULL);
-	else
-		ret = m4sensorhub_load_firmware(m4sensorhub, 0, NULL);
+	/* Passing "true" will reset M4 before trying to communicate */
+	ret = m4sensorhub_test_m4_reboot(m4sensorhub, true);
 	if (ret < 0) {
 		KDEBUG(M4SH_ERROR, "%s: Failed to restart M4, ret = %d\n",
 			__func__, ret);
