@@ -177,9 +177,6 @@ struct atmxt_driver_data {
 	struct mutex                *mutex;
 	struct input_dev            *in_dev;
 	struct wake_lock            timed_lock;
-	struct workqueue_struct     *workqueue;
-	struct work_struct          work;
-	struct wake_lock            wake_lock;
 
 	enum atmxt_driver_state     drv_stat;
 	enum atmxt_ic_state         ic_stat;
