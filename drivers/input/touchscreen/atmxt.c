@@ -527,7 +527,7 @@ static int atmxt_enter_aot(struct atmxt_driver_data *dd)
 	int err = 0;
 	int drv_state = 0;
 	int ic_state = 0;
-	uint8_t sleep_cmd[4] = {0x32, 0x32, 0x19, 0x00};
+	uint8_t sleep_cmd[4] = {0x64, 0x64, 0x19, 0x00};
 	uint8_t adx_cmd[2] = {0x08, 0x08};
 	uint8_t mxd_cmd = 0x08;
 
