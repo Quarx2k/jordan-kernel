@@ -331,7 +331,7 @@
 		maxim,enable_por_init;
 		maxim,configuration {
 			/* Required properties */
-			config		= /bits/ 16 <0x2254>;	/* Tex = 0, TS = Ten = ETHRM = 1,  Aen = 1 */
+			config		= /bits/ 16 <0x6254>;	/* Tex = 0, Ss = Aen = TS = Ten = ETHRM = 1 */
 			full_soc_thresh	= /bits/ 16 <0x5F00>;	/* app note constant */
 			design_cap	= /bits/ 16 <662>;	/* in 5uVh/Rsns = 0.5 mAh */
 			ichgt_term	= /bits/ 16 <0x0080>;	/* battery attribute */
