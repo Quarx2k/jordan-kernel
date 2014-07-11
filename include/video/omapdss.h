@@ -692,6 +692,7 @@ struct omap_dss_driver {
 	void (*disable)(struct omap_dss_device *display);
 #if defined(CONFIG_HAS_AMBIENTMODE)
 	int (*suspend)(struct omap_dss_device *display);
+	int (*resume)(struct omap_dss_device *display);
 #endif
 	int (*run_test)(struct omap_dss_device *display, int test);
 

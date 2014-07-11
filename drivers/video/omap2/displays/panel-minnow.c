@@ -253,7 +253,10 @@ static struct minnow_panel_attr panel_attr_table[MINNOW_PANEL_MAX] = {
 
 struct minnow_panel_data {
 	struct mutex lock;		/* mutex */
-	struct wake_lock wake_lock;	/* wake_lock */
+	/* wake_lock for common function, it should be used in same thread */
+	struct wake_lock wake_lock;
+	/* wake_lock for update function, it's used in different thread */
+	struct wake_lock update_wake_lock;
 
 	struct omap_dss_device *dssdev;
 
@@ -310,6 +313,9 @@ struct minnow_panel_data {
 
 	struct delayed_work esd_work;
 	unsigned esd_interval;
+#if defined(CONFIG_HAS_AMBIENTMODE)
+	struct timespec esd_start_time;
+#endif
 
 	bool ulps_enabled;
 	unsigned ulps_timeout;
@@ -332,6 +338,9 @@ struct minnow_panel_data {
 	struct notifier_block displayenable_nb;
 	struct work_struct early_init_work;
 #endif /* CONFIG_WAKEUP_SOURCE_NOTIFY */
+#if defined(CONFIG_HAS_AMBIENTMODE)
+	struct completion resume_completion;
+#endif
 };
 
 /* panel parameter passed from boot-loader */
@@ -353,6 +362,22 @@ static void minnow_panel_esd_work(struct work_struct *work);
 static void minnow_panel_ulps_work(struct work_struct *work);
 
 static int minnow_panel_enable(struct omap_dss_device *dssdev);
+
+static void minnow_panel_sync_resume_mlocked(struct minnow_panel_data *mpd)
+{
+#if defined(CONFIG_HAS_AMBIENTMODE)
+	/* check if there is already resumed */
+	if (completion_done(&mpd->resume_completion))
+		return;
+	/* wait 500ms for resume completed */
+	if (wait_for_completion_timeout(&mpd->resume_completion,
+					msecs_to_jiffies(500)))
+		return;
+	WARN(1, "%s: failed sync with resume\n", __func__);
+#else
+	(void)mpd;
+#endif
+}
 
 #ifdef CONFIG_WAKEUP_SOURCE_NOTIFY
 static int omapdss_displayenable_notify(struct notifier_block *self,
@@ -943,6 +968,10 @@ static void minnow_panel_queue_esd_work(struct minnow_panel_data *mpd)
 		return;
 	queue_delayed_work(mpd->workqueue, &mpd->esd_work,
 			   msecs_to_jiffies(mpd->esd_interval));
+#if defined(CONFIG_HAS_AMBIENTMODE)
+	/* store start time of delayed work */
+	read_persistent_clock(&mpd->esd_start_time);
+#endif
 }
 
 static void minnow_panel_cancel_esd_work(struct minnow_panel_data *mpd)
@@ -1590,6 +1619,7 @@ static ssize_t minnow_panel_store_interactivemode(struct device *dev,
 		 */
 		mutex_lock(&mpd->lock);
 		if (mpd->enabled && (mpd->interactive != enable)) {
+			minnow_panel_sync_resume_mlocked(mpd);
 			mpd->interactive = enable;
 			dsi_bus_lock(dssdev);
 			if (enable)
@@ -2211,12 +2241,19 @@ static int minnow_panel_probe(struct omap_dss_device *dssdev)
 		dss_debugfs_create_file("panel_regs", minnow_panel_dump_regs);
 #endif
 	wake_lock_init(&mpd->wake_lock, WAKE_LOCK_SUSPEND, "minnow-panel");
+	wake_lock_init(&mpd->update_wake_lock, WAKE_LOCK_SUSPEND,
+		       "minnow-panel-update");
 
 #ifdef CONFIG_WAKEUP_SOURCE_NOTIFY
 	INIT_WORK(&mpd->early_init_work, minnow_panel_early_init_func);
 	mpd->displayenable_nb.notifier_call = omapdss_displayenable_notify;
 	wakeup_source_register_notify(&mpd->displayenable_nb);
 #endif /* CONFIG_WAKEUP_SOURCE_NOTIFY */
+
+#if defined(CONFIG_HAS_AMBIENTMODE)
+	init_completion(&mpd->resume_completion);
+	complete_all(&mpd->resume_completion);
+#endif
 
 	return 0;
 
@@ -2491,10 +2528,10 @@ static int minnow_panel_update_locked(struct minnow_panel_data *mpd)
 	int r = 0;
 
 	/* hold wake_lock to avoid kernel suspend */
-	wake_lock(&mpd->wake_lock);
+	wake_lock(&mpd->update_wake_lock);
 
 	/* XXX no need to send this every frame, but dsi break if not done */
-	r = minnow_panel_set_update_window(mpd, 0, 0, 
+	r = minnow_panel_set_update_window(mpd, 0, 0,
 					   mpd->dssdev->panel.timings.x_res,
 					   mpd->dssdev->panel.timings.y_res);
 	if (r)
@@ -2517,7 +2554,7 @@ static int minnow_panel_update_locked(struct minnow_panel_data *mpd)
 	/* No wake_unlock here, unlock will be done in framedone_cb */
 	return r;
 err:
-	wake_unlock(&mpd->wake_lock);
+	wake_unlock(&mpd->update_wake_lock);
 	return r;
 }
 
@@ -2532,8 +2569,10 @@ static int minnow_panel_enable(struct omap_dss_device *dssdev)
 		 __func__, dssdev->state);
 
 	if (dssdev->state == OMAP_DSS_DISPLAY_DISABLED) {
+		wake_lock(&mpd->wake_lock);
 		minnow_panel_cancel_ulps_work(mpd);
 		minnow_panel_cancel_esd_work(mpd);
+		minnow_panel_sync_resume_mlocked(mpd);
 
 		dsi_bus_lock(dssdev);
 		r = minnow_panel_enable_locked(mpd);
@@ -2553,6 +2592,7 @@ static int minnow_panel_enable(struct omap_dss_device *dssdev)
 			dev_info(&dssdev->dev, "Display enabled successfully "
 				 "%s update!\n", update ? "with" : "without");
 		}
+		wake_unlock(&mpd->wake_lock);
 	}
 	mutex_unlock(&mpd->lock);
 
@@ -2567,8 +2607,10 @@ static void minnow_panel_disable(struct omap_dss_device *dssdev)
 		 __func__, dssdev->state);
 
 	mutex_lock(&mpd->lock);
+	wake_lock(&mpd->wake_lock);
 	minnow_panel_cancel_ulps_work(mpd);
 	minnow_panel_cancel_esd_work(mpd);
+	minnow_panel_sync_resume_mlocked(mpd);
 
 	dsi_bus_lock(dssdev);
 	if (dssdev->state == OMAP_DSS_DISPLAY_ACTIVE) {
@@ -2578,6 +2620,7 @@ static void minnow_panel_disable(struct omap_dss_device *dssdev)
 	}
 	dsi_bus_unlock(dssdev);
 
+	wake_unlock(&mpd->wake_lock);
 	mutex_unlock(&mpd->lock);
 }
 
@@ -2593,8 +2636,45 @@ static int minnow_panel_suspend(struct omap_dss_device *dssdev)
 		dsi_bus_lock(dssdev);
 		minnow_panel_enter_ulps_locked(mpd);
 		dsi_bus_unlock(dssdev);
+		/* cancel queued esd work in suspend mode */
+		if (mpd->esd_interval)
+			minnow_panel_cancel_esd_work(mpd);
+	}
+	/* block all threads waiting on resume */
+	INIT_COMPLETION(mpd->resume_completion);
+	mutex_unlock(&mpd->lock);
+	return 0;
+}
+
+static int minnow_panel_resume(struct omap_dss_device *dssdev)
+{
+	struct minnow_panel_data *mpd = dev_get_drvdata(&dssdev->dev);
+	dev_dbg(&dssdev->dev, "%s: current state = %d, wake_lock:%d\n",
+		__func__, dssdev->state, wake_lock_active(&mpd->wake_lock));
+
+	/* wake up all threads waiting on resume
+	 * don't mutex_lock this as it may dead lock
+	 */
+	complete_all(&mpd->resume_completion);
+
+	mutex_lock(&mpd->lock);
+	/* calculate delay time to queue esd work again */
+	if (mpd->esd_interval && mpd->enabled) {
+		int ms;
+		struct timespec ts;
+		read_persistent_clock(&ts);
+		ts = timespec_sub(ts, mpd->esd_start_time);
+		ms = ts.tv_sec * MSEC_PER_SEC +
+			ts.tv_nsec / NSEC_PER_MSEC;
+		if (ms >= mpd->esd_interval)
+			ms = 0;
+		else
+			ms = mpd->esd_interval - ms;
+		queue_delayed_work(mpd->workqueue, &mpd->esd_work,
+				   msecs_to_jiffies(ms));
 	}
 	mutex_unlock(&mpd->lock);
+
 	return 0;
 }
 #endif
@@ -2616,7 +2696,7 @@ static void minnow_panel_framedone_cb(int err, void *data)
 }
 #endif
 	dsi_bus_unlock(dssdev);
-	wake_unlock(&mpd->wake_lock);
+	wake_unlock(&mpd->update_wake_lock);
 }
 
 static irqreturn_t minnow_panel_te_isr(int irq, void *data)
@@ -2663,9 +2743,11 @@ static int minnow_panel_update(struct omap_dss_device *dssdev,
 
 	/* if driver is disabled ot it's video mode, do not manual update */
 	mutex_lock(&mpd->lock);
+	wake_lock(&mpd->wake_lock);
 	if (mpd->enabled && (mpd->dsi_config.mode!=OMAP_DSS_DSI_VIDEO_MODE)) {
 		int recovered = 0;
 		dev_dbg(&dssdev->dev, "update %d, %d, %d-%d\n", x, y, w, h);
+		minnow_panel_sync_resume_mlocked(mpd);
 
 		dsi_bus_lock(dssdev);
 		r = minnow_panel_wake_up_locked(mpd);
@@ -2693,6 +2775,7 @@ static int minnow_panel_update(struct omap_dss_device *dssdev,
 		dsi_bus_unlock(dssdev);
 	}
 _mutex_unlock_:
+	wake_unlock(&mpd->wake_lock);
 	mutex_unlock(&mpd->lock);
 	return r;
 }
@@ -2918,6 +3001,9 @@ static void minnow_panel_esd_work(struct work_struct *work)
 		return;
 	}
 
+	wake_lock(&mpd->wake_lock);
+	minnow_panel_sync_resume_mlocked(mpd);
+
 	dsi_bus_lock(dssdev);
 
 	r = minnow_panel_wake_up_locked(mpd);
@@ -2950,6 +3036,7 @@ _next_:
 
 	dsi_bus_unlock(dssdev);
 	minnow_panel_queue_esd_work(mpd);
+	wake_unlock(&mpd->wake_lock);
 	mutex_unlock(&mpd->lock);
 	return;
 
@@ -2969,28 +3056,9 @@ _reset_:
 	}
 	dsi_bus_unlock(dssdev);
 _munlock_:
+	wake_unlock(&mpd->wake_lock);
 	mutex_unlock(&mpd->lock);
 }
-
-static int minnow_panel_pm_prepare(struct device *dev)
-{
-	struct minnow_panel_data *mpd = dev_get_drvdata(dev);
-	minnow_panel_cancel_esd_work(mpd);
-
-	return 0;
-}
-
-static void minnow_panel_pm_complete(struct device *dev)
-{
-	struct minnow_panel_data *mpd = dev_get_drvdata(dev);
-	minnow_panel_queue_esd_work(mpd);
-}
-
-
-static struct dev_pm_ops minnow_panel_pm_ops = {
-	.prepare =  minnow_panel_pm_prepare,
-	.complete = minnow_panel_pm_complete,
-};
 
 static struct omap_dss_driver minnow_panel_driver = {
 	.probe		= minnow_panel_probe,
@@ -3000,6 +3068,7 @@ static struct omap_dss_driver minnow_panel_driver = {
 	.disable	= minnow_panel_disable,
 #if defined(CONFIG_HAS_AMBIENTMODE)
 	.suspend	= minnow_panel_suspend,
+	.resume		= minnow_panel_resume,
 #endif
 
 	.update		= minnow_panel_update,
@@ -3019,7 +3088,6 @@ static struct omap_dss_driver minnow_panel_driver = {
 	.driver         = {
 		.name   = "minnow-panel",
 		.owner  = THIS_MODULE,
-		.pm     = &minnow_panel_pm_ops,
 	},
 };
 

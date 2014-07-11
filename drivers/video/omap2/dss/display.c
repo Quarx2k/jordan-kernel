@@ -80,17 +80,15 @@ static int dss_suspend_device(struct device *dev, void *data)
 {
 	struct omap_dss_device *dssdev = to_dss_device(dev);
 
+#if defined(CONFIG_HAS_AMBIENTMODE)
+	if (dssdev->driver->suspend)
+		return dssdev->driver->suspend(dssdev);
+#else
 	if (dssdev->state != OMAP_DSS_DISPLAY_ACTIVE) {
 		dssdev->activate_after_resume = false;
 		return 0;
 	}
 
-#if defined(CONFIG_HAS_AMBIENTMODE)
-	if (dssdev->driver->suspend) {
-		dssdev->activate_after_resume = false;
-		return dssdev->driver->suspend(dssdev);
-	}
-#else
 	dssdev->driver->disable(dssdev);
 
 	dssdev->activate_after_resume = true;
@@ -116,16 +114,20 @@ int dss_suspend_all_devices(void)
 
 static int dss_resume_device(struct device *dev, void *data)
 {
-	int r;
 	struct omap_dss_device *dssdev = to_dss_device(dev);
 
+#if defined(CONFIG_HAS_AMBIENTMODE)
+	if (dssdev->driver->resume)
+		return dssdev->driver->resume(dssdev);
+#else
 	if (dssdev->activate_after_resume) {
-		r = dssdev->driver->enable(dssdev);
+		int r = dssdev->driver->enable(dssdev);
 		if (r)
 			return r;
 	}
 
 	dssdev->activate_after_resume = false;
+#endif
 
 	return 0;
 }

@@ -220,11 +220,10 @@ static int omap_dss_pm_notif(struct notifier_block *b, unsigned long v, void *d)
 		DSSDBG("suspending displays\n");
 		return dss_suspend_all_devices();
 
-#if !defined(CONFIG_HAS_AMBIENTMODE)
 	case PM_POST_SUSPEND:
 		DSSDBG("resuming displays\n");
 		return dss_resume_all_devices();
-#endif
+
 	default:
 		return 0;
 	}
