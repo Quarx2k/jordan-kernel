@@ -116,7 +116,7 @@ static struct xattr_handler *ext3_xattr_handler_map[] = {
 #endif
 };
 
-struct xattr_handler *ext3_xattr_handlers[] = {
+const struct xattr_handler *ext3_xattr_handlers[] = {
 	&ext3_xattr_user_handler,
 	&ext3_xattr_trusted_handler,
 #ifdef CONFIG_EXT3_FS_POSIX_ACL

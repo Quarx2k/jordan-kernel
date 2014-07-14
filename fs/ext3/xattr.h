@@ -76,7 +76,7 @@ extern void ext3_xattr_put_super(struct super_block *);
 extern int init_ext3_xattr(void);
 extern void exit_ext3_xattr(void);
 
-extern struct xattr_handler *ext3_xattr_handlers[];
+extern const struct xattr_handler *ext3_xattr_handlers[];
 
 # else  /* CONFIG_EXT3_FS_XATTR */
 

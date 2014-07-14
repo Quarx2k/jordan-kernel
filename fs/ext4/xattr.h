@@ -86,7 +86,7 @@ extern int ext4_expand_extra_isize_ea(struct inode *inode, int new_extra_isize,
 extern int init_ext4_xattr(void);
 extern void exit_ext4_xattr(void);
 
-extern struct xattr_handler *ext4_xattr_handlers[];
+extern const struct xattr_handler *ext4_xattr_handlers[];
 
 # else  /* CONFIG_EXT4_FS_XATTR */
 

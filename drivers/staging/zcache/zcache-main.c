@@ -1535,7 +1535,7 @@ static bool zcache_freeze;
 /*
  * zcache shrinker interface (only useful for ephemeral pages, so zbud only)
  */
-static int shrink_zcache_memory(struct shrinker *shrink, int nr, gfp_t gfp_mask)
+static  int shrink_zcache_memory(int nr, gfp_t gfp_mask)
 {
 	int ret = -1;
 
