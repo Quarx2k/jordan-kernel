@@ -338,7 +338,7 @@ int m4sensorhub_test_m4_reboot(struct m4sensorhub_data *m4, bool reboot_first)
 {
 	int err = 0;
 	int i;
-	uint16_t version;
+	unsigned char buf[2];
 
 	if (m4 == NULL) {
 		KDEBUG(M4SH_ERROR, "%s: M4 data is missing.\n", __func__);
@@ -363,8 +363,9 @@ int m4sensorhub_test_m4_reboot(struct m4sensorhub_data *m4, bool reboot_first)
 			msleep(i * 100);
 
 		/* Read M4 register to test if M4 is ready */
-		err = m4sensorhub_reg_read(m4, M4SH_REG_GENERAL_VERSION,
-			(char *)&version);
+		buf[0] = 0x00; /* Bank */
+		buf[1] = 0x00; /* Offset */
+		err = m4sensorhub_i2c_write_read(m4, &(buf[0]), 2, 1);
 		if (err < 0) {
 			KDEBUG(M4SH_ERROR, "%s: %s (retries=%d).\n", __func__,
 				"Failed initial I2C read", i);
