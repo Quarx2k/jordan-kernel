@@ -727,7 +727,7 @@ static int fw_load(struct cpcap_uc_data *uc_data, struct device *dev)
 		}
 
 		num_words = num_bytes >> 1;
-		dev_info(dev, "Loading %d word(s) at 0x%04x\n",
+		dev_dbg(dev, "Loading %d word(s) at 0x%04x\n",
 			 num_words, be32_to_cpu(rec->addr));
 
 		buf = kzalloc(num_bytes, GFP_KERNEL);
@@ -766,11 +766,11 @@ static int fw_load(struct cpcap_uc_data *uc_data, struct device *dev)
 		else
 			err = ram_write(uc_data, 0x90F0, 1, &(data->is_umts));
 
-		dev_info(dev, "Loaded Sec SPI Init = %d: %d\n",
+		dev_dbg(dev, "Loaded Sec SPI Init = %d: %d\n",
 			 data->is_umts, err);
 
 		err = cpcap_uc_start(uc_data->cpcap, CPCAP_MACRO_4);
-		dev_info(dev, "Started macro 4: %d\n", err);
+		dev_dbg(dev, "Started macro 4: %d\n", err);
 	}
 
 err:

@@ -669,7 +669,7 @@ static void print_constraints(struct regulator_dev *rdev)
 	if (constraints->valid_modes_mask & REGULATOR_MODE_STANDBY)
 		count += sprintf(buf + count, "standby");
 
-	printk(KERN_INFO "regulator: %s: %s\n", rdev->desc->name, buf);
+	pr_debug(KERN_INFO "regulator: %s: %s\n", rdev->desc->name, buf);
 }
 
 /**

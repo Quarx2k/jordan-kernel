@@ -1771,7 +1771,7 @@ void dt_prop_or_init(struct dt_operation *op)
 
 	prop = of_get_property(node, op->prop, &size);
 	if ((!prop) || (size % op->prop_unit_size)) {
-		printk(KERN_ERR "Read property %s error!\n", op->prop);
+		pr_debug(KERN_ERR "Read property %s error!\n", op->prop);
 	} else {
 		for (i = 0; i < size / op->prop_unit_size; i++) {
 			(*op->callback) (prop);
@@ -1780,7 +1780,7 @@ void dt_prop_or_init(struct dt_operation *op)
 	}
 
 	of_node_put(node);
-	printk(KERN_INFO "Device tree prop %s override done\n", op->prop);
+	pr_debug(KERN_INFO "Device tree prop %s override done\n", op->prop);
 }
 
 void __init mux_setting_init(void)

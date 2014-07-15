@@ -475,10 +475,10 @@ static struct cpcap_platform_data mapphone_cpcap_data = {
 	.regulator_init = cpcap_regulator,
 	.adc_ato = &mapphone_cpcap_adc_ato,
 	.leds = &mapphone_cpcap_leds,
-	.ac_changed = NULL,
+	.ac_changed = ac_changed,
 	.batt_changed = batt_changed,
 	.usb_changed = NULL,
-	.is_umts = 0,
+	.is_umts = 1,
 };
 
 static struct spi_board_info mapphone_spi_board_info[] __initdata = {
@@ -525,7 +525,7 @@ static void regulator_init(void *p_data)
 		p_devs[p->id].constraints.always_on = p->always_on;
 		p_devs[p->id].constraints.boot_on = p->boot_on;
 		p_devs[p->id].constraints.apply_uV = p->apply_uV;
-		printk(KERN_INFO "CPCAP: Overwrite regulator init [%d]!\n",
+		pr_debug(KERN_DEBUG "CPCAP: Overwrite regulator init [%d]!\n",
 				p->id);
 	} else {
 		printk(KERN_ERR "CPCAP: Too big cpcap regulator count!\n");
@@ -539,7 +539,7 @@ static void regulator_mode_init(void *p_data)
 
 	if (p->id < CPCAP_NUM_REGULATORS) {
 		p_devs[p->id] = p->data;
-		printk(KERN_INFO "CPCAP: Overwrite regulator mode [%d]!\n",
+		pr_debug(KERN_DEBUG  "CPCAP: Overwrite regulator mode [%d]!\n",
 				p->id);
 	} else {
 		printk(KERN_ERR "CPCAP: Too big cpcap regulator count!\n");
@@ -553,7 +553,7 @@ static void regulator_off_mode_init(void *p_data)
 
 	if (p->id < CPCAP_NUM_REGULATORS) {
 		p_devs[p->id] = p->data;
-		printk(KERN_INFO "CPCAP: Overwrite regulator off mode [%d]!\n",
+		pr_debug(KERN_DEBUG  "CPCAP: Overwrite regulator off mode [%d]!\n",
 				p->id);
 	} else {
 		printk(KERN_ERR "CPCAP: Too big cpcap regulator count!\n");
@@ -574,7 +574,7 @@ static void cpcap_spi_init(void *p_data)
 			if (i != CPCAP_REG_SIZE)
 				p_devs[i + 1].reg = CPCAP_REG_UNUSED;
 
-			printk(KERN_INFO "CPCAP: Add new reg [%d] setting!\n",
+			pr_debug(KERN_DEBUG  "CPCAP: Add new reg [%d] setting!\n",
 					p->reg);
 			return;
 		}
@@ -582,7 +582,7 @@ static void cpcap_spi_init(void *p_data)
 		if (p_devs[i].reg == p->reg) {
 			p_devs[i].data = p->data;
 
-			printk(KERN_INFO "CPCAP: Overwrite reg [%d] setting!\n",
+			pr_debug(KERN_DEBUG  "CPCAP: Overwrite reg [%d] setting!\n",
 					p->reg);
 			return;
 		}
@@ -599,19 +599,6 @@ static void __init cpcap_of_init(void)
 	const void *prop;
 	struct device_node *bp_node;
 	const void *bp_prop;
-	char *cpcap_bp_model = "CDMA";
-
-	bp_node = of_find_node_by_path(DT_PATH_CHOSEN);
-	if (bp_node) {
-		bp_prop = of_get_property(bp_node, DT_PROP_CHOSEN_BP, NULL);
-		if (bp_prop)
-			cpcap_bp_model = (char *)bp_prop;
-
-		of_node_put(bp_node);
-	}
-
-	if (strcmp(cpcap_bp_model, "UMTS") >= 0)
-		mapphone_cpcap_data.is_umts = 1;
 
 	node = of_find_node_by_path(DT_PATH_CPCAP);
 	if (node == NULL) {
@@ -671,7 +658,6 @@ static void __init cpcap_of_init(void)
 	}
 
 	count = size / unit_size;
-	printk(KERN_INFO "cpcap init size = %d\n", count);
 
 	for (i = 0; i < count; i++)
 		regulator_mode_init((struct omap_rgt_mode_entry *)prop + i);
@@ -686,7 +672,6 @@ static void __init cpcap_of_init(void)
 	}
 
 	count = size / unit_size;
-	printk(KERN_INFO "cpcap init size = %d\n", count);
 
 	for (i = 0; i < count; i++)
 		regulator_off_mode_init((struct omap_rgt_mode_entry *)prop + i);

@@ -161,7 +161,6 @@ static int mt9p012_sensor_power_set(struct device* dev, enum v4l2_power power)
 			gpio_set_value(cam_reset_gpio, 0);
 			/* free reset GPIO */
 			gpio_free(cam_reset_gpio);
-			cam_reset_gpio = -1;
 		}
 
 		mt9p012_set_xclk(0);
@@ -176,7 +175,6 @@ static int mt9p012_sensor_power_set(struct device* dev, enum v4l2_power power)
 		if (cam_standby_gpio >= 0) {
 			gpio_set_value(cam_standby_gpio, 1);
 			gpio_free(cam_standby_gpio);
-			cam_standby_gpio = -1;
 		}
 	break;
 	case V4L2_POWER_ON:
@@ -184,8 +182,6 @@ static int mt9p012_sensor_power_set(struct device* dev, enum v4l2_power power)
 
 			/* mt9p012 autofocus module needs the standby
 			  put the standby to high after functional mode */
-			cam_standby_gpio = get_gpio_by_name("gpio_cam_pwdn");
-
 			/* Set min throughput to:
 			 *  2592 x 1944 x 2bpp x 30fps x 3 L3 accesses */
 			omap_pm_set_min_bus_tput(dev, OCP_INITIATOR_AGENT, 885735);
@@ -201,7 +197,6 @@ static int mt9p012_sensor_power_set(struct device* dev, enum v4l2_power power)
 
 		if (previous_power == V4L2_POWER_OFF) {
 			/* request for the GPIO's */
-			cam_reset_gpio = get_gpio_by_name("gpio_cam_reset");
 			if (cam_reset_gpio >= 0) {
 				printk(KERN_INFO "cam_reset_gpio %d\n",
 					cam_reset_gpio);
@@ -236,12 +231,10 @@ static int mt9p012_sensor_power_set(struct device* dev, enum v4l2_power power)
 failed_cam_standby_gpio:
 		if (cam_standby_gpio >= 0) {
 			gpio_free(cam_standby_gpio);
-			cam_standby_gpio = -1;
 		}
 failed_cam_reset_gpio:
 		if (cam_reset_gpio >= 0) {
 			gpio_free(cam_reset_gpio);
-			cam_reset_gpio = -1;
 		}
         case V4L2_POWER_STANDBY:
                 /* Stand By Sequence */
@@ -398,13 +391,11 @@ static int camise_sensor_power_set(struct device *dev, enum v4l2_power power)
 			if (cam_standby_gpio >= 0) {
 				gpio_set_value(cam_standby_gpio, 1);
 				gpio_free(cam_standby_gpio);
-				cam_standby_gpio = -1;
 			}
 
 			if (cam_reset_gpio >= 0) {
 				gpio_set_value(cam_reset_gpio, 0);
 				gpio_free(cam_reset_gpio);
-				cam_reset_gpio = -1;
 			}
 
 			/* turn off ISP clock */
@@ -419,10 +410,7 @@ static int camise_sensor_power_set(struct device *dev, enum v4l2_power power)
 		if (previous_power == V4L2_POWER_OFF) {
 
 			/* request for the GPIO's */
-			cam_reset_gpio = get_gpio_by_name("gpio_cam_reset");
 			if (cam_reset_gpio >= 0) {
-				printk(KERN_INFO "cam_reset_gpio %d\n",
-					cam_reset_gpio);
 				if (gpio_request(cam_reset_gpio,
 					"camera reset") != 0) {
 					printk(KERN_ERR "Failed to req cam reset\n");
@@ -431,7 +419,6 @@ static int camise_sensor_power_set(struct device *dev, enum v4l2_power power)
 				gpio_direction_output(cam_reset_gpio, 0);
 			}
 
-			cam_standby_gpio = get_gpio_by_name("gpio_cam_pwdn");
 			if (cam_standby_gpio >= 0) {
 				printk(KERN_INFO "cam_standby_gpio %d\n",
 					cam_standby_gpio);
@@ -477,12 +464,10 @@ static int camise_sensor_power_set(struct device *dev, enum v4l2_power power)
 failed_cam_standby_gpio:
 	if (cam_standby_gpio >= 0) {
 		gpio_free(cam_standby_gpio);
-		cam_standby_gpio = -1;
 	}
 failed_cam_reset_gpio:
 	if (cam_reset_gpio >= 0) {
 		gpio_free(cam_reset_gpio);
-		cam_reset_gpio = -1;
 	}
 	return error;
 }
@@ -497,4 +482,10 @@ struct camise_platform_data mapphone_camise_platform_data = {
 };
 
 #endif /*CONFIG_VIDEO_CAM_ISE*/
+
+void __init mapphone_camera_init(void) {
+	cam_reset_gpio = get_gpio_by_name("gpio_cam_reset");
+	cam_standby_gpio = get_gpio_by_name("gpio_cam_pwdn");
+}
+
 

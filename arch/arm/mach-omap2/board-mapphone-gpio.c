@@ -129,7 +129,7 @@ static void gpiodev_devs_init(void *p_data)
 			if (i != (GPIO_DEVICE_SIZE - 1))
 				p_devs[i + 1].pin_nr = GPIO_DEVICE_UNUSED;
 
-			printk(KERN_INFO "GPIODev: Add new device [%s] setting!\n",
+			pr_debug(KERN_DEBUG "GPIODev: Add new device [%s] setting!\n",
 					p->name);
 			return;
 		}
@@ -142,7 +142,7 @@ static void gpiodev_devs_init(void *p_data)
 			p_devs[i].flags = GPIODEV_FLAG_CONFIGURABLE |
 						GPIODEV_FLAG_LOWLEVELACCESS;
 
-			printk(KERN_INFO "GPIODev: Overwrite device [%s] setting!\n",
+			pr_debug(KERN_DEBUG "GPIODev: Overwrite device [%s] setting!\n",
 					p->name);
 			return;
 		}
@@ -176,7 +176,6 @@ static void gpio_devs_of_init(void)
 	}
 
 	count = size / unit_size;
-	printk(KERN_INFO "gpio_dev_size = %d\n", count);
 
 	for (i = 0; i < count; i++)
 		gpiodev_devs_init((struct omap_gpiodev_entry *)prop + i);
@@ -291,7 +290,7 @@ void __init mapphone_gpio_mapping_init(void)
 		if (j == GPIO_MAP_SIZE)
 			printk(KERN_ERR "Unable to write gpio_map_table\n");
 		else
-			printk(KERN_INFO "GPIO mapping write: pin = %d, name = %s\n",
+			pr_debug(KERN_INFO "GPIO mapping write: pin = %d, name = %s\n",
 						gpio_map_table[j].pin_num,
 						gpio_map_table[j].name);
 

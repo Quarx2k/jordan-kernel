@@ -387,7 +387,7 @@ static void qtouch_force_reset(struct qtouch_ts_data *ts, uint8_t sw_reset)
 	int ret;
 
 	if (ts->pdata->hw_reset && !sw_reset) {
-		pr_info("%s: Forcing HW reset\n", __func__);
+		pr_debug("%s: Forcing HW reset\n", __func__);
 		ts->pdata->hw_reset();
 	} else if (sw_reset) {
 		pr_info("%s: Forcing SW reset\n", __func__);
@@ -813,7 +813,7 @@ static int do_cmd_proc_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 				ts->eeprom_checksum = checksum;
 				ts->checksum_cnt = 0;
 			} else {
-				pr_info("%s:EEPROM checksum mismatch 0x%8X\n",
+				pr_debug("%s:EEPROM checksum mismatch 0x%8X\n",
 					 __func__, checksum);
 				ret = qtouch_hw_init(ts);
 				if (ret != 0)
@@ -823,11 +823,11 @@ static int do_cmd_proc_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 				ts->checksum_cnt++;
 			}
 		} else {
-			pr_info("%s:EEPROM checksum matches\n", __func__);
+			pr_debug("%s:EEPROM checksum matches\n", __func__);
 		}
 		if (ts->family_id == QTM_OBP_FAMILY_XMEGAT)
 			calibrate_chip(ts);
-		pr_info("%s: Reset done.\n", __func__);
+		pr_debug("%s: Reset done.\n", __func__);
 	}
 
 	if (msg->status & QTM_CMD_PROC_STATUS_CAL) {
@@ -835,7 +835,7 @@ static int do_cmd_proc_msg(struct qtouch_ts_data *ts, struct qtm_object *obj,
 			ts->cal_check_flag = 1;
 			ts->cal_timer = 0;
 		}
-		pr_info("%s: Self-calibration started.\n", __func__);
+		pr_debug("%s: Self-calibration started.\n", __func__);
 	}
 
 	if (msg->status & QTM_CMD_PROC_STATUS_OFL)
@@ -1223,7 +1223,7 @@ static int qtouch_process_info_block(struct qtouch_ts_data *ts)
 		entry.size++;
 		entry.num_inst++;
 
-		pr_info("%s: Object %d @ 0x%04x (%d) insts %d rep_ids %d\n",
+		pr_debug("%s: Object %d @ 0x%04x (%d) insts %d rep_ids %d\n",
 			__func__, entry.type, entry.addr, entry.size,
 			entry.num_inst, entry.num_rids);
 

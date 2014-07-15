@@ -338,9 +338,8 @@ int cpcap_device_register(struct platform_device *pdev)
 	 * Therefore, call platform_device_register() to probe the device.
 	 */
 	if (misc_cpcap) {
-		dev_info(&(misc_cpcap->spi->dev),
+		dev_dbg(&(misc_cpcap->spi->dev),
 			 "Probing CPCAP device %s\n", pdev->name);
-
 		/*
 		 * platform_data is non-empty indicates
 		 * CPCAP client devices need to pass their own data
