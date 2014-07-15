@@ -119,9 +119,31 @@ IMG_VOID IonDeinit(IMG_VOID)
 
 #else /* defined(CONFIG_ION_SUNXI) */
 
+#if defined(CONFIG_ION_INCDHAD1)
+
+/* Real ion with sharing (incdhad1) */
+
+extern struct ion_device *incdhad1_ion_device;
+struct ion_device *gpsIonDev;
+
+PVRSRV_ERROR IonInit(IMG_VOID)
+{
+	gpsIonDev = incdhad1_ion_device;
+	return PVRSRV_OK;
+}
+
+
+IMG_VOID IonDeinit(IMG_VOID)
+{
+	gpsIonDev = IMG_NULL;
+}
+
+#else /* defined(CONFIG_ION_INCDHAD1) */
+
 /* "Reference" ion implementation */
 
-#include "../drivers/gpu/ion/ion_priv.h"
+#include SUPPORT_ION_PRIV_HEADER
+#include <linux/version.h>
 
 static struct ion_heap **gapsIonHeaps;
 struct ion_device *gpsIonDev;
@@ -138,6 +160,9 @@ static struct ion_platform_data gsGenericConfig =
 {
 	.nr = 3,
 	.heaps =
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,39))
+	(struct ion_platform_heap [])
+#endif
 	{
 		{
 			.type = ION_HEAP_TYPE_SYSTEM_CONTIG,
@@ -215,6 +240,8 @@ IMG_VOID IonDeinit(IMG_VOID)
 	kfree(gapsIonHeaps);
 	ion_device_destroy(gpsIonDev);
 }
+
+#endif /* defined(CONFIG_ION_INCDHAD1) */
 
 #endif /* defined(CONFIG_ION_SUNXI) */
 

@@ -1777,8 +1777,12 @@ static IMG_VOID FreePrivateData(IMG_HANDLE hCallbackData)
 {
 	CALLBACK_DATA *psCallbackData = hCallbackData;
 
-	OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, psCallbackData->ui32PrivDataLength,
-			  psCallbackData->pvPrivData, IMG_NULL);
+	if(psCallbackData->ui32PrivDataLength)
+	{
+		OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP, psCallbackData->ui32PrivDataLength,
+				  psCallbackData->pvPrivData, IMG_NULL);
+	}
+
 	OSFreeMem(PVRSRV_OS_PAGEABLE_HEAP,
 			  sizeof(IMG_VOID *) * psCallbackData->ui32NumMemInfos,
 			  psCallbackData->ppvMemInfos, IMG_NULL);

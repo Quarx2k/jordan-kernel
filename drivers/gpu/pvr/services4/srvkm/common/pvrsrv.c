@@ -182,13 +182,13 @@ IMG_VOID IMG_CALLCONV PVRSRVCompatCheckKM(PVRSRV_BRIDGE_IN_COMPAT_CHECK *psUserM
 		|| (psUserModeDDKDetails->ui32DDKBuild != ui32DDKBuild))
 	{
 		psRetOUT->eError = PVRSRV_ERROR_DDK_VERSION_MISMATCH;
-		PVR_DPF((PVR_DBG_ERROR, "(FAIL) UM-KM DDK Mismatch UM-(%d) KM-(%d).",
+		PVR_LOG(("(FAIL) UM-KM DDK Mismatch UM-(%d) KM-(%d).",
 						psUserModeDDKDetails->ui32DDKBuild, ui32DDKBuild));
 	}
 	else
 	{
 		psRetOUT->eError = PVRSRV_OK;
-		PVR_DPF((PVR_DBG_MESSAGE, "UM DDK-(%d) and KM DDK-(%d) match. [ OK ]",
+		PVR_LOG(("UM DDK-(%d) and KM DDK-(%d) match. [ OK ]",
 						psUserModeDDKDetails->ui32DDKBuild, ui32DDKBuild));
 	}
 }
