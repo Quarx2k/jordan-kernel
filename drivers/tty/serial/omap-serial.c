@@ -196,10 +196,10 @@ void omap_serial_runtime_get(int port_index)
 	spin_lock(&up->port.lock);
 	ext_rt_cnt = up->ext_rt_cnt;
 	up->ext_rt_cnt = 1;
-	spin_unlock(&up->port.lock);
 
 	if (up->dev && !ext_rt_cnt)
 		pm_runtime_get_sync(up->dev);
+	spin_unlock(&up->port.lock);
 }
 
 void omap_serial_runtime_put(int port_index)
@@ -214,12 +214,12 @@ void omap_serial_runtime_put(int port_index)
 	spin_lock(&up->port.lock);
 	ext_rt_cnt = up->ext_rt_cnt;
 	up->ext_rt_cnt = 0;
-	spin_unlock(&up->port.lock);
 
 	if (up->dev && ext_rt_cnt) {
 		pm_runtime_mark_last_busy(up->dev);
 		pm_runtime_put_autosuspend(up->dev);
 	}
+	spin_unlock(&up->port.lock);
 }
 
 static inline unsigned int serial_in(struct uart_omap_port *up, int offset)

@@ -111,6 +111,14 @@ static void ll_device_want_to_wakeup(struct st_data_s *st_data)
  * enable ST LL */
 void st_ll_enable(struct st_data_s *ll)
 {
+	struct kim_data_s *kim_plat_data;
+	struct ti_st_plat_data	*pdata;
+
+	if (ll->ll_state == ST_LL_INVALID) {
+		kim_plat_data = (struct kim_data_s *)ll->kim_data;
+		pdata = kim_plat_data->kim_pdev->dev.platform_data;
+		omap_serial_runtime_get(pdata->port_index);
+	}
 	ll->ll_state = ST_LL_AWAKE;
 }
 
@@ -118,6 +126,15 @@ void st_ll_enable(struct st_data_s *ll)
  * disable ST LL */
 void st_ll_disable(struct st_data_s *ll)
 {
+	struct kim_data_s *kim_plat_data;
+	struct ti_st_plat_data	*pdata;
+
+	if (ll->ll_state == ST_LL_AWAKE ||
+	    ll->ll_state == ST_LL_ASLEEP_TO_AWAKE) {
+		kim_plat_data = (struct kim_data_s *)ll->kim_data;
+		pdata = kim_plat_data->kim_pdev->dev.platform_data;
+		omap_serial_runtime_put(pdata->port_index);
+	}
 	ll->ll_state = ST_LL_INVALID;
 }
 

@@ -465,7 +465,6 @@ long st_kim_start(void *kim_data)
 
 	pr_info("%s\n", __func__);
 	pdata = kim_gdata->kim_pdev->dev.platform_data;
-	omap_serial_runtime_get(pdata->port_index);
 	do {
 		/* platform specific enabling code here */
 		if (pdata->chip_enable)
@@ -507,7 +506,6 @@ long st_kim_start(void *kim_data)
 			}
 		}
 	} while (retry--);
-	omap_serial_runtime_put(pdata->port_index);
 	return err;
 }
 
