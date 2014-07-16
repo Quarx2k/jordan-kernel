@@ -91,6 +91,8 @@ static int atmxt_save_data8(struct atmxt_driver_data *dd,
 		uint8_t *entry, uint8_t *reg);
 static int atmxt_save_data9(struct atmxt_driver_data *dd,
 		uint8_t *entry, uint8_t *reg);
+static int atmxt_save_data42(struct atmxt_driver_data *dd,
+		uint8_t *entry, uint8_t *reg);
 static int atmxt_save_data46(struct atmxt_driver_data *dd,
 		uint8_t *entry, uint8_t *reg);
 static int atmxt_save_data62(struct atmxt_driver_data *dd,
@@ -498,6 +500,7 @@ static int atmxt_enter_aot(struct atmxt_driver_data *dd)
 	uint8_t sleep_cmd[4] = {0x64, 0x64, 0x19, 0x00};
 	uint8_t adx_cmd[2] = {0x08, 0x08};
 	uint8_t mxd_cmd = 0x08;
+	uint8_t sup_cmd[3] = {0x14, 0x14, 0x40};
 
 	atmxt_dbg(dd, ATMXT_DBG3, "%s: Entering AOT...\n", __func__);
 
@@ -532,6 +535,15 @@ static int atmxt_enter_aot(struct atmxt_driver_data *dd)
 				&mxd_cmd, 1);
 			if (err < 0) {
 				pr_err("%s: Failed to reduce mxd.\n",
+					__func__);
+				goto atmxt_enter_aot_fail;
+			}
+
+			err = atmxt_i2c_write(dd,
+				dd->addr->sup[0], dd->addr->sup[1],
+				&(sup_cmd[0]), 3);
+			if (err < 0) {
+				pr_err("%s: Failed to change sup.\n",
 					__func__);
 				goto atmxt_enter_aot_fail;
 			}
@@ -603,6 +615,15 @@ static int atmxt_exit_aot(struct atmxt_driver_data *dd)
 				&(dd->data->mxd), 1);
 			if (err < 0) {
 				pr_err("%s: Failed to restore mxd.\n",
+					__func__);
+				goto atmxt_exit_aot_fail;
+			}
+
+			err = atmxt_i2c_write(dd,
+				dd->addr->sup[0], dd->addr->sup[1],
+				&(dd->data->sup[0]), 3);
+			if (err < 0) {
+				pr_err("%s: Failed to restore sup.\n",
 					__func__);
 				goto atmxt_exit_aot_fail;
 			}
@@ -2065,6 +2086,7 @@ static int atmxt_save_internal_data(struct atmxt_driver_data *dd)
 	bool chk_7 = false;
 	bool chk_8 = false;
 	bool chk_9 = false;
+	bool chk_42 = false;
 	bool chk_46 = false;
 	bool chk_62 = false;
 
@@ -2110,6 +2132,14 @@ static int atmxt_save_internal_data(struct atmxt_driver_data *dd)
 
 		case 38:
 			usr_start_seen = true;
+			break;
+
+		case 42:
+			chk_42 = true;
+			err = atmxt_save_data42(dd, &(dd->info_blk->data[i+0]),
+				&(dd->nvm->data[nvm_iter]));
+			if (err < 0)
+				goto atmxt_save_internal_data_fail;
 			break;
 
 		case 46:
@@ -2160,6 +2190,11 @@ static int atmxt_save_internal_data(struct atmxt_driver_data *dd)
 
 	if (!chk_9) {
 		printk(KERN_ERR "%s: Object 9 is missing.\n", __func__);
+		err = -ENODATA;
+	}
+
+	if (!chk_42) {
+		pr_err("%s: Object 42 is missing.\n", __func__);
 		err = -ENODATA;
 	}
 
@@ -2301,6 +2336,31 @@ static int atmxt_save_data9(struct atmxt_driver_data *dd,
 	}
 
 atmxt_save_data9_fail:
+	return err;
+}
+
+static int atmxt_save_data42(struct atmxt_driver_data *dd,
+		uint8_t *entry, uint8_t *reg)
+{
+	int err = 0;
+
+	if (entry[3] < 4) {
+		printk(KERN_ERR "%s: Suppression object is too small.\n",
+			__func__);
+		err = -ENODATA;
+		goto atmxt_save_data42_fail;
+	}
+
+	dd->addr->sup[0] = entry[1] + 2;
+	dd->addr->sup[1] = entry[2];
+	if (dd->addr->sup[0] < entry[1]) /* Check for 16-bit addr overflow */
+		dd->addr->sup[1]++;
+
+	dd->data->sup[0] = reg[2];
+	dd->data->sup[1] = reg[3];
+	dd->data->sup[2] = reg[4];
+
+atmxt_save_data42_fail:
 	return err;
 }
 
