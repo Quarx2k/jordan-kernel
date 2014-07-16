@@ -173,13 +173,9 @@ static void bq5105x_detect_chg_irq_work(struct work_struct *work)
 				enable_irq(chip->det_irq);
 				chip->det_irq_enabled = true;
 			}
-			if (!gpio_get_value_cansleep(chip->dts_data->det_gpio)) {
+			if (!gpio_get_value_cansleep(chip->dts_data->det_gpio))
 				alarm_start_relative(&chip->undocked_alarm,
 						     chip->alarm_time);
-			} else {
-				dev_dbg(&chip->pdev->dev,
-					"det_gpio is high, postponing timer\n");
-			}
 		} else {
 			bq5105x_detect_set_docked(chip, false);
 		}
@@ -228,6 +224,9 @@ static void bq5105x_detect_undocked_work(struct work_struct *work)
 						   undocked_work);
 	dev_dbg(&chip->pdev->dev, "no pulse\n");
 	bq5105x_detect_set_docked(chip, false);
+	if (gpio_get_value_cansleep(chip->dts_data->det_gpio))
+		dev_dbg(&chip->pdev->dev,
+			"timer expired, but det_gpio is high\n");
 	wake_unlock(&chip->pulse_wakelock);
 	wake_unlock(&chip->undocked_wakelock);
 }
