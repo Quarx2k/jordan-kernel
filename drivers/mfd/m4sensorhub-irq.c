@@ -134,16 +134,14 @@ static irqreturn_t event_isr(int irq, void *data)
 	struct m4sensorhub_irqdata *irq_data = data;
 	disable_irq_nosync(irq_data->m4sensorhub->i2c_client->irq);
 	wake_lock(&irq_data->wake_lock);
+
+	if (irq_data->m4sensorhub->irq_dbg.suspend == 1)
+		irq_data->m4sensorhub->irq_dbg.print_irqs = 1;
+
 	queue_work(irq_data->workqueue, &irq_data->work);
 
 	return IRQ_HANDLED;
 }
-
-static struct mrsensorhub_irq_dbg {
-	unsigned short en_ints[NUM_INT_REGS];
-	unsigned char suspend;
-	unsigned char wakeup;
-} irq_dbg_info;
 
 #ifdef CONFIG_DEBUG_FS
 static const struct file_operations debug_fops = {
@@ -613,81 +611,6 @@ m4sensorhub_irq_enable_fail:
 }
 EXPORT_SYMBOL_GPL(m4sensorhub_irq_enable);
 
-/* m4sensorhub_irq_pm_suspend()
-
-   Called by core to track suspend state and wakeup cause
-
-*/
-void m4sensorhub_irq_pm_dbg_suspend(void)
-{
-	irq_dbg_info.suspend = 1;
-	irq_dbg_info.wakeup = 0;
-}
-EXPORT_SYMBOL_GPL(m4sensorhub_irq_pm_dbg_suspend);
-
-/* m4sensorhub_irq_pm_resume()
-
-   Called by core to print interupt source on M4SH wakeup
-
-*/
-void m4sensorhub_irq_pm_dbg_resume(void)
-{
-	char buffer[DBG_BUF_LINE_LEN];
-	int i;
-
-	irq_dbg_info.suspend = 0;
-	if ((irq_dbg_info.wakeup != 0) && (m4sensorhub_debug >= M4SH_NOTICE)) {
-		strcpy(buffer, "M4 Sensor Hub IRQ registers:");
-		for (i = 0; (i < NUM_INT_REGS) &&
-			    (strlen(buffer) < DBG_BUF_LINE_LEN-5); ++i) {
-			sprintf(&buffer[strlen(buffer)], " 0x%02x",
-				irq_dbg_info.en_ints[i]);
-		}
-
-		KDEBUG(M4SH_NOTICE, "newbuf: %s\n", buffer);
-
-		/* Decode the bits */
-		KDEBUG(M4SH_NOTICE, "M4 Sensor Hub IRQ sources:\n");
-		for (i = 0; i < NUM_INT_REGS; ++i) {
-			unsigned char index;
-
-			while (irq_dbg_info.en_ints[i] > 0) {
-				/* find the first set bit */
-				index = (unsigned char)
-					(ffs(irq_dbg_info.en_ints[i]) - 1);
-				if (index >= M4SH_IRQ__NUM) {
-					KDEBUG(M4SH_NOTICE,
-							"%s: No set bits found\n",
-							__func__);
-					goto error;
-				}
-
-				/* clear the bit */
-				irq_dbg_info.en_ints[i] &= ~(1 << index);
-				/* find the event that occurred */
-				index += M4SH_IRQ__START +
-					 (i * NUM_INTS_PER_REG);
-				if (index >= M4SH_IRQ__NUM) {
-					KDEBUG(M4SH_NOTICE,
-							"%s: IRQ index is %d\n",
-							__func__, index);
-					goto error;
-				}
-
-				if (index <= ARRAY_SIZE(irq_name))
-					KDEBUG(M4SH_NOTICE, "\t%s\n",
-						irq_name[index]);
-				else
-					KDEBUG(M4SH_NOTICE,
-						"\tIRQ %d\n", index);
-			}
-		}
-	}
-error:
-	return;
-}
-EXPORT_SYMBOL_GPL(m4sensorhub_irq_pm_dbg_resume);
-
 /* m4sensorhub_irq_disable_all()
 
    Disables all M4 IRQs (bypasses m4sensorhub_irq_disable())
@@ -756,6 +679,58 @@ static unsigned short get_enable_reg(enum m4sensorhub_irqs event)
 	return ret;
 }
 
+static void m4sensorhub_print_irq_sources(unsigned short *en_ints)
+{
+	char buffer[DBG_BUF_LINE_LEN];
+	int i;
+	unsigned char index;
+	unsigned short cur_ints;
+
+	if (m4sensorhub_debug < M4SH_NOTICE)
+		goto error;
+
+	strcpy(buffer, "M4 IRQ Registers:");
+	for (i = 0; (i < NUM_INT_REGS) &&
+			(strlen(buffer) < DBG_BUF_LINE_LEN-5); ++i) {
+		sprintf(&buffer[strlen(buffer)], " 0x%02x", en_ints[i]);
+	}
+
+	KDEBUG(M4SH_NOTICE, "%s: %s\n", __func__, buffer);
+
+	/* Decode the bits */
+	KDEBUG(M4SH_NOTICE, "%s: M4 IRQ Sources:\n", __func__);
+	for (i = 0; i < NUM_INT_REGS; ++i) {
+		cur_ints = en_ints[i];
+		while (cur_ints > 0) {
+			/* find the first set bit */
+			index = (unsigned char) (ffs(cur_ints) - 1);
+			if (index >= M4SH_IRQ__NUM) {
+				KDEBUG(M4SH_NOTICE, "%s: No set bits found\n",
+					__func__);
+				goto error;
+			}
+
+			/* clear the bit */
+			cur_ints &= ~(1 << index);
+			/* find the event that occurred */
+			index += M4SH_IRQ__START + (i * NUM_INTS_PER_REG);
+			if (index >= M4SH_IRQ__NUM) {
+				KDEBUG(M4SH_NOTICE, "%s: IRQ index is %d\n",
+					__func__, index);
+				goto error;
+			}
+
+			if (index <= ARRAY_SIZE(irq_name))
+				KDEBUG(M4SH_NOTICE, "\t%s\n", irq_name[index]);
+			else
+				KDEBUG(M4SH_NOTICE, "\tIRQ %d\n", index);
+		}
+	}
+
+error:
+	return;
+}
+
 static void irq_work_func(struct work_struct *work)
 {
 	unsigned short en_ints[NUM_INT_REGS] = { 0 };
@@ -787,10 +762,9 @@ static void irq_work_func(struct work_struct *work)
 		goto error;
 	}
 
-	if ((irq_dbg_info.suspend != 0) && (irq_dbg_info.wakeup == 0)) {
-		for (i = 0; i < NUM_INT_REGS; ++i)
-			irq_dbg_info.en_ints[i] = en_ints[i];
-		irq_dbg_info.wakeup = 1;
+	if (m4sensorhub->irq_dbg.print_irqs == 1) {
+		m4sensorhub_print_irq_sources(en_ints);
+		m4sensorhub->irq_dbg.print_irqs = 0;
 	}
 
 	for (i = 0; i < NUM_INT_REGS; ++i) {

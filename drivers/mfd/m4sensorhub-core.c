@@ -58,7 +58,6 @@ struct init_call {
 
 /* --------------- Local Declarations -------------- */
 static struct m4sensorhub_data m4sensorhub_misc_data;
-static DEFINE_MUTEX(m4sensorhub_driver_lock);
 static struct init_call *inithead;
 static struct init_call *preflash_head;
 static char tcmd_exec_status;
@@ -925,15 +924,14 @@ static int __exit m4sensorhub_remove(struct i2c_client *client)
 static int m4sensorhub_suspend(struct i2c_client *client, pm_message_t mesg)
 {
 	KDEBUG(M4SH_INFO, "%s\n", __func__);
-	m4sensorhub_irq_pm_dbg_suspend();
+	m4sensorhub_misc_data.irq_dbg.suspend = 1;
 	return 0;
 }
 
 static int m4sensorhub_resume(struct i2c_client *client)
 {
-
 	KDEBUG(M4SH_INFO, "%s\n", __func__);
-	m4sensorhub_irq_pm_dbg_resume();
+	m4sensorhub_misc_data.irq_dbg.suspend = 0;
 	return 0;
 }
 #endif /* CONFIG_PM */

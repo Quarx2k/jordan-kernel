@@ -84,17 +84,6 @@ enum m4sensorhub_panichdl_index {
 	PANICHDL_MAX = PANICHDL_IRQ_RESTORE+1
 };
 
-struct m4sensorhub_data;
-
-/* args passed to init callback,
-	p_m4sensorhub_data is pointer to M4's data
-	p_data is the void * that was registered along
-		with the function pointer*/
-struct init_calldata {
-	struct m4sensorhub_data *p_m4sensorhub_data;
-	void *p_data;
-};
-
 struct m4sensorhub_hwconfig {
 	int irq_gpio;
 	int reset_gpio;
@@ -104,14 +93,25 @@ struct m4sensorhub_hwconfig {
 	int mpu_9150_en_gpio;
 };
 
+struct m4sensorhub_irq_dbg {
+	unsigned char suspend; /* 1 - Suspended, 0 - Normal */
+	unsigned char print_irqs; /* 1 - IRQs to print, 0 - None */
+};
+
 struct m4sensorhub_data {
 	struct i2c_client *i2c_client;
 	void *irqdata;
 	void *panicdata;
 	enum m4sensorhub_mode mode;
 	struct m4sensorhub_hwconfig hwconfig;
+	struct m4sensorhub_irq_dbg irq_dbg;
 	char *filename;
 	u16 fw_version;
+};
+
+struct init_calldata {
+	struct m4sensorhub_data *p_m4sensorhub_data; /* M4 pointer */
+	void *p_data; /* Driver data */
 };
 
 /* Global (kernel) functions */
@@ -200,8 +200,7 @@ int m4sensorhub_irq_enable(struct m4sensorhub_data *m4sensorhub,
 			   enum m4sensorhub_irqs irq);
 int m4sensorhub_irq_enable_get(struct m4sensorhub_data *m4sensorhub,
 			       enum m4sensorhub_irqs irq);
-void m4sensorhub_irq_pm_dbg_suspend(void);
-void m4sensorhub_irq_pm_dbg_resume(void);
+
 
 /* M4 Panic Calls */
 int m4sensorhub_panic_init(struct m4sensorhub_data *m4sensorhub);
