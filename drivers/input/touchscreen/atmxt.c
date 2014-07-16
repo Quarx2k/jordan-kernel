@@ -3536,7 +3536,7 @@ static ssize_t atmxt_drv_interactivemode_show(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%s",
 			(ic_state == ATMXT_IC_ACTIVE ? "1" : "0"));
 }
-static DEVICE_ATTR(interactivemode, S_IRUGO | S_IWGRP | S_IWOTH,
+static DEVICE_ATTR(interactivemode, 0664,
 		atmxt_drv_interactivemode_show,
 		atmxt_drv_interactivemode_store);
 
