@@ -173,6 +173,7 @@ struct uart_omap_port {
 	int			ext_rt_cnt;
 	bool			open_close_pm;
 	unsigned int		rx_trig;
+	int			wakelock_timeout;
 	int (*get_context_loss_count)(struct device *);
 };
 
@@ -542,6 +543,9 @@ static irqreturn_t serial_omap_irq(int irq, void *dev_id)
 
 	spin_lock(&up->port.lock);
 	pm_runtime_get_sync(up->dev);
+
+	if (up->wakelock_timeout)
+		pm_wakeup_event(up->dev, up->wakelock_timeout);
 
 	do {
 		iir = serial_in(up, UART_IIR);
@@ -1436,6 +1440,7 @@ static struct omap_uart_port_info *of_get_uart_port_info(struct device *dev)
 	of_property_read_u32(np, "flags", &oi->flags);
 	oi->wakeup_capable = of_property_read_bool(np, "wakeup-capable");
 	of_property_read_u32(np, "autosuspend-delay", &oi->autosuspend_timeout);
+	of_property_read_u32(np, "timed-wakelock", &oi->wakelock_timeout);
 	oi->open_close_pm = of_property_read_bool(np, "open_close_pm");
 	if (of_property_read_u32(np, "rx_trig", &oi->rx_trig))
 		oi->rx_trig = 1;
@@ -1573,6 +1578,9 @@ static int serial_omap_probe(struct platform_device *pdev)
 
 	up->open_close_pm = omap_up_info->open_close_pm;
 	up->get_context_loss_count = omap_pm_get_dev_context_loss_count;
+
+	if (omap_up_info->wakelock_timeout)
+		up->wakelock_timeout = omap_up_info->wakelock_timeout;
 
 	pm_runtime_mark_last_busy(up->dev);
 	pm_runtime_put_autosuspend(up->dev);

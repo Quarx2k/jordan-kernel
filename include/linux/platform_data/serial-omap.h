@@ -37,6 +37,7 @@ struct omap_uart_port_info {
 	unsigned int		dma_rx_buf_size;
 	unsigned int		dma_rx_timeout;
 	unsigned int		autosuspend_timeout;
+	unsigned int		wakelock_timeout;
 	unsigned int		dma_rx_poll_rate;
 	int			DTR_gpio;
 	int			DTR_inverted;
