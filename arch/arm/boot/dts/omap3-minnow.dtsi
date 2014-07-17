@@ -833,6 +833,7 @@ tps65912_0: tps65912 {
 	ti,no-pm-qos;
 	wakeup-capable;
 	autosuspend-delay = <50>; /* ms */
+	timed-wakelock = <50>; /* ms */
 	rx_trig = <32>;
 };
 /* serial console */
