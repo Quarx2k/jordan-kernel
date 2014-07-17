@@ -46,9 +46,9 @@
 
 //#define BATTERY_DEBUG
 #include "cpcap_charge_table.h"
+#define SAMPLING_RATE_MS	20000
 
 static int own_charger_enabled;
-#define SAMPLING_RATE_MS	20000
 static unsigned long sampling_rate;
 static u32 battery_old_cap = -1;
 static long max_battery_level = 100;
@@ -68,14 +68,20 @@ static int cpcap_batt_resume(struct platform_device *pdev);
 
 static int __init cpcap_charger_enabled(char *s)
 {
-	if (strcmp(s,"y")) {
+	if (s == NULL) {
+		own_charger_enabled = 0;
+		return 1;
+	}
+
+	if (!strcmp(s,"y")) {
 		own_charger_enabled = 1;
 	} else {
 		own_charger_enabled = 0;
 	}
+
 	return 1;
 }
-__setup("cpcap_charger_enabled", cpcap_charger_enabled);
+__setup("cpcap_charger_enabled=", cpcap_charger_enabled);
 
 struct cpcap_batt_ps {
 	struct power_supply batt;
