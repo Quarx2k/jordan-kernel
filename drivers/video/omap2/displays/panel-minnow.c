@@ -339,13 +339,19 @@ struct minnow_panel_data {
 	bool vsync_events_enabled;
 	ktime_t vsync_events_timestamp;
 #ifdef CONFIG_WAKEUP_SOURCE_NOTIFY
+	bool early_inited;
 	struct notifier_block displayenable_nb;
 	struct work_struct early_init_work;
+	struct delayed_work early_init_timeout_work;
 #endif /* CONFIG_WAKEUP_SOURCE_NOTIFY */
 #if defined(CONFIG_HAS_AMBIENTMODE)
 	struct completion resume_completion;
 #endif
 };
+
+#define DECLARE_MPD_FROM_CONTAINER(ptr, member)	\
+	struct minnow_panel_data *mpd =	\
+		container_of(ptr, struct minnow_panel_data, member)
 
 /* panel parameter passed from boot-loader */
 static char *def_panel_param;
@@ -365,7 +371,8 @@ static int minnow_panel_update_locked(struct minnow_panel_data *mpd);
 static void minnow_panel_esd_work(struct work_struct *work);
 static void minnow_panel_ulps_work(struct work_struct *work);
 
-static int minnow_panel_enable(struct omap_dss_device *dssdev);
+static int minnow_panel_enable_mlocked(struct minnow_panel_data *mpd);
+static void minnow_panel_disable_mlocked(struct minnow_panel_data *mpd);
 
 static void minnow_panel_sync_resume_mlocked(struct minnow_panel_data *mpd)
 {
@@ -387,8 +394,7 @@ static void minnow_panel_sync_resume_mlocked(struct minnow_panel_data *mpd)
 static int omapdss_displayenable_notify(struct notifier_block *self,
 			unsigned long action, void *dev)
 {
-	struct minnow_panel_data *mpd =
-		container_of(self, struct minnow_panel_data, displayenable_nb);
+	DECLARE_MPD_FROM_CONTAINER(self, displayenable_nb);
 	dev_info(&mpd->dssdev->dev, "%s, action is %lu", __func__, action);
 	if (action == DISPLAY_WAKE_EVENT) {
 		/* Queue work to init the display */
@@ -399,13 +405,38 @@ static int omapdss_displayenable_notify(struct notifier_block *self,
 
 static void minnow_panel_early_init_func(struct work_struct *work)
 {
-	struct minnow_panel_data *mpd;
+	DECLARE_MPD_FROM_CONTAINER(work, early_init_work);
 	int r;
-	mpd = container_of(work, struct minnow_panel_data, early_init_work);
-	r = minnow_panel_enable(mpd->dssdev);
-	if (r)
-		dev_err(&mpd->dssdev->dev, "minnow_panel_enable failed: %d\n",
-			r);
+	mutex_lock(&mpd->lock);
+	if (!mpd->enabled) {
+		r = minnow_panel_enable_mlocked(mpd);
+		if (r) {
+			dev_err(&mpd->dssdev->dev,
+				"%s: minnow_panel_enable failed: %d\n",
+				__func__, r);
+		} else {
+			/* it will turn off display if it's not enabled
+			 * by android within 500ms or kernel suspend
+			 */
+			mpd->early_inited = true;
+			queue_delayed_work(mpd->workqueue,
+					   &mpd->early_init_timeout_work,
+					   msecs_to_jiffies(500));
+		}
+	}
+	mutex_unlock(&mpd->lock);
+}
+
+static void minnow_panel_early_init_timeout_func(struct work_struct *work)
+{
+	DECLARE_MPD_FROM_CONTAINER(work, early_init_timeout_work.work);
+	mutex_lock(&mpd->lock);
+	if (mpd->early_inited) {
+		minnow_panel_disable_mlocked(mpd);
+		dev_dbg(&mpd->dssdev->dev, "%s: cancelled previous early"
+			" initialize works\n", __func__);
+	}
+	mutex_unlock(&mpd->lock);
 }
 #endif /* CONFIG_WAKEUP_SOURCE_NOTIFY */
 
@@ -2355,6 +2386,8 @@ static int minnow_panel_probe(struct omap_dss_device *dssdev)
 
 #ifdef CONFIG_WAKEUP_SOURCE_NOTIFY
 	INIT_WORK(&mpd->early_init_work, minnow_panel_early_init_func);
+	INIT_DELAYED_WORK(&mpd->early_init_timeout_work,
+			  minnow_panel_early_init_timeout_func);
 	mpd->displayenable_nb.notifier_call = omapdss_displayenable_notify;
 	wakeup_source_register_notify(&mpd->displayenable_nb);
 #endif /* CONFIG_WAKEUP_SOURCE_NOTIFY */
@@ -2667,13 +2700,12 @@ err:
 	return r;
 }
 
-static int minnow_panel_enable(struct omap_dss_device *dssdev)
+static int minnow_panel_enable_mlocked(struct minnow_panel_data *mpd)
 {
-	struct minnow_panel_data *mpd = dev_get_drvdata(&dssdev->dev);
+	struct omap_dss_device *dssdev = mpd->dssdev;
 	bool update;
 	int r = 0;
 
-	mutex_lock(&mpd->lock);
 	dev_info(&dssdev->dev, "%s: current state = %d\n",
 		 __func__, dssdev->state);
 
@@ -2703,20 +2735,20 @@ static int minnow_panel_enable(struct omap_dss_device *dssdev)
 		}
 		wake_unlock(&mpd->wake_lock);
 	}
-	mutex_unlock(&mpd->lock);
 
 	return r;
 }
 
-static void minnow_panel_disable(struct omap_dss_device *dssdev)
+static void minnow_panel_disable_mlocked(struct minnow_panel_data *mpd)
 {
-	struct minnow_panel_data *mpd = dev_get_drvdata(&dssdev->dev);
+	struct omap_dss_device *dssdev = mpd->dssdev;
 
 	dev_info(&dssdev->dev, "%s: current state = %d\n",
 		 __func__, dssdev->state);
 
-	mutex_lock(&mpd->lock);
 	wake_lock(&mpd->wake_lock);
+	mpd->early_inited = false;
+	cancel_delayed_work(&mpd->early_init_timeout_work);
 	minnow_panel_cancel_ulps_work(mpd);
 	minnow_panel_cancel_esd_work(mpd);
 	minnow_panel_sync_resume_mlocked(mpd);
@@ -2730,7 +2762,6 @@ static void minnow_panel_disable(struct omap_dss_device *dssdev)
 	dsi_bus_unlock(dssdev);
 
 	wake_unlock(&mpd->wake_lock);
-	mutex_unlock(&mpd->lock);
 }
 
 #if defined(CONFIG_HAS_AMBIENTMODE)
@@ -2741,6 +2772,14 @@ static int minnow_panel_suspend(struct omap_dss_device *dssdev)
 		__func__, dssdev->state, wake_lock_active(&mpd->wake_lock));
 
 	mutex_lock(&mpd->lock);
+#ifdef	CONFIG_WAKEUP_SOURCE_NOTIFY
+	/* it needs turn off display if it's early initialized */
+	if (mpd->early_inited) {
+		minnow_panel_disable_mlocked(mpd);
+		dev_dbg(&mpd->dssdev->dev, "%s: cancelled previous early"
+			" initialize works\n", __func__);
+	}
+#endif
 	if (mpd->enabled) {
 		dsi_bus_lock(dssdev);
 		minnow_panel_enter_ulps_locked(mpd);
@@ -2834,14 +2873,39 @@ err:
 
 static void minnow_panel_te_timeout_work_callback(struct work_struct *work)
 {
-	struct minnow_panel_data *mpd = container_of(work, struct minnow_panel_data,
-					te_timeout_work.work);
+	DECLARE_MPD_FROM_CONTAINER(work, te_timeout_work.work);
 	struct omap_dss_device *dssdev = mpd->dssdev;
 
 	dev_err(&dssdev->dev, "TE not received for 250ms!\n");
 
 	atomic_set(&mpd->do_update, 0);
 	dsi_bus_unlock(dssdev);
+}
+
+static int minnow_panel_enable(struct omap_dss_device *dssdev)
+{
+	struct minnow_panel_data *mpd = dev_get_drvdata(&dssdev->dev);
+	int r;
+
+	mutex_lock(&mpd->lock);
+#ifdef	CONFIG_WAKEUP_SOURCE_NOTIFY
+	if (mpd->early_inited) {
+		mpd->early_inited = false;
+		cancel_delayed_work(&mpd->early_init_timeout_work);
+	}
+#endif
+	r = minnow_panel_enable_mlocked(mpd);
+	mutex_unlock(&mpd->lock);
+	return r;
+}
+
+static void minnow_panel_disable(struct omap_dss_device *dssdev)
+{
+	struct minnow_panel_data *mpd = dev_get_drvdata(&dssdev->dev);
+
+	mutex_lock(&mpd->lock);
+	minnow_panel_disable_mlocked(mpd);
+	mutex_unlock(&mpd->lock);
 }
 
 static int minnow_panel_update(struct omap_dss_device *dssdev,
@@ -3078,8 +3142,7 @@ err1:
 
 static void minnow_panel_ulps_work(struct work_struct *work)
 {
-	struct minnow_panel_data *mpd = container_of(work, struct minnow_panel_data,
-			ulps_work.work);
+	DECLARE_MPD_FROM_CONTAINER(work, ulps_work.work);
 	struct omap_dss_device *dssdev = mpd->dssdev;
 
 	mutex_lock(&mpd->lock);
@@ -3098,8 +3161,7 @@ static void minnow_panel_ulps_work(struct work_struct *work)
 
 static void minnow_panel_esd_work(struct work_struct *work)
 {
-	struct minnow_panel_data *mpd = container_of(work, struct minnow_panel_data,
-			esd_work.work);
+	DECLARE_MPD_FROM_CONTAINER(work, esd_work.work);
 	struct omap_dss_device *dssdev = mpd->dssdev;
 	int r;
 

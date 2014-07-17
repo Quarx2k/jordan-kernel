@@ -1251,8 +1251,10 @@ static int omapfb_blank(int blank, struct fb_info *fbi)
 
 	switch (blank) {
 	case FB_BLANK_UNBLANK:
+#if !defined(CONFIG_WAKEUP_SOURCE_NOTIFY) && !defined(CONFIG_HAS_AMBIENTMODE)
 		if (display->state == OMAP_DSS_DISPLAY_ACTIVE)
 			goto exit;
+#endif
 
 		r = display->driver->enable(display);
 
@@ -1269,8 +1271,10 @@ static int omapfb_blank(int blank, struct fb_info *fbi)
 	case FB_BLANK_VSYNC_SUSPEND:
 	case FB_BLANK_HSYNC_SUSPEND:
 	case FB_BLANK_POWERDOWN:
+#if !defined(CONFIG_WAKEUP_SOURCE_NOTIFY) && !defined(CONFIG_HAS_AMBIENTMODE)
 		if (display->state != OMAP_DSS_DISPLAY_ACTIVE)
 			goto exit;
+#endif
 
 		if (d->auto_update_work_enabled)
 			omapfb_stop_auto_update(fbdev, display);
@@ -1283,7 +1287,9 @@ static int omapfb_blank(int blank, struct fb_info *fbi)
 		r = -EINVAL;
 	}
 
+#if !defined(CONFIG_WAKEUP_SOURCE_NOTIFY) && !defined(CONFIG_HAS_AMBIENTMODE)
 exit:
+#endif
 	omapfb_unlock(fbdev);
 
 	return r;
