@@ -614,10 +614,6 @@ tps65912_0: tps65912 {
 			0x122 0x004	/* SIM_CLK, MODE4 | OUTPUT */
 			0x124 0x00f	/* SIM_PWRCTRL, MODE7 | PULLDOWN */
 			0x13e 0x00F	/* MCBSP3_DR, MODE7 | PULLDOWN */
-			0x144 0x4100	/* UART2_CTS, MODE0  | OUTPUT | OFFWAKEUP */
-			0x146 0x000	/* UART2_RTS, MODE0 | OUTPUT */
-			0x148 0x000	/* UART2_TX, MODE0 | OUTPUT */
-			0x14a 0x100	/* UART2_RX, MODE0 | INPUT */
 			0x15c 0x10f	/* MCBSP1_CLKR, GPIO 156, MODE7 | PD */
 			0x168 0x104	/* MCBSP1_CLKX, MODE4 | INPUT */
 			0x16a 0x10f	/* UART3_CTS_RCTX, GPIO 163, MODE7 | PD */
@@ -733,6 +729,24 @@ tps65912_0: tps65912 {
 		>;
 	};
 
+	uart2_pins_default: pinmux_uart_pins_default@2 {
+		pinctrl-single,pins = <
+			0x144 0x4100	/* UART2_CTS, MODE0  | OUTPUT | OFFWAKEUP */
+			0x146 0x000	/* UART2_RTS, MODE0 | OUTPUT */
+			0x148 0x000	/* UART2_TX, MODE0 | OUTPUT */
+			0x14a 0x100	/* UART2_RX, MODE0 | INPUT */
+		>;
+	};
+
+	uart2_pins_idle: pinmux_uart_pins_idle@2 {
+		pinctrl-single,pins = <
+			0x144 0x4100	/* UART2_CTS, MODE0  | OUTPUT | OFFWAKEUP */
+			0x146 0x004	/* UART2_RTS, MODE4 | OUTPUT */
+			0x148 0x000	/* UART2_TX, MODE0 | OUTPUT */
+			0x14a 0x100	/* UART2_RX, MODE0 | INPUT */
+		>;
+	};
+
 	cc_alert_pin: pinmax_cc_alert_pin {
 		pinctrl-single,pins = <
 			0x13c 0x411c	/* MCBSP3_DX, MODE4 | INPUT | INPUT_PULLUP | OFFWAKEUP */
@@ -836,6 +850,12 @@ tps65912_0: tps65912 {
 	autosuspend-delay = <50>; /* ms */
 	timed-wakelock = <50>; /* ms */
 	rx_trig = <32>;
+
+	/* rts_gpio HACK */
+	gpios = <&gpio5 17 2>; /* gpio_145 (uart_rts) GPIOF_DIR_OUT|GPIOF_INIT_HIGH */
+	pinctrl-names = "default", "idle";
+	pinctrl-0 = <&uart2_pins_default>;
+	pinctrl-1 = <&uart2_pins_idle>;
 };
 /* serial console */
 &uart3 {

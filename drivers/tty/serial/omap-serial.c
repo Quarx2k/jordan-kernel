@@ -39,6 +39,7 @@
 #include <linux/irq.h>
 #include <linux/pm_runtime.h>
 #include <linux/of.h>
+#include <linux/of_gpio.h>
 #include <linux/gpio.h>
 #include <linux/pinctrl/consumer.h>
 #include <linux/platform_data/serial-omap.h>
@@ -168,6 +169,8 @@ struct uart_omap_port {
 	u32			calc_latency;
 	struct work_struct	qos_work;
 	struct pinctrl		*pins;
+	struct pinctrl_state	*pin_default;
+	struct pinctrl_state	*pin_idle;
 	bool			is_suspending;
 	bool			in_transmit;
 	int			ext_rt_cnt;
@@ -1448,6 +1451,39 @@ static struct omap_uart_port_info *of_get_uart_port_info(struct device *dev)
 	return oi;
 }
 
+static void uart_pinctrl_state_init(struct device *dev, struct uart_omap_port *up)
+{
+	struct device_node *np = dev->of_node;
+	enum of_gpio_flags flags;
+	int gpio;
+
+	up->pin_default = pinctrl_lookup_state(up->pins, PINCTRL_STATE_DEFAULT);
+	if (IS_ERR(up->pin_default)) {
+		dev_dbg(dev, "did not get default state for uart%i error: %li\n",
+			up->port.line, PTR_ERR(up->pin_default));
+		up->pin_default = NULL;
+		return;
+	}
+
+	up->pin_idle = pinctrl_lookup_state(up->pins, PINCTRL_STATE_IDLE);
+	if (IS_ERR(up->pin_idle)) {
+		dev_dbg(dev, "did not get idle state for uart%i error: %li\n",
+			up->port.line, PTR_ERR(up->pin_idle));
+		up->pin_idle = NULL;
+		return;
+	}
+
+	if (np) {
+		gpio = of_get_gpio_flags(np, 0, &flags);
+		if (gpio > 0) {
+			if (!gpio_request(gpio, "rts")) {
+				dev_info(dev, "got rts gpio %d\n", gpio);
+				gpio_direction_output(gpio, 1);
+			}
+		}
+	}
+}
+
 static int serial_omap_probe(struct platform_device *pdev)
 {
 	struct uart_omap_port	*up;
@@ -1526,7 +1562,8 @@ static int serial_omap_probe(struct platform_device *pdev)
 		dev_warn(&pdev->dev, "did not get pins for uart%i error: %li\n",
 			 up->port.line, PTR_ERR(up->pins));
 		up->pins = NULL;
-	}
+	} else
+		uart_pinctrl_state_init(&pdev->dev, up);
 
 	sprintf(up->name, "OMAP UART%d", up->port.line);
 	up->port.mapbase = mem->start;
@@ -1703,14 +1740,21 @@ static int serial_omap_runtime_suspend(struct device *dev)
 	up->latency = PM_QOS_CPU_DMA_LAT_DEFAULT_VALUE;
 	serial_omap_uart_qos(up);
 
+	if (up->pin_idle)
+		pinctrl_select_state(up->pins, up->pin_idle);
+
 	return 0;
 }
 
 static int serial_omap_runtime_resume(struct device *dev)
 {
+	int loss_cnt;
 	struct uart_omap_port *up = dev_get_drvdata(dev);
 
-	int loss_cnt = serial_omap_get_context_loss_count(up);
+	if (up->pin_default && up->pin_idle)
+		pinctrl_select_state(up->pins, up->pin_default);
+
+	loss_cnt = serial_omap_get_context_loss_count(up);
 	if (loss_cnt < 0) {
 		serial_omap_restore_context(up);
 	} else if (up->context_loss_cnt != loss_cnt) {
