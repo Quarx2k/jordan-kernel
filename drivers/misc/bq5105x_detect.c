@@ -29,6 +29,7 @@
 #include <linux/switch.h>
 #include <linux/wakelock.h>
 #include <linux/workqueue.h>
+#include <linux/wakeup_source_notify.h>
 
 /*
  * Detect when a device is placed on a wireless charger and report this to user
@@ -127,6 +128,11 @@ static void bq5105x_detect_set_docked(struct bq5105x_detect *chip, bool docked)
 {
 	if (chip->docked != docked) {
 		dev_dbg(&chip->pdev->dev, "docked=%d\n", docked);
+#ifdef CONFIG_WAKEUP_SOURCE_NOTIFY
+		wakeup_source_notify_subscriber(docked
+						? DISPLAY_WAKE_EVENT_DOCKON
+						: DISPLAY_WAKE_EVENT_DOCKOFF);
+#endif
 		chip->docked = docked;
 		power_supply_changed(&chip->charger);
 		switch_set_state(chip->sdev, chip->docked);

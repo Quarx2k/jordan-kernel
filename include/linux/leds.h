@@ -139,6 +139,14 @@ extern void led_blink_set_oneshot(struct led_classdev *led_cdev,
 extern void led_set_brightness(struct led_classdev *led_cdev,
 			       enum led_brightness brightness);
 
+#ifdef	CONFIG_HAS_AMBIENTMODE
+/**
+ * led_get_default_dev - get default LED device
+ *   return default LED device
+ */
+extern struct led_classdev *led_get_default_dev(void);
+#endif
+
 /*
  * LED Triggers
  */

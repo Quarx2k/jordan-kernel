@@ -35,6 +35,10 @@
 #include <linux/regulator/consumer.h>
 #include <linux/clk.h>
 #include <linux/wakelock.h>
+#include <linux/leds.h>
+#include <linux/alarmtimer.h>
+#include <linux/m4sensorhub.h>
+#include <linux/m4sensorhub/MemMapUserSettings.h>
 
 #include <video/omapdss.h>
 #include <video/omap-panel-data.h>
@@ -158,6 +162,7 @@ static u8 panel_off_common[] = {
 #define	PANEL_WIDTH		BRIDGE_WIDTH
 #define	PANEL_HEIGHT		290
 #define	UNUSED_LINES		(BRIDGE_HEIGHT-PANEL_HEIGHT)
+#define	DRIVER_NAME		"minnow-panel"
 
 struct minnow_panel_clk_range {
 	int	min;
@@ -251,6 +256,15 @@ static struct minnow_panel_attr panel_attr_table[MINNOW_PANEL_MAX] = {
 #define GET_ELAPSE_TIME(last)	jiffies_to_msecs((unsigned long)jiffies-last)
 #endif
 
+enum display_state {
+	DISPLAY_DISABLE,
+	DISPLAY_ENABLE,
+#ifdef	CONFIG_HAS_AMBIENTMODE
+	DISPLAY_AMBIENT_OFF,
+	DISPLAY_AMBIENT_ON,
+#endif
+};
+
 struct minnow_panel_data {
 	struct mutex lock;		/* mutex */
 	/* wake_lock for common function, it should be used in same thread */
@@ -288,6 +302,7 @@ struct minnow_panel_data {
 	int release_ms;
 
 	/* runtime variables */
+	enum display_state state;
 	bool enabled;
 	bool interactive;
 	bool output_enabled;
@@ -313,7 +328,7 @@ struct minnow_panel_data {
 
 	struct delayed_work esd_work;
 	unsigned esd_interval;
-#if defined(CONFIG_HAS_AMBIENTMODE)
+#ifdef	CONFIG_HAS_AMBIENTMODE
 	struct timespec esd_start_time;
 #endif
 
@@ -340,12 +355,19 @@ struct minnow_panel_data {
 	ktime_t vsync_events_timestamp;
 #ifdef CONFIG_WAKEUP_SOURCE_NOTIFY
 	bool early_inited;
+	enum display_state last_state;
 	struct notifier_block displayenable_nb;
 	struct work_struct early_init_work;
 	struct delayed_work early_init_timeout_work;
 #endif /* CONFIG_WAKEUP_SOURCE_NOTIFY */
-#if defined(CONFIG_HAS_AMBIENTMODE)
+#ifdef	CONFIG_HAS_AMBIENTMODE
 	struct completion resume_completion;
+	struct work_struct dock_work;
+	struct work_struct ambient_wake_work;
+	struct alarm ambient_timeout_alarm;
+	int ambient_timeout;		/* time out in seconds */
+	struct work_struct ambient_timeout_work;
+	int is_docked;
 #endif
 };
 
@@ -373,6 +395,8 @@ static void minnow_panel_ulps_work(struct work_struct *work);
 
 static int minnow_panel_enable_mlocked(struct minnow_panel_data *mpd);
 static void minnow_panel_disable_mlocked(struct minnow_panel_data *mpd);
+static int minnow_panel_change_state_mlocked(struct minnow_panel_data *mpd,
+					     int state);
 
 static void minnow_panel_sync_resume_mlocked(struct minnow_panel_data *mpd)
 {
@@ -396,9 +420,31 @@ static int omapdss_displayenable_notify(struct notifier_block *self,
 {
 	DECLARE_MPD_FROM_CONTAINER(self, displayenable_nb);
 	dev_info(&mpd->dssdev->dev, "%s, action is %lu", __func__, action);
-	if (action == DISPLAY_WAKE_EVENT) {
-		/* Queue work to init the display */
+	switch (action) {
+	case DISPLAY_WAKE_EVENT_POWERKEY:
+	case DISPLAY_WAKE_EVENT_TOUCH:
+	case DISPLAY_WAKE_EVENT_GESTURE:
+		/* Queue work to early enable the display */
 		queue_work(mpd->workqueue, &mpd->early_init_work);
+		break;
+#ifdef	CONFIG_HAS_AMBIENTMODE
+	case DISPLAY_WAKE_EVENT_GESTURE_VIEW:
+		/* Queue work to enable the ambient display mode */
+		queue_work(mpd->workqueue, &mpd->ambient_wake_work);
+		break;
+#endif
+	case DISPLAY_WAKE_EVENT_DOCKON:
+	case DISPLAY_WAKE_EVENT_DOCKOFF:
+#ifdef	CONFIG_HAS_AMBIENTMODE
+		mpd->is_docked = action == DISPLAY_WAKE_EVENT_DOCKON;
+		/* Queue work to dock the display */
+		queue_work(mpd->workqueue, &mpd->dock_work);
+#endif
+		break;
+	default:
+		dev_err(&mpd->dssdev->dev,
+			"%s: ignore unknown action(%lu)!\n", __func__, action);
+		break;
 	}
 	return NOTIFY_OK;
 }
@@ -409,7 +455,14 @@ static void minnow_panel_early_init_func(struct work_struct *work)
 	int r;
 	mutex_lock(&mpd->lock);
 	if (!mpd->enabled) {
-		r = minnow_panel_enable_mlocked(mpd);
+		/* record last state for later switch back */
+		if (!mpd->early_inited) {
+			if (mpd->state == DISPLAY_AMBIENT_OFF)
+				mpd->last_state = DISPLAY_AMBIENT_OFF;
+			else
+				mpd->last_state = DISPLAY_DISABLE;
+		}
+		r = minnow_panel_change_state_mlocked(mpd, DISPLAY_ENABLE);
 		if (r) {
 			dev_err(&mpd->dssdev->dev,
 				"%s: minnow_panel_enable failed: %d\n",
@@ -432,13 +485,83 @@ static void minnow_panel_early_init_timeout_func(struct work_struct *work)
 	DECLARE_MPD_FROM_CONTAINER(work, early_init_timeout_work.work);
 	mutex_lock(&mpd->lock);
 	if (mpd->early_inited) {
-		minnow_panel_disable_mlocked(mpd);
+		/* switch back to last state when early init been called */
+		minnow_panel_change_state_mlocked(mpd, mpd->last_state);
 		dev_dbg(&mpd->dssdev->dev, "%s: cancelled previous early"
 			" initialize works\n", __func__);
 	}
 	mutex_unlock(&mpd->lock);
 }
 #endif /* CONFIG_WAKEUP_SOURCE_NOTIFY */
+
+#ifdef	CONFIG_HAS_AMBIENTMODE
+static void minnow_panel_dock_func(struct work_struct *work)
+{
+	DECLARE_MPD_FROM_CONTAINER(work, dock_work);
+	bool update_state = false;
+	/* to handler DOCK event is for blocking the smart ambient
+	 * timeout when it's on dock, so the only thing is needed
+	 * just update state to DISPLAY_AMBIENT_ON as:
+	 * 1) when ambient timout (DISPLAY_AMBIENT_OFF), put device
+	 *    dock, need wake up it to ambient mode and never timeout
+	 * 2) when it's on ambient mode, leave device from dock, set
+	 *    DISPLAY_AMBIENT_ON that will restart ambient timeout
+	 * for all other cases, just ignore this event
+	 */
+	mutex_lock(&mpd->lock);
+	if (mpd->is_docked) {
+		if (mpd->state == DISPLAY_AMBIENT_OFF)
+			update_state = true;
+	} else {
+		if (mpd->state == DISPLAY_AMBIENT_ON)
+			update_state = true;
+	}
+	if (update_state)
+		minnow_panel_change_state_mlocked(mpd, DISPLAY_AMBIENT_ON);
+	mutex_unlock(&mpd->lock);
+}
+
+static void minnow_panel_ambient_wake_func(struct work_struct *work)
+{
+	DECLARE_MPD_FROM_CONTAINER(work, ambient_wake_work);
+	mutex_lock(&mpd->lock);
+	minnow_panel_change_state_mlocked(mpd, DISPLAY_AMBIENT_ON);
+	mutex_unlock(&mpd->lock);
+}
+
+static enum alarmtimer_restart minnow_panel_ambient_alarm_callback(
+	struct alarm *alarm, ktime_t now)
+{
+	DECLARE_MPD_FROM_CONTAINER(alarm, ambient_timeout_alarm);
+	dev_dbg(&mpd->dssdev->dev, "%s: turn off display\n", __func__);
+	/* Queue work to turn off the display */
+	queue_work(mpd->workqueue, &(mpd->ambient_timeout_work));
+
+	return ALARMTIMER_NORESTART;
+}
+
+static void minnow_panel_ambient_timeout_func(struct work_struct *work)
+{
+	DECLARE_MPD_FROM_CONTAINER(work, ambient_timeout_work);
+	mutex_lock(&mpd->lock);
+	minnow_panel_change_state_mlocked(mpd, DISPLAY_AMBIENT_OFF);
+	mutex_unlock(&mpd->lock);
+}
+
+/* the smart ambient timeout enabled when
+ * 1) defined ambient timeout
+ * 2) and it's not on dock
+ */
+#define is_smart_ambient_timeout_enabled(mpd)	\
+		(mpd->ambient_timeout && !mpd->is_docked)
+static void minnow_panel_start_ambient_alarm(struct minnow_panel_data *mpd)
+{
+	alarm_cancel(&mpd->ambient_timeout_alarm);
+	if (is_smart_ambient_timeout_enabled(mpd))
+		alarm_start_relative(&mpd->ambient_timeout_alarm,
+				     ktime_set(mpd->ambient_timeout, 0));
+}
+#endif /* CONFIG_HAS_AMBIENTMODE */
 
 #ifdef	CONFIG_OMAP2_DSS_DEBUGFS
 static void minnow_panel_dump_regs(struct seq_file *s)
@@ -1003,7 +1126,7 @@ static void minnow_panel_queue_esd_work(struct minnow_panel_data *mpd)
 		return;
 	queue_delayed_work(mpd->workqueue, &mpd->esd_work,
 			   msecs_to_jiffies(mpd->esd_interval));
-#if defined(CONFIG_HAS_AMBIENTMODE)
+#ifdef	CONFIG_HAS_AMBIENTMODE
 	/* store start time of delayed work */
 	read_persistent_clock(&mpd->esd_start_time);
 #endif
@@ -1621,8 +1744,9 @@ static ssize_t minnow_panel_show_init_data(struct device *dev,
 
 	return i;
 }
-#endif
+#endif /* PANEL_DEBUG */
 
+#ifdef	CONFIG_HAS_AMBIENTMODE
 static ssize_t minnow_panel_show_interactivemode(struct device *dev,
 	struct device_attribute *attr, char *buf)
 {
@@ -1648,28 +1772,61 @@ static ssize_t minnow_panel_store_interactivemode(struct device *dev,
 	r = strict_strtoul(buf, 10, &t);
 	if (!r) {
 		bool enable = !!t;
-		/* Temporary force DSI goto ULPS mode when interactive mode
-		 * turns OFF, it will add support to switch bridge/panel to
-		 * low refresh mode later
-		 */
 		mutex_lock(&mpd->lock);
-		if (mpd->enabled && (mpd->interactive != enable)) {
-			minnow_panel_sync_resume_mlocked(mpd);
-			mpd->interactive = enable;
-			dsi_bus_lock(dssdev);
-			if (enable)
-				r = minnow_panel_wake_up_locked(mpd);
-			else
-				r = minnow_panel_enter_ulps_locked(mpd);
-			dsi_bus_unlock(dssdev);
+#ifdef	CONFIG_WAKEUP_SOURCE_NOTIFY
+		/* clean early init timeout as someone handle it also */
+		if (mpd->early_inited) {
+			mpd->early_inited = false;
+			cancel_delayed_work(&mpd->early_init_timeout_work);
+		}
+#endif
+		if (mpd->interactive != enable) {
+			r = enable ? DISPLAY_ENABLE : DISPLAY_AMBIENT_OFF;
+			r = minnow_panel_change_state_mlocked(mpd, r);
+			if (!r)
+				mpd->interactive = enable;
 		}
 		mutex_unlock(&mpd->lock);
-		dev_info(&dssdev->dev, "%s interactive mode%s\n",
-			 enable ? "enable" : "disable", r ? " failed" : "");
+		dev_info(&dssdev->dev, "%s interactive mode %s\n",
+			 enable ? "enable" : "disable",
+			 r ? "failed" : "succeeded");
 	}
 
 	return r ? r : count;
 }
+
+static ssize_t minnow_panel_show_ambient_timeout(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct omap_dss_device *dssdev = to_dss_device(dev);
+	struct minnow_panel_data *mpd = dev_get_drvdata(&dssdev->dev);
+	unsigned int t;
+
+	mutex_lock(&mpd->lock);
+	t = mpd->ambient_timeout;
+	mutex_unlock(&mpd->lock);
+
+	return snprintf(buf, PAGE_SIZE, "%u\n", t);
+}
+
+static ssize_t minnow_panel_store_ambient_timeout(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct omap_dss_device *dssdev = to_dss_device(dev);
+	struct minnow_panel_data *mpd = dev_get_drvdata(&dssdev->dev);
+	unsigned long t;
+	int r;
+
+	r = kstrtoul(buf, 10, &t);
+	if (!r) {
+		mutex_lock(&mpd->lock);
+		mpd->ambient_timeout = (int)t;
+		mutex_unlock(&mpd->lock);
+	}
+
+	return r ? r : count;
+}
+#endif /* CONFIG_HAS_AMBIENTMODE */
 
 #ifdef	PANEL_PERF_TIME
 static ssize_t minnow_panel_perftime_show(struct device *dev,
@@ -1810,9 +1967,14 @@ static DEVICE_ATTR(init_data, S_IRUGO | S_IWUSR,
 		   minnow_panel_show_init_data,
 		   minnow_panel_store_init_data);
 #endif
+#ifdef	CONFIG_HAS_AMBIENTMODE
 static DEVICE_ATTR(interactivemode, S_IRUGO | S_IWUSR,
 		   minnow_panel_show_interactivemode,
 		   minnow_panel_store_interactivemode);
+static DEVICE_ATTR(ambient_timeout, S_IRUGO | S_IWUSR,
+		   minnow_panel_show_ambient_timeout,
+		   minnow_panel_store_ambient_timeout);
+#endif
 #ifdef	PANEL_PERF_TIME
 static DEVICE_ATTR(perftime, S_IRUGO, minnow_panel_perftime_show, NULL);
 #endif
@@ -1833,7 +1995,10 @@ static struct attribute *minnow_panel_attrs[] = {
 	&dev_attr_cabc_available_modes.attr,
 	&dev_attr_init_data.attr,
 #endif
+#ifdef	CONFIG_HAS_AMBIENTMODE
 	&dev_attr_interactivemode.attr,
+	&dev_attr_ambient_timeout.attr,
+#endif
 #ifdef	PANEL_PERF_TIME
 	&dev_attr_perftime.attr,
 #endif
@@ -2032,6 +2197,13 @@ static int minnow_panel_dt_init(struct minnow_panel_data *mpd)
 		mpd->esd_interval = value;
 		DTINFO("esd_interval = %d\n", mpd->esd_interval);
 	}
+#ifdef	CONFIG_HAS_AMBIENTMODE
+	mpd->ambient_timeout = 0;
+	if (!of_property_read_u32(dt_node, "ambient_timeout", &value)) {
+		mpd->ambient_timeout = value;
+		DTINFO("ambient_timeout = %d\n", mpd->ambient_timeout);
+	}
+#endif
 	/* automatically go to ULPS mode for none-update within 250ms */
 	mpd->ulps_timeout = 250;
 #ifdef	CONFIG_PANEL_BACKLIGHT
@@ -2392,9 +2564,15 @@ static int minnow_panel_probe(struct omap_dss_device *dssdev)
 	wakeup_source_register_notify(&mpd->displayenable_nb);
 #endif /* CONFIG_WAKEUP_SOURCE_NOTIFY */
 
-#if defined(CONFIG_HAS_AMBIENTMODE)
+#ifdef	CONFIG_HAS_AMBIENTMODE
 	init_completion(&mpd->resume_completion);
 	complete_all(&mpd->resume_completion);
+	INIT_WORK(&mpd->dock_work, minnow_panel_dock_func);
+	INIT_WORK(&mpd->ambient_wake_work, minnow_panel_ambient_wake_func);
+	INIT_WORK(&mpd->ambient_timeout_work,
+		  minnow_panel_ambient_timeout_func);
+	alarm_init(&mpd->ambient_timeout_alarm, ALARM_REALTIME,
+		   minnow_panel_ambient_alarm_callback);
 #endif
 
 	return 0;
@@ -2433,6 +2611,9 @@ static void __exit minnow_panel_remove(struct omap_dss_device *dssdev)
 	wakeup_source_unregister_notify(&mpd->displayenable_nb);
 	cancel_work_sync(&mpd->early_init_work);
 #endif /* CONFIG_WAKEUP_SOURCE_NOTIFY */
+#ifdef	CONFIG_HAS_AMBIENTMODE
+	alarm_cancel(&mpd->ambient_timeout_alarm);
+#endif
 	minnow_panel_cancel_ulps_work(mpd);
 	minnow_panel_cancel_esd_work(mpd);
 	destroy_workqueue(mpd->workqueue);
@@ -2576,7 +2757,6 @@ init_start:
 		goto err;
 
 	mpd->enabled = true;
-	mpd->interactive = true;
 	mpd->output_enabled = true;
 
 	if (mpd->first_enable)
@@ -2619,7 +2799,6 @@ static void minnow_panel_power_off(struct minnow_panel_data *mpd,
 	omapdss_dsi_display_disable(mpd->dssdev, true, fast_power_off);
 
 	mpd->enabled = false;
-	mpd->interactive = false;
 	mpd->ulps_enabled = false;
 }
 
@@ -2764,7 +2943,111 @@ static void minnow_panel_disable_mlocked(struct minnow_panel_data *mpd)
 	wake_unlock(&mpd->wake_lock);
 }
 
-#if defined(CONFIG_HAS_AMBIENTMODE)
+static void minnow_panel_sync_display_status_mlocked(
+	struct minnow_panel_data *mpd)
+{
+	static int last_display_on = -1;
+	int display_on = (mpd->state == DISPLAY_DISABLE)
+			? DISPLAY_OFF : DISPLAY_ON;
+	struct m4sensorhub_data *m4sensorhub;
+
+	if (display_on == last_display_on)
+		return;
+	m4sensorhub = m4sensorhub_client_get_drvdata();
+	if (m4sensorhub->mode != NORMALMODE) {
+		dev_err(&mpd->dssdev->dev,
+			"M4 is not ready, unable to set screen status\n");
+		return;
+	}
+	if (m4sensorhub_reg_write_1byte(m4sensorhub,
+					M4SH_REG_USERSETTINGS_SCREENSTATUS,
+					display_on,
+					SCREEN_STATUS_DISPLAY_MASK) != 1) {
+		dev_err(&mpd->dssdev->dev,
+			"Unable to set screen status(%d) to M4\n",
+			display_on);
+		return;
+	}
+	dev_dbg(&mpd->dssdev->dev,
+		"Set screen status(%d) to M4 success!\n", display_on);
+	last_display_on = display_on;
+}
+
+static int minnow_panel_change_state_mlocked(struct minnow_panel_data *mpd,
+					     int state)
+{
+	int r = 0;
+
+	dev_info(&mpd->dssdev->dev, "change state(%d),"
+		 " current state(%d)\n", state, mpd->state);
+
+	/* already in state, return success */
+	if (state == mpd->state) {
+#ifdef	CONFIG_HAS_AMBIENTMODE
+		if (state == DISPLAY_AMBIENT_ON) {
+			/* reset smart ambient timeout if it's needed */
+			minnow_panel_start_ambient_alarm(mpd);
+		}
+#endif
+		return r;
+	}
+
+#ifdef	CONFIG_HAS_AMBIENTMODE
+	alarm_cancel(&mpd->ambient_timeout_alarm);
+#endif
+	switch (state) {
+	case DISPLAY_DISABLE:
+		if (mpd->enabled)
+			minnow_panel_disable_mlocked(mpd);
+		break;
+	case DISPLAY_ENABLE:
+		if (!mpd->enabled)
+			r = minnow_panel_enable_mlocked(mpd);
+		break;
+#ifdef	CONFIG_HAS_AMBIENTMODE
+	case DISPLAY_AMBIENT_OFF:
+		/* it can't go to smart ambient mode when display disabled */
+		if (mpd->state == DISPLAY_DISABLE) {
+			r = -EINVAL;
+			break;
+		}
+		if (is_smart_ambient_timeout_enabled(mpd)) {
+			/* Turn off the back light */
+			led_set_brightness(led_get_default_dev(), 0);
+			minnow_panel_disable_mlocked(mpd);
+		}
+		break;
+	case DISPLAY_AMBIENT_ON:
+		/* it can only turn on ambient mode it's off before */
+		if (mpd->state == DISPLAY_AMBIENT_OFF) {
+			/* check if smart ambient mode feature enabled */
+			if (!mpd->ambient_timeout)
+				break;
+			r = minnow_panel_enable_mlocked(mpd);
+			if (!r) {
+				/* Dim the back light */
+				led_set_brightness(led_get_default_dev(), 5);
+				minnow_panel_start_ambient_alarm(mpd);
+			}
+		} else {
+			r = -EINVAL;
+		}
+		break;
+#endif /* CONFIG_HAS_AMBIENTMODE */
+	default:
+		r = -EINVAL;
+	}
+	if (!r) {
+		mpd->state = state;
+		minnow_panel_sync_display_status_mlocked(mpd);
+	} else {
+		dev_err(&mpd->dssdev->dev, "failed(%d) set state(%d),"
+			" current state(%d)\n", r, state, mpd->state);
+	}
+	return r;
+}
+
+#ifdef	CONFIG_HAS_AMBIENTMODE
 static int minnow_panel_suspend(struct omap_dss_device *dssdev)
 {
 	struct minnow_panel_data *mpd = dev_get_drvdata(&dssdev->dev);
@@ -2775,7 +3058,8 @@ static int minnow_panel_suspend(struct omap_dss_device *dssdev)
 #ifdef	CONFIG_WAKEUP_SOURCE_NOTIFY
 	/* it needs turn off display if it's early initialized */
 	if (mpd->early_inited) {
-		minnow_panel_disable_mlocked(mpd);
+		/* switch back to last state when early init been called */
+		minnow_panel_change_state_mlocked(mpd, mpd->last_state);
 		dev_dbg(&mpd->dssdev->dev, "%s: cancelled previous early"
 			" initialize works\n", __func__);
 	}
@@ -2791,6 +3075,7 @@ static int minnow_panel_suspend(struct omap_dss_device *dssdev)
 	/* block all threads waiting on resume */
 	INIT_COMPLETION(mpd->resume_completion);
 	mutex_unlock(&mpd->lock);
+
 	return 0;
 }
 
@@ -2825,7 +3110,7 @@ static int minnow_panel_resume(struct omap_dss_device *dssdev)
 
 	return 0;
 }
-#endif
+#endif /* CONFIG_HAS_AMBIENTMODE */
 
 static void minnow_panel_framedone_cb(int err, void *data)
 {
@@ -2890,11 +3175,12 @@ static int minnow_panel_enable(struct omap_dss_device *dssdev)
 	mutex_lock(&mpd->lock);
 #ifdef	CONFIG_WAKEUP_SOURCE_NOTIFY
 	if (mpd->early_inited) {
+		/* clean early init timeout as someone handle it also */
 		mpd->early_inited = false;
 		cancel_delayed_work(&mpd->early_init_timeout_work);
 	}
 #endif
-	r = minnow_panel_enable_mlocked(mpd);
+	r = minnow_panel_change_state_mlocked(mpd, DISPLAY_ENABLE);
 	mutex_unlock(&mpd->lock);
 	return r;
 }
@@ -2904,7 +3190,7 @@ static void minnow_panel_disable(struct omap_dss_device *dssdev)
 	struct minnow_panel_data *mpd = dev_get_drvdata(&dssdev->dev);
 
 	mutex_lock(&mpd->lock);
-	minnow_panel_disable_mlocked(mpd);
+	minnow_panel_change_state_mlocked(mpd, DISPLAY_DISABLE);
 	mutex_unlock(&mpd->lock);
 }
 
@@ -3237,7 +3523,7 @@ static struct omap_dss_driver minnow_panel_driver = {
 
 	.enable		= minnow_panel_enable,
 	.disable	= minnow_panel_disable,
-#if defined(CONFIG_HAS_AMBIENTMODE)
+#ifdef	CONFIG_HAS_AMBIENTMODE
 	.suspend	= minnow_panel_suspend,
 	.resume		= minnow_panel_resume,
 #endif
@@ -3257,7 +3543,7 @@ static struct omap_dss_driver minnow_panel_driver = {
 #endif
 
 	.driver         = {
-		.name   = "minnow-panel",
+		.name   = DRIVER_NAME,
 		.owner  = THIS_MODULE,
 	},
 };

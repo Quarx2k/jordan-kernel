@@ -478,6 +478,14 @@ static uint8_t lm3535_convert_value (unsigned value, unsigned zone)
     return reg;
 }
 
+#ifdef	CONFIG_HAS_AMBIENTMODE
+struct led_classdev *led_get_default_dev(void)
+{
+	return &lm3535_led;
+}
+EXPORT_SYMBOL(led_get_default_dev);
+#endif
+
 static void lm3535_brightness_set (struct led_classdev *led_cdev,
                 enum led_brightness value)
 {

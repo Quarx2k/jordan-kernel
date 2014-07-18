@@ -103,7 +103,7 @@ void tps65912_broadcast_key_event(struct tps65912 *tps65912,
 		input_sync(key->input_dev);
 #ifdef CONFIG_WAKEUP_SOURCE_NOTIFY
 		if (value == PWRKEY_PRESS)
-			wakeup_source_notify_subscriber(DISPLAY_WAKE_EVENT);
+			notify_display_wakeup(POWERKEY);
 #endif /* CONFIG_WAKEUP_SOURCE_NOTIFY */
 	}
 }

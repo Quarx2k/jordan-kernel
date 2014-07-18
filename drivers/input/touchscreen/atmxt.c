@@ -2754,7 +2754,7 @@ static void atmxt_report_touches(struct atmxt_driver_data *dd)
 	input_sync(dd->in_dev);
 #ifdef CONFIG_WAKEUP_SOURCE_NOTIFY
 	if (atmxt_get_ic_state(dd) == ATMXT_IC_AOT)
-		wakeup_source_notify_subscriber(DISPLAY_WAKE_EVENT);
+		notify_display_wakeup(TOUCH);
 #endif /* CONFIG_WAKEUP_SOURCE_NOTIFY */
 
 	/* Hold to allow events time to propagate up */

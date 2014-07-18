@@ -20,8 +20,17 @@
 #ifdef __KERNEL__
 
 enum display_wakeup_request {
-	DISPLAY_WAKE_EVENT,
+	DISPLAY_WAKE_EVENT_POWERKEY,
+	DISPLAY_WAKE_EVENT_TOUCH,
+	DISPLAY_WAKE_EVENT_GESTURE,
+	DISPLAY_WAKE_EVENT_GESTURE_VIEW,
+	DISPLAY_WAKE_EVENT_DOCKON,
+	DISPLAY_WAKE_EVENT_DOCKOFF,
+	DISPLAY_WAKE_EVENT_MAX
 };
+
+#define	notify_display_wakeup(reason)	\
+	wakeup_source_notify_subscriber(DISPLAY_WAKE_EVENT_##reason)
 
 extern void wakeup_source_register_notify(struct notifier_block *nb);
 extern void wakeup_source_unregister_notify(struct notifier_block *nb);

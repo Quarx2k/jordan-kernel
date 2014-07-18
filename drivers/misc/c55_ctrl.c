@@ -16,6 +16,7 @@
 #include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/m4sensorhub.h>
+#include <linux/m4sensorhub/MemMapUserSettings.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/regulator/consumer.h>
@@ -169,8 +170,8 @@ static ssize_t c55_ctrl_enable(struct device *dev,
 		gpio_set_value(cdata->ap_c55_int_gpio, 1);
 
 		if (m4sensorhub_reg_write_1byte
-		    (m4sensorhub, M4SH_REG_USERSETTINGS_SCREENSTATUS, 0x01, 0xFF
-		    ) != 1) {
+		    (m4sensorhub, M4SH_REG_USERSETTINGS_SCREENSTATUS,
+		    INTERACTIVE_ON, SCREEN_STATUS_INTERACTIVE_MASK) != 1) {
 			dev_err(dev, "Unable to set screen status to 0x01\n");
 			mutex_unlock(&cdata->ctrl_mutex);
 			return -EINVAL;
@@ -189,8 +190,8 @@ static ssize_t c55_ctrl_enable(struct device *dev,
 		}
 
 		if (m4sensorhub_reg_write_1byte
-		    (m4sensorhub, M4SH_REG_USERSETTINGS_SCREENSTATUS, 0x00, 0xFF
-				) != 1) {
+		    (m4sensorhub, M4SH_REG_USERSETTINGS_SCREENSTATUS,
+		    INTERACTIVE_OFF, SCREEN_STATUS_INTERACTIVE_MASK) != 1) {
 			dev_err(dev, "Unable to set screen status to 0x00\n");
 			mutex_unlock(&cdata->ctrl_mutex);
 			return -EINVAL;
@@ -375,8 +376,8 @@ static int c55_ctrl_suspend(struct platform_device *dev, pm_message_t state)
 		}
 
 		if (m4sensorhub_reg_write_1byte
-		    (m4sensorhub, M4SH_REG_USERSETTINGS_SCREENSTATUS, 0x00, 0xFF
-				) != 1) {
+		    (m4sensorhub, M4SH_REG_USERSETTINGS_SCREENSTATUS,
+		    INTERACTIVE_OFF, SCREEN_STATUS_INTERACTIVE_MASK) != 1) {
 			dev_err(&dev->dev,
 				"Unable to set screen status to 0x00\n");
 		}
