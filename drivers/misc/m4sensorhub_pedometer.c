@@ -38,6 +38,7 @@
 #define m4ped_err(format, args...)  KDEBUG(M4SH_ERROR, format, ## args)
 
 #define M4PED_IRQ_ENABLED_BIT       0
+#define M4PED_FEATURE_ENABLED_BIT   1
 
 struct m4ped_driver_data {
 	struct platform_device      *pdev;
@@ -45,12 +46,11 @@ struct m4ped_driver_data {
 	struct mutex                mutex; /* controls driver entry points */
 
 	struct m4sensorhub_pedometer_iio_data   iiodat;
+	struct m4sensorhub_pedometer_iio_data   base_dat;
 	int16_t         samplerate;
 	int16_t         latest_samplerate;
 
 	uint16_t        status;
-	struct m4sensorhub_pedometer_iio_data   base_dat;
-
 };
 
 static int m4ped_read_report_data(struct iio_dev *iio,
@@ -455,10 +455,103 @@ m4ped_userdata_store_fail:
 static IIO_DEVICE_ATTR(userdata, S_IRUSR | S_IWUSR,
 		m4ped_userdata_show, m4ped_userdata_store, 0);
 
+static ssize_t m4ped_feature_enable_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct iio_dev *iio = platform_get_drvdata(pdev);
+	struct m4ped_driver_data *dd = iio_priv(iio);
+	ssize_t size = 0;
+
+	mutex_lock(&(dd->mutex));
+	if (dd->status & (1 << M4PED_FEATURE_ENABLED_BIT))
+		size = snprintf(buf, PAGE_SIZE, "Enabled\n");
+	else
+		size = snprintf(buf, PAGE_SIZE, "Disabled\n");
+	mutex_unlock(&(dd->mutex));
+	return size;
+}
+static ssize_t m4ped_feature_enable_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	int err = 0;
+	struct platform_device *pdev = to_platform_device(dev);
+	struct iio_dev *iio = platform_get_drvdata(pdev);
+	struct m4ped_driver_data *dd = iio_priv(iio);
+	int value = 0;
+	uint8_t enable = 0x00;
+
+	mutex_lock(&(dd->mutex));
+
+	err = kstrtoint(buf, 10, &value);
+	if (err < 0) {
+		m4ped_err("%s: Failed to convert value.\n", __func__);
+		goto m4ped_feature_enable_store_fail;
+	}
+
+	if (value == 0) {
+		if (dd->status & (1 << M4PED_FEATURE_ENABLED_BIT)) {
+			enable = 0x00;
+			err = m4sensorhub_reg_write(dd->m4,
+				M4SH_REG_PEDOMETER_ENABLE, &enable,
+				m4sh_no_mask);
+			if (err < 0) {
+				m4ped_err("%s: Failed to write ped disable.\n",
+					__func__);
+				goto m4ped_feature_enable_store_fail;
+			}
+
+			err = m4sensorhub_reg_write(dd->m4,
+				M4SH_REG_METS_ENABLE, &enable,
+				m4sh_no_mask);
+			if (err < 0) {
+				m4ped_err("%s: Failed to write mets disable.\n",
+					__func__);
+				goto m4ped_feature_enable_store_fail;
+			}
+
+			dd->status = dd->status &
+				~(1 << M4PED_FEATURE_ENABLED_BIT);
+		}
+	} else {
+		if (!(dd->status & (1 << M4PED_FEATURE_ENABLED_BIT))) {
+			enable = 0x01;
+			err = m4sensorhub_reg_write(dd->m4,
+				M4SH_REG_PEDOMETER_ENABLE, &enable,
+				m4sh_no_mask);
+			if (err < 0) {
+				m4ped_err("%s: Failed to write ped enable.\n",
+					__func__);
+				goto m4ped_feature_enable_store_fail;
+			}
+
+			err = m4sensorhub_reg_write(dd->m4,
+				M4SH_REG_METS_ENABLE, &enable,
+				m4sh_no_mask);
+			if (err < 0) {
+				m4ped_err("%s: Failed to write mets enable.\n",
+					__func__);
+				goto m4ped_feature_enable_store_fail;
+			}
+
+			dd->status = dd->status |
+				1 << M4PED_FEATURE_ENABLED_BIT;
+		}
+	}
+
+m4ped_feature_enable_store_fail:
+	mutex_unlock(&(dd->mutex));
+
+	return size;
+}
+static IIO_DEVICE_ATTR(feature_enable, S_IRUSR | S_IWUSR,
+		m4ped_feature_enable_show, m4ped_feature_enable_store, 0);
+
 static struct attribute *m4ped_iio_attributes[] = {
 	&iio_dev_attr_setrate.dev_attr.attr,
 	&iio_dev_attr_iiodata.dev_attr.attr,
 	&iio_dev_attr_userdata.dev_attr.attr,
+	&iio_dev_attr_feature_enable.dev_attr.attr,
 	NULL,
 };
 
@@ -549,6 +642,8 @@ static void m4ped_panic_restore(struct m4sensorhub_data *m4sensorhub,
 				void *data)
 {
 	struct m4ped_driver_data *dd = (struct m4ped_driver_data *)data;
+	int err = 0;
+	uint8_t disable = 0x00;
 
 	if (dd == NULL) {
 		m4ped_err("%s: Driver data is null, unable to restore\n",
@@ -566,6 +661,25 @@ static void m4ped_panic_restore(struct m4sensorhub_data *m4sensorhub,
 		  dd->base_dat.total_distance, dd->base_dat.total_steps,
 		  dd->base_dat.healthy_minutes, dd->base_dat.calories);
 
+	if (!(dd->status & (1 << M4PED_FEATURE_ENABLED_BIT))) {
+		err = m4sensorhub_reg_write(dd->m4, M4SH_REG_PEDOMETER_ENABLE,
+			&disable, m4sh_no_mask);
+		if (err < 0) {
+			m4ped_err("%s: Failed to write ped disable (%d).\n",
+				__func__, err);
+			goto m4ped_panic_restore_fail;
+		}
+
+		err = m4sensorhub_reg_write(dd->m4, M4SH_REG_METS_ENABLE,
+			&disable, m4sh_no_mask);
+		if (err < 0) {
+			m4ped_err("%s: Failed to write mets disable (%d).\n",
+				__func__, err);
+			goto m4ped_panic_restore_fail;
+		}
+	}
+
+m4ped_panic_restore_fail:
 	mutex_unlock(&(dd->mutex));
 }
 
@@ -633,6 +747,7 @@ static int m4ped_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, iio);
 	dd->samplerate = -1; /* We always start disabled */
 	dd->latest_samplerate = dd->samplerate;
+	dd->status = dd->status | (1 << M4PED_FEATURE_ENABLED_BIT);
 
 	err = m4ped_create_iiodev(iio); /* iio and dd are freed on fail */
 	if (err < 0) {
