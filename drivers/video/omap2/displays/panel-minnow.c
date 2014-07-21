@@ -3012,9 +3012,11 @@ static int minnow_panel_change_state_mlocked(struct minnow_panel_data *mpd,
 			break;
 		}
 		if (is_smart_ambient_timeout_enabled(mpd)) {
-			/* Turn off the back light */
-			led_set_brightness(led_get_default_dev(), 0);
 			minnow_panel_disable_mlocked(mpd);
+			/* Turn off the back light */
+			/* LED function below dependent on panel_disable_mlocked
+			 * above to guarantee i2c bus is ready */
+			led_set_brightness(led_get_default_dev(), 0);
 		}
 		break;
 	case DISPLAY_AMBIENT_ON:
