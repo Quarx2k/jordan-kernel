@@ -236,17 +236,29 @@
 		 *   irq = 16 + 96 + (gpio_bank - 1) * 32
 		 */
 		compatible = "ti,pad-wkup";
-		           /* pad off  IRQ  */
 
-		ti,pad_irq = <0x144  89>, /* uart2 - bluetooth */
-		             <0x16e  90>, /* uart3 - serial rx */
-		             <0x0a2  96>, /* uart4 - m4 rx     */
-		             <0x08e 171>, /* m4sensor hub      */
-		             <0x0e6 211>, /* touch             */
-		             <0x13c 252>, /* battery           */
-		             <0x140 254>, /* USB               */
-		             <0x1a2 288>, /* bq5105x charger   */
-		             <0x5bc 134>; /* bq5105x charger   */
+		/* Map the pad offset (off) to an interrupt (IRQ).    */
+		/* if handle is 1, an irq will be generated based on  */
+		/* the pad wkup bit.  If 0, the pad will be used only */
+		/* for reporting, assumingly because the domain will  */
+		/* be in a state during suspend to generate the IRQ   */
+		/* directly.                                          */
+		/* generic_handle_irq() will be called for multiple   */
+		/* wakeup sources, but only the first in the order    */
+		/* listed below will be reported as the wakeup reason */
+		/*                                                    */
+		/*             off  IRQ handle                        */
+		ti,pad_irq = <0x144  89 1>, /* uart2 - bluetooth      */
+		             <0x16e  90 1>, /* uart3 - serial rx      */
+		             <0x0a2  96 1>, /* uart4 - m4 rx          */
+		             <0x08e 171 1>, /* m4sensor hub           */
+		             <0x0e6 211 1>, /* touch                  */
+		             <0x140 254 1>, /* USB                    */
+		             <0x1a2 288 1>, /* bq5105x charger        */
+			     <0x1b0 112 0>, /* gpio0 - tps (dbg only) */
+		             <0x5bc 134 1>, /* bq5105x charger pulse  */
+		             <0x13c 252 1>; /* battery                */
+
 	};
 };
 
