@@ -12,6 +12,7 @@
 #include <linux/module.h>
 #include <linux/list.h>
 #include <linux/err.h>
+#include <linux/wakeup_reason.h>
 
 #include "soc.h"
 #include "common.h"
@@ -27,20 +28,23 @@ struct offmode_wkup {
 	u32 irq;
 	u32 pad;
 	u32 pad_shift;
+	bool handle; /* if true generate irq otherwise for debug only */
 };
 LIST_HEAD(offmode_wkup_list);
 
-static void omap_register_pad_wkup(struct device *dev, u32 pad, u32 irq)
+static void omap_register_pad_wkup(struct device *dev, u32 pad, u32 irq,
+		bool handle)
 {
 	struct offmode_wkup *wkup;
 
-	pr_info("register pad (0x%04x, %u)\n", pad, irq);
+	pr_info("register pad (0x%04x, %u, %d)\n", pad, irq, handle);
 
 	wkup = devm_kzalloc(dev, sizeof(struct offmode_wkup), GFP_KERNEL);
 	if (wkup) {
 		wkup->irq = irq;
 		wkup->pad = pad & 0xFFFFFFFC;
 		wkup->pad_shift = pad % 4 ? 16 : 0;
+		wkup->handle = handle;
 		list_add_tail(&wkup->node, &offmode_wkup_list);
 	}
 }
@@ -54,16 +58,35 @@ static inline int is_pad_wkup(const struct offmode_wkup *wkup)
 	return (pad & WAKEUPEVENT) ? 1 : 0;
 }
 
+/* prcm_handle_pad_wkup:
+ *
+ *   map i/o pad wkup bits to interrupts.  The primary function is
+ *   to generate interrupts.  If the handle flag is set, then generate
+ *   interrupt.  If the wkup bit is set on multiple pads, interrupts
+ *   are generated for all.   The secondary function is to log the
+ *   Typically there should only be one wakeup event, but if there
+ *   are multiple wakeup reasons, only the first in the list will be
+ *   anointed "the" wakeup reason and logged.  This means the order
+ *   items are listed in the device tree will control which irq
+ *   wins in the case of a tie.
+ */
 void prcm_handle_pad_wkup(void)
 {
 	struct offmode_wkup *wkup;
+	int wkup_irq = -1;
 
 	list_for_each_entry(wkup, &offmode_wkup_list, node) {
 		if (is_pad_wkup(wkup)) {
 			pr_info("%s IRQ = %d\n", __func__, wkup->irq);
-			generic_handle_irq(wkup->irq);
+			if (wkup_irq < 0)
+				wkup_irq = wkup->irq;
+			if (wkup->handle)
+				generic_handle_irq(wkup->irq);
 		}
 	}
+	if (wkup_irq >= 0)
+		log_wakeup_reason(wkup_irq);
+
 }
 
 #ifdef CONFIG_OMAP3_PAD_WKUP_IO
@@ -79,7 +102,7 @@ static int omap3_pad_wkup_probe(struct platform_device *pdev)
 {
 	struct device_node *node = pdev->dev.of_node;
 	int ndx = 0;
-	u32 pad, irq;
+	uint32_t pad, irq, handle;
 	int ret = 0;
 
 	if (!node)
@@ -92,7 +115,11 @@ static int omap3_pad_wkup_probe(struct platform_device *pdev)
 		if (of_property_read_u32_index(node, "ti,pad_irq", ndx, &irq))
 			break;
 		ndx++;
-		omap_register_pad_wkup(&pdev->dev, pad, irq);
+		if (of_property_read_u32_index(node, "ti,pad_irq", ndx,
+				&handle))
+			break;
+		ndx++;
+		omap_register_pad_wkup(&pdev->dev, pad, irq, handle);
 	} while (1);
 
 #ifdef CONFIG_OMAP3_PAD_WKUP_IO
