@@ -187,7 +187,7 @@ static struct switch_dev usbnet_enable_device = {
 
 #define USBNETDBG(context, fmt, args...)				\
 	if (context && context->gadget)					\
-		dev_err(&(context->gadget->dev) , fmt , ## args)
+		dev_dbg(&(context->gadget->dev) , fmt , ## args)
 
 static const char *usb_description = "Motorola BLAN Interface";
 

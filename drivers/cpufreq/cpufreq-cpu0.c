@@ -154,7 +154,7 @@ static int cpu0_cpufreq_pm_notify(struct notifier_block *nb,
 	if (event == PM_SUSPEND_PREPARE) {
 		struct cpufreq_policy *policy = cpufreq_cpu_get(0);
 		is_suspended = true;
-		pr_info("cpu0 cpufreq suspend: setting frequency to %d kHz\n",
+		pr_debug("cpu0 cpufreq suspend: setting frequency to %d kHz\n",
 			policy->max);
 		__cpu0_set_target(policy, policy->max, CPUFREQ_RELATION_L);
 		cpufreq_cpu_put(policy);

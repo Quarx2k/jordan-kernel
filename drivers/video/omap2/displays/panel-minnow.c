@@ -2909,7 +2909,7 @@ static int minnow_panel_enable_mlocked(struct minnow_panel_data *mpd)
 		if (!r) {
 			minnow_panel_queue_ulps_work(mpd);
 			minnow_panel_queue_esd_work(mpd);
-			dev_info(&dssdev->dev, "Display enabled successfully "
+			dev_dbg(&dssdev->dev, "Display enabled successfully "
 				 "%s update!\n", update ? "with" : "without");
 		}
 		wake_unlock(&mpd->wake_lock);

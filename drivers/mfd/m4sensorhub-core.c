@@ -923,14 +923,14 @@ static int __exit m4sensorhub_remove(struct i2c_client *client)
 #ifdef CONFIG_PM
 static int m4sensorhub_suspend(struct i2c_client *client, pm_message_t mesg)
 {
-	KDEBUG(M4SH_INFO, "%s\n", __func__);
+	KDEBUG(M4SH_DEBUG, "%s\n", __func__);
 	m4sensorhub_misc_data.irq_dbg.suspend = 1;
 	return 0;
 }
 
 static int m4sensorhub_resume(struct i2c_client *client)
 {
-	KDEBUG(M4SH_INFO, "%s\n", __func__);
+	KDEBUG(M4SH_DEBUG, "%s\n", __func__);
 	m4sensorhub_misc_data.irq_dbg.suspend = 0;
 	return 0;
 }
