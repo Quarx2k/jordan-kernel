@@ -49,6 +49,7 @@ struct m4ges_driver_data {
 	struct m4sensorhub_gesture_iio_data   iiodat;
 	int16_t         samplerate;
 	int16_t         latest_samplerate;
+	uint32_t        gesture_count;
 	uint16_t        status;
 };
 
@@ -116,6 +117,7 @@ static void m4ges_isr(enum m4sensorhub_irqs int_event, void *handle)
 
 	dd->iiodat.timestamp = iio_get_time_ns();
 	iio_push_to_buffers(iio, (unsigned char *)&(dd->iiodat));
+	dd->gesture_count++;
 
 m4ges_isr_fail:
 	if (err < 0)
@@ -237,10 +239,11 @@ static ssize_t m4ges_iiodata_show(struct device *dev,
 
 	mutex_lock(&(dd->mutex));
 	size = snprintf(buf, PAGE_SIZE,
-		"%s%hhu\n%s%hhu\n%s%hhd\n",
+		"%s%hhu\n%s%hhu\n%s%hhd\n%s%u\n",
 		"gesture_type: ", dd->iiodat.gesture_type,
 		"gesture_confidence: ", dd->iiodat.gesture_confidence,
-		"gesture_value: ", dd->iiodat.gesture_value);
+		"gesture_value: ", dd->iiodat.gesture_value,
+		"gesture_count: ", dd->gesture_count);
 	mutex_unlock(&(dd->mutex));
 	return size;
 }
@@ -264,9 +267,6 @@ static const struct iio_info m4ges_iio_info = {
 static const struct iio_chan_spec m4ges_iio_channels[] = {
 	{
 		.type = IIO_GESTURE,
-		.indexed = 1,
-		.channel = 0,
-		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),
 		.scan_index = 0,
 		.scan_type = {
 			.sign = 'u',

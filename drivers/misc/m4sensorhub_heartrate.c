@@ -412,9 +412,6 @@ static const struct iio_info m4hrt_iio_info = {
 static const struct iio_chan_spec m4hrt_iio_channels[] = {
 	{
 		.type = IIO_HEARTRATE,
-		.indexed = 1,
-		.channel = 0,
-		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),
 		.scan_index = 0,
 		.scan_type = {
 			.sign = 'u',
