@@ -12,12 +12,12 @@ Purpose :
 /****************************** Defines *******************************/
 typedef struct memMapUserSettings
 {
-  u8 version;
+  u8 screenStatus;
   u8 userAge;
   u8 userGender;
   u8 userHeight;
   u16 userWeight;
-  u8 screenStatus;
+  u8 audioStatus;
   u8 rtcReset;
 }sUserData;
 
@@ -29,28 +29,26 @@ typedef enum
 
 typedef enum
 {
-  DISPLAY_OFF_INTERACTIVE_OFF = 0, /* was SCREEN_OFF */
-  DISPLAY_OFF_INTERACTIVE_ON  = 1, /* was SCREEN_ON */
-  DISPLAY_ON_INTERACTIVE_OFF  = 2,
-  DISPLAY_ON_INTERACTIVE_ON   = 3
+  SCREEN_STATUS_NORMAL_OFF  = 0,
+  SCREEN_STATUS_NORMAL_ON   = 1,
+  SCREEN_STATUS_AMBIENT_OFF = 2,
+  SCREEN_STATUS_AMBIENT_ON  = 3
 }eScreenStatus;
-
-#define SCREEN_STATUS_INTERACTIVE_MASK 1
-#define SCREEN_STATUS_DISPLAY_MASK 2
-
-#define INTERACTIVE_ON  (SCREEN_STATUS_INTERACTIVE_MASK & DISPLAY_OFF_INTERACTIVE_ON)
-#define INTERACTIVE_OFF (SCREEN_STATUS_INTERACTIVE_MASK & DISPLAY_OFF_INTERACTIVE_OFF)
-#define DISPLAY_ON      (SCREEN_STATUS_DISPLAY_MASK     & DISPLAY_ON_INTERACTIVE_OFF)
-#define DISPLAY_OFF     (SCREEN_STATUS_DISPLAY_MASK     & DISPLAY_OFF_INTERACTIVE_OFF)
 
 typedef enum
 {
-  USERSETTINGS_VERSION = 0,
+  AUDIO_STATUS_OFF = 0, // was SCREEN_OFF
+  AUDIO_STATUS_ON  = 1, // was SCREEN_ON
+}eAudioStatus;
+
+typedef enum
+{
+  USERSETTINGS_SCREENSTATUS = 0,
   USERSETTINGS_USERAGE = 1,
   USERSETTINGS_USERGENDER = 2,
   USERSETTINGS_USERHEIGHT = 3,
   USERSETTINGS_USERWEIGHT = 4,
-  USERSETTINGS_SCREENSTATUS = 6,
+  USERSETTINGS_AUDIOSTATUS = 6,
   USERSETTINGS_RTCRESET = 7,
 }eUserSettingsOffset;
 

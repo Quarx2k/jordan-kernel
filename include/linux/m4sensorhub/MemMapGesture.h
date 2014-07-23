@@ -37,6 +37,20 @@ typedef enum  {
   GESTURE_MAX
 } eGestureType;
 
+typedef enum  {
+  GESTURE_VIEW_ON,
+  GESTURE_VIEW_OFF
+} eGestureViewValue;
+
+typedef enum  {
+  GESTURE_WRIST_ROTATE_NORMAL,
+  GESTURE_WRIST_ROTATE_FLAT,
+  GESTURE_WRIST_ROTATE_BED,
+  GESTURE_WRIST_ROTATE_GENT,
+  GESTURE_WRIST_ROTATE_INSIDE,
+  GESTURE_WRIST_ROTATE_FAST,
+} eGestureWristRotateValue;
+
 /********************************** Globals **************************/
 
 /********************************** Prototypes ***********************/
