@@ -404,7 +404,7 @@ module_param_array(als_z4, long, NULL, 0644);
 static unsigned long als_denom = 10000000;
 module_param(als_denom, ulong, 0644);
 
-static unsigned dim_values[] = {0x24, 0x30, 0x50, 0x50, 0x50};
+static unsigned dim_values[] = {0x03, 0x30, 0x50, 0x50, 0x50};
 module_param_array(dim_values, uint, NULL, 0644);
 
 /* Convert slider value into LM3535 register value */
