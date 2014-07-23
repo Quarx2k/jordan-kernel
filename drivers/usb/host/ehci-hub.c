@@ -603,14 +603,14 @@ static int check_reset_complete (
 				index+1);
 			return port_status;
 		}
-
+#ifndef CONFIG_MACH_OMAP_MAPPHONE
 		if (ehci->no_companion_port_handoff) {
 			/* on omap, we can't hand off companion port */
 			ehci_dbg(ehci, "port %d FS device detected - cannot handoff port\n",
 				index + 1);
 			return port_status;
 		}
-
+#endif
 		ehci_dbg (ehci, "port %d full speed --> companion\n",
 			index + 1);
 
@@ -633,12 +633,12 @@ static int check_reset_complete (
 			ehci_writel(ehci, port_status, status_reg);
 		}
 #endif
-
+#ifndef CONFIG_MACH_OMAP_MAPPHONE
 		/* what happens if HCS_N_CC(params) == 0 ? */
 		port_status |= PORT_OWNER;
 		port_status &= ~PORT_RWC_BITS;
 		ehci_writel(ehci, port_status, status_reg);
-
+#endif
 		/* ensure 440EPX ohci controller state is operational */
 		if (ehci->has_amcc_usb23)
 			set_ohci_hcfs(ehci, 1);
@@ -695,15 +695,17 @@ ehci_hub_status_data (struct usb_hcd *hcd, char *buf)
 
 	/* port N changes (bit N)? */
 	spin_lock_irqsave (&ehci->lock, flags);
-
+#ifndef CONFIG_MACH_OMAP_MAPPHONE
 	/* get per-port change detect bits */
 	if (ehci->has_ppcd)
 		ppcd = ehci_readl(ehci, &ehci->regs->status) >> 16;
-
+#endif
 	for (i = 0; i < ports; i++) {
+#ifndef CONFIG_MACH_OMAP_MAPPHONE
 		/* leverage per-port change bits feature */
 		if (ehci->has_ppcd && !(ppcd & (1 << i)))
 			continue;
+#endif
 		temp = ehci_readl(ehci, &ehci->regs->port_status [i]);
 
 		/*
@@ -845,7 +847,7 @@ static int ehci_hub_control (
 				break;
 			if ((temp & PORT_PE) == 0)
 				goto error;
-
+#ifndef CONFIG_MACH_OMAP_MAPPHONE
 			/* clear phy low-power mode before resume */
 			if (hostpc_reg) {
 				temp1 = ehci_readl(ehci, hostpc_reg);
@@ -855,6 +857,7 @@ static int ehci_hub_control (
 				msleep(5);/* wait to leave low-power mode */
 				spin_lock_irqsave(&ehci->lock, flags);
 			}
+#endif
 			/* resume signaling for 20 msec */
 			temp &= ~(PORT_RWC_BITS | PORT_WAKE_BITS);
 			ehci_writel(ehci, temp | PORT_RESUME, status_reg);
@@ -871,11 +874,13 @@ static int ehci_hub_control (
 					  status_reg);
 			break;
 		case USB_PORT_FEAT_C_CONNECTION:
+#ifndef CONFIG_MACH_OMAP_MAPPHONE
 			if (ehci->has_lpm) {
 				/* clear PORTSC bits on disconnect */
 				temp &= ~PORT_LPM;
 				temp &= ~PORT_DEV_ADDR;
 			}
+#endif
 			ehci_writel(ehci, (temp & ~PORT_RWC_BITS) | PORT_CSC,
 					status_reg);
 			break;
@@ -1107,15 +1112,24 @@ static int ehci_hub_control (
 			if ((temp & PORT_PE) == 0
 					|| (temp & PORT_RESET) != 0)
 				goto error;
-
+#ifdef CONFIG_MACH_OMAP_MAPPHONE
+			ehci_writel(ehci, temp | PORT_SUSPEND, status_reg);
+#endif
 			/* After above check the port must be connected.
 			 * Set appropriate bit thus could put phy into low power
 			 * mode if we have hostpc feature
 			 */
+#ifndef CONFIG_MACH_OMAP_MAPPHONE
 			temp &= ~PORT_WKCONN_E;
 			temp |= PORT_WKDISC_E | PORT_WKOC_E;
 			ehci_writel(ehci, temp | PORT_SUSPEND, status_reg);
+#endif
 			if (hostpc_reg) {
+#ifdef CONFIG_MACH_OMAP_MAPPHONE
+			temp &= ~PORT_WKCONN_E;
+			temp |= PORT_WKDISC_E | PORT_WKOC_E;
+			ehci_writel(ehci, temp | PORT_SUSPEND, status_reg);
+#endif
 				spin_unlock_irqrestore(&ehci->lock, flags);
 				msleep(5);/* 5ms for HCD enter low pwr mode */
 				spin_lock_irqsave(&ehci->lock, flags);

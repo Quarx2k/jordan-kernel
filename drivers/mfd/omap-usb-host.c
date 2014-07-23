@@ -94,9 +94,13 @@
 /* UHH Register Set */
 #define	OMAP_UHH_REVISION				(0x00)
 #define	OMAP_UHH_SYSCONFIG				(0x10)
-#define	OMAP_UHH_SYSCONFIG_MIDLEMODE			(1 << 12)
+#define	OMAP_UHH_SYSCONFIG_NOSTBYMODE			(1 << 12)
+#define	OMAP_UHH_SYSCONFIG_MIDLEMODE			(2 << 12)
+#define	OMAP_UHH_SYSCONFIG_MIDLEMODE_MASK		(3 << 12)
 #define	OMAP_UHH_SYSCONFIG_CACTIVITY			(1 << 8)
-#define	OMAP_UHH_SYSCONFIG_SIDLEMODE			(1 << 3)
+#define	OMAP_UHH_SYSCONFIG_NOIDLEMODE			(1 << 3)
+#define	OMAP_UHH_SYSCONFIG_SIDLEMODE			(2 << 3)
+#define	OMAP_UHH_SYSCONFIG_SIDLEMODE_MASK		(3 << 3)
 #define	OMAP_UHH_SYSCONFIG_ENAWAKEUP			(1 << 2)
 #define	OMAP_UHH_SYSCONFIG_SOFTRESET			(1 << 1)
 #define	OMAP_UHH_SYSCONFIG_AUTOIDLE			(1 << 0)
@@ -114,7 +118,6 @@
 #define OMAP_UHH_HOSTCONFIG_P1_CONNECT_STATUS		(1 << 8)
 #define OMAP_UHH_HOSTCONFIG_P2_CONNECT_STATUS		(1 << 9)
 #define OMAP_UHH_HOSTCONFIG_P3_CONNECT_STATUS		(1 << 10)
-#define OMAP4_UHH_HOSTCONFIG_APP_START_CLK		(1 << 31)
 
 /* OMAP4-specific defines */
 #define OMAP4_UHH_SYSCONFIG_IDLEMODE_CLEAR		(3 << 2)
@@ -671,7 +674,8 @@ static int usbhs_runtime_resume(struct device *dev)
 {
 	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
 	struct usbhs_omap_platform_data	*pdata = &omap->platdata;
-
+	u32 status;
+	u32 sysconfig;
 	dev_dbg(dev, "usbhs_runtime_resume\n");
 
 	if (!pdata) {
@@ -691,13 +695,40 @@ static int usbhs_runtime_resume(struct device *dev)
 		clk_enable(omap->utmi_p1_fck);
 		clk_enable(omap->utmi_p2_fck);
 	}
+
+
+	usbhs_write(omap->tll_base, OMAP_USBTLL_IRQENABLE, 0);
+	usbhs_write(omap->tll_base, OMAP_USBTLL_IRQSTATUS, 7);
+	usbhs_write(omap->tll_base, OMAP_TLL_SHARED_CONF,
+		1 | usbhs_read(omap->tll_base,
+			OMAP_TLL_SHARED_CONF));
+
+	/* Put UHH in NoStandby mode */
+	sysconfig = usbhs_read(omap->uhh_base, OMAP_UHH_SYSCONFIG);
+	sysconfig &= ~OMAP_UHH_SYSCONFIG_MIDLEMODE_MASK;
+	sysconfig |= OMAP_UHH_SYSCONFIG_NOSTBYMODE;
+	usbhs_write(omap->uhh_base, OMAP_UHH_SYSCONFIG, sysconfig);
+
+	/* Put UHH in NoIdle mode */
+	sysconfig = usbhs_read(omap->uhh_base, OMAP_UHH_SYSCONFIG);
+	sysconfig &= ~OMAP_UHH_SYSCONFIG_SIDLEMODE_MASK;
+	sysconfig |= OMAP_UHH_SYSCONFIG_NOIDLEMODE;
+	usbhs_write(omap->uhh_base, OMAP_UHH_SYSCONFIG, sysconfig);
+	sysconfig = usbhs_read(omap->uhh_base, OMAP_UHH_SYSCONFIG);
+	
 	return 0;
 }
+
+
+
+#define	OMAP_UHH_DEBUG_CSR				(0x44)
 
 static int usbhs_runtime_suspend(struct device *dev)
 {
 	struct usbhs_hcd_omap		*omap = dev_get_drvdata(dev);
 	struct usbhs_omap_platform_data	*pdata = &omap->platdata;
+	u32 status;
+	u32 sysconfig;
 
 	dev_dbg(dev, "usbhs_runtime_suspend\n");
 
@@ -718,6 +749,26 @@ static int usbhs_runtime_suspend(struct device *dev)
 		clk_disable(omap->utmi_p2_fck);
 		clk_disable(omap->utmi_p1_fck);
 	}
+
+	/* Put UHH in SmartStandby mode */
+	sysconfig = usbhs_read(omap->uhh_base, OMAP_UHH_SYSCONFIG);
+	sysconfig &= ~OMAP_UHH_SYSCONFIG_MIDLEMODE_MASK;
+	sysconfig |= OMAP_UHH_SYSCONFIG_MIDLEMODE;
+	usbhs_write(omap->uhh_base, OMAP_UHH_SYSCONFIG, sysconfig);
+
+	usbhs_write(omap->tll_base, OMAP_TLL_SHARED_CONF,
+		usbhs_read(omap->tll_base, OMAP_TLL_SHARED_CONF) &
+		~(1));
+	/* Enable the interrupt so that the remote-wakeup
+	 * can be detected */
+	usbhs_write(omap->tll_base, OMAP_USBTLL_IRQSTATUS, 7);
+	usbhs_write(omap->tll_base, OMAP_USBTLL_IRQENABLE, 1);
+
+	/* Put UHH in ForceIdle mode */
+	sysconfig = usbhs_read(omap->uhh_base, OMAP_UHH_SYSCONFIG);
+	sysconfig &= ~OMAP_UHH_SYSCONFIG_SIDLEMODE_MASK;
+	usbhs_write(omap->uhh_base, OMAP_UHH_SYSCONFIG, sysconfig);
+
 	return 0;
 }
 

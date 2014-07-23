@@ -2447,8 +2447,14 @@ static int finish_port_resume(struct usb_device *udev)
 	 * and device drivers will know about any resume quirks.
 	 */
 	if (status == 0) {
+#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+		devstatus = 1;
+		status = 2;
+		printk("Status value = %d, we want == 2\n", usb_get_status(udev, USB_RECIP_DEVICE, 0, &devstatus));
+#else
 		devstatus = 0;
 		status = usb_get_status(udev, USB_RECIP_DEVICE, 0, &devstatus);
+#endif
 		if (status >= 0)
 			status = (status > 0 ? 0 : -ENODEV);
 
