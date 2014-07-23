@@ -61,14 +61,20 @@ static int cpcap_batt_resume(struct platform_device *pdev);
 
 static int __init cpcap_charger_enabled(char *s)
 {
-	if (strcmp(s,"y")) {
+	if (s == NULL) {
+		own_charger_enabled = 0;
+		return 1;
+	}
+
+	if (!strcmp(s,"y")) {
 		own_charger_enabled = 1;
 	} else {
 		own_charger_enabled = 0;
 	}
+
 	return 1;
 }
-__setup("cpcap_charger_enabled", cpcap_charger_enabled);
+__setup("cpcap_charger_enabled=", cpcap_charger_enabled);
 
 struct cpcap_batt_ps {
 	struct power_supply batt;
