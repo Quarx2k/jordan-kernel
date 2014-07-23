@@ -18,7 +18,7 @@
 
 #ifndef _MINNOW_PANEL_COMMON_HEADER_
 
-#define	INIT_DATA_VERSION	(0x071514) /*MM/DD/YY*/
+#define	INIT_DATA_VERSION	(0x072314) /*MM/DD/YY*/
 /* This header file is used to sync Bootloader and Kernel Display Initialize
  * Structure/Data, please make sure sync it for both Bootloader/Kernel when
  * it changes some settings for Solomon/Orise. Bootloader should pass
@@ -124,14 +124,14 @@ static u8 panel_init_ssd2848_320x320[] = {
 6, SSD2848_CMD, 0x20, 0x10, 0x00, 0x5F, 0x00, 0x1F,
 /* VTCM Display Horizontal Configuration Register[0x0014]
  *   Horizontal Total = 392 = 20 + 42 + 320 + 10
- *   Horizontal Display Period Start = 42
+ *   Horizontal Display Period Start = 52 (10 + 42)
  */
-6, SSD2848_CMD, 0x20, 0x14, 0x01, 0x88, 0x00, 0x2A,
+6, SSD2848_CMD, 0x20, 0x14, 0x01, 0x88, 0x00, 0x34,
 /* VTCM Vertical Display Configuration Register[0x0018]
  *   Vertical Total = 334 = 2 + 10 + 320 + 2
- *   Vertical Display Period Start = 10
+ *   Vertical Display Period Start = 12 (2 + 10)
  */
-6, SSD2848_CMD, 0x20, 0x18, 0x01, 0x4E, 0x00, 0x0A,
+6, SSD2848_CMD, 0x20, 0x18, 0x01, 0x4E, 0x00, 0x0C,
 /* VTCM Display Size Register[0x0020]
  *   Display Width = 320
  *   Display Height = 320
@@ -162,21 +162,21 @@ static u8 panel_init_ssd2848_320x320[] = {
  */
 6, SSD2848_CMD, 0x60, 0x08, 0x00, 0x04, 0x00, 0x0A,
 /* DSITX Video Timing Control Register[0x000C]
- *   VBP = 10, HBP = 42, VSA = 2, HSA = 10
+ *   VBP = 12, HBP = 52, VSA = 2, HSA = 10
  */
-6, SSD2848_CMD, 0x60, 0x0C, 0x0A, 0x2A, 0x02, 0x0A,
+6, SSD2848_CMD, 0x60, 0x0C, 0x0C, 0x34, 0x02, 0x0A,
 /* DSITX Video Timing Control 2 Register[0x0010]
  *   VACT = 320, VFP = 2, HFP = 20
  */
 6, SSD2848_CMD, 0x60, 0x10, 0x01, 0x40, 0x02, 0x14,
 /* DSITX Video Configuration Register[0x0014]
- *   VM = 00, Non burst mode with sync pulses
+ *   VM = 10, burst mode
  *   VEC = 1, Command packet will be sent after video packet
        are sent during Vertical blanking period for Non burst
        video transfer or Vertical/Horizontal blanking period
        for Burst video transfer
  */
-6, SSD2848_CMD, 0x60, 0x14, 0x01, 0x00, 0x01, 0x40,
+6, SSD2848_CMD, 0x60, 0x14, 0x01, 0x00, 0x01, 0x4E,
 /* DSITX Delay Adjustment 1 Register[0x0040]
  * HPD = 1, HZD = 10, CPD = 1, CZD = 19
  *   byte_clk = 1000 / (216.6 / 8) = 36.9 ns
@@ -273,6 +273,28 @@ static u8 panel_init_ssd2848_320x320_1[] = {
  *   actual pix_clk = 3.93 * 48 / 24 = 7.87 MHz
  */
 6, SSD2848_CMD, 0x20, 0x10, 0x00, 0xF7, 0x00, 0x6C,
+/* VTCM Display Horizontal Configuration Register[0x0014]
+ *   Horizontal Total = 392 = 20 + 42 + 320 + 10
+ *   Horizontal Display Period Start = 42
+ */
+6, SSD2848_CMD, 0x20, 0x14, 0x01, 0x88, 0x00, 0x2A,
+/* VTCM Vertical Display Configuration Register[0x0018]
+ *   Vertical Total = 334 = 2 + 10 + 320 + 2
+ *   Vertical Display Period Start = 10
+ */
+6, SSD2848_CMD, 0x20, 0x18, 0x01, 0x4E, 0x00, 0x0A,
+/* DSITX Video Timing Control Register[0x000C]
+ *   VBP = 10, HBP = 42, VSA = 2, HSA = 10
+ */
+6, SSD2848_CMD, 0x60, 0x0C, 0x0A, 0x2A, 0x02, 0x0A,
+/* DSITX Video Configuration Register[0x0014]
+ *   VM = 00, Non burst mode with sync pulses
+ *   VEC = 1, Command packet will be sent after video packet
+       are sent during Vertical blanking period for Non burst
+       video transfer or Vertical/Horizontal blanking period
+       for Burst video transfer
+ */
+6, SSD2848_CMD, 0x60, 0x14, 0x01, 0x00, 0x01, 0x40,
 /* DSITX Delay Adjustment 2 Register[0x0044]
  * CPTD = 22, CPED = 4, HTD = 10, CTD = 10
  *   byte_clk = 1000 / (216.6 / 8) = 36.9 ns
