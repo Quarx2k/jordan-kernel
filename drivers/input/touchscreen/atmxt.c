@@ -500,7 +500,7 @@ static int atmxt_enter_aot(struct atmxt_driver_data *dd)
 	uint8_t sleep_cmd[4] = {0x64, 0x64, 0x19, 0x00};
 	uint8_t adx_cmd[2] = {0x08, 0x08};
 	uint8_t mxd_cmd = 0x08;
-	uint8_t sup_cmd[3] = {0x14, 0x14, 0x40};
+	uint8_t sup_cmd[5] = {0x41, 0x28, 0x14, 0x14, 0x40};
 
 	atmxt_dbg(dd, ATMXT_DBG3, "%s: Entering AOT...\n", __func__);
 
@@ -541,7 +541,7 @@ static int atmxt_enter_aot(struct atmxt_driver_data *dd)
 
 			err = atmxt_i2c_write(dd,
 				dd->addr->sup[0], dd->addr->sup[1],
-				&(sup_cmd[0]), 3);
+				&(sup_cmd[0]), 5);
 			if (err < 0) {
 				pr_err("%s: Failed to change sup.\n",
 					__func__);
@@ -621,7 +621,7 @@ static int atmxt_exit_aot(struct atmxt_driver_data *dd)
 
 			err = atmxt_i2c_write(dd,
 				dd->addr->sup[0], dd->addr->sup[1],
-				&(dd->data->sup[0]), 3);
+				&(dd->data->sup[0]), 5);
 			if (err < 0) {
 				pr_err("%s: Failed to restore sup.\n",
 					__func__);
@@ -2351,14 +2351,13 @@ static int atmxt_save_data42(struct atmxt_driver_data *dd,
 		goto atmxt_save_data42_fail;
 	}
 
-	dd->addr->sup[0] = entry[1] + 2;
+	dd->addr->sup[0] = entry[1];
 	dd->addr->sup[1] = entry[2];
-	if (dd->addr->sup[0] < entry[1]) /* Check for 16-bit addr overflow */
-		dd->addr->sup[1]++;
-
-	dd->data->sup[0] = reg[2];
-	dd->data->sup[1] = reg[3];
-	dd->data->sup[2] = reg[4];
+	dd->data->sup[0] = reg[0];
+	dd->data->sup[1] = reg[1];
+	dd->data->sup[2] = reg[2];
+	dd->data->sup[3] = reg[3];
+	dd->data->sup[4] = reg[4];
 
 atmxt_save_data42_fail:
 	return err;
@@ -2948,10 +2947,6 @@ static int atmxt_message_handler42(struct atmxt_driver_data *dd,
 		goto atmxt_message_handler42_fail;
 	}
 
-	/* Only send keys when the IC is active */
-	if (atmxt_get_ic_state(dd) != ATMXT_IC_ACTIVE)
-		goto atmxt_message_handler42_fail;
-
 	if (msg[1] & 0x01) {
 		atmxt_dbg(dd, ATMXT_DBG3,
 			 "%s: Touch suppression is active.\n",
@@ -3536,7 +3531,7 @@ static ssize_t atmxt_drv_interactivemode_show(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%s",
 			(ic_state == ATMXT_IC_ACTIVE ? "1" : "0"));
 }
-static DEVICE_ATTR(interactivemode, 0664,
+static DEVICE_ATTR(interactivemode, S_IRUGO | S_IWUSR | S_IWGRP,
 		atmxt_drv_interactivemode_show,
 		atmxt_drv_interactivemode_store);
 

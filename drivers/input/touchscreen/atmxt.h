@@ -145,7 +145,7 @@ struct atmxt_data {
 	uint8_t         acq[6];
 	uint8_t         adx[2];
 	uint8_t         mxd;
-	uint8_t         sup[3];
+	uint8_t         sup[5];
 	unsigned long   timer;
 	uint8_t         last_stat;
 } __packed;
