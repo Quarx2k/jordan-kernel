@@ -557,10 +557,13 @@ static void minnow_panel_ambient_wake_func(struct work_struct *work)
 {
 	DECLARE_MPD_FROM_CONTAINER(work, ambient_wake_work);
 	mutex_lock(&mpd->lock);
-	minnow_panel_change_state_mlocked(mpd,
-					  mpd->is_gesture_view_on
-					  ? DISPLAY_AMBIENT_ON
-					  : DISPLAY_AMBIENT_OFF);
+	/* we should only care view gesture when it's in ambient mode */
+	if ((mpd->state == DISPLAY_AMBIENT_ON) ||
+	    (mpd->state == DISPLAY_AMBIENT_OFF)) {
+		int state = mpd->is_gesture_view_on
+				? DISPLAY_AMBIENT_ON : DISPLAY_AMBIENT_OFF;
+		minnow_panel_change_state_mlocked(mpd, state);
+	}
 	mutex_unlock(&mpd->lock);
 }
 
@@ -589,6 +592,39 @@ static void minnow_panel_start_ambient_alarm(struct minnow_panel_data *mpd)
 	if (is_smart_ambient_timeout_enabled(mpd))
 		alarm_start_relative(&mpd->ambient_timeout_alarm,
 				     ktime_set(mpd->ambient_timeout, 0));
+}
+
+enum refresh_rate {
+	REFRESH_RATE_30HZ,
+	REFRESH_RATE_45HZ,
+};
+#define minnow_panel_set_lowest_fps(mpd)	\
+		minnow_panel_set_refresh_rate_mlocked(mpd, REFRESH_RATE_30HZ)
+#define minnow_panel_set_default_fps(mpd)	\
+		minnow_panel_set_refresh_rate_mlocked(mpd, REFRESH_RATE_45HZ)
+static int minnow_panel_set_refresh_rate_mlocked(struct minnow_panel_data *mpd,
+						 enum refresh_rate rate)
+{
+	static u8 ssd2848_vtcm_pcfrr[][6] = {
+		[REFRESH_RATE_30HZ] = {0x20, 0x10, 0x00, 0xEF, 0x00, 0x34},
+		[REFRESH_RATE_45HZ] = {0x20, 0x10, 0x00, 0x5F, 0x00, 0x1F}
+	};
+	int r = 0;
+
+	if (mpd->panel_type < OTM3201_2_0)
+		return r;
+
+	dsi_bus_lock(mpd->dssdev);
+	r = minnow_panel_wake_up_locked(mpd);
+	if (!r)
+		r = dsi_vc_generic_write(mpd->dssdev, mpd->channel,
+					 ssd2848_vtcm_pcfrr[rate], 6);
+	dsi_bus_unlock(mpd->dssdev);
+	if (r)
+		dev_err(&mpd->dssdev->dev,
+			"Failed to set refresh rate(%d)\n", rate);
+
+	return r;
 }
 #endif /* CONFIG_HAS_AMBIENTMODE */
 
@@ -1820,9 +1856,12 @@ static ssize_t minnow_panel_store_interactivemode(struct device *dev,
 				mpd->interactive = enable;
 		}
 		mutex_unlock(&mpd->lock);
-		dev_info(&dssdev->dev, "%s interactive mode %s\n",
-			 enable ? "enable" : "disable",
-			 r ? "failed" : "succeeded");
+		if (r)
+			dev_err(&dssdev->dev, "%s interactive mode failed %d\n",
+				enable ? "enable" : "disable", r);
+		else
+			dev_dbg(&dssdev->dev, "%s interactive mode succeeded\n",
+				enable ? "enable" : "disable");
 	}
 
 	return r ? r : count;
@@ -3016,6 +3055,7 @@ static void minnow_panel_sync_display_status_mlocked(
 	mpd->m4_state = m4_state;
 }
 
+#ifdef	CONFIG_HAS_AMBIENTMODE
 static int als_to_backlight(struct device *dev, int als)
 {
 	int backlight;
@@ -3055,20 +3095,38 @@ static int als_to_backlight(struct device *dev, int als)
 				(4 * als)/10)
 				+ 37559974)/10000000;
 	}
-	dev_err(dev, "ALS: %d, backlight :%d\n", als, backlight);
+	dev_info(dev, "ALS: %d, backlight: %d\n", als, backlight);
 	return backlight;
 }
+
+static void led_set_dim_brightness(struct device *dev)
+{
+	struct m4sensorhub_data *m4sensorhub;
+	uint16_t als = DIM_BACKLIGHT; /* default value */
+	int size, backlight;
+
+	m4sensorhub = m4sensorhub_client_get_drvdata();
+	size = m4sensorhub_reg_getsize(m4sensorhub,
+				       M4SH_REG_LIGHTSENSOR_SIGNAL);
+	if (size != sizeof(als))
+		dev_err(dev, "can't get M4 reg size for ALS\n");
+	else if (size != m4sensorhub_reg_read(m4sensorhub,
+					      M4SH_REG_LIGHTSENSOR_SIGNAL,
+					      (char *)&als))
+		dev_err(dev, "error reading M4 ALS value\n");
+
+	backlight = als_to_backlight(dev, als);
+	led_set_brightness(led_get_default_dev(), backlight);
+}
+#endif /* CONFIG_HAS_AMBIENTMODE */
 
 static int minnow_panel_change_state_mlocked(struct minnow_panel_data *mpd,
 					     int state)
 {
 	int r = 0;
-	struct m4sensorhub_data *m4sensorhub;
-	uint16_t als;
-	int size, err, adjusted_backlight;
 
 	dev_info(&mpd->dssdev->dev, "change state(%d),"
-		 " current state(%d)\n", state, mpd->state);
+		" current state(%d)\n", state, mpd->state);
 
 	/* already in state, return success */
 	if (state == mpd->state) {
@@ -3095,6 +3153,13 @@ static int minnow_panel_change_state_mlocked(struct minnow_panel_data *mpd,
 	case DISPLAY_ENABLE:
 		if (!mpd->enabled)
 			r = minnow_panel_enable_mlocked(mpd);
+#ifdef	CONFIG_HAS_AMBIENTMODE
+		/* switch back default refresh rate when last state is
+		 * ambient mode
+		 */
+		else if (mpd->state == DISPLAY_AMBIENT_ON)
+			minnow_panel_set_default_fps(mpd);
+#endif
 		break;
 #ifdef	CONFIG_HAS_AMBIENTMODE
 	case DISPLAY_AMBIENT_OFF:
@@ -3129,36 +3194,14 @@ static int minnow_panel_change_state_mlocked(struct minnow_panel_data *mpd,
 			/* turn on display when it's off before */
 			r = minnow_panel_enable_mlocked(mpd);
 			if (!r) {
-				m4sensorhub = m4sensorhub_client_get_drvdata();
-				size = m4sensorhub_reg_getsize(m4sensorhub,
-						M4SH_REG_LIGHTSENSOR_SIGNAL);
-				if (size < 0) {
-					/* error case.. use hardcoded value. */
-					dev_err(&mpd->dssdev->dev, "can't get M4 reg size for ALS\n");
-					als = DIM_BACKLIGHT;
-				}
-				err = m4sensorhub_reg_read(m4sensorhub,
-						M4SH_REG_LIGHTSENSOR_SIGNAL,
-						(char *)&als);
-				if (err < 0) {
-					/* error case.. use hardcoded value. */
-					dev_err(&mpd->dssdev->dev, "error reading ALS value\n");
-					als = DIM_BACKLIGHT;
-				} else if (err != size) {
-					/* error case.. use hardcoded value. */
-					dev_err(&mpd->dssdev->dev, "can't get ALS value\n");
-					als = DIM_BACKLIGHT;
-				}
-
-				adjusted_backlight = als_to_backlight(
-						&mpd->dssdev->dev, als);
-
 				/* Dim the back light */
-				led_set_brightness(led_get_default_dev(),
-						   adjusted_backlight);
+				led_set_dim_brightness(&mpd->dssdev->dev);
 				minnow_panel_start_ambient_alarm(mpd);
 			}
 		}
+		/* switch to lowest refresh rate when ambient mode on */
+		if (!r)
+			minnow_panel_set_lowest_fps(mpd);
 		break;
 #endif /* CONFIG_HAS_AMBIENTMODE */
 	default:
