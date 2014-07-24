@@ -61,6 +61,7 @@
 #define DCS_GET_ID1		0xda
 #define DCS_GET_ID2		0xdb
 #define DCS_GET_ID3		0xdc
+#define DIM_BACKLIGHT 5
 
 enum minnow_panel_component {
 	MINNOW_PANEL,
@@ -3015,10 +3016,56 @@ static void minnow_panel_sync_display_status_mlocked(
 	mpd->m4_state = m4_state;
 }
 
+static int als_to_backlight(struct device *dev, int als)
+{
+	int backlight;
+	/*
+	Clamp ALS to max 2330.
+	for ALS 0 to 86
+	Y=(-44772.9*X^2+6893284.5*X+23168220.5)
+
+	for ALS 87 to 999
+	Y=(-141.2*X^2+358959.2*X+274671182)
+
+	for ALS 1000 to 2330
+	Y=(-74.1*X^2+529533.4*X+37559974.7)
+
+	For all ranges, Y = Y / 10000000;
+	This is the final backlight value
+	*/
+	if (als < 86) {
+		backlight = (((-44772 * als * als) +
+				((-9 * als * als)/10) +
+				(6893284 * als) +
+				(5 * als)/10)
+				+ 23168220)/10000000;
+	} else if (als > 87 && als < 999) {
+		backlight = (((-141 * als * als) +
+				((-2 * als * als)/10) +
+				(358959 * als) +
+				(2 * als)/10)
+				+ 274671182)/10000000;
+	} else {
+		if (als > 2330)
+			als = 2330;
+
+		backlight = (((-74 * als * als) +
+				((-1 * als * als)/10) +
+				(529533 * als) +
+				(4 * als)/10)
+				+ 37559974)/10000000;
+	}
+	dev_err(dev, "ALS: %d, backlight :%d\n", als, backlight);
+	return backlight;
+}
+
 static int minnow_panel_change_state_mlocked(struct minnow_panel_data *mpd,
 					     int state)
 {
 	int r = 0;
+	struct m4sensorhub_data *m4sensorhub;
+	uint16_t als;
+	int size, err, adjusted_backlight;
 
 	dev_info(&mpd->dssdev->dev, "change state(%d),"
 		 " current state(%d)\n", state, mpd->state);
@@ -3082,8 +3129,33 @@ static int minnow_panel_change_state_mlocked(struct minnow_panel_data *mpd,
 			/* turn on display when it's off before */
 			r = minnow_panel_enable_mlocked(mpd);
 			if (!r) {
+				m4sensorhub = m4sensorhub_client_get_drvdata();
+				size = m4sensorhub_reg_getsize(m4sensorhub,
+						M4SH_REG_LIGHTSENSOR_SIGNAL);
+				if (size < 0) {
+					/* error case.. use hardcoded value. */
+					dev_err(&mpd->dssdev->dev, "can't get M4 reg size for ALS\n");
+					als = DIM_BACKLIGHT;
+				}
+				err = m4sensorhub_reg_read(m4sensorhub,
+						M4SH_REG_LIGHTSENSOR_SIGNAL,
+						(char *)&als);
+				if (err < 0) {
+					/* error case.. use hardcoded value. */
+					dev_err(&mpd->dssdev->dev, "error reading ALS value\n");
+					als = DIM_BACKLIGHT;
+				} else if (err != size) {
+					/* error case.. use hardcoded value. */
+					dev_err(&mpd->dssdev->dev, "can't get ALS value\n");
+					als = DIM_BACKLIGHT;
+				}
+
+				adjusted_backlight = als_to_backlight(
+						&mpd->dssdev->dev, als);
+
 				/* Dim the back light */
-				led_set_brightness(led_get_default_dev(), 5);
+				led_set_brightness(led_get_default_dev(),
+						   adjusted_backlight);
 				minnow_panel_start_ambient_alarm(mpd);
 			}
 		}
