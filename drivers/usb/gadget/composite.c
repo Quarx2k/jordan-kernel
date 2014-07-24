@@ -1144,8 +1144,9 @@ static int composite_bind(struct usb_gadget *gadget)
 	 * more than 100mA from USB must report itself as bus-powered in
 	 * the GetStatus(DEVICE) call.
 	 */
-	if (CONFIG_USB_GADGET_VBUS_DRAW <= USB_SELF_POWER_VBUS_MAX_DRAW)
-		usb_gadget_set_selfpowered(gadget);
+	//if (CONFIG_USB_GADGET_VBUS_DRAW <= USB_SELF_POWER_VBUS_MAX_DRAW)
+	/* Do not report Self Powered as WHQL tests fail on Win7 */
+	//	usb_gadget_set_selfpowered(gadget);
 
 	/* interface and string IDs start at zero via kzalloc.
 	 * we force endpoints to start unassigned; few controller

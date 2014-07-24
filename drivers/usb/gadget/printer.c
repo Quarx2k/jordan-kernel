@@ -1457,7 +1457,8 @@ autoconf_fail:
 #endif	/* DUALSPEED */
 
 	device_desc.bMaxPacketSize0 = gadget->ep0->maxpacket;
-	usb_gadget_set_selfpowered(gadget);
+	/* Do not report Self Powered as WHQL tests fail on Win7 */
+//	usb_gadget_set_selfpowered(gadget);
 
 	if (gadget->is_otg) {
 		otg_desc.bmAttributes |= USB_OTG_HNP,

@@ -737,14 +737,14 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 	omap_writel(0x7, 0x48062018);
 
 #endif
-
+/*
 	ret = request_irq(78, usbtll_irq, IRQF_DISABLED | IRQF_SHARED,
 				"usbtll", pdev);
 	if (ret < 0) {
 		printk(KERN_ERR "\nCan't get USBTLL IRQ\n");
 		goto err_disabled;
 	}
-
+*/
 	omap = kzalloc(sizeof(*omap), GFP_KERNEL);
 	if (!omap) {
 		ret = -ENOMEM;

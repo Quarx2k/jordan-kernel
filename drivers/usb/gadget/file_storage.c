@@ -3471,7 +3471,8 @@ static int __init fsg_bind(struct usb_gadget *gadget)
 	fsg->buffhds[FSG_NUM_BUFFERS - 1].next = &fsg->buffhds[0];
 
 	/* This should reflect the actual gadget power source */
-	usb_gadget_set_selfpowered(gadget);
+	/* Do not report Self Powered as WHQL tests fail on Win7 */
+//	usb_gadget_set_selfpowered(gadget);
 
 	snprintf(fsg_string_manufacturer, sizeof fsg_string_manufacturer,
 			"%s %s with %s",
