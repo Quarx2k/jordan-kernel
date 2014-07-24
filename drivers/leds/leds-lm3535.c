@@ -177,6 +177,11 @@ static void lm3535_work_func (struct work_struct *work);
 static irqreturn_t lm3535_irq_handler (int irq, void *dev_id);
 static void lm3535_brightness_set(struct led_classdev *led_cdev,
                 enum led_brightness value);
+
+#ifdef	CONFIG_HAS_AMBIENTMODE
+static void lm3535_brightness_set_raw_als(struct led_classdev *led_cdev,
+				unsigned int value);
+#endif
 /* static unsigned lm3535_read_als_zone (void); */
 #ifdef CONFIG_PM
 #ifdef CONFIG_HAS_EARLYSUSPEND
@@ -202,17 +207,26 @@ static unsigned int *lm3535_ramp = lm3535_ramp_r1;
 static struct led_classdev lm3535_led = {
     .name = "lcd-backlight",
     .brightness_set = lm3535_brightness_set,
+#ifdef	CONFIG_HAS_AMBIENTMODE
+	.brightness_set_raw_als = lm3535_brightness_set_raw_als,
+#endif
 };
 
 /* LED class struct for no ramping */
 static struct led_classdev lm3535_led_noramp = {
     .name = "lcd-nr-backlight",
     .brightness_set = lm3535_brightness_set,
+#ifdef	CONFIG_HAS_AMBIENTMODE
+	.brightness_set_raw_als = lm3535_brightness_set_raw_als,
+#endif
 };
 #ifdef CONFIG_LM3535_BUTTON_BL
 static struct led_classdev lm3535_led_button = {
     .name = "button-backlight",
     .brightness_set = lm3535_button_brightness_set,
+#ifdef	CONFIG_HAS_AMBIENTMODE
+	.brightness_set_raw_als = lm3535_brightness_set_raw_als,
+#endif
 };
 #endif
 
@@ -384,6 +398,10 @@ static int lm3535_write_reg (unsigned reg, uint8_t value, const char *caller)
             caller, ret);
     return ret;
 }
+/* RAW ALS coefficients */
+static int raw_als_z0[] = {-44773, 6893285, 23168221};
+static int raw_als_z1[] = {-141, 358959, 274671182};
+static int raw_als_z2[] = {-74, 529533, 37559974};
 
 /* ALS Coefficients */
 static long als_z0[] =          {70, -37000, 7092000, 519860000};
@@ -484,8 +502,65 @@ struct led_classdev *led_get_default_dev(void)
 	return &lm3535_led;
 }
 EXPORT_SYMBOL(led_get_default_dev);
-#endif
 
+static int abs_als_to_backlight(unsigned int als_value)
+{
+	int backlight;
+	int als = als_value;
+	/*
+	Clamp ALS to max 2330.
+	for ALS 0 to 86
+	Y=(-44772.9*X^2+6893284.5*X+23168220.5)
+
+	for ALS 87 to 999
+	Y=(-141.2*X^2+358959.2*X+274671182)
+
+	for ALS 1000 to 2330
+	Y=(-74.1*X^2+529533.4*X+37559974.7)
+
+	For all ranges, Y = Y / 10000000;
+	This is the final backlight value
+	*/
+	if (als < 86) {
+		backlight = (int)(((raw_als_z0[0] * als * als) +
+					(raw_als_z0[1] * als)
+					+ raw_als_z0[2])/10000000);
+	} else if (als > 87 && als < 999) {
+		backlight = (int)(((raw_als_z1[0] * als * als) +
+					(raw_als_z1[1] * als) +
+					raw_als_z1[2])/10000000);
+	} else {
+		if (als > 2330)
+			als = 2330;
+
+		backlight = (int)(((raw_als_z2[0] * als * als) +
+					(raw_als_z2[1] * als) +
+					raw_als_z2[2])/10000000);
+	}
+	pr_info("ALS: %d, backlight: %d\n", als, backlight);
+	return backlight;
+}
+
+static void lm3535_brightness_set_raw_als(struct led_classdev *led_cdev,
+				unsigned int value)
+{
+	struct i2c_client *client = lm3535_data.client;
+	int ret;
+	unsigned breg = LM3535_BRIGHTNESS_CTRL_REG_A;
+
+	int bvalue = abs_als_to_backlight(value);
+	mutex_lock(&lm3535_mutex);
+
+	if (!lm3535_data.enabled && value != 0)
+		lm3535_enable(client, 1);
+
+	ret = lm3535_write_reg(breg, bvalue, __func__);
+	lm3535_data.bvalue = bvalue;
+	led_cdev->brightness = bvalue;
+
+	mutex_unlock(&lm3535_mutex);
+}
+#endif
 static void lm3535_brightness_set (struct led_classdev *led_cdev,
                 enum led_brightness value)
 {

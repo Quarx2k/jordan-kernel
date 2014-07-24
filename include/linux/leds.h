@@ -50,6 +50,11 @@ struct led_classdev {
 	/* Get LED brightness level */
 	enum led_brightness (*brightness_get)(struct led_classdev *led_cdev);
 
+#ifdef CONFIG_HAS_AMBIENTMODE
+	void		(*brightness_set_raw_als)(struct led_classdev *led_cdev,
+					  unsigned int brightness);
+#endif
+
 	/*
 	 * Activate hardware accelerated blink, delays are in milliseconds
 	 * and if both are zero then a sensible default should be chosen.
@@ -145,6 +150,8 @@ extern void led_set_brightness(struct led_classdev *led_cdev,
  *   return default LED device
  */
 extern struct led_classdev *led_get_default_dev(void);
+extern void led_set_brightness_raw_als(struct led_classdev *led_cdev,
+			       unsigned int brightness);
 #endif
 
 /*

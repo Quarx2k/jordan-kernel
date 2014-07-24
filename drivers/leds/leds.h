@@ -27,6 +27,17 @@ static inline void __led_set_brightness(struct led_classdev *led_cdev,
 		led_cdev->brightness_set(led_cdev, value);
 }
 
+#ifdef CONFIG_HAS_AMBIENTMODE
+static inline void __led_set_brightness_raw_als(struct led_classdev *led_cdev,
+					unsigned int value)
+{
+	if (!(led_cdev->flags & LED_SUSPENDED)) {
+		if (led_cdev->brightness_set_raw_als)
+			led_cdev->brightness_set_raw_als(led_cdev, value);
+	}
+}
+#endif
+
 static inline int led_get_brightness(struct led_classdev *led_cdev)
 {
 	return led_cdev->brightness;

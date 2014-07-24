@@ -3056,54 +3056,11 @@ static void minnow_panel_sync_display_status_mlocked(
 }
 
 #ifdef	CONFIG_HAS_AMBIENTMODE
-static int als_to_backlight(struct device *dev, int als)
-{
-	int backlight;
-	/*
-	Clamp ALS to max 2330.
-	for ALS 0 to 86
-	Y=(-44772.9*X^2+6893284.5*X+23168220.5)
-
-	for ALS 87 to 999
-	Y=(-141.2*X^2+358959.2*X+274671182)
-
-	for ALS 1000 to 2330
-	Y=(-74.1*X^2+529533.4*X+37559974.7)
-
-	For all ranges, Y = Y / 10000000;
-	This is the final backlight value
-	*/
-	if (als < 86) {
-		backlight = (((-44772 * als * als) +
-				((-9 * als * als)/10) +
-				(6893284 * als) +
-				(5 * als)/10)
-				+ 23168220)/10000000;
-	} else if (als > 87 && als < 999) {
-		backlight = (((-141 * als * als) +
-				((-2 * als * als)/10) +
-				(358959 * als) +
-				(2 * als)/10)
-				+ 274671182)/10000000;
-	} else {
-		if (als > 2330)
-			als = 2330;
-
-		backlight = (((-74 * als * als) +
-				((-1 * als * als)/10) +
-				(529533 * als) +
-				(4 * als)/10)
-				+ 37559974)/10000000;
-	}
-	dev_info(dev, "ALS: %d, backlight: %d\n", als, backlight);
-	return backlight;
-}
-
 static void led_set_dim_brightness(struct device *dev)
 {
 	struct m4sensorhub_data *m4sensorhub;
 	uint16_t als = DIM_BACKLIGHT; /* default value */
-	int size, backlight;
+	int size;
 
 	m4sensorhub = m4sensorhub_client_get_drvdata();
 	size = m4sensorhub_reg_getsize(m4sensorhub,
@@ -3115,8 +3072,7 @@ static void led_set_dim_brightness(struct device *dev)
 					      (char *)&als))
 		dev_err(dev, "error reading M4 ALS value\n");
 
-	backlight = als_to_backlight(dev, als);
-	led_set_brightness(led_get_default_dev(), backlight);
+	led_set_brightness_raw_als(led_get_default_dev(), als);
 }
 #endif /* CONFIG_HAS_AMBIENTMODE */
 
@@ -3185,23 +3141,16 @@ static int minnow_panel_change_state_mlocked(struct minnow_panel_data *mpd,
 		/* check if smart ambient mode feature enabled */
 		if (!is_smart_ambient_feature_enabled(mpd))
 			break;
-		if (mpd->state == DISPLAY_ENABLE) {
-			/* first time to turn on ambient mode,
-			 * start time out only
-			 */
-			minnow_panel_start_ambient_alarm(mpd);
-		} else {
-			/* turn on display when it's off before */
+		/* turn on display when it's off before */
+		if (!mpd->enabled)
 			r = minnow_panel_enable_mlocked(mpd);
-			if (!r) {
-				/* Dim the back light */
-				led_set_dim_brightness(&mpd->dssdev->dev);
-				minnow_panel_start_ambient_alarm(mpd);
-			}
-		}
-		/* switch to lowest refresh rate when ambient mode on */
-		if (!r)
+		if (!r) {
+			/* switch to lowest refresh rate */
 			minnow_panel_set_lowest_fps(mpd);
+			/* Dim the back light */
+			led_set_dim_brightness(&mpd->dssdev->dev);
+			minnow_panel_start_ambient_alarm(mpd);
+		}
 		break;
 #endif /* CONFIG_HAS_AMBIENTMODE */
 	default:

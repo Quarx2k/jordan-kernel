@@ -111,6 +111,15 @@ void led_stop_software_blink(struct led_classdev *led_cdev)
 }
 EXPORT_SYMBOL_GPL(led_stop_software_blink);
 
+#ifdef CONFIG_HAS_AMBIENTMODE
+void led_set_brightness_raw_als(struct led_classdev *led_cdev,
+			unsigned int brightness)
+{
+	__led_set_brightness_raw_als(led_cdev, brightness);
+}
+EXPORT_SYMBOL(led_set_brightness_raw_als);
+#endif
+
 void led_set_brightness(struct led_classdev *led_cdev,
 			enum led_brightness brightness)
 {
