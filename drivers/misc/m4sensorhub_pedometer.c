@@ -339,7 +339,7 @@ static ssize_t m4ped_userdata_show(struct device *dev,
 
 	mutex_lock(&(dd->mutex));
 
-	err = m4sensorhub_reg_read_n(dd->m4, M4SH_REG_USERSETTINGS_VERSION,
+	err = m4sensorhub_reg_read_n(dd->m4, M4SH_REG_USERSETTINGS_SCREENSTATUS,
 		(char *)&(data[0]), ARRAY_SIZE(data));
 	if (err < 0) {
 		m4ped_err("%s: Failed to read user data.\n", __func__);
@@ -348,13 +348,6 @@ static ssize_t m4ped_userdata_show(struct device *dev,
 		m4ped_err("%s: Read %d bytes instead of %d.\n",
 			  __func__, err, size);
 		err = -EBADE;
-		goto m4ped_userdata_show_fail;
-	}
-
-	if (data[0] > 0) {
-		m4ped_err("%s: User settings version is too new (0x%02X)\n",
-			  __func__, data[0]);
-		err = -EINVAL;
 		goto m4ped_userdata_show_fail;
 	}
 

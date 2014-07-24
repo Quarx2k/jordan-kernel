@@ -76,18 +76,6 @@ static void m4ges_isr(enum m4sensorhub_irqs int_event, void *handle)
 		goto m4ges_isr_fail;
 	}
 
-#ifdef CONFIG_WAKEUP_SOURCE_NOTIFY
-	if (dd->iiodat.gesture_type == GESTURE_WRIST_ROTATE) {
-		notify_display_wakeup(GESTURE);
-	} else if (dd->iiodat.gesture_type == GESTURE_VIEW) {
-		notify_display_wakeup(GESTURE_VIEW);
-		/* the GESTURE_VIEW is only effect for kernel now
-		 * do not send gesture to android
-		 */
-		goto m4ges_isr_fail;
-	}
-#endif /* CONFIG_WAKEUP_SOURCE_NOTIFY */
-
 	size = m4sensorhub_reg_getsize(dd->m4, M4SH_REG_GESTURE_CONFIDENCE1);
 	err = m4sensorhub_reg_read(dd->m4, M4SH_REG_GESTURE_CONFIDENCE1,
 		(char *)&(dd->iiodat.gesture_confidence));
@@ -114,6 +102,21 @@ static void m4ges_isr(enum m4sensorhub_irqs int_event, void *handle)
 		err = -EBADE;
 		goto m4ges_isr_fail;
 	}
+
+#ifdef CONFIG_WAKEUP_SOURCE_NOTIFY
+	if (dd->iiodat.gesture_type == GESTURE_WRIST_ROTATE) {
+		notify_display_wakeup(GESTURE);
+	} else if (dd->iiodat.gesture_type == GESTURE_VIEW) {
+		if (dd->iiodat.gesture_value == GESTURE_VIEW_ON)
+			notify_display_wakeup(GESTURE_VIEWON);
+		else
+			notify_display_wakeup(GESTURE_VIEWOFF);
+		/* the GESTURE_VIEW is only effect for kernel now
+		 * do not send gesture to android
+		 */
+		goto m4ges_isr_fail;
+	}
+#endif /* CONFIG_WAKEUP_SOURCE_NOTIFY */
 
 	dd->iiodat.timestamp = iio_get_time_ns();
 	iio_push_to_buffers(iio, (unsigned char *)&(dd->iiodat));

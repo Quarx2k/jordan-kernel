@@ -82,7 +82,8 @@
 		//gpio_te = <&gpio1 0 0>;       /* EXT_TE gpio-0 */
 		//pins = <0 1 2 3>;             /* DSI Pin config */
 		esd_interval = <8000>;          /* ESD_INTERVAL */
-		ambient_timeout = <5>;          /* timeout in second */
+		support_smart_ambient;
+		ambient_timeout = <0>;		/* time out in second */
 		//pixel_clock = <4608>;         /* kHZ = 320*240*60/1000*/
 		/* 0: RGB888
 		 * 1: RGB666
