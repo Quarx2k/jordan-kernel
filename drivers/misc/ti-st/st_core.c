@@ -807,6 +807,8 @@ static void st_tty_receive(struct tty_struct *tty, const unsigned char *data,
 	st_recv(tty->disc_data, data, count);
 	wake_lock_timeout(&st_wk_lock_timeout,
 			  msecs_to_jiffies(ST_WAKE_LOCK_TIMEOUT_MS));
+
+	omap_serial_relax(tty->index);
 	pr_debug("done %s\n", __func__);
 }
 

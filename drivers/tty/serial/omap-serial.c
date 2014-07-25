@@ -226,6 +226,28 @@ void omap_serial_runtime_put(int port_index)
 	spin_unlock(&up->port.lock);
 }
 
+static void _omap_serial_wakeup_event(struct uart_omap_port *up)
+{
+	if (up->wakelock_timeout)
+		pm_wakeup_event(up->dev, up->wakelock_timeout);
+}
+
+static void _omap_serial_relax(struct uart_omap_port *up)
+{
+	if (up->wakelock_timeout)
+		pm_relax(up->dev);
+}
+
+void omap_serial_relax(int port_index)
+{
+	struct uart_omap_port *up;
+
+	if (port_index >= OMAP_MAX_HSUART_PORTS)
+		return;
+	up = ui[port_index];
+	_omap_serial_relax(up);
+}
+
 static inline unsigned int serial_in(struct uart_omap_port *up, int offset)
 {
 	offset <<= up->port.regshift;
@@ -546,9 +568,7 @@ static irqreturn_t serial_omap_irq(int irq, void *dev_id)
 
 	spin_lock(&up->port.lock);
 	pm_runtime_get_sync(up->dev);
-
-	if (up->wakelock_timeout)
-		pm_wakeup_event(up->dev, up->wakelock_timeout);
+	_omap_serial_wakeup_event(up);
 
 	do {
 		iir = serial_in(up, UART_IIR);

@@ -403,6 +403,7 @@ unsigned long st_ll_sleep_state(struct st_data_s *, unsigned char);
 void st_ll_wakeup(struct st_data_s *);
 void omap_serial_runtime_get(int port_index);
 void omap_serial_runtime_put(int port_index);
+void omap_serial_relax(int port_index);
 
 /*
  * header information used by st_core.c for FM and GPS
