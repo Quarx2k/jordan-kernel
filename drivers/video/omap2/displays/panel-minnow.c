@@ -61,7 +61,7 @@
 #define DCS_GET_ID1		0xda
 #define DCS_GET_ID2		0xdb
 #define DCS_GET_ID3		0xdc
-#define DIM_BACKLIGHT 5
+#define DIM_BACKLIGHT_ALS	5
 
 enum minnow_panel_component {
 	MINNOW_PANEL,
@@ -597,17 +597,21 @@ static void minnow_panel_start_ambient_alarm(struct minnow_panel_data *mpd)
 enum refresh_rate {
 	REFRESH_RATE_30HZ,
 	REFRESH_RATE_45HZ,
+	REFRESH_RATE_60HZ,
 };
 #define minnow_panel_set_lowest_fps(mpd)	\
 		minnow_panel_set_refresh_rate_mlocked(mpd, REFRESH_RATE_30HZ)
 #define minnow_panel_set_default_fps(mpd)	\
 		minnow_panel_set_refresh_rate_mlocked(mpd, REFRESH_RATE_45HZ)
+#define minnow_panel_set_dock_fps(mpd)	\
+		minnow_panel_set_refresh_rate_mlocked(mpd, REFRESH_RATE_60HZ)
 static int minnow_panel_set_refresh_rate_mlocked(struct minnow_panel_data *mpd,
 						 enum refresh_rate rate)
 {
 	static u8 ssd2848_vtcm_pcfrr[][6] = {
 		[REFRESH_RATE_30HZ] = {0x20, 0x10, 0x00, 0xEF, 0x00, 0x34},
-		[REFRESH_RATE_45HZ] = {0x20, 0x10, 0x00, 0x5F, 0x00, 0x1F}
+		[REFRESH_RATE_45HZ] = {0x20, 0x10, 0x00, 0x5F, 0x00, 0x1F},
+		[REFRESH_RATE_60HZ] = {0x20, 0x10, 0x00, 0xF7, 0x00, 0x6C},
 	};
 	int r = 0;
 
@@ -3059,7 +3063,7 @@ static void minnow_panel_sync_display_status_mlocked(
 static void led_set_dim_brightness(struct device *dev)
 {
 	struct m4sensorhub_data *m4sensorhub;
-	uint16_t als = DIM_BACKLIGHT; /* default value */
+	uint16_t als = DIM_BACKLIGHT_ALS; /* default value */
 	int size;
 
 	m4sensorhub = m4sensorhub_client_get_drvdata();
@@ -3081,8 +3085,8 @@ static int minnow_panel_change_state_mlocked(struct minnow_panel_data *mpd,
 {
 	int r = 0;
 
-	dev_info(&mpd->dssdev->dev, "change state(%d),"
-		" current state(%d)\n", state, mpd->state);
+	dev_info(&mpd->dssdev->dev,
+		 "change state %d ==> %d\n", mpd->state, state);
 
 	/* already in state, return success */
 	if (state == mpd->state) {
@@ -3138,6 +3142,12 @@ static int minnow_panel_change_state_mlocked(struct minnow_panel_data *mpd,
 		 */
 		if (mpd->state == DISPLAY_DISABLE)
 			goto _ret_;
+		/* check if it's ambient mode on dock */
+		if ((mpd->state == DISPLAY_ENABLE) && mpd->is_docked) {
+			/* switch to dock refresh rate */
+			minnow_panel_set_dock_fps(mpd);
+			break;
+		}
 		/* check if smart ambient mode feature enabled */
 		if (!is_smart_ambient_feature_enabled(mpd))
 			break;

@@ -50,6 +50,11 @@
 #ifdef CONFIG_LM3535_ESD_RECOVERY
 #include <mot/esd_poll.h>
 #endif /* CONFIG_LM3535_ESD_RECOVERY */
+#ifdef CONFIG_WAKEUP_SOURCE_NOTIFY
+#include <linux/notifier.h>
+#include <linux/wakeup_source_notify.h>
+#define MIN_DOCK_BVALUE		36
+#endif
 
 #define MODULE_NAME "leds_lm3535"
 
@@ -275,6 +280,10 @@ struct lm3535 {
     unsigned saved_bvalue; // Brightness before TCMD SUSPEND
     //struct hrtimer timer;
     struct work_struct  work;
+#ifdef CONFIG_WAKEUP_SOURCE_NOTIFY
+	atomic_t docked;
+	struct notifier_block dock_nb;
+#endif
 };
 static DEFINE_MUTEX(lm3535_mutex);
 
@@ -496,6 +505,23 @@ static uint8_t lm3535_convert_value (unsigned value, unsigned zone)
     return reg;
 }
 
+#ifdef CONFIG_WAKEUP_SOURCE_NOTIFY
+static int lm3535_dock_notifier(struct notifier_block *self,
+				unsigned long action, void *dev)
+{
+	switch (action) {
+	case DISPLAY_WAKE_EVENT_DOCKON:
+		atomic_set(&lm3535_data.docked, 1);
+		break;
+	case DISPLAY_WAKE_EVENT_DOCKOFF:
+		atomic_set(&lm3535_data.docked, 0);
+		break;
+	}
+
+	return NOTIFY_OK;
+}
+#endif /* CONFIG_WAKEUP_SOURCE_NOTIFY */
+
 #ifdef	CONFIG_HAS_AMBIENTMODE
 struct led_classdev *led_get_default_dev(void)
 {
@@ -608,6 +634,10 @@ static void lm3535_brightness_set (struct led_classdev *led_cdev,
 
     /* Calculate brightness value for each zone relative to its cap */
     bvalue = lm3535_convert_value (value, bright_zone);
+#ifdef CONFIG_WAKEUP_SOURCE_NOTIFY
+	if (atomic_read(&lm3535_data.docked) && (bvalue < MIN_DOCK_BVALUE))
+		bvalue = MIN_DOCK_BVALUE; /* hard code for dock mode */
+#endif /* CONFIG_WAKEUP_SOURCE_NOTIFY */
 
     /* Calculate number of steps for ramping */
     nsteps = bvalue - lm3535_data.bvalue;
@@ -931,6 +961,11 @@ static int lm3535_probe (struct i2c_client *client,
     //lm3535_brightness_set (&lm3535_led_noramp, 255);
     lm3535_write_reg (LM3535_BRIGHTNESS_CTRL_REG_A, 0x79, __FUNCTION__);
     lm3535_data.initialized = 1;
+#ifdef CONFIG_WAKEUP_SOURCE_NOTIFY
+	atomic_set(&lm3535_data.docked, 0);
+	lm3535_data.dock_nb.notifier_call = lm3535_dock_notifier;
+	wakeup_source_register_notify(&lm3535_data.dock_nb);
+#endif /* CONFIG_WAKEUP_SOURCE_NOTIFY */
 
     return 0;
 }
