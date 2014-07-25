@@ -861,8 +861,8 @@ tps65912_0: tps65912 {
 	flags = <0x00200000>;
 	ti,no-pm-qos;
 	wakeup-capable;
-	autosuspend-delay = <50>; /* ms */
-	timed-wakelock = <50>; /* ms */
+	autosuspend-delay = <100>; /* ms */
+	timed-wakelock = <150>; /* ms */
 	rx_trig = <32>;
 
 	/* rts_gpio HACK */
