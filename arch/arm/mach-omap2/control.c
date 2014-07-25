@@ -245,6 +245,16 @@ void omap3_ctrl_write_boot_mode(u8 bootmode)
 void omap3_enable_usim_buffer(void)
 {
 	u32 reg;
+	/*
+	 * Configure USIM pins for 1.8V control and disable high-z state
+	 * CTRL_PBIAS_LITE = 0x20b
+	 */
+	reg = omap_ctrl_readl(OMAP343X_CONTROL_PBIAS_LITE);
+	reg |= (OMAP2_PBIASLITEVMODE0 | OMAP2_PBIASLITEPWRDNZ0);
+	reg |= OMAP343X_PBIASLITEPWRDNZ1;
+	reg &= ~OMAP343X_PBIASLITEVMODE1;
+	reg &= ~OMAP2_PBIASSPEEDCTRL0;
+	omap_ctrl_writel(reg, OMAP343X_CONTROL_PBIAS_LITE);
 
 	reg = omap_ctrl_readl(OMAP343X_CONTROL_WKUP_CTRL);
 	reg |= OMAP343X_USIM_IO_PWRDNZ;
