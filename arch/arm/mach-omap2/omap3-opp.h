@@ -7,15 +7,15 @@
 #define S1200M	1200000000
 #define S1000M	1000000000
 #define S800M	800000000
-#define S720M   720000000
-#define S600M   600000000
-#define S550M   550000000
-#define S520M   520000000
-#define S500M   500000000
+#define S720M	720000000
+#define S600M	600000000
+#define S550M	550000000
+#define S520M	520000000
+#define S500M	500000000
 #define S300M	300000000
-#define S250M   250000000
+#define S250M	250000000
 #define S150M	150000000
-#define S125M   125000000
+#define S125M	125000000
 
 /* DSP speeds */
 #define S875M   875000000
@@ -42,7 +42,7 @@ static struct omap_opp omap3630_mpu_rate_table[] = {
         {0, 0, 0, 0},
         /*Add headroom for CPCAP IR drop*/
         /*OPP1,CPCAP 1.0125v*/
-        {S300M, VDD1_OPP1, 0x21, 0x0},
+        {S400M, VDD1_OPP1, 0x22, 0x0},
         /*OPP2,CPCAP 1.2v*/
         {S600M, VDD1_OPP2, 0x30, 0x0},
         /*OPP3,CPCAP 1.325v*/
@@ -70,7 +70,7 @@ static struct omap_opp omap3630_dsp_rate_table[] = {
         /*OPP3,CPCAP 1.325v*/
         {S660M, VDD1_OPP3, 0x3A, 0x0},
         /*OPP4,CPCAP 1.375v*/
-        {S800M, VDD1_OPP4, 0x3E, 0x0},
+        {S875M, VDD1_OPP4, 0x3F, 0x0},
         /*OPP5,CPCAP 1.375v*/
         {S65M, VDD1_OPP5, 0x3E, 0x0},
 };
