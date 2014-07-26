@@ -1051,7 +1051,7 @@ static int mt9p012_write_reg(struct i2c_client *client, u16 data_length,
 		data[5] = (u8) (val & 0xff);
 	}
 
-	do {
+	//do {
 		err = i2c_transfer(client->adapter, msg, 1);
 		if (err >= 0) {
 			hplens_unlock();
@@ -1062,7 +1062,7 @@ static int mt9p012_write_reg(struct i2c_client *client, u16 data_length,
 		}
 		retry++;
 		msleep(3);
-	} while (retry <= MT9P012_I2C_RETRY_COUNT);
+	//} while (retry <= MT9P012_I2C_RETRY_COUNT);
 
 #if defined(CONFIG_VIDEO_OMAP3_HPLENS)
 	hplens_unlock();
