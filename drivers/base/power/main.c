@@ -817,7 +817,10 @@ static void device_complete(struct device *dev, pm_message_t state)
 
 	device_unlock(dev);
 
-	pm_runtime_put(dev);
+	if (dev->power.resume_noidle)
+		pm_runtime_put_noidle(dev);
+	else
+		pm_runtime_put(dev);
 }
 
 /**
