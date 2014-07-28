@@ -1756,6 +1756,8 @@ static int serial_omap_runtime_suspend(struct device *dev)
 	if (!up)
 		return -EINVAL;
 
+	if (up->pin_idle)
+		pinctrl_select_state(up->pins, up->pin_idle);
 	up->context_loss_cnt = serial_omap_get_context_loss_count(up);
 
 	if (device_may_wakeup(dev)) {
@@ -1765,9 +1767,6 @@ static int serial_omap_runtime_suspend(struct device *dev)
 	up->latency = PM_QOS_CPU_DMA_LAT_DEFAULT_VALUE;
 	serial_omap_uart_qos(up);
 
-	if (up->pin_idle)
-		pinctrl_select_state(up->pins, up->pin_idle);
-
 	return 0;
 }
 
@@ -1775,9 +1774,6 @@ static int serial_omap_runtime_resume(struct device *dev)
 {
 	int loss_cnt;
 	struct uart_omap_port *up = dev_get_drvdata(dev);
-
-	if (up->pin_default && up->pin_idle)
-		pinctrl_select_state(up->pins, up->pin_default);
 
 	loss_cnt = serial_omap_get_context_loss_count(up);
 	if (loss_cnt < 0) {
@@ -1791,6 +1787,9 @@ static int serial_omap_runtime_resume(struct device *dev)
 	}
 	up->latency = up->calc_latency;
 	serial_omap_uart_qos(up);
+	if (up->pin_default && up->pin_idle)
+		pinctrl_select_state(up->pins, up->pin_default);
+
 	return 0;
 }
 #endif
