@@ -20,7 +20,9 @@
 #include <linux/debugfs.h>
 #include <linux/gpio.h>
 #include <linux/interrupt.h>
+#include <linux/m4sensorhub.h>
 #include <linux/module.h>
+#include <linux/mutex.h>
 #include <linux/of.h>
 #include <linux/of_gpio.h>
 #include <linux/platform_device.h>
@@ -46,6 +48,9 @@
  *
  * For new h/w, the state of det_gpio alone is sufficinet to determine docked
  * state. We have to use state of chg_gpo for compatibality with old h/w.
+ *
+ * Provide an option to use motion to report undocking. If this option is
+ * enabled, then udocking is reported only if motion has been detected.
  */
 
 /*
@@ -60,6 +65,7 @@
  * uevent_wakelock_timeout	time to hold wake_lock to ensure user space has
  *				processed new docked state
  * old_hw		h/w where det_gpio is always high
+ * use_motion		use motion to detect undocking
  */
 struct bq5105x_detect_dts {
 	int chg_gpio;
@@ -71,12 +77,14 @@ struct bq5105x_detect_dts {
 	size_t num_supplicants;
 	unsigned long uevent_wakelock_timeout;
 	bool old_hw;
+	bool use_motion;
 };
 
 struct bq5105x_detect {
 	const struct bq5105x_detect_dts *dts_data;
 	struct platform_device *pdev;
-	bool docked;
+	bool docked;		/* based on chg_gpio and det_gpio states */
+	bool reported_docked;	/* based on docked state and motion */
 	unsigned int chg_irq;
 	unsigned int det_irq;
 	bool det_irq_enabled;
@@ -100,6 +108,10 @@ struct bq5105x_detect {
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *debugfs_root;
 #endif
+	/* For using motion to detect undocking */
+	struct m4sensorhub_data *m4shub;
+	bool in_motion; /* has there been some motion lately ? */
+	struct mutex motion_mutex;
 };
 
 static enum power_supply_property bq5105x_detect_chg_prop[] = {
@@ -115,7 +127,7 @@ static int bq5105x_detect_get_property(struct power_supply *psy,
 	switch (psp) {
 	case POWER_SUPPLY_PROP_ONLINE:
 		/* TODO: Atomic access to the state */
-		val->intval = chip->docked;
+		val->intval = chip->reported_docked;
 		break;
 	default:
 		return -EINVAL;
@@ -124,21 +136,124 @@ static int bq5105x_detect_get_property(struct power_supply *psy,
 	return 0;
 }
 
-static void bq5105x_detect_set_docked(struct bq5105x_detect *chip, bool docked)
+
+static void bq5105x_detect_m4_track_motion(struct bq5105x_detect *chip, bool en)
 {
-	if (chip->docked != docked) {
-		dev_dbg(&chip->pdev->dev, "docked=%d\n", docked);
+	int ret;
+
+	if (!chip->m4shub) {
+		dev_dbg(&chip->pdev->dev, "m4 sensor hub is not ready to track motion\n");
+		return;
+	}
+
+	dev_dbg(&chip->pdev->dev, "motion tracking is %s\n", en ? "on" : "off");
+
+	if (en) {
+		ret = m4sensorhub_irq_enable(chip->m4shub,
+					     M4SH_IRQ_MOTION_DETECTED);
+		if (ret < 0) {
+			dev_err(&chip->pdev->dev, "failed to enable motion detection\n");
+			goto err_m4_track;
+		}
+
+		ret = m4sensorhub_irq_enable(chip->m4shub,
+					     M4SH_IRQ_STILL_DETECTED);
+		if (ret < 0) {
+			dev_err(&chip->pdev->dev, "failed to enable still mode detection\n");
+			goto err_m4_track;
+		}
+	} else {
+		ret = m4sensorhub_irq_disable(chip->m4shub,
+					      M4SH_IRQ_MOTION_DETECTED);
+		if (ret < 0) {
+			dev_err(&chip->pdev->dev, "failed to disable motion detection\n");
+			goto err_m4_track;
+		}
+
+		ret = m4sensorhub_irq_disable(chip->m4shub,
+					      M4SH_IRQ_STILL_DETECTED);
+		if (ret < 0) {
+			dev_err(&chip->pdev->dev, "failed to disable still mode detection\n");
+			goto err_m4_track;
+		}
+	}
+
+	return;
+
+err_m4_track:
+	/* Unregister from interrupts and assume to be in motion */
+	chip->in_motion = true;
+	m4sensorhub_irq_unregister(chip->m4shub, M4SH_IRQ_MOTION_DETECTED);
+	m4sensorhub_irq_unregister(chip->m4shub, M4SH_IRQ_STILL_DETECTED);
+	chip->m4shub = NULL;
+}
+
+static bool bq5105x_detect_m4_motion(struct bq5105x_detect *chip)
+{
+	bool motion;
+	unsigned char val;
+	int ret;
+
+	/*
+	 * In motion if sensor hub is not ready or error occured when reading
+	 * the current state.
+	 */
+	if (!chip->m4shub) {
+		dev_dbg(&chip->pdev->dev, "m4 sensor hub is not ready to report motion state\n");
+		ret = -1;
+	} else {
+		ret = m4sensorhub_reg_read(chip->m4shub,
+					   M4SH_REG_POWER_DEVICESTATE, &val);
+	}
+
+	motion = (ret < 0 || val);
+	dev_dbg(&chip->pdev->dev, "current motion=%d\n", motion);
+	return motion;
+}
+
+static void bq5105x_detect_report(struct bq5105x_detect *chip, bool docked)
+{
+	if (chip->reported_docked != docked) {
+		dev_dbg(&chip->pdev->dev, "report docked=%d\n", docked);
 #ifdef CONFIG_WAKEUP_SOURCE_NOTIFY
 		wakeup_source_notify_subscriber(docked
 						? DISPLAY_WAKE_EVENT_DOCKON
 						: DISPLAY_WAKE_EVENT_DOCKOFF);
 #endif
-		chip->docked = docked;
+		chip->reported_docked = docked;
 		power_supply_changed(&chip->charger);
-		switch_set_state(chip->sdev, chip->docked);
+		switch_set_state(chip->sdev, docked);
+		if (chip->dts_data->use_motion) {
+			/* Track motion state while docked */
+			if (docked) {
+				bq5105x_detect_m4_track_motion(chip, true);
+				chip->in_motion =
+					bq5105x_detect_m4_motion(chip);
+			} else {
+				bq5105x_detect_m4_track_motion(chip, false);
+			}
+		}
 		/* TODO: Release wakelock when switch state is read */
 		wake_lock_timeout(&chip->uevent_wakelock,
 				  chip->dts_data->uevent_wakelock_timeout);
+	}
+}
+
+static void bq5105x_detect_set_docked(struct bq5105x_detect *chip, bool docked)
+{
+	if (chip->docked != docked) {
+		dev_dbg(&chip->pdev->dev, "docked=%d\n", docked);
+		if (chip->dts_data->use_motion) {
+			/* Report undocked only if there has been some motion */
+			mutex_lock(&chip->motion_mutex);
+			chip->docked = docked;
+			if (chip->docked || chip->in_motion)
+				bq5105x_detect_report(chip, docked);
+			mutex_unlock(&chip->motion_mutex);
+		} else {
+			chip->docked = docked;
+			bq5105x_detect_report(chip, docked);
+		}
 	}
 }
 
@@ -247,6 +362,83 @@ bq5105x_detect_undocked_alarm(struct alarm *alrm, ktime_t now)
 	return ALARMTIMER_NORESTART;
 }
 
+static void
+bq5105x_detect_m4_motion_changed(enum m4sensorhub_irqs int_event, void *data)
+{
+	struct bq5105x_detect *chip = (struct bq5105x_detect *)data;
+
+	mutex_lock(&chip->motion_mutex);
+
+	/* Assume in motion if enabling/disabling IRQs has previously failed */
+	if (chip->m4shub)
+		chip->in_motion = (int_event == M4SH_IRQ_MOTION_DETECTED);
+	else
+		chip->in_motion = true;
+
+	dev_dbg(&chip->pdev->dev, "new motion=%d\n", chip->in_motion);
+
+	/* Report undocked if in motion and undocking has been detected */
+	if (chip->in_motion && !chip->docked)
+		bq5105x_detect_report(chip, false);
+	mutex_unlock(&chip->motion_mutex);
+}
+
+static int bq5105x_detect_m4_init(struct init_calldata *p_arg)
+{
+	struct bq5105x_detect *chip = (struct bq5105x_detect *) p_arg->p_data;
+	int ret;
+
+	mutex_lock(&chip->motion_mutex);
+	/*
+	 * Register motion and still mode detection callbacks. If docked,
+	 * determine the current state and enable callbacks to detect future
+	 * state changes.
+	 */
+
+	chip->m4shub = p_arg->p_m4sensorhub_data;
+	if (!chip->m4shub) {
+		dev_err(&chip->pdev->dev, "invalid handle to sensor hub\n");
+		ret = -EINVAL;
+		goto err_m4_handle;
+	}
+
+	ret = m4sensorhub_irq_register(chip->m4shub, M4SH_IRQ_MOTION_DETECTED,
+				       bq5105x_detect_m4_motion_changed,
+				       (void *)chip, 0);
+	if (ret < 0) {
+		dev_err(&chip->pdev->dev,
+			"failed to register motion detection\n");
+		goto err_m4_motion;
+	}
+
+	ret = m4sensorhub_irq_register(chip->m4shub, M4SH_IRQ_STILL_DETECTED,
+				       bq5105x_detect_m4_motion_changed,
+				       (void *)chip, 0);
+	if (ret < 0) {
+		dev_err(&chip->pdev->dev,
+			"failed to register still mode detection\n");
+		goto err_m4_still;
+	}
+
+	dev_dbg(&chip->pdev->dev, "m4 sensor hub is ready\n");
+
+	if (chip->docked) {
+		bq5105x_detect_m4_track_motion(chip, true);
+		chip->in_motion = bq5105x_detect_m4_motion(chip);
+	}
+
+	mutex_unlock(&chip->motion_mutex);
+	return 0;
+
+err_m4_still:
+	m4sensorhub_irq_unregister(chip->m4shub, M4SH_IRQ_MOTION_DETECTED);
+err_m4_motion:
+	chip->m4shub = NULL;
+err_m4_handle:
+	mutex_unlock(&chip->motion_mutex);
+	return ret;
+}
+
 static struct bq5105x_detect_dts *
 of_bq5105x_detect(struct platform_device *pdev)
 {
@@ -326,6 +518,8 @@ of_bq5105x_detect(struct platform_device *pdev)
 	dts_data->uevent_wakelock_timeout = msecs_to_jiffies(val);
 
 	dts_data->old_hw = of_property_read_bool(np, "old-hw");
+
+	dts_data->use_motion = of_property_read_bool(np, "use-motion");
 
 	return dts_data;
 
@@ -449,6 +643,18 @@ static int bq5105x_detect_probe(struct platform_device *pdev)
 		       "docked-state-uevent");
 	wake_lock_init(&chip->pulse_wakelock, WAKE_LOCK_SUSPEND, "det-pulse");
 
+	if (chip->dts_data->use_motion) {
+		/* Initialize mutex before irqs are enabled and register with
+		 * sensor hub to be called when it is setup and running */
+		mutex_init(&chip->motion_mutex);
+		ret = m4sensorhub_register_initcall(bq5105x_detect_m4_init,
+						    (void *)chip);
+		if (ret < 0) {
+			dev_err(&pdev->dev, "failed to register with sensor hub\n");
+			goto err_m4shub;
+		}
+	}
+
 	/* Do not enable det_gpio interrupt on old h/w. Moreover, if the IRQ got
 	 * processed on old h/w, the detection logic will be broken */
 	if (!chip->dts_data->old_hw) {
@@ -496,8 +702,14 @@ err_chg_irq:
 	if (!chip->dts_data->old_hw)
 		free_irq(chip->det_irq, chip);
 err_det_irq:
+	if (chip->dts_data->use_motion)
+		m4sensorhub_unregister_initcall(bq5105x_detect_m4_init);
+err_m4shub:
 	alarm_cancel(&chip->undocked_alarm);
 	destroy_workqueue(chip->wq);
+	/* Destroy mutex after workqueue since work functions use the mutex */
+	if (chip->dts_data->use_motion)
+		mutex_destroy(&chip->motion_mutex);
 	wake_lock_destroy(&chip->chg_irq_wakelock);
 	wake_lock_destroy(&chip->det_irq_wakelock);
 	wake_lock_destroy(&chip->undocked_wakelock);
