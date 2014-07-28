@@ -870,6 +870,8 @@ tps65912_0: tps65912 {
 	pinctrl-names = "default", "idle";
 	pinctrl-0 = <&uart2_pins_default>;
 	pinctrl-1 = <&uart2_pins_idle>;
+
+	resume-noidle;
 };
 /* serial console */
 &uart3 {
