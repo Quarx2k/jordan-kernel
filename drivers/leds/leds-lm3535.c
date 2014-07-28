@@ -54,6 +54,8 @@
 #include <linux/notifier.h>
 #include <linux/wakeup_source_notify.h>
 #define MIN_DOCK_BVALUE		36
+#include <linux/m4sensorhub.h>
+#include <linux/m4sensorhub/MemMapUserSettings.h>
 #endif
 
 #define MODULE_NAME "leds_lm3535"
@@ -434,11 +436,54 @@ module_param(als_denom, ulong, 0644);
 static unsigned dim_values[] = {0x03, 0x30, 0x50, 0x50, 0x50};
 module_param_array(dim_values, uint, NULL, 0644);
 
+static int abs_als_to_backlight(unsigned int als_value)
+{
+	int backlight;
+	int als = als_value;
+	/*
+	Clamp ALS to max 2330.
+	for ALS 0 to 86
+	Y=(-44772.9*X^2+6893284.5*X+23168220.5)
+
+	for ALS 87 to 999
+	Y=(-141.2*X^2+358959.2*X+274671182)
+
+	for ALS 1000 to 2330
+	Y=(-74.1*X^2+529533.4*X+37559974.7)
+
+	For all ranges, Y = Y / 10000000;
+	This is the final backlight value
+	*/
+	if (als < 86) {
+		backlight = (int)(((raw_als_z0[0] * als * als) +
+					(raw_als_z0[1] * als)
+					+ raw_als_z0[2])/10000000);
+	} else if (als > 87 && als < 999) {
+		backlight = (int)(((raw_als_z1[0] * als * als) +
+					(raw_als_z1[1] * als) +
+					raw_als_z1[2])/10000000);
+	} else {
+		if (als > 2330)
+			als = 2330;
+
+		backlight = (int)(((raw_als_z2[0] * als * als) +
+					(raw_als_z2[1] * als) +
+					raw_als_z2[2])/10000000);
+	}
+	pr_info("ALS: %d, backlight: %d\n", als, backlight);
+	return backlight;
+}
 /* Convert slider value into LM3535 register value */
 static uint8_t lm3535_convert_value (unsigned value, unsigned zone)
 {
     uint8_t reg;
     uint32_t res;
+#ifdef CONFIG_WAKEUP_SOURCE_NOTIFY
+	struct m4sensorhub_data *m4sensorhub;
+	int size, ambient_als_backlight;
+	uint16_t als;
+	bool adjust_als = false;
+#endif
 
     if (!value)
         return 0;
@@ -500,8 +545,32 @@ static uint8_t lm3535_convert_value (unsigned value, unsigned zone)
         reg = res;
     else
         reg = res / als_denom;
-    printk_br (KERN_INFO "%s: v=%d, z=%d, res=0x%x, reg=0x%x\n", 
-        __FUNCTION__, value, zone, res, reg);
+
+#ifdef CONFIG_WAKEUP_SOURCE_NOTIFY
+	/* make sure this is atleast as high as corresponding ambient mode
+	value for current ALS condition */
+	m4sensorhub = m4sensorhub_client_get_drvdata();
+	size = m4sensorhub_reg_getsize(m4sensorhub,
+				M4SH_REG_LIGHTSENSOR_SIGNAL);
+	if (size != sizeof(als)) {
+		pr_err("can't get M4 reg size for ALS\n");
+	} else if (size != m4sensorhub_reg_read(m4sensorhub,
+						M4SH_REG_LIGHTSENSOR_SIGNAL,
+					(char *)&als)) {
+		pr_err("error reading M4 ALS value\n");
+	} else
+		adjust_als = true;
+
+	if (adjust_als) {
+		ambient_als_backlight = abs_als_to_backlight(als);
+
+		if (ambient_als_backlight > reg)
+			reg = ambient_als_backlight;
+	}
+#endif
+	printk_br(KERN_INFO "%s: v=%d, z=%d, res=0x%x, reg=0x%x\n",
+		  __func__, value, zone, res, reg);
+
     return reg;
 }
 
@@ -529,43 +598,7 @@ struct led_classdev *led_get_default_dev(void)
 }
 EXPORT_SYMBOL(led_get_default_dev);
 
-static int abs_als_to_backlight(unsigned int als_value)
-{
-	int backlight;
-	int als = als_value;
-	/*
-	Clamp ALS to max 2330.
-	for ALS 0 to 86
-	Y=(-44772.9*X^2+6893284.5*X+23168220.5)
 
-	for ALS 87 to 999
-	Y=(-141.2*X^2+358959.2*X+274671182)
-
-	for ALS 1000 to 2330
-	Y=(-74.1*X^2+529533.4*X+37559974.7)
-
-	For all ranges, Y = Y / 10000000;
-	This is the final backlight value
-	*/
-	if (als < 86) {
-		backlight = (int)(((raw_als_z0[0] * als * als) +
-					(raw_als_z0[1] * als)
-					+ raw_als_z0[2])/10000000);
-	} else if (als > 87 && als < 999) {
-		backlight = (int)(((raw_als_z1[0] * als * als) +
-					(raw_als_z1[1] * als) +
-					raw_als_z1[2])/10000000);
-	} else {
-		if (als > 2330)
-			als = 2330;
-
-		backlight = (int)(((raw_als_z2[0] * als * als) +
-					(raw_als_z2[1] * als) +
-					raw_als_z2[2])/10000000);
-	}
-	pr_info("ALS: %d, backlight: %d\n", als, backlight);
-	return backlight;
-}
 
 static void lm3535_brightness_set_raw_als(struct led_classdev *led_cdev,
 				unsigned int value)
