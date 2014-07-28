@@ -1565,9 +1565,14 @@ static int serial_omap_probe(struct platform_device *pdev)
 	up->port.fifosize = 64;
 	up->port.ops = &serial_omap_pops;
 
-	if (pdev->dev.of_node)
+	if (pdev->dev.of_node) {
 		up->port.line = of_alias_get_id(pdev->dev.of_node, "serial");
-	else
+		pdev->dev.power.resume_noidle =
+			of_property_read_bool(pdev->dev.of_node,
+			"resume-noidle");
+		dev_info(&pdev->dev, "resume-noidle = %d\n",
+			pdev->dev.power.resume_noidle);
+	} else
 		up->port.line = pdev->id;
 
 	if (up->port.line < 0) {

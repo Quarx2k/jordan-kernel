@@ -10,3 +10,8 @@ Optional properties:
 - clock-frequency : frequency of the clock input to the UART
 - flags : an integer specifying the UPF flags of the uart port
 - ti,no-pm-qos: empty property that disables PM QoS for the UART
+
+- resume-noidle: device_complete should call pm_runtime_put_noidle
+   rather than pm_runtime_put.  This prevents a bounce on serial
+   devices that require a strict autosuspend delay.
+
