@@ -104,7 +104,7 @@ static int ntarget_loads = ARRAY_SIZE(default_target_loads);
 /*
  * The minimum amount of time to spend at a frequency before we can ramp down.
  */
-#define DEFAULT_MIN_SAMPLE_TIME (60 * USEC_PER_MSEC)
+#define DEFAULT_MIN_SAMPLE_TIME (50 * USEC_PER_MSEC)
 static unsigned int default_min_sample_time[] = {DEFAULT_MIN_SAMPLE_TIME};
 static spinlock_t min_sample_time_lock;
 static unsigned int *min_sample_times = default_min_sample_time;
@@ -304,8 +304,8 @@ static unsigned int freq_to_min_sample_time(unsigned int freq)
 static unsigned int calc_freq(struct cpufreq_interactive_cpuinfo *pcpu, 
 	unsigned int load)
 {
-	unsigned int max = pcpu->policy->cpuinfo.max_freq;
-	unsigned int min = pcpu->policy->cpuinfo.min_freq;
+	unsigned int max = pcpu->policy->max;
+	unsigned int min = pcpu->policy->min;
 
 	return min + load * (max - min) / 100;
 }
@@ -386,7 +386,7 @@ static void cpufreq_interactive_timer(unsigned long data)
 				new_freq = boosted_freq;
 		}
 	}
-	else{
+	else {
 		new_freq = calc_freq(pcpu, cpu_load);
 
 		if (new_freq > boosted_freq &&
