@@ -349,7 +349,7 @@
 			config		= /bits/ 16 <0x6254>;	/* Tex = 0, Ss = Aen = TS = Ten = ETHRM = 1 */
 			full_soc_thresh	= /bits/ 16 <0x5F00>;	/* app note constant */
 			design_cap	= /bits/ 16 <662>;	/* in 5uVh/Rsns = 0.5 mAh */
-			ichgt_term	= /bits/ 16 <0x0080>;	/* battery attribute */
+			ichgt_term	= /bits/ 16 <0x0066>;	/* battery attribute */
 			learn_cfg	= /bits/ 16 <0x2606>;	/* app note constant */
 			filter_cfg	= /bits/ 16 <0x87A4>;	/* app note constant */
 			relax_cfg	= /bits/ 16 <0x203B>;	/* Load = 5 mA, dV = 3.7 mV, dT = 6 mins */
