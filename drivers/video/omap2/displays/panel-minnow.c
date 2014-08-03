@@ -279,6 +279,9 @@ struct minnow_panel_data {
 	int reset_gpio[MINNOW_COMPONENT_MAX];
 	int ext_te_gpio;
 	int vio_en_gpio;
+	struct pinctrl *vio_pctrl;
+	struct pinctrl_state *vio_state_output;
+	struct pinctrl_state *vio_state_pulldown;
 	int mem_en_gpio;
 	struct minnow_panel_hw_reset hw_reset[MINNOW_COMPONENT_MAX];
 	struct regulator *regulators[MINNOW_COMPONENT_MAX];
@@ -2142,8 +2145,26 @@ static int minnow_panel_set_regulators(struct minnow_panel_data *mpd,
 static void minnow_panel_enable_vio(struct minnow_panel_data *mpd, bool enable)
 {
 	if (enable) {
-		if (gpio_is_valid(mpd->vio_en_gpio))
+		if (gpio_is_valid(mpd->vio_en_gpio)) {
+			/* This is workaround to fix unexpected M4 reset issue
+			 * select pulldown mode to enable switch will tuen on
+			 * 1.8v power supply slowly, that will help reduce the
+			 * dip of 1.8v supply
+			 */
+			int r = pinctrl_select_state(mpd->vio_pctrl,
+						     mpd->vio_state_pulldown);
+			if (r)
+				dev_err(&mpd->dssdev->dev, "failed to activate"
+					" vio_state_pulldown!");
+			usleep_range(250, 300);
+			/* go back to output low mode to keep switch enabled */
 			gpio_set_value(mpd->vio_en_gpio, 0);
+			r = pinctrl_select_state(mpd->vio_pctrl,
+						 mpd->vio_state_output);
+			if (r)
+				dev_err(&mpd->dssdev->dev, "failed to activate"
+					" vio_state_output!");
+		}
 		if (gpio_is_valid(mpd->mem_en_gpio))
 			gpio_set_value(mpd->mem_en_gpio, 1);
 	} else {
@@ -2252,6 +2273,25 @@ static int minnow_panel_dt_init(struct minnow_panel_data *mpd)
 	DTINFO("gpio_te = %d\n", mpd->ext_te_gpio);
 	mpd->vio_en_gpio = of_get_named_gpio(dt_node, "gpio_vio_en", 0);
 	DTINFO("gpio_vio_en = %d\n", mpd->vio_en_gpio);
+	if (gpio_is_valid(mpd->vio_en_gpio)) {
+		mpd->vio_pctrl = devm_pinctrl_get(&mpd->dssdev->dev);
+		if (IS_ERR(mpd->vio_pctrl)) {
+			dev_err(&mpd->dssdev->dev, "no vio pinctrl handle\n");
+			return PTR_ERR(mpd->vio_pctrl);
+		}
+		mpd->vio_state_pulldown =
+			pinctrl_lookup_state(mpd->vio_pctrl, "viopulldown");
+		if (IS_ERR(mpd->vio_state_pulldown)) {
+			dev_err(&mpd->dssdev->dev, "no vio pulldown state\n");
+			return PTR_ERR(mpd->vio_state_pulldown);
+		}
+		mpd->vio_state_output =
+			pinctrl_lookup_state(mpd->vio_pctrl, "viooutput");
+		if (IS_ERR(mpd->vio_state_output)) {
+			dev_err(&mpd->dssdev->dev, "no vio output state\n");
+			return PTR_ERR(mpd->vio_state_output);
+		}
+	}
 	mpd->mem_en_gpio = of_get_named_gpio(dt_node, "gpio_mem_en", 0);
 	DTINFO("gpio_mem_en = %d\n", mpd->mem_en_gpio);
 	mpd->vsync_events_gpio = of_get_named_gpio(dt_node,
@@ -2474,6 +2514,13 @@ static int minnow_panel_probe(struct omap_dss_device *dssdev)
 		if (r) {
 			dev_err(&dssdev->dev,
 				"failed to request panel vio_en gpio\n");
+			return r;
+		}
+		r = pinctrl_select_state(mpd->vio_pctrl,
+					 mpd->vio_state_output);
+		if (r) {
+			dev_err(&mpd->dssdev->dev,
+				"failed to activate vio output state!");
 			return r;
 		}
 	}
@@ -2902,10 +2949,28 @@ static int minnow_panel_enable_locked(struct minnow_panel_data *mpd)
 	r = minnow_panel_set_regulators(mpd, regulator_enable);
 	if (r)
 		goto err;
-	minnow_panel_enable_vio(mpd, true);
+	/* By default, there's a leakage current coming from peripheral
+	 * 26 MHz clock, so turn on 1.8v VIO first, then turn on clk_in
+	 * will help avoid the step issue of enable 1.8v VIO.
+	 * But unfortunately, there is a big problem of the hardware now,
+	 * when turn off VIO for long time(above 12 minutes), it occurred
+	 * the capacitance fully discharged, when enable VIO later, it will
+	 * pull down 1.8V power supply momently as the capacitance charging,
+	 * that occurred M4 reset since power supply dip.
+	 * So turn on peripheral 26 MHz clock first and waiting for 6ms,
+	 * let leakage current fully charge the capacitance, then turn on
+	 * VIO, that will help avoid unexpected M4 reset (it still has dip
+	 * on 1.8V power supply but smaller than worse case)
+	 * For the step issue of 1.8v VIO, it's not a big deal as the reset
+	 * pin has been hold and will release after it reaches 1.8v for 20ms,
+	 * this matches the requirement of Solomon power on sequence.
+	 * This is just software work around to fix the hardware issue
+	 */
 	r = minnow_panel_enable_clkin(mpd, true);
 	if (r)
 		goto err;
+	usleep_range(6000, 6300);
+	minnow_panel_enable_vio(mpd, true);
 
 	r = minnow_panel_power_on(mpd);
 	if (r)

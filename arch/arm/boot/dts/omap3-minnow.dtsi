@@ -93,6 +93,9 @@
 		//pixel_format = <1>;
 		//hs_clk = <90000000 150000000>;        /* min max*/
 		//lp_clk = <7000000 9000000>;   /* min max*/
+		pinctrl-names = "viopulldown", "viooutput";
+		pinctrl-0 = <&display_vddio_pulldown>;
+		pinctrl-1 = <&display_vddio_output>;
 	};
 
 	c55-ctrl@0 {
@@ -585,7 +588,6 @@ tps65912_0: tps65912 {
 			0x04e 0x00f	/* GPMC_A3, GPIO 36, MODE7 | PD */
 			0x056 0x00f	/* GPMC_A7, GPIO 40, MODE7 | PD */
 			0x058 0x00f	/* GPMC_A8, GPIO 41, MODE7 | PD */
-			0x05a 0x004	/* GPMC_A9, MODE4 | OUTPUT */
 			0x06e 0x00f	/* GPMC_D8, GPIO 44, MODE7 | PD */
 			0x070 0x00f	/* GPMC_D9, GPIO 45, MODE7 | PD */
 			0x072 0x00f	/* GPMC_D10, GPIO 46, MODE7 | PD */
@@ -777,6 +779,18 @@ tps65912_0: tps65912 {
 	atmxt_int_pulldown: pinmux_atmxt_int_pulldown {
 		pinctrl-single,pins = <
 			0x0e6 0x10c	/* CAM_D0, MODE4 | INPUT_PULLDOWN */
+		>;
+	};
+
+	display_vddio_pulldown: pinmux_vddio_pulldown {
+		pinctrl-single,pins = <
+			0x05a 0x00f	/* GPMC_A9, GPIO 42, MODE7 | PULLDOWN */
+		>;
+	};
+
+	display_vddio_output: pinmux_vddio_output {
+		pinctrl-single,pins = <
+			0x05a 0x004	/* GPMC_A9, GPIO 42, MODE4 | OUTPUT */
 		>;
 	};
 };
