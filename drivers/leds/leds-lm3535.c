@@ -183,6 +183,7 @@ static int lm3535_probe(struct i2c_client *client,
 static int lm3535_setup (struct i2c_client *client);
 static int lm3535_remove (struct i2c_client *client);
 static void lm3535_work_func (struct work_struct *work);
+static void lm3535_allow_als_work_func(struct work_struct *work);
 static irqreturn_t lm3535_irq_handler (int irq, void *dev_id);
 static void lm3535_brightness_set(struct led_classdev *led_cdev,
                 enum led_brightness value);
@@ -249,22 +250,6 @@ static const struct i2c_device_id lm3535_id[] = {
     { }
 };
 
-/* This is the I2C driver that will be inserted */
-static struct i2c_driver lm3535_driver =
-{
-    .driver = {
-        .name   = "lm3535",
-		.of_match_table = of_match_ptr(of_lm3535_match),
-    },
-    .id_table = lm3535_id,
-    .probe = lm3535_probe,
-    .remove  = lm3535_remove,
-#if !defined(CONFIG_HAS_EARLYSUSPEND) && !defined(CONFIG_HAS_AMBIENTMODE)
-    .suspend    = lm3535_suspend,
-    .resume     = lm3535_resume,
-#endif
-};
-
 #define LM3535_NUM_ZONES 6
 struct lm3535 {
     uint16_t addr;
@@ -284,6 +269,8 @@ struct lm3535 {
     unsigned saved_bvalue; // Brightness before TCMD SUSPEND
     //struct hrtimer timer;
     struct work_struct  work;
+	struct delayed_work als_delayed_work;
+	int prevent_als_read;	/* Whether to prevent als reads for a time */
 #ifdef CONFIG_WAKEUP_SOURCE_NOTIFY
 	atomic_t docked;
 	struct notifier_block dock_nb;
@@ -294,6 +281,39 @@ static DEFINE_MUTEX(lm3535_mutex);
 static struct lm3535 lm3535_data = {
     .nramp = 4,
     .bvalue = 0x79,
+};
+
+#if defined CONFIG_PM_SLEEP
+
+static int lm3535_pm_suspend(struct device *dev)
+{
+	cancel_delayed_work_sync(&lm3535_data.als_delayed_work);
+	lm3535_data.prevent_als_read = 0;
+
+	return 0;
+}
+
+static SIMPLE_DEV_PM_OPS(lm3535_pm_ops, lm3535_pm_suspend, NULL);
+#define LM3535_PM_OPS (&lm3535_pm_ops)
+
+#else
+#define LM3535_PM_OPS NULL
+#endif
+
+/* This is the I2C driver that will be inserted */
+static struct i2c_driver lm3535_driver = {
+	.driver = {
+		.name   = "lm3535",
+		.of_match_table = of_match_ptr(of_lm3535_match),
+		.pm = LM3535_PM_OPS,
+	},
+	.id_table = lm3535_id,
+	.probe = lm3535_probe,
+	.remove  = lm3535_remove,
+#if !defined(CONFIG_HAS_EARLYSUSPEND) && !defined(CONFIG_HAS_AMBIENTMODE)
+	.suspend    = lm3535_suspend,
+	.resume     = lm3535_resume,
+#endif
 };
 
 #if 0
@@ -486,7 +506,8 @@ static uint8_t lm3535_convert_value (unsigned value, unsigned zone)
     uint32_t res;
 #ifdef CONFIG_WAKEUP_SOURCE_NOTIFY
 	struct m4sensorhub_data *m4sensorhub;
-	int size, ambient_als_backlight;
+	int size;
+	static int ambient_als_backlight;
 	uint16_t als;
 	bool adjust_als = false;
 #endif
@@ -553,19 +574,31 @@ static uint8_t lm3535_convert_value (unsigned value, unsigned zone)
         reg = res / als_denom;
 
 #ifdef CONFIG_WAKEUP_SOURCE_NOTIFY
-	/* make sure this is atleast as high as corresponding ambient mode
-	value for current ALS condition */
-	m4sensorhub = m4sensorhub_client_get_drvdata();
-	size = m4sensorhub_reg_getsize(m4sensorhub,
-				M4SH_REG_LIGHTSENSOR_SIGNAL);
-	if (size != sizeof(als)) {
-		pr_err("can't get M4 reg size for ALS\n");
-	} else if (size != m4sensorhub_reg_read(m4sensorhub,
+	if (!lm3535_data.prevent_als_read) {
+		/* make sure this is atleast as high as corresponding ambient
+		 * mode value for current ALS condition */
+		m4sensorhub = m4sensorhub_client_get_drvdata();
+		size = m4sensorhub_reg_getsize(m4sensorhub,
+					M4SH_REG_LIGHTSENSOR_SIGNAL);
+		if (size != sizeof(als)) {
+			pr_err("can't get M4 reg size for ALS\n");
+			ambient_als_backlight = 0;
+		} else if (size != m4sensorhub_reg_read(m4sensorhub,
 						M4SH_REG_LIGHTSENSOR_SIGNAL,
-					(char *)&als)) {
-		pr_err("error reading M4 ALS value\n");
-	} else
-		adjust_als = true;
+						(char *)&als)) {
+			pr_err("error reading M4 ALS value\n");
+			ambient_als_backlight = 0;
+		} else {
+			adjust_als = true;
+			/* prevent als reads for next 500 ms */
+			lm3535_data.prevent_als_read = 1;
+			schedule_delayed_work(&lm3535_data.als_delayed_work,
+					      msecs_to_jiffies(500));
+		}
+	} else if (ambient_als_backlight > reg) {
+		/* If valid, use previously read als value */
+		reg = ambient_als_backlight;
+	}
 
 	if (adjust_als) {
 		ambient_als_backlight = abs_als_to_backlight(als);
@@ -1006,6 +1039,9 @@ static int lm3535_probe (struct i2c_client *client,
 	wakeup_source_register_notify(&lm3535_data.dock_nb);
 #endif /* CONFIG_WAKEUP_SOURCE_NOTIFY */
 
+	INIT_DELAYED_WORK(&lm3535_data.als_delayed_work,
+			  lm3535_allow_als_work_func);
+
     return 0;
 }
 
@@ -1120,6 +1156,11 @@ static void lm3535_work_func (struct work_struct *work)
             __FUNCTION__, ALS_AVERAGING);
     }
     enable_irq (lm3535_data.client->irq);
+}
+
+static void lm3535_allow_als_work_func(struct work_struct *work)
+{
+	lm3535_data.prevent_als_read = 0;
 }
 
 #if 0
@@ -1463,6 +1504,9 @@ static int lm3535_setup (struct i2c_client *client)
 static int lm3535_remove (struct i2c_client *client)
 {
     struct lm3535 *data_ptr = i2c_get_clientdata(client);
+
+	cancel_delayed_work_sync(&lm3535_data.als_delayed_work);
+	lm3535_data.prevent_als_read = 0;
     if (data_ptr->use_irq)
         free_irq (client->irq, data_ptr);
     led_classdev_unregister (&lm3535_led);
