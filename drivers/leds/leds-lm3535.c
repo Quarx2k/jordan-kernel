@@ -102,6 +102,8 @@
 /* ALS Averaging time */
 #define ALS_AVERAGING 0x50  // 1600ms, needs 2 ave. periods
 
+#define MAX_AMBIENT_BACKLIGHT 36
+
 /* Zone boundaries */
 static unsigned als_zb[] = {0x04, 0x42, 0x96, 0xFF};
 module_param_array(als_zb, uint, NULL, 0644);
@@ -470,6 +472,10 @@ static int abs_als_to_backlight(unsigned int als_value)
 					(raw_als_z2[1] * als) +
 					raw_als_z2[2])/10000000);
 	}
+
+	/* Cap ambient mode backlight to 36*/
+	if (backlight > MAX_AMBIENT_BACKLIGHT)
+		backlight = MAX_AMBIENT_BACKLIGHT;
 	pr_info("ALS: %d, backlight: %d\n", als, backlight);
 	return backlight;
 }
