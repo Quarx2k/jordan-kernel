@@ -223,7 +223,6 @@
 		switch-name = "dock";
 		uevent-wakelock-timeout,ms = <2000>;
 		supplied_to = "max170xx_battery";
-		use-motion;
 	};
 
 	bq5105x-ctrl {
