@@ -47,9 +47,9 @@ struct m4ped_driver_data {
 
 	struct m4sensorhub_pedometer_iio_data   iiodat;
 	struct m4sensorhub_pedometer_iio_data   base_dat;
+	struct delayed_work	m4ped_work;
 	int16_t         samplerate;
-	int16_t         latest_samplerate;
-
+	int16_t         fastest_rate;
 	uint16_t        status;
 };
 
@@ -162,15 +162,21 @@ m4ped_read_fail:
 	return err;
 }
 
-static void m4ped_isr(enum m4sensorhub_irqs int_event, void *handle)
+static void m4ped_work_func(struct work_struct *work)
 {
 	int err = 0;
-	struct iio_dev *iio = handle;
-	struct m4ped_driver_data *dd = iio_priv(iio);
+	struct m4ped_driver_data *dd = container_of(work,
+						    struct m4ped_driver_data,
+						    m4ped_work.work);
+	struct iio_dev *iio = platform_get_drvdata(dd->pdev);
+
 	mutex_lock(&(dd->mutex));
 	err = m4ped_read_report_data(iio, dd);
 	if (err < 0)
 		m4ped_err("%s: Failed with error code %d.\n", __func__, err);
+	if (dd->samplerate > 0)
+		schedule_delayed_work(&(dd->m4ped_work),
+				      msecs_to_jiffies(dd->samplerate));
 	mutex_unlock(&(dd->mutex));
 	return;
 }
@@ -180,60 +186,17 @@ static int m4ped_set_samplerate(struct iio_dev *iio, int16_t rate)
 	int err = 0;
 	struct m4ped_driver_data *dd = iio_priv(iio);
 
-	/*
-	 * Currently, there is no concept of setting a sample rate for this
-	 * sensor, so this function only enables/disables interrupt reporting.
-	 */
-	dd->latest_samplerate = rate;
+	if ((rate >= 0) && (rate <= dd->fastest_rate))
+		rate = dd->fastest_rate;
+
 	if (rate == dd->samplerate)
 		goto m4ped_set_samplerate_fail;
 
-	if (rate >= 0) {
-		/* Enable the IRQ if necessary */
-		if (!(dd->status & (1 << M4PED_IRQ_ENABLED_BIT))) {
-			err = m4sensorhub_irq_enable(dd->m4,
-				M4SH_IRQ_PEDOMETER_DATA_READY);
-			if (err < 0) {
-				m4ped_err("%s: Failed to enable ped irq.\n",
-					  __func__);
-				goto m4ped_set_samplerate_fail;
-			}
-
-			err = m4sensorhub_irq_enable(dd->m4,
-				M4SH_IRQ_ACTIVITY_CHANGE);
-			if (err < 0) {
-				m4ped_err("%s: Failed to enable act irq.\n",
-					  __func__);
-				goto m4ped_set_samplerate_fail;
-			}
-
-			dd->status = dd->status | (1 << M4PED_IRQ_ENABLED_BIT);
-			dd->samplerate = rate;
-		}
-	} else {
-		/* Disable the IRQ if necessary */
-		if (dd->status & (1 << M4PED_IRQ_ENABLED_BIT)) {
-			err = m4sensorhub_irq_disable(dd->m4,
-				M4SH_IRQ_PEDOMETER_DATA_READY);
-			if (err < 0) {
-				m4ped_err("%s: Failed to disable ped irq.\n",
-					  __func__);
-				goto m4ped_set_samplerate_fail;
-			}
-
-			err = m4sensorhub_irq_disable(dd->m4,
-				M4SH_IRQ_ACTIVITY_CHANGE);
-			if (err < 0) {
-				m4ped_err("%s: Failed to disable act irq.\n",
-					  __func__);
-				goto m4ped_set_samplerate_fail;
-			}
-
-			dd->status = dd->status & ~(1 << M4PED_IRQ_ENABLED_BIT);
-			dd->samplerate = rate;
-		}
-	}
-
+	cancel_delayed_work(&(dd->m4ped_work));
+	dd->samplerate = rate;
+	if (dd->samplerate > 0)
+		schedule_delayed_work(&(dd->m4ped_work),
+				      msecs_to_jiffies(rate));
 m4ped_set_samplerate_fail:
 	return err;
 }
@@ -668,6 +631,10 @@ static void m4ped_panic_restore(struct m4sensorhub_data *m4sensorhub,
 			goto m4ped_panic_restore_fail;
 		}
 	}
+	cancel_delayed_work(&(dd->m4ped_work));
+	if (dd->samplerate > 0)
+		schedule_delayed_work(&(dd->m4ped_work),
+				      msecs_to_jiffies(dd->samplerate));
 
 m4ped_panic_restore_fail:
 	mutex_unlock(&(dd->mutex));
@@ -688,19 +655,7 @@ static int m4ped_driver_init(struct init_calldata *p_arg)
 		goto m4ped_driver_init_fail;
 	}
 
-	err = m4sensorhub_irq_register(dd->m4,
-		M4SH_IRQ_PEDOMETER_DATA_READY, m4ped_isr, iio, 0);
-	if (err < 0) {
-		m4ped_err("%s: Failed to register M4 PED IRQ.\n", __func__);
-		goto m4ped_driver_init_fail;
-	}
-
-	err = m4sensorhub_irq_register(dd->m4,
-		M4SH_IRQ_ACTIVITY_CHANGE, m4ped_isr, iio, 0);
-	if (err < 0) {
-		m4ped_err("%s: Failed to register M4 ACT IRQ.\n", __func__);
-		goto m4ped_driver_init_irq_act_fail;
-	}
+	INIT_DELAYED_WORK(&(dd->m4ped_work), m4ped_work_func);
 
 	err = m4sensorhub_panic_register(dd->m4, PANICHDL_PEDOMETER_RESTORE,
 					 m4ped_panic_restore, dd);
@@ -709,8 +664,6 @@ static int m4ped_driver_init(struct init_calldata *p_arg)
 
 	goto m4ped_driver_init_exit;
 
-m4ped_driver_init_irq_act_fail:
-	m4sensorhub_irq_unregister(dd->m4, M4SH_IRQ_PEDOMETER_DATA_READY);
 m4ped_driver_init_fail:
 	m4ped_err("%s: Init failed with error code %d.\n", __func__, err);
 m4ped_driver_init_exit:
@@ -736,7 +689,7 @@ static int m4ped_probe(struct platform_device *pdev)
 	mutex_init(&(dd->mutex));
 	platform_set_drvdata(pdev, iio);
 	dd->samplerate = -1; /* We always start disabled */
-	dd->latest_samplerate = dd->samplerate;
+	dd->fastest_rate = 1000; /* in milli secs */
 	dd->status = dd->status | (1 << M4PED_FEATURE_ENABLED_BIT);
 
 	err = m4ped_create_iiodev(iio); /* iio and dd are freed on fail */
@@ -773,32 +726,10 @@ static int __exit m4ped_remove(struct platform_device *pdev)
 		goto m4ped_remove_exit;
 
 	mutex_lock(&(dd->mutex));
-	if (dd->status & (1 << M4PED_IRQ_ENABLED_BIT)) {
-		m4sensorhub_irq_disable(dd->m4,
-					M4SH_IRQ_PEDOMETER_DATA_READY);
-		m4sensorhub_irq_disable(dd->m4,
-					M4SH_IRQ_ACTIVITY_CHANGE);
-		dd->status = dd->status & ~(1 << M4PED_IRQ_ENABLED_BIT);
-	}
-	m4sensorhub_irq_unregister(dd->m4,
-				   M4SH_IRQ_PEDOMETER_DATA_READY);
-	m4sensorhub_irq_unregister(dd->m4,
-				   M4SH_IRQ_ACTIVITY_CHANGE);
 	m4sensorhub_unregister_initcall(m4ped_driver_init);
 	m4ped_remove_iiodev(iio);  /* dd is freed here */
 
 m4ped_remove_exit:
-	return 0;
-}
-
-static int m4ped_suspend(struct platform_device *pdev, pm_message_t state)
-{
-	struct iio_dev *iio = platform_get_drvdata(pdev);
-	struct m4ped_driver_data *dd = iio_priv(iio);
-	mutex_lock(&(dd->mutex));
-	if (m4ped_set_samplerate(iio, dd->latest_samplerate) < 0)
-		m4ped_err("%s: setrate retry failed\n", __func__);
-	mutex_unlock(&(dd->mutex));
 	return 0;
 }
 
@@ -811,7 +742,7 @@ static struct platform_driver m4ped_driver = {
 	.probe		= m4ped_probe,
 	.remove		= __exit_p(m4ped_remove),
 	.shutdown	= NULL,
-	.suspend	= m4ped_suspend,
+	.suspend	= NULL,
 	.resume		= NULL,
 	.driver		= {
 		.name	= M4PED_DRIVER_NAME,

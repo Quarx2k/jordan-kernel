@@ -46,19 +46,22 @@ struct m4hrt_driver_data {
 	struct mutex                mutex; /* controls driver entry points */
 
 	struct m4sensorhub_heartrate_iio_data   iiodat;
+	struct delayed_work    m4hrt_work;
 	int32_t         samplerate;
 	int32_t         latest_samplerate;
+	int32_t         fastest_rate;
 	uint16_t        status;
 
 	uint8_t         dbg_addr;
 };
 
-
-static void m4hrt_isr(enum m4sensorhub_irqs int_event, void *handle)
+static void m4hrt_work_func(struct work_struct *work)
 {
 	int err = 0;
-	struct iio_dev *iio = handle;
-	struct m4hrt_driver_data *dd = iio_priv(iio);
+	struct m4hrt_driver_data *dd = container_of(work,
+						    struct m4hrt_driver_data,
+						    m4hrt_work.work);
+	struct iio_dev *iio = platform_get_drvdata(dd->pdev);
 	int size = 0;
 
 	mutex_lock(&(dd->mutex));
@@ -91,6 +94,9 @@ static void m4hrt_isr(enum m4sensorhub_irqs int_event, void *handle)
 
 	dd->iiodat.timestamp = iio_get_time_ns();
 	iio_push_to_buffers(iio, (unsigned char *)&(dd->iiodat));
+	if (dd->samplerate > 0)
+		schedule_delayed_work(&(dd->m4hrt_work),
+				      msecs_to_jiffies(dd->samplerate));
 
 m4hrt_isr_fail:
 	if (err < 0)
@@ -107,10 +113,13 @@ static int m4hrt_set_samplerate(struct iio_dev *iio, int32_t rate)
 	struct m4hrt_driver_data *dd = iio_priv(iio);
 	int size = 0;
 
+	if ((rate >= 0) && (rate <= dd->fastest_rate))
+		rate = dd->fastest_rate;
+
 	dd->latest_samplerate = rate;
 
 	if (rate == dd->samplerate)
-		goto m4hrt_set_samplerate_irq_check;
+		goto m4hrt_set_samplerate_fail;
 
 	size = m4sensorhub_reg_getsize(dd->m4,
 		M4SH_REG_HEARTRATE_APSAMPLERATE);
@@ -125,35 +134,11 @@ static int m4hrt_set_samplerate(struct iio_dev *iio, int32_t rate)
 		err = -EBADE;
 		goto m4hrt_set_samplerate_fail;
 	}
+	cancel_delayed_work(&(dd->m4hrt_work));
 	dd->samplerate = rate;
-
-m4hrt_set_samplerate_irq_check:
-	if (rate >= 0) {
-		/* Enable the IRQ if necessary */
-		if (!(dd->status & (1 << M4HRT_IRQ_ENABLED_BIT))) {
-			err = m4sensorhub_irq_enable(dd->m4,
-				M4SH_IRQ_HEARTRATE_DATA_READY);
-			if (err < 0) {
-				m4hrt_err("%s: Failed to enable irq.\n",
-					  __func__);
-				goto m4hrt_set_samplerate_fail;
-			}
-			dd->status = dd->status | (1 << M4HRT_IRQ_ENABLED_BIT);
-		}
-	} else {
-		/* Disable the IRQ if necessary */
-		if (dd->status & (1 << M4HRT_IRQ_ENABLED_BIT)) {
-			err = m4sensorhub_irq_disable(dd->m4,
-				M4SH_IRQ_HEARTRATE_DATA_READY);
-			if (err < 0) {
-				m4hrt_err("%s: Failed to disable irq.\n",
-					  __func__);
-				goto m4hrt_set_samplerate_fail;
-			}
-			dd->status = dd->status & ~(1 << M4HRT_IRQ_ENABLED_BIT);
-		}
-	}
-
+	if (dd->samplerate > 0)
+		schedule_delayed_work(&(dd->m4hrt_work),
+				      msecs_to_jiffies(dd->samplerate));
 m4hrt_set_samplerate_fail:
 	return err;
 }
@@ -504,7 +489,10 @@ static void m4hrt_panic_restore(struct m4sensorhub_data *m4sensorhub,
 		m4hrt_err("%s:  Wrote %d bytes instead of %d.\n",
 			  __func__, err, size);
 	}
-
+	cancel_delayed_work(&(dd->m4hrt_work));
+	if (dd->samplerate > 0)
+		schedule_delayed_work(&(dd->m4hrt_work),
+				      msecs_to_jiffies(dd->samplerate));
 	mutex_unlock(&(dd->mutex));
 }
 
@@ -523,12 +511,7 @@ static int m4hrt_driver_init(struct init_calldata *p_arg)
 		goto m4hrt_driver_init_fail;
 	}
 
-	err = m4sensorhub_irq_register(dd->m4,
-		M4SH_IRQ_HEARTRATE_DATA_READY, m4hrt_isr, iio, 0);
-	if (err < 0) {
-		m4hrt_err("%s: Failed to register M4 IRQ.\n", __func__);
-		goto m4hrt_driver_init_fail;
-	}
+	INIT_DELAYED_WORK(&(dd->m4hrt_work), m4hrt_work_func);
 
 	err = m4sensorhub_panic_register(dd->m4, PANICHDL_HEARTRATE_RESTORE,
 					m4hrt_panic_restore, dd);
@@ -563,6 +546,7 @@ static int m4hrt_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, iio);
 	dd->samplerate = -1; /* We always start disabled */
 	dd->latest_samplerate = dd->samplerate;
+	dd->fastest_rate = 80; /* in milli secs */
 
 	err = m4hrt_create_iiodev(iio); /* iio and dd are freed on fail */
 	if (err < 0) {
@@ -598,13 +582,7 @@ static int __exit m4hrt_remove(struct platform_device *pdev)
 		goto m4hrt_remove_exit;
 
 	mutex_lock(&(dd->mutex));
-	if (dd->status & (1 << M4HRT_IRQ_ENABLED_BIT)) {
-		m4sensorhub_irq_disable(dd->m4,
-					M4SH_IRQ_HEARTRATE_DATA_READY);
-		dd->status = dd->status & ~(1 << M4HRT_IRQ_ENABLED_BIT);
-	}
-	m4sensorhub_irq_unregister(dd->m4,
-				   M4SH_IRQ_HEARTRATE_DATA_READY);
+	cancel_delayed_work(&(dd->m4hrt_work));
 	m4sensorhub_unregister_initcall(m4hrt_driver_init);
 	m4hrt_remove_iiodev(iio);  /* dd is freed here */
 
@@ -616,10 +594,8 @@ static int m4hrt_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	struct iio_dev *iio = platform_get_drvdata(pdev);
 	struct m4hrt_driver_data *dd = iio_priv(iio);
-	mutex_lock(&(dd->mutex));
 	if (m4hrt_set_samplerate(iio, dd->latest_samplerate) < 0)
 		m4hrt_err("%s: setrate retry failed\n", __func__);
-	mutex_unlock(&(dd->mutex));
 	return 0;
 }
 

@@ -77,12 +77,11 @@ struct mpu9150_client {
 	struct mpu9150_gyro_data gyro_data;
 	struct mpu9150_compass_data compass_data;
 	struct mutex mutex; /* prevent concurrent thread access */
+	struct delayed_work mpu9150_work[NUM_TYPES];
+	signed short fastest_rate[NUM_TYPES];
 };
 
 struct mpu9150_client *misc_mpu9150_data;
-static int mpu9150_irq_enable_disable(struct mpu9150_client *mpu9150_client_data,
-					enum mpu9150_sensor type, int flag);
-
 static int mpu9150_client_open(struct inode *inode, struct file *file)
 {
 	int err = 0;
@@ -144,22 +143,30 @@ static void m4_report_mpu9150_inputevent(
 static void m4_set_mpu9150_delay(struct mpu9150_client *mpu9150_client_data,
 			int delay, enum mpu9150_sensor type)
 {
-	mpu9150_client_data->latest_samplerate[type] = delay;
+	struct mpu9150_client *dd = mpu9150_client_data;
 
-	if (delay != mpu9150_client_data->samplerate[type]) {
+	if ((delay >= 0) && (delay <= dd->fastest_rate[type]))
+		delay = dd->fastest_rate[type];
+
+	dd->latest_samplerate[type] = delay;
+	if (delay != dd->samplerate[type]) {
 		switch (type) {
 		case TYPE_GYRO:
-			m4sensorhub_reg_write(mpu9150_client_data->m4sensorhub,
-				M4SH_REG_GYRO_SAMPLERATE, (char *)&delay, m4sh_no_mask);
+			m4sensorhub_reg_write(dd->m4sensorhub,
+					      M4SH_REG_GYRO_SAMPLERATE,
+					      (char *)&delay, m4sh_no_mask);
 			break;
 		case TYPE_ACCEL:
-			m4sensorhub_reg_write(mpu9150_client_data->m4sensorhub,
-				M4SH_REG_ACCEL_SAMPLERATE, (char *)&delay, m4sh_no_mask);
+			m4sensorhub_reg_write(dd->m4sensorhub,
+					      M4SH_REG_ACCEL_SAMPLERATE,
+					      (char *)&delay, m4sh_no_mask);
 			break;
 		case TYPE_COMPASS:
-			m4sensorhub_reg_write(mpu9150_client_data->m4sensorhub,
-				M4SH_REG_COMPASS_SAMPLERATE, (char *)&delay, m4sh_no_mask);
+			m4sensorhub_reg_write(dd->m4sensorhub,
+					      M4SH_REG_COMPASS_SAMPLERATE,
+					      (char *)&delay, m4sh_no_mask);
 			break;
+
 		default:
 			return;
 			break;
@@ -168,8 +175,12 @@ static void m4_set_mpu9150_delay(struct mpu9150_client *mpu9150_client_data,
 				   " %d to %d\n", __func__, type,
 				   mpu9150_client_data->samplerate[type],
 				   delay);
+		cancel_delayed_work(&(dd->mpu9150_work[type]));
+		dd->samplerate[type] = delay;
+		if (dd->samplerate[type] > 0)
+			schedule_delayed_work(&(dd->mpu9150_work[type]),
+					      msecs_to_jiffies(delay));
 
-		mpu9150_client_data->samplerate[type] = delay;
 	}
 }
 
@@ -224,47 +235,63 @@ static void m4_read_mpu9150_data(struct mpu9150_client *mpu9150_client_data,
 	default:
 		break;
 	}
-
 }
 
-static void m4_handle_mpu9150_gyro_irq(enum m4sensorhub_irqs int_event,
-					 void *mpu9150_data)
+static void m4gyro_work_func(struct work_struct *work)
 {
-	struct mpu9150_client *mpu9150_client_data = mpu9150_data;
+	struct mpu9150_client *dd =
+			container_of(work,
+				     struct mpu9150_client,
+				     mpu9150_work[TYPE_GYRO].work);
+	signed short rate;
 
-	mutex_lock(&(mpu9150_client_data->mutex));
-
-	m4_read_mpu9150_data(mpu9150_client_data, TYPE_GYRO);
-	m4_report_mpu9150_inputevent(mpu9150_client_data, TYPE_GYRO);
-
-	mutex_unlock(&(mpu9150_client_data->mutex));
+	mutex_lock(&(dd->mutex));
+	m4_read_mpu9150_data(dd, TYPE_GYRO);
+	m4_report_mpu9150_inputevent(dd, TYPE_GYRO);
+	rate = dd->samplerate[TYPE_GYRO];
+	if (rate > 0)
+		schedule_delayed_work(&(dd->mpu9150_work[TYPE_GYRO]),
+				      msecs_to_jiffies(rate));
+	mutex_unlock(&(dd->mutex));
 }
 
-static void m4_handle_mpu9150_accel_irq(enum m4sensorhub_irqs int_event,
-					 void *mpu9150_data)
+
+static void m4accel_work_func(struct work_struct *work)
 {
-	struct mpu9150_client *mpu9150_client_data = mpu9150_data;
+	struct mpu9150_client *dd =
+			container_of(work,
+				     struct mpu9150_client,
+				     mpu9150_work[TYPE_ACCEL].work);
+	signed short rate;
 
-	mutex_lock(&(mpu9150_client_data->mutex));
-
-	m4_read_mpu9150_data(mpu9150_client_data, TYPE_ACCEL);
-	m4_report_mpu9150_inputevent(mpu9150_client_data, TYPE_ACCEL);
-
-	mutex_unlock(&(mpu9150_client_data->mutex));
+	mutex_lock(&(dd->mutex));
+	m4_read_mpu9150_data(dd, TYPE_ACCEL);
+	m4_report_mpu9150_inputevent(dd, TYPE_ACCEL);
+	rate = dd->samplerate[TYPE_ACCEL];
+	if (rate > 0)
+		schedule_delayed_work(&(dd->mpu9150_work[TYPE_ACCEL]),
+				      msecs_to_jiffies(rate));
+	mutex_unlock(&(dd->mutex));
 }
 
-static void m4_handle_mpu9150_compass_irq(enum m4sensorhub_irqs int_event,
-					void *mpu9150_data)
+static void m4compass_work_func(struct work_struct *work)
 {
-	struct mpu9150_client *mpu9150_client_data = mpu9150_data;
+	struct mpu9150_client *dd =
+			container_of(work,
+				     struct mpu9150_client,
+				     mpu9150_work[TYPE_COMPASS].work);
+	signed short rate;
 
-	mutex_lock(&(mpu9150_client_data->mutex));
-
-	m4_read_mpu9150_data(mpu9150_client_data, TYPE_COMPASS);
-	m4_report_mpu9150_inputevent(mpu9150_client_data, TYPE_COMPASS);
-
-	mutex_unlock(&(mpu9150_client_data->mutex));
+	mutex_lock(&(dd->mutex));
+	m4_read_mpu9150_data(dd, TYPE_COMPASS);
+	m4_report_mpu9150_inputevent(dd, TYPE_COMPASS);
+	rate = dd->samplerate[TYPE_COMPASS];
+	if (rate > 0)
+		schedule_delayed_work(&(dd->mpu9150_work[TYPE_COMPASS]),
+				      msecs_to_jiffies(rate));
+	mutex_unlock(&(dd->mutex));
 }
+
 
 static ssize_t m4_mpu9150_write_accel_setdelay(struct device *dev,
 			struct device_attribute *attr,
@@ -287,21 +314,7 @@ static ssize_t m4_mpu9150_write_accel_setdelay(struct device *dev,
 	}
 
 	mutex_lock(&(misc_mpu9150_data->mutex));
-
 	m4_set_mpu9150_delay(misc_mpu9150_data, scanresult, TYPE_ACCEL);
-
-	if (scanresult == -1) {
-		mpu9150_irq_enable_disable(
-					misc_mpu9150_data, TYPE_ACCEL,
-					SENSOR_IRQ_DISABLE
-					);
-	} else {
-		mpu9150_irq_enable_disable(
-					misc_mpu9150_data, TYPE_ACCEL,
-					SENSOR_IRQ_ENABLE
-					);
-	}
-
 	mutex_unlock(&(misc_mpu9150_data->mutex));
 
 	return count;
@@ -332,17 +345,6 @@ static ssize_t m4_mpu9150_write_gyro_setdelay(struct device *dev,
 	mutex_lock(&(misc_mpu9150_data->mutex));
 
 	m4_set_mpu9150_delay(misc_mpu9150_data, scanresult, TYPE_GYRO);
-	if (scanresult == -1) {
-		mpu9150_irq_enable_disable(
-					misc_mpu9150_data, TYPE_GYRO,
-					SENSOR_IRQ_DISABLE
-					);
-	} else {
-		mpu9150_irq_enable_disable(
-					misc_mpu9150_data, TYPE_GYRO,
-					SENSOR_IRQ_ENABLE
-					);
-	}
 
 	mutex_unlock(&(misc_mpu9150_data->mutex));
 
@@ -374,17 +376,6 @@ static ssize_t m4_mpu9150_write_compass_setdelay(struct device *dev,
 	mutex_lock(&(misc_mpu9150_data->mutex));
 
 	m4_set_mpu9150_delay(misc_mpu9150_data, scanresult, TYPE_COMPASS);
-	if (scanresult == -1) {
-		mpu9150_irq_enable_disable(
-				misc_mpu9150_data, TYPE_COMPASS,
-				SENSOR_IRQ_DISABLE
-				);
-	} else {
-		mpu9150_irq_enable_disable(
-				misc_mpu9150_data, TYPE_COMPASS,
-				SENSOR_IRQ_ENABLE
-			);
-	}
 
 	mutex_unlock(&(misc_mpu9150_data->mutex));
 
@@ -556,130 +547,12 @@ static struct miscdevice mpu9150_client_miscdrv = {
 	.fops = &mpu9150_client_fops,
 };
 
-static int mpu9150_irq_init(struct mpu9150_client *mpu9150_client_data)
-{
-	int ret = -1;
-
-	ret = m4sensorhub_irq_register(mpu9150_client_data->m4sensorhub,
-				M4SH_IRQ_GYRO_DATA_READY,
-				m4_handle_mpu9150_gyro_irq,
-				mpu9150_client_data, 0);
-	if (ret < 0) {
-		KDEBUG(M4SH_ERROR, "Error registering int %d (%d)\n",
-					M4SH_IRQ_GYRO_DATA_READY, ret);
-		return ret;
-	}
-	ret = m4sensorhub_irq_register(mpu9150_client_data->m4sensorhub,
-				M4SH_IRQ_ACCEL_DATA_READY,
-				m4_handle_mpu9150_accel_irq,
-				mpu9150_client_data, 0);
-	if (ret < 0) {
-		KDEBUG(M4SH_ERROR, "Error registering int %d (%d)\n",
-					M4SH_IRQ_ACCEL_DATA_READY, ret);
-		goto unregister_gyro_irq;
-	}
-	ret = m4sensorhub_irq_register(mpu9150_client_data->m4sensorhub,
-				M4SH_IRQ_COMPASS_DATA_READY,
-				m4_handle_mpu9150_compass_irq,
-				mpu9150_client_data, 0);
-	if (ret < 0) {
-		KDEBUG(M4SH_ERROR, "Error registering int %d (%d)\n",
-				M4SH_IRQ_COMPASS_DATA_READY, ret);
-		goto unregister_accel_irq;
-	}
-	return ret;
-
-unregister_accel_irq:
-	m4sensorhub_irq_unregister(mpu9150_client_data->m4sensorhub,
-				M4SH_IRQ_ACCEL_DATA_READY);
-unregister_gyro_irq:
-	m4sensorhub_irq_unregister(mpu9150_client_data->m4sensorhub,
-				M4SH_IRQ_GYRO_DATA_READY);
-	return ret;
-}
-
-static void mpu9150_irq_deinit(struct mpu9150_client *mpu9150_client_data)
-{
-	m4sensorhub_irq_unregister(mpu9150_client_data->m4sensorhub,
-				M4SH_IRQ_COMPASS_DATA_READY);
-	m4sensorhub_irq_unregister(mpu9150_client_data->m4sensorhub,
-				M4SH_IRQ_ACCEL_DATA_READY);
-	m4sensorhub_irq_unregister(mpu9150_client_data->m4sensorhub,
-				M4SH_IRQ_GYRO_DATA_READY);
-}
-
-static int mpu9150_irq_enable_disable(struct mpu9150_client *mpu9150_client_data,
-				enum mpu9150_sensor type, int flag)
-{
-	int ret = 0;
-	int irq_status = 0;
-
-	switch (type) {
-	case TYPE_GYRO:
-		irq_status = m4sensorhub_irq_enable_get(
-				mpu9150_client_data->m4sensorhub,
-				M4SH_IRQ_GYRO_DATA_READY);
-		if (flag && (!irq_status)) {
-			ret = m4sensorhub_irq_enable(
-					mpu9150_client_data->m4sensorhub,
-					M4SH_IRQ_GYRO_DATA_READY);
-			if (ret < 0) {
-				KDEBUG(M4SH_ERROR, "Error enabling int %d (%d)\n",
-					M4SH_IRQ_GYRO_DATA_READY, ret);
-				return ret;
-			}
-		} else if ((!flag) && irq_status)
-			m4sensorhub_irq_disable(
-					mpu9150_client_data->m4sensorhub,
-					M4SH_IRQ_GYRO_DATA_READY);
-		break;
-	case TYPE_ACCEL:
-		irq_status = m4sensorhub_irq_enable_get(
-				mpu9150_client_data->m4sensorhub,
-				M4SH_IRQ_ACCEL_DATA_READY);
-		if (flag && (!irq_status)) {
-			ret = m4sensorhub_irq_enable(
-					mpu9150_client_data->m4sensorhub,
-					M4SH_IRQ_ACCEL_DATA_READY);
-			if (ret < 0) {
-				KDEBUG(M4SH_ERROR, "Error enabling int %d (%d)\n",
-					M4SH_IRQ_ACCEL_DATA_READY, ret);
-				return ret;
-			}
-		} else if ((!flag) && irq_status)
-			m4sensorhub_irq_disable(
-					mpu9150_client_data->m4sensorhub,
-					M4SH_IRQ_ACCEL_DATA_READY);
-		break;
-	case TYPE_COMPASS:
-		irq_status = m4sensorhub_irq_enable_get(
-				mpu9150_client_data->m4sensorhub,
-				 M4SH_IRQ_COMPASS_DATA_READY);
-		if (flag && (!irq_status)) {
-			ret = m4sensorhub_irq_enable(
-					mpu9150_client_data->m4sensorhub,
-					M4SH_IRQ_COMPASS_DATA_READY);
-			if (ret < 0) {
-				KDEBUG(M4SH_ERROR, "Error enabling int %d (%d)\n",
-					M4SH_IRQ_COMPASS_DATA_READY, ret);
-				return ret;
-			}
-		} else if ((!flag) && irq_status)
-			m4sensorhub_irq_disable(
-					mpu9150_client_data->m4sensorhub,
-					M4SH_IRQ_COMPASS_DATA_READY);
-		break;
-	default:
-		ret = -EINVAL;
-		break;
-	}
-	return ret;
-}
-
 static void mpu9150_panic_restore(struct m4sensorhub_data *m4sensorhub,
 				void *data)
 {
 	struct mpu9150_client *dd = (struct mpu9150_client *)data;
+	int type;
+	signed short rate;
 
 	if (dd == NULL) {
 		KDEBUG(M4SH_INFO, "%s: Driver data is null,unable to restore\n",
@@ -688,36 +561,37 @@ static void mpu9150_panic_restore(struct m4sensorhub_data *m4sensorhub,
 	}
 
 	mutex_lock(&(dd->mutex));
-
 	KDEBUG(M4SH_INFO, "Executing mpu9150 panic restore\n");
-	m4_set_mpu9150_delay(dd, dd->samplerate[TYPE_ACCEL], TYPE_ACCEL);
-	m4_set_mpu9150_delay(dd, dd->samplerate[TYPE_GYRO], TYPE_GYRO);
-	m4_set_mpu9150_delay(dd, dd->samplerate[TYPE_COMPASS], TYPE_COMPASS);
-
+	for (type = 0; type < NUM_TYPES; type++) {
+		rate = dd->samplerate[type];
+		m4_set_mpu9150_delay(dd, rate, type);
+		cancel_delayed_work(&(dd->mpu9150_work[type]));
+		if (rate > 0)
+			schedule_delayed_work(&(dd->mpu9150_work[type]),
+					      msecs_to_jiffies(rate));
+	}
 	mutex_unlock(&(dd->mutex));
 }
 
 static int mpu9150_driver_init(struct init_calldata *p_arg)
 {
 	int ret;
+	struct mpu9150_client *dd = p_arg->p_data;
 
-	mutex_lock(&(misc_mpu9150_data->mutex));
-
-	ret = mpu9150_irq_init(misc_mpu9150_data);
-	if (ret < 0) {
-		KDEBUG(M4SH_ERROR, "mpu9150 irq init failed\n");
-		goto driver_init_exit;
-	}
-
-	ret = m4sensorhub_panic_register(misc_mpu9150_data->m4sensorhub,
+	mutex_lock(&(dd->mutex));
+	INIT_DELAYED_WORK(&(dd->mpu9150_work[TYPE_ACCEL]), m4accel_work_func);
+	INIT_DELAYED_WORK(&(dd->mpu9150_work[TYPE_COMPASS]),
+			  m4compass_work_func);
+	INIT_DELAYED_WORK(&(dd->mpu9150_work[TYPE_GYRO]),
+			  m4gyro_work_func);
+	ret = m4sensorhub_panic_register(dd->m4sensorhub,
 					 PANICHDL_MPU9150_RESTORE,
 					 mpu9150_panic_restore,
-					 misc_mpu9150_data);
+					 dd);
 	if (ret < 0)
 		KDEBUG(M4SH_ERROR, "HR panic callback register failed\n");
 
-driver_init_exit:
-	mutex_unlock(&(misc_mpu9150_data->mutex));
+	mutex_unlock(&(dd->mutex));
 	return ret;
 }
 
@@ -746,6 +620,9 @@ static int mpu9150_client_probe(struct platform_device *pdev)
 			mpu9150_client_data->samplerate[TYPE_GYRO];
 	mpu9150_client_data->latest_samplerate[TYPE_COMPASS] =
 			mpu9150_client_data->samplerate[TYPE_COMPASS];
+	mpu9150_client_data->fastest_rate[TYPE_ACCEL] = 40;
+	mpu9150_client_data->fastest_rate[TYPE_GYRO] = 40;
+	mpu9150_client_data->fastest_rate[TYPE_COMPASS] = 40;
 
 	mpu9150_client_data->input_dev = input_allocate_device();
 	if (!mpu9150_client_data->input_dev) {
@@ -841,7 +718,9 @@ static int __exit mpu9150_client_remove(struct platform_device *pdev)
 #ifdef MPU9150_DEBUG
 	sysfs_remove_group(&pdev->dev.kobj, &mpu9150_group);
 #endif
-	mpu9150_irq_deinit(mpu9150_client_data);
+	cancel_delayed_work(&(mpu9150_client_data->mpu9150_work[TYPE_COMPASS]));
+	cancel_delayed_work(&(mpu9150_client_data->mpu9150_work[TYPE_ACCEL]));
+	cancel_delayed_work(&(mpu9150_client_data->mpu9150_work[TYPE_GYRO]));
 	m4sensorhub_unregister_initcall(mpu9150_driver_init);
 	misc_mpu9150_data = NULL;
 	misc_deregister(&mpu9150_client_miscdrv);
@@ -865,17 +744,15 @@ static int mpu9150_client_suspend(struct platform_device *pdev,
 		return 0;
 	}
 
-	mutex_lock(&(dd->mutex));
 
 	m4_set_mpu9150_delay(dd, dd->latest_samplerate[TYPE_ACCEL], TYPE_ACCEL);
 	m4_set_mpu9150_delay(dd, dd->latest_samplerate[TYPE_GYRO], TYPE_GYRO);
 	m4_set_mpu9150_delay(dd, dd->latest_samplerate[TYPE_COMPASS],
 			     TYPE_COMPASS);
-
-	mutex_unlock(&(dd->mutex));
-
 	return 0;
 }
+
+
 
 static struct of_device_id m4mpu9150_match_tbl[] = {
 	{ .compatible = "mot,m4mpu9150" },
