@@ -437,7 +437,7 @@ static int raw_als_z1[] = {-141, 358959, 274671182};
 static int raw_als_z2[] = {-74, 529533, 37559974};
 
 /* ALS Coefficients */
-static long als_z0[] =          {70, -37000, 7092000, 519860000};
+static long als_z0[] =          {24, -15295, 4123276, 634967215};
 module_param_array(als_z0, long, NULL, 0644);
 
 static long als_z1[] =          {24, -14596, 3987380, 659307205};
@@ -607,8 +607,9 @@ static uint8_t lm3535_convert_value (unsigned value, unsigned zone)
 			reg = ambient_als_backlight;
 	}
 #endif
+
 	printk_br(KERN_INFO "%s: v=%d, z=%d, res=0x%x, reg=0x%x\n",
-		  __func__, value, zone, res, reg);
+		__func__, value, zone, res, reg);
 
     return reg;
 }
