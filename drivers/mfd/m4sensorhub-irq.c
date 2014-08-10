@@ -20,7 +20,6 @@
 #include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/mutex.h>
-#include <linux/workqueue.h>
 #include <linux/wakelock.h>
 #include <linux/i2c.h>
 #include <linux/slab.h>
@@ -47,7 +46,7 @@
 
 /* ------------ Local Function Prototypes ----------- */
 static unsigned short get_enable_reg(enum m4sensorhub_irqs event);
-static void irq_work_func(struct work_struct *work);
+static irqreturn_t event_threaded(int irq, void *devid);
 #ifdef CONFIG_DEBUG_FS
 static int m4sensorhub_dbg_irq_open(struct inode *inode, struct file *file);
 #endif
@@ -95,8 +94,6 @@ struct m4sensorhub_irq_info {
 
 struct m4sensorhub_irqdata {
 	struct mutex lock;           /* lock event handlers and data */
-	struct work_struct work;
-	struct workqueue_struct *workqueue;
 	struct m4sensorhub_data *m4sensorhub;
 	struct m4sensorhub_event_handler event_handler[M4SH_IRQ__NUM];
 	struct m4sensorhub_irq_info irq_info[M4SH_IRQ__NUM];
@@ -126,21 +123,11 @@ static const struct {
 
 static irqreturn_t event_isr(int irq, void *data)
 {
-	/* Interrupts are left enabled; if multiple interrupts arrive, there
-	 * will be multiple jobs in the workqueue.  In this case, the first
-	 * job in the workqueue may service multple interrupts and
-	 * susbsequent jobs will have no interrupts left to service.
-	 */
 	struct m4sensorhub_irqdata *irq_data = data;
-	disable_irq_nosync(irq_data->m4sensorhub->i2c_client->irq);
+
 	wake_lock(&irq_data->wake_lock);
 
-	if (irq_data->m4sensorhub->irq_dbg.suspend == 1)
-		irq_data->m4sensorhub->irq_dbg.print_irqs = 1;
-
-	queue_work(irq_data->workqueue, &irq_data->work);
-
-	return IRQ_HANDLED;
+	return IRQ_WAKE_THREAD;
 }
 
 #ifdef CONFIG_DEBUG_FS
@@ -201,20 +188,12 @@ int m4sensorhub_irq_init(struct m4sensorhub_data *m4sensorhub)
 		goto err_free;
 	}
 
-	data->workqueue = create_workqueue("m4sensorhub_irq");
-	if (data->workqueue == NULL) {
-		KDEBUG(M4SH_ERROR, "%s: IRQ Workqueue init failure\n",
-			__func__);
-		retval = -ENOMEM;
-		goto err_free;
-	}
-	INIT_WORK(&data->work, irq_work_func);
-
 	wake_lock_init(&data->wake_lock, WAKE_LOCK_SUSPEND, "m4sensorhub-irq");
 	wake_lock_init(&data->tm_wake_lock, WAKE_LOCK_SUSPEND,
 		       "m4sensorhub-timed-irq");
 
-	retval = request_irq(i2c->irq, event_isr, IRQF_TRIGGER_HIGH,
+	retval = request_threaded_irq(i2c->irq, event_isr, event_threaded,
+		IRQF_TRIGGER_HIGH | IRQF_ONESHOT,
 		"m4sensorhub-irq", data);
 	if (retval) {
 		KDEBUG(M4SH_ERROR, "%s: Failed requesting irq.\n", __func__);
@@ -252,7 +231,6 @@ err_free_irq:
 err_destroy_wq:
 	wake_lock_destroy(&data->wake_lock);
 	wake_lock_destroy(&data->tm_wake_lock);
-	destroy_workqueue(data->workqueue);
 err_free:
 	mutex_destroy(&data->lock);
 	m4sensorhub->irqdata = NULL;
@@ -314,9 +292,6 @@ void m4sensorhub_irq_shutdown(struct m4sensorhub_data *m4sensorhub)
 	if (mutex_is_locked(&data->lock))
 		mutex_unlock(&data->lock);
 	mutex_destroy(&data->lock);
-
-	cancel_work_sync(&data->work);
-	destroy_workqueue(data->workqueue);
 
 	kfree(data);
 }
@@ -731,16 +706,15 @@ error:
 	return;
 }
 
-static void irq_work_func(struct work_struct *work)
+static irqreturn_t event_threaded(int irq, void *devid)
 {
 	unsigned short en_ints[NUM_INT_REGS] = { 0 };
 	int i;
-	struct m4sensorhub_irqdata *data;
+	struct m4sensorhub_irqdata *data = devid;
 	struct m4sensorhub_data *m4sensorhub;
 	struct i2c_client *i2c;
 	unsigned char value, is_irq_set = 0;
 
-	data = container_of(work, struct m4sensorhub_irqdata, work);
 	m4sensorhub = data->m4sensorhub;
 	i2c = m4sensorhub->i2c_client;
 
@@ -762,10 +736,8 @@ static void irq_work_func(struct work_struct *work)
 		goto error;
 	}
 
-	if (m4sensorhub->irq_dbg.print_irqs == 1) {
+	if (m4sensorhub->irq_dbg.suspend == 1)
 		m4sensorhub_print_irq_sources(en_ints);
-		m4sensorhub->irq_dbg.print_irqs = 0;
-	}
 
 	for (i = 0; i < NUM_INT_REGS; ++i) {
 		unsigned char index;
@@ -810,7 +782,8 @@ static void irq_work_func(struct work_struct *work)
 	}
 error:
 	wake_unlock(&data->wake_lock);
-	enable_irq(m4sensorhub->i2c_client->irq);
+
+	return IRQ_HANDLED;
 }
 
 #ifdef CONFIG_DEBUG_FS
