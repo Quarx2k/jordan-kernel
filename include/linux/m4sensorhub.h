@@ -95,6 +95,7 @@ struct m4sensorhub_hwconfig {
 
 struct m4sensorhub_irq_dbg {
 	unsigned char suspend; /* 1 - Suspended, 0 - Normal */
+	unsigned char print_irqs; /* 1 - IRQs to print, 0 - None */
 };
 
 struct m4sensorhub_data {
