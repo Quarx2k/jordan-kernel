@@ -133,7 +133,7 @@ static void m4fus_work_func(struct work_struct *work)
 	 */
 	iio_push_to_buffers(iio, (unsigned char *)&(dd->iiodat[0]));
 	if (dd->samplerate > 0)
-		schedule_delayed_work(&(dd->m4fus_work),
+		queue_delayed_work(system_freezable_wq, &(dd->m4fus_work),
 				      msecs_to_jiffies(dd->samplerate));
 
 m4fus_isr_fail:
@@ -174,7 +174,7 @@ static int m4fus_set_samplerate(struct iio_dev *iio, int16_t rate)
 	dd->samplerate = rate;
 	cancel_delayed_work(&(dd->m4fus_work));
 	if (dd->samplerate > 0)
-		schedule_delayed_work(&(dd->m4fus_work),
+		queue_delayed_work(system_freezable_wq, &(dd->m4fus_work),
 				      msecs_to_jiffies(rate));
 
 m4fus_set_samplerate_fail:
@@ -372,7 +372,7 @@ static void m4fus_panic_restore(struct m4sensorhub_data *m4sensorhub,
 
 	cancel_delayed_work(&(dd->m4fus_work));
 	if (dd->samplerate > 0)
-		schedule_delayed_work(&(dd->m4fus_work),
+		queue_delayed_work(system_freezable_wq, &(dd->m4fus_work),
 				      msecs_to_jiffies(dd->samplerate));
 	mutex_unlock(&(dd->mutex));
 }

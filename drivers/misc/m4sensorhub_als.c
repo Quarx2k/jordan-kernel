@@ -84,7 +84,7 @@ static void m4als_work_func(struct work_struct *work)
 	input_event(dd->indev, EV_MSC, MSC_RAW, dd->luminosity);
 	input_sync(dd->indev);
 	if (dd->samplerate > 0)
-		schedule_delayed_work(&(dd->m4als_work),
+		queue_delayed_work(system_freezable_wq, &(dd->m4als_work),
 				      msecs_to_jiffies(dd->samplerate));
 
 m4als_isr_fail:
@@ -133,7 +133,7 @@ static int m4als_set_samplerate(struct m4als_driver_data *dd, int16_t rate)
 	cancel_delayed_work(&(dd->m4als_work));
 	dd->samplerate = rate;
 	if (dd->samplerate > 0)
-		schedule_delayed_work(&(dd->m4als_work),
+		queue_delayed_work(system_freezable_wq, &(dd->m4als_work),
 				      msecs_to_jiffies(rate));
 
 m4als_set_samplerate_fail:
@@ -286,7 +286,7 @@ static void m4als_panic_restore(struct m4sensorhub_data *m4sensorhub,
 	}
 	cancel_delayed_work(&(dd->m4als_work));
 	if (dd->samplerate > 0)
-		schedule_delayed_work(&(dd->m4als_work),
+		queue_delayed_work(system_freezable_wq, &(dd->m4als_work),
 				      msecs_to_jiffies(dd->samplerate));
 	mutex_unlock(&(dd->mutex));
 }

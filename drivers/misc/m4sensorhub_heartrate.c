@@ -95,7 +95,7 @@ static void m4hrt_work_func(struct work_struct *work)
 	dd->iiodat.timestamp = iio_get_time_ns();
 	iio_push_to_buffers(iio, (unsigned char *)&(dd->iiodat));
 	if (dd->samplerate > 0)
-		schedule_delayed_work(&(dd->m4hrt_work),
+		queue_delayed_work(system_freezable_wq, &(dd->m4hrt_work),
 				      msecs_to_jiffies(dd->samplerate));
 
 m4hrt_isr_fail:
@@ -137,7 +137,7 @@ static int m4hrt_set_samplerate(struct iio_dev *iio, int32_t rate)
 	cancel_delayed_work(&(dd->m4hrt_work));
 	dd->samplerate = rate;
 	if (dd->samplerate > 0)
-		schedule_delayed_work(&(dd->m4hrt_work),
+		queue_delayed_work(system_freezable_wq, &(dd->m4hrt_work),
 				      msecs_to_jiffies(dd->samplerate));
 m4hrt_set_samplerate_fail:
 	return err;
@@ -491,7 +491,7 @@ static void m4hrt_panic_restore(struct m4sensorhub_data *m4sensorhub,
 	}
 	cancel_delayed_work(&(dd->m4hrt_work));
 	if (dd->samplerate > 0)
-		schedule_delayed_work(&(dd->m4hrt_work),
+		queue_delayed_work(system_freezable_wq, &(dd->m4hrt_work),
 				      msecs_to_jiffies(dd->samplerate));
 	mutex_unlock(&(dd->mutex));
 }

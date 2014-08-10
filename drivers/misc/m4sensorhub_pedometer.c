@@ -175,8 +175,8 @@ static void m4ped_work_func(struct work_struct *work)
 	if (err < 0)
 		m4ped_err("%s: Failed with error code %d.\n", __func__, err);
 	if (dd->samplerate > 0)
-		schedule_delayed_work(&(dd->m4ped_work),
-				      msecs_to_jiffies(dd->samplerate));
+		queue_delayed_work(system_freezable_wq, &(dd->m4ped_work),
+			msecs_to_jiffies(dd->samplerate));
 	mutex_unlock(&(dd->mutex));
 	return;
 }
@@ -195,8 +195,8 @@ static int m4ped_set_samplerate(struct iio_dev *iio, int16_t rate)
 	cancel_delayed_work(&(dd->m4ped_work));
 	dd->samplerate = rate;
 	if (dd->samplerate > 0)
-		schedule_delayed_work(&(dd->m4ped_work),
-				      msecs_to_jiffies(rate));
+		queue_delayed_work(system_freezable_wq, &(dd->m4ped_work),
+			msecs_to_jiffies(dd->samplerate));
 m4ped_set_samplerate_fail:
 	return err;
 }
@@ -633,8 +633,8 @@ static void m4ped_panic_restore(struct m4sensorhub_data *m4sensorhub,
 	}
 	cancel_delayed_work(&(dd->m4ped_work));
 	if (dd->samplerate > 0)
-		schedule_delayed_work(&(dd->m4ped_work),
-				      msecs_to_jiffies(dd->samplerate));
+		queue_delayed_work(system_freezable_wq, &(dd->m4ped_work),
+			msecs_to_jiffies(dd->samplerate));
 
 m4ped_panic_restore_fail:
 	mutex_unlock(&(dd->mutex));
