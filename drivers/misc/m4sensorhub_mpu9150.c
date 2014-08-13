@@ -142,6 +142,23 @@ static void m4_report_mpu9150_inputevent(
 	}
 }
 
+static void m4_queue_delayed_work(struct mpu9150_client *dd,
+			int delay, enum mpu9150_sensor type)
+{
+	if (type == TYPE_COMPASS) {
+		/* initial calibration is not done and there is
+		no app requesting compass data */
+		if ((!dd->calibration_done) && (!dd->app_override))
+			/* For current drain saving, m4 is sampling
+			   compass at 40ms while omap is polling
+			   for compass data at 15 secs */
+			delay = 15000;
+	}
+	queue_delayed_work(system_freezable_wq,
+			   &(dd->mpu9150_work[type]),
+			   msecs_to_jiffies(delay));
+}
+
 static void m4_set_mpu9150_delay(struct mpu9150_client *mpu9150_client_data,
 			int delay, enum mpu9150_sensor type)
 {
@@ -180,12 +197,10 @@ static void m4_set_mpu9150_delay(struct mpu9150_client *mpu9150_client_data,
 		cancel_delayed_work(&(dd->mpu9150_work[type]));
 		dd->samplerate[type] = delay;
 		if (dd->samplerate[type] > 0)
-			queue_delayed_work(system_freezable_wq,
-					&(dd->mpu9150_work[type]),
-					msecs_to_jiffies(delay));
-
+			m4_queue_delayed_work(dd, delay, type);
 	}
 }
+
 
 static void m4_read_mpu9150_data(struct mpu9150_client *mpu9150_client_data,
 			enum mpu9150_sensor type)
@@ -237,6 +252,7 @@ static void m4_read_mpu9150_data(struct mpu9150_client *mpu9150_client_data,
 		/* Check if calibration is complete */
 		if ((!(dd->calibration_done)) && (compassdata.accuracy)) {
 			dd->calibration_done = 1;
+			KDEBUG(M4SH_INFO, "Calibration complete\n");
 			/* Stop compass sampling if no app is using the data */
 			if (dd->app_override == 0) {
 				m4_set_mpu9150_delay(dd,
@@ -304,9 +320,7 @@ static void m4compass_work_func(struct work_struct *work)
 	m4_report_mpu9150_inputevent(dd, TYPE_COMPASS);
 	rate = dd->samplerate[TYPE_COMPASS];
 	if (rate > 0)
-		queue_delayed_work(system_freezable_wq,
-				&(dd->mpu9150_work[TYPE_COMPASS]),
-				msecs_to_jiffies(rate));
+		m4_queue_delayed_work(dd, rate, TYPE_COMPASS);
 	mutex_unlock(&(dd->mutex));
 }
 
@@ -597,9 +611,7 @@ static void mpu9150_panic_restore(struct m4sensorhub_data *m4sensorhub,
 		m4_set_mpu9150_delay(dd, rate, type);
 		cancel_delayed_work(&(dd->mpu9150_work[type]));
 		if (rate > 0)
-			queue_delayed_work(system_freezable_wq,
-					&(dd->mpu9150_work[type]),
-					msecs_to_jiffies(rate));
+			m4_queue_delayed_work(dd, rate, type);
 	}
 	mutex_unlock(&(dd->mutex));
 }
