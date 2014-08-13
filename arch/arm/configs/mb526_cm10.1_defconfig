@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.32.9
-# Sun Jul 20 16:14:28 2014
+# Thu Aug 14 00:29:48 2014
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -279,7 +279,8 @@ CONFIG_MAPPHONE_2NDBOOT=y
 # CONFIG_MACH_OMAP_3630SDP is not set
 CONFIG_MACH_OMAP_3430_ES3_ARM_ERRATA=y
 # CONFIG_EMU_UART_DEBUG is not set
-# CONFIG_DTC is not set
+CONFIG_DTC=y
+CONFIG_MAPPHONE_DTC=y
 # CONFIG_OMAP3_EXPORT_DIE_ID is not set
 CONFIG_PM_DEEPSLEEP=y
 # CONFIG_OMAP3_OVERCLOCK is not set
