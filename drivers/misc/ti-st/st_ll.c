@@ -24,6 +24,7 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/ti_wilink_st.h>
+#include <linux/wakelock.h>
 
 /**********************************************************************/
 /* internal functions */
@@ -37,13 +38,17 @@ static void send_ll_cmd(struct st_data_s *st_data,
 
 	kim_plat_data = (struct kim_data_s *)st_data->kim_data;
 	pdata = kim_plat_data->kim_pdev->dev.platform_data;
-	if (cmd == LL_WAKE_UP_IND || cmd == LL_WAKE_UP_ACK)
+	if (cmd == LL_WAKE_UP_IND || cmd == LL_WAKE_UP_ACK) {
+		wake_lock(&st_data->st_awake);
 		omap_serial_runtime_get(pdata->port_index);
+	}
 
 	st_int_write(st_data, &cmd, 1);
 
-	if (cmd == LL_SLEEP_ACK)
+	if (cmd == LL_SLEEP_ACK) {
+		wake_unlock(&st_data->st_awake);
 		omap_serial_runtime_put(pdata->port_index);
+	}
 	return;
 }
 
@@ -117,6 +122,7 @@ void st_ll_enable(struct st_data_s *ll)
 	if (ll->ll_state == ST_LL_INVALID) {
 		kim_plat_data = (struct kim_data_s *)ll->kim_data;
 		pdata = kim_plat_data->kim_pdev->dev.platform_data;
+		wake_lock(&ll->st_awake);
 		omap_serial_runtime_get(pdata->port_index);
 	}
 	ll->ll_state = ST_LL_AWAKE;
@@ -133,6 +139,7 @@ void st_ll_disable(struct st_data_s *ll)
 	    ll->ll_state == ST_LL_ASLEEP_TO_AWAKE) {
 		kim_plat_data = (struct kim_data_s *)ll->kim_data;
 		pdata = kim_plat_data->kim_pdev->dev.platform_data;
+		wake_unlock(&ll->st_awake);
 		omap_serial_runtime_put(pdata->port_index);
 	}
 	ll->ll_state = ST_LL_INVALID;
@@ -194,6 +201,7 @@ long st_ll_init(struct st_data_s *ll)
 {
 	/* set state to invalid */
 	ll->ll_state = ST_LL_INVALID;
+
 	return 0;
 }
 

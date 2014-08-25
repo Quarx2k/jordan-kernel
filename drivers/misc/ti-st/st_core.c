@@ -892,6 +892,7 @@ int st_core_init(struct st_data_s **core_data)
 			pr_err("unable to un-register ldisc\n");
 		return err;
 	}
+	wake_lock_init(&st_gdata->st_awake, WAKE_LOCK_SUSPEND, "st_alive");
 	*core_data = st_gdata;
 	return 0;
 }
@@ -905,6 +906,7 @@ void st_core_exit(struct st_data_s *st_gdata)
 		pr_err("error during deinit of ST LL %ld\n", err);
 
 	if (st_gdata != NULL) {
+		wake_lock_destroy(&st_gdata->st_awake);
 		/* Free ST Tx Qs and skbs */
 		skb_queue_purge(&st_gdata->txq);
 		skb_queue_purge(&st_gdata->tx_waitq);

@@ -26,6 +26,7 @@
 #define TI_WILINK_ST_H
 
 #include <linux/skbuff.h>
+#include <linux/wakelock.h>
 
 /**
  * enum proto-type - The protocol on WiLink chips which share a
@@ -158,6 +159,8 @@ struct st_data_s {
 	unsigned long ll_state;
 	void *kim_data;
 	struct tty_struct *tty;
+
+	struct wake_lock st_awake;  /* Held while controller is awake */
 };
 
 /*
