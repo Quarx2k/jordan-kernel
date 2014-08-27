@@ -1478,6 +1478,32 @@ u32 omap_pmic_voltage_ramp_delay(u8 srid, u8 target_vsel, u8 current_vsel)
 }
 #endif
 
+
+#define WARMRESET 1
+#define COLDRESET 0
+
+static unsigned long reset_status = COLDRESET ;
+static struct notifier_block mapphone_pm_reboot_notifier;
+
+/* Choose cold or warm reset
+ *    RST_TIME1>4ms will trigger CPCAP to trigger a system cold reset */
+static void mapphone_pm_set_reset(char cold)
+{
+	if (cold) {
+		/* Configure RST_TIME1 to 6ms  */
+		prm_rmw_mod_reg_bits(OMAP_RSTTIME1_MASK,
+		0xc8<<OMAP_RSTTIME1_SHIFT,
+		OMAP3430_GR_MOD,
+		OMAP3_PRM_RSTTIME_OFFSET);
+	} else {
+		/* Configure RST_TIME1 to 30us  */
+		prm_rmw_mod_reg_bits(OMAP_RSTTIME1_MASK,
+		0x01<<OMAP_RSTTIME1_SHIFT,
+		OMAP3430_GR_MOD,
+		OMAP3_PRM_RSTTIME_OFFSET);
+	}
+}
+
 static void mapphone_pm_init(void)
 {
 	omap3_pm_init_vc(&mapphone_prm_setup);
@@ -1502,7 +1528,32 @@ static void mapphone_pm_init(void)
 	omap3_bypass_cmd(CPCAP_SRI2C_SLAVE_ADDR_VDD2,
 			CPCAP_SMPS_VOL_OPP2, 0x2E);
 
+	if (reset_status == COLDRESET)
+		mapphone_pm_set_reset(1);
+	else
+		mapphone_pm_set_reset(0);
+
+	register_reboot_notifier(&mapphone_pm_reboot_notifier);
+
 }
+
+static int mapphone_pm_reboot_call(struct notifier_block *this,
+			unsigned long code, void *cmd)
+{
+	int result = NOTIFY_DONE;
+
+	if (code == SYS_RESTART) {
+		/* set cold reset */
+		mapphone_pm_set_reset(1);
+	}
+
+	return result;
+}
+
+static struct notifier_block mapphone_pm_reboot_notifier = {
+	.notifier_call = mapphone_pm_reboot_call,
+};
+
 
 /* must match value in drivers/w1/w1_family.h */
 #define W1_EEPROM_DS2502        0x89
