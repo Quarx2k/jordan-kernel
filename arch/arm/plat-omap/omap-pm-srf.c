@@ -401,7 +401,7 @@ u8 omap_pm_get_max_vdd1_opp()
 		case OMAP_3630_0800:
 			return VDD1_OPP3;
 		case OMAP_3630_1000:
-			return VDD1_OPP4;
+			return VDD1_OPP3; //4
 		case OMAP_3630_1200:
 			return VDD1_OPP5;
 		}

@@ -38,7 +38,7 @@
 #include "cm.h"
 #include "cm-regbits-24xx.h"
 #include "cm-regbits-34xx.h"
-
+#include "omap3-opp.h"
 /* DPLL rate rounding: minimum DPLL multiplier, divider values */
 #define DPLL_MIN_MULTIPLIER		1
 #define DPLL_MIN_DIVIDER		1
@@ -585,7 +585,7 @@ static const struct clksel *omap2_get_clksel_by_parent(struct clk *clk,
 u32 omap2_clksel_round_rate_div(struct clk *clk, unsigned long target_rate,
 				u32 *new_div)
 {
-	unsigned long test_rate, parent_rate;
+	unsigned long test_rate, parent_rate = S800M;
 	const struct clksel *clks;
 	const struct clksel_rate *clkr;
 	u32 last_div = 0;
@@ -780,7 +780,7 @@ int omap2_clksel_set_rate(struct clk *clk, unsigned long rate)
 
 	validrate = omap2_clksel_round_rate_div(clk, rate, &new_div);
 	if (validrate != rate) {
-		printk("%s: validrate (%lu) != rate (%lu)\n", __FUNCTION__, validrate, rate);
+		printk("%s: validrate (%d) != rate (%lu)\n", __FUNCTION__, validrate, rate);
 		return -EINVAL;
 	}
 
