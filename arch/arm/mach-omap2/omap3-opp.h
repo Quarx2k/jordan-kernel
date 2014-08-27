@@ -42,7 +42,7 @@ static struct omap_opp omap3630_mpu_rate_table[] = {
         {0, 0, 0, 0},
         /*Add headroom for CPCAP IR drop*/
         /*OPP1,CPCAP 1.0125v*/
-        {S400M, VDD1_OPP1, 0x22, 0x0},
+        {S300M, VDD1_OPP1, 0x22, 0x0},
         /*OPP2,CPCAP 1.2v*/
         {S600M, VDD1_OPP2, 0x30, 0x0},
         /*OPP3,CPCAP 1.325v*/
