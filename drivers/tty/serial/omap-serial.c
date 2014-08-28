@@ -1372,6 +1372,10 @@ static int serial_omap_prepare(struct device *dev)
 static void serial_omap_complete(struct device *dev)
 {
 	struct uart_omap_port *up = dev_get_drvdata(dev);
+	if (up->need_delayed_rts && up->pin_default && up->pin_idle) {
+		pinctrl_select_state(up->pins, up->pin_default);
+		up->need_delayed_rts = 0;
+	}
 
 	up->is_suspending = false;
 }
@@ -1390,10 +1394,6 @@ static int serial_omap_resume(struct device *dev)
 	struct uart_omap_port *up = dev_get_drvdata(dev);
 
 	uart_resume_port(&serial_omap_reg, &up->port);
-	if (up->need_delayed_rts && up->pin_default && up->pin_idle) {
-		pinctrl_select_state(up->pins, up->pin_default);
-		up->need_delayed_rts = 0;
-	}
 
 	return 0;
 }
