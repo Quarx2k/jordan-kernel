@@ -172,6 +172,7 @@ struct uart_omap_port {
 	struct pinctrl_state	*pin_default;
 	struct pinctrl_state	*pin_idle;
 	bool			is_suspending;
+	bool			need_delayed_rts;
 	bool			in_transmit;
 	int			ext_rt_cnt;
 	bool			open_close_pm;
@@ -1389,6 +1390,10 @@ static int serial_omap_resume(struct device *dev)
 	struct uart_omap_port *up = dev_get_drvdata(dev);
 
 	uart_resume_port(&serial_omap_reg, &up->port);
+	if (up->need_delayed_rts && up->pin_default && up->pin_idle) {
+		pinctrl_select_state(up->pins, up->pin_default);
+		up->need_delayed_rts = 0;
+	}
 
 	return 0;
 }
@@ -1756,8 +1761,10 @@ static int serial_omap_runtime_suspend(struct device *dev)
 	if (!up)
 		return -EINVAL;
 
-	if (up->pin_idle)
+	if (up->pin_idle) {
 		pinctrl_select_state(up->pins, up->pin_idle);
+		up->need_delayed_rts = 0;
+	}
 	up->context_loss_cnt = serial_omap_get_context_loss_count(up);
 
 	if (device_may_wakeup(dev)) {
@@ -1787,8 +1794,12 @@ static int serial_omap_runtime_resume(struct device *dev)
 	}
 	up->latency = up->calc_latency;
 	serial_omap_uart_qos(up);
-	if (up->pin_default && up->pin_idle)
-		pinctrl_select_state(up->pins, up->pin_default);
+	if (up->pin_default && up->pin_idle) {
+		if (up->is_suspending)
+			up->need_delayed_rts = 1;
+		else
+			pinctrl_select_state(up->pins, up->pin_default);
+	}
 
 	return 0;
 }
