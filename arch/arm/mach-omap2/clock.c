@@ -46,6 +46,8 @@
 /* Possible error results from _dpll_test_mult */
 #define DPLL_MULT_UNDERFLOW		-1
 
+#define GPU_PARENT_RATE			800000000
+
 /*
  * Scale factor to mitigate roundoff errors in DPLL rate rounding.
  * The higher the scale factor, the greater the risk of arithmetic overflow,
@@ -585,7 +587,7 @@ static const struct clksel *omap2_get_clksel_by_parent(struct clk *clk,
 u32 omap2_clksel_round_rate_div(struct clk *clk, unsigned long target_rate,
 				u32 *new_div)
 {
-	unsigned long test_rate, parent_rate = S800M;
+	unsigned long test_rate, parent_rate;
 	const struct clksel *clks;
 	const struct clksel_rate *clkr;
 	u32 last_div = 0;
@@ -613,9 +615,9 @@ u32 omap2_clksel_round_rate_div(struct clk *clk, unsigned long target_rate,
 		// Engle, Add for SGX530 frequence control, start
 		// test_rate = clk->parent->rate / clkr->div;
 		parent_rate = clk->parent->rate;
-		if (strcmp(clk->name, "sgx_fck") == 0 && S800M != clk->parent->rate) {
-			parent_rate = S800M;
-			printk("%s: force change to S800M\n", __FUNCTION__);
+		if (strcmp(clk->name, "sgx_fck") == 0 && GPU_PARENT_RATE != clk->parent->rate) {
+			parent_rate = GPU_PARENT_RATE;
+			printk("%s: force change to GPU_PARENT_RATE\n", __FUNCTION__);
 		}
 		test_rate = parent_rate / clkr->div;
 		//printk("After recalc %lu, parent is %s, test_rate %lu, div %d \n",
@@ -799,8 +801,8 @@ int omap2_clksel_set_rate(struct clk *clk, unsigned long rate)
 	// Engle, Add for SGX530 frequence control, start
 	// clk->rate = clk->parent->rate / new_div;
 	parent_rate = clk->parent->rate;
-	if (strcmp(clk->name, "sgx_fck") == 0 && S800M != parent_rate) {
-		parent_rate =  S800M;
+	if (strcmp(clk->name, "sgx_fck") == 0 && GPU_PARENT_RATE != parent_rate) {
+		parent_rate =  GPU_PARENT_RATE;
 	}
 	// printk("%s: parent_rate %lu, new_div %d\n", __FUNCTION__, parent_rate, new_div);
 	clk->rate = parent_rate / new_div;
