@@ -84,7 +84,7 @@ static unsigned int suspend_freq = 600000;
 #endif
 
 /* Hi speed to bump to from lo speed when load burst (default max) */
-static unsigned int hispeed_freq = 800000;
+static unsigned int hispeed_freq = 1000000;
 
 /* Go to hi speed when CPU load at or above this value. */
 #define DEFAULT_GO_HISPEED_LOAD 90
@@ -142,7 +142,7 @@ static int boostpulse_duration_val = DEFAULT_BOOSTPULSE_DURATION;
  * Max additional time to wait in idle, beyond timer_rate, at speeds above
  * minimum before wakeup to reduce speed, or -1 if unnecessary.
  */
-#define DEFAULT_TIMER_SLACK (70000)
+#define DEFAULT_TIMER_SLACK (40000)
 static int default_timer_slack_val[] = { DEFAULT_TIMER_SLACK };
 static spinlock_t timer_slack_lock;
 static int *timer_slack_vals = default_timer_slack_val;
@@ -154,7 +154,7 @@ static bool io_is_busy = true;
  * The CPU will be boosted to this frequency when the screen is
  * touched. input_boost needs to be enabled.
  */
-#define DEFAULT_INPUT_BOOST_FREQ 800000
+#define DEFAULT_INPUT_BOOST_FREQ 1000000
 int input_boost_freq = DEFAULT_INPUT_BOOST_FREQ;
 extern u64 last_input_time;
 
