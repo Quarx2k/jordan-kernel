@@ -103,7 +103,6 @@
 #endif
 
 #include <plat/omap-pm.h>
-#include <mach-omap2/omap3-opp.h>
 
 #define BRIDGE_NAME "C6410"
 /*  ----------------------------------- Globals */
@@ -557,7 +556,6 @@ void bridge_prcm_registers_dump(void)
 #define OMAP_GRP_SEL_BASE 0x48307000
 #define OMAP_MBX_BASE 0x48094000
 
-	u32 addr;
 	u32 prm_base = 0;
 	u32 cm_base = 0;
 	u32 grp_base = 0;
