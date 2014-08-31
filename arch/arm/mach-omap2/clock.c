@@ -38,7 +38,7 @@
 #include "cm.h"
 #include "cm-regbits-24xx.h"
 #include "cm-regbits-34xx.h"
-
+#include "omap3-opp.h"
 /* DPLL rate rounding: minimum DPLL multiplier, divider values */
 #define DPLL_MIN_MULTIPLIER		1
 #define DPLL_MIN_DIVIDER		1
