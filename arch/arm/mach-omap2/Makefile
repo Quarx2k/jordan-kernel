@@ -67,30 +67,6 @@ obj-y                                  += dspbridge.o
 endif
 
 # Specific board support
-obj-$(CONFIG_MACH_OMAP_GENERIC)		+= board-generic.o
-obj-$(CONFIG_MACH_OMAP_H4)		+= board-h4.o
-obj-$(CONFIG_MACH_OMAP_2430SDP)		+= board-2430sdp.o \
-					   mmc-twl4030.o
-obj-$(CONFIG_MACH_OMAP_APOLLON)		+= board-apollon.o
-obj-$(CONFIG_MACH_OMAP3_BEAGLE)		+= board-omap3beagle.o \
-					   mmc-twl4030.o
-obj-$(CONFIG_MACH_OMAP_LDP)		+= board-ldp.o \
-					   mmc-twl4030.o
-obj-$(CONFIG_MACH_OVERO)		+= board-overo.o \
-					   mmc-twl4030.o
-obj-$(CONFIG_MACH_OMAP3EVM)		+= board-omap3evm.o \
-					   mmc-twl4030.o
-obj-$(CONFIG_MACH_OMAP3_PANDORA)	+= board-omap3pandora.o \
-					   mmc-twl4030.o
-obj-$(CONFIG_MACH_OMAP_3430SDP)		+= board-3430sdp.o \
-					   mmc-twl4030.o
-obj-$(CONFIG_MACH_NOKIA_N8X0)		+= board-n8x0.o
-obj-$(CONFIG_MACH_OMAP_ZOOM2)		+= board-zoom2.o \
-					   mmc-twl4030.o \
-					   board-ldp-flash.o \
-					   board-zoom2-camera.o \
-					   board-zoom2-wifi.o
-
 obj-$(CONFIG_MACH_MAPPHONE)             += board-mapphone.o \
                                            board-mapphone-camera.o \
                                            board-mapphone-panel.o \
@@ -105,30 +81,6 @@ obj-$(CONFIG_MACH_MAPPHONE)             += board-mapphone.o \
 					   board-mapphone-padconf.o
 
 obj-$(CONFIG_EMU_UART_DEBUG)		+= board-mapphone-emu_uart.o
-
-obj-$(CONFIG_MACH_NOKIA_RX51)		+= board-rx51.o \
-					   board-rx51-sdram.o \
-					   board-rx51-peripherals.o \
-					   mmc-twl4030.o
-obj-$(CONFIG_MACH_OMAP_ZOOM2)		+= board-zoom2.o \
-					   board-zoom-peripherals.o \
-					   mmc-twl4030.o \
-					   board-zoom-debugboard.o
-obj-$(CONFIG_MACH_OMAP_ZOOM3)		+= board-zoom3.o \
-					   board-zoom-peripherals.o \
-					   mmc-twl4030.o \
-					   board-zoom-debugboard.o
-obj-$(CONFIG_MACH_OMAP_3630SDP)		+= board-3630sdp.o \
-					   board-zoom-peripherals.o \
-					   mmc-twl4030.o
-obj-$(CONFIG_MACH_CM_T35)		+= board-cm-t35.o \
-					   mmc-twl4030.o
-obj-$(CONFIG_MACH_IGEP0020)		+= board-igep0020.o \
-					   mmc-twl4030.o
-
-obj-$(CONFIG_MACH_OMAP_4430SDP)		+= board-4430sdp.o
-
-obj-$(CONFIG_MACH_OMAP3517EVM)     += board-am3517evm.o
 
 # Platform specific device init code
 obj-y					+= usb-musb.o

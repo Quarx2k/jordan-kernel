@@ -32,55 +32,6 @@ config MACH_OMAP_GENERIC
 	bool "Generic OMAP board"
 	depends on ARCH_OMAP2 && ARCH_OMAP24XX
 
-config MACH_OMAP2_TUSB6010
-	bool
-	depends on ARCH_OMAP2 && ARCH_OMAP2420
-	default y if MACH_NOKIA_N8X0
-
-config MACH_OMAP_H4
-	bool "OMAP 2420 H4 board"
-	depends on ARCH_OMAP2 && ARCH_OMAP24XX
-	select OMAP_DEBUG_DEVICES
-
-config MACH_OMAP_APOLLON
-	bool "OMAP 2420 Apollon board"
-	depends on ARCH_OMAP2 && ARCH_OMAP24XX
-
-config MACH_OMAP_2430SDP
-	bool "OMAP 2430 SDP board"
-	depends on ARCH_OMAP2 && ARCH_OMAP24XX
-
-config MACH_OMAP3_BEAGLE
-	bool "OMAP3 BEAGLE board"
-	depends on ARCH_OMAP3 && ARCH_OMAP34XX
-
-config MACH_OMAP_LDP
-	bool "OMAP3 LDP board"
-	depends on ARCH_OMAP3 && ARCH_OMAP34XX
-
-config MACH_OVERO
-	bool "Gumstix Overo board"
-	depends on ARCH_OMAP3 && ARCH_OMAP34XX
-
-config MACH_OMAP3EVM
-	bool "OMAP 3530 EVM board"
-	depends on ARCH_OMAP3 && ARCH_OMAP34XX
-
-config MACH_OMAP3517EVM
-	bool "OMAP3517/ AM3517 EVM board"
-	depends on ARCH_OMAP3 && ARCH_OMAP34XX
-
-config MACH_OMAP3_PANDORA
-	bool "OMAP3 Pandora"
-	depends on ARCH_OMAP3 && ARCH_OMAP34XX
-
-config OMAP3_EMU
-	bool "OMAP3 debugging peripherals"
-	depends on ARCH_OMAP3
-	select OC_ETM
-	help
-	  Say Y here to enable debugging hardware of omap3
-
 config WIFI_CONTROL_FUNC
         bool "Enable WiFi control function abstraction"
 	depends on MACH_OMAP_ZOOM2 || MACH_SHOLES || MACH_MAPPHONE
@@ -104,37 +55,6 @@ config TIWLAN_MMC_CONTROLLER
 	  connected to. TI WLAN has SDIO host controller that will control
 	  this MMC port.
 
-config MACH_OMAP_3430SDP
-	bool "OMAP 3430 SDP board"
-	depends on ARCH_OMAP3 && ARCH_OMAP34XX
-
-config MACH_NOKIA_N800
-       bool
-
-config MACH_NOKIA_N810
-       bool
-
-config MACH_NOKIA_N810_WIMAX
-       bool
-
-config MACH_NOKIA_N8X0
-	bool "Nokia N800/N810"
-	depends on ARCH_OMAP2420
-	select MACH_NOKIA_N800
-	select MACH_NOKIA_N810
-	select MACH_NOKIA_N810_WIMAX
-
-config MACH_NOKIA_RX51
-	bool "Nokia RX-51 board"
-	depends on ARCH_OMAP3 && ARCH_OMAP34XX
-
-config MACH_OMAP_ZOOM2
-	bool "OMAP3 Zoom2 board"
-	depends on ARCH_OMAP3 && ARCH_OMAP34XX
-
-config MACH_OMAP_ZOOM3
-	bool "OMAP3630 Zoom3 board"
-
 config MACH_MAPPHONE
 	bool "Motorola Android Platform phone"
 	depends on ARCH_OMAP3 && ARCH_OMAP34XX
@@ -142,22 +62,6 @@ config MACH_MAPPHONE
 config MAPPHONE_2NDBOOT
 	bool "Motorola Android Platform phone 2nd-boot kernel modifications"
 	depends on MACH_MAPPHONE
-
-config MACH_CM_T35
-	bool "CompuLab CM-T35 module"
-	depends on ARCH_OMAP3 && ARCH_OMAP34XX
-
-config MACH_IGEP0020
-	bool "IGEP0020"
-	depends on ARCH_OMAP3 && ARCH_OMAP34XX
-
-config MACH_OMAP_3630SDP
-	bool "OMAP3630 SDP board"
-	depends on ARCH_OMAP3 && ARCH_OMAP34XX
-
-config MACH_OMAP_4430SDP
-	bool "OMAP 4430 SDP board"
-	depends on ARCH_OMAP4
 
 config MACH_OMAP_3430_ES3_ARM_ERRATA
 	bool "OMAP 3430 ES3.x Cortex-A8 ARM Errata"
