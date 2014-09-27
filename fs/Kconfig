@@ -264,6 +264,12 @@ source "fs/9p/Kconfig"
 
 endif # NETWORK_FILESYSTEMS
 
+config CMDLINE_PARSER
+	bool "Block device command line partition parser"
+	default n
+	---help---
+	Parsing command line, get the partitions information.
+
 if BLOCK
 menu "Partition Types"
 

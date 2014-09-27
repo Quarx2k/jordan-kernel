@@ -38,6 +38,7 @@
 #include "efi.h"
 #include "karma.h"
 #include "sysv68.h"
+#include "cmdline.h"
 
 #ifdef CONFIG_BLK_DEV_MD
 extern void md_autodetect_dev(dev_t dev);
@@ -73,6 +74,9 @@ static int (*check_part[])(struct parsed_partitions *) = {
 	adfspart_check_ADFS,
 #endif
 
+#ifdef CONFIG_CMDLINE_PARTITION
+	cmdline_partition,
+#endif
 #ifdef CONFIG_EFI_PARTITION
 	efi_partition,		/* this must come before msdos */
 #endif
