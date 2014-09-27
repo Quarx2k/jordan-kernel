@@ -23,6 +23,7 @@
 #include <linux/notifier.h>
 #include <linux/reboot.h>
 #include <linux/writeback.h>
+#include <linux/cmdline-parser.h>
 
 #define DYN_FSYNC_VERSION_MAJOR 1
 #define DYN_FSYNC_VERSION_MINOR 5
