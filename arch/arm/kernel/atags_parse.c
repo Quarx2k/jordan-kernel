@@ -141,7 +141,7 @@ __tagtable(ATAG_CMDLINE, parse_tag_cmdline);
 
 u32 flat_dev_tree_address; /* 32bit physical address */
 
-#ifdef CONFIG_MACH_MINNOW
+#if defined(CONFIG_MACH_MINNOW) || defined (CONFIG_MACH_MAPPHONE) 
 /* process Motorola device tree */
 static int __init parse_tag_flat_dev_tree_address(const struct tag *tag)
 {

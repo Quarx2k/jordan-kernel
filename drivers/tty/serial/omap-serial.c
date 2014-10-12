@@ -1596,6 +1596,11 @@ static int serial_omap_probe(struct platform_device *pdev)
 		uart_pinctrl_state_init(&pdev->dev, up);
 
 	sprintf(up->name, "OMAP UART%d", up->port.line);
+#ifdef CONFIG_DEBUG_LL
+	if (up->port.line == 2) {
+		return 0;
+	}
+#endif
 	up->port.mapbase = mem->start;
 	up->port.membase = devm_ioremap(&pdev->dev, mem->start,
 						resource_size(mem));

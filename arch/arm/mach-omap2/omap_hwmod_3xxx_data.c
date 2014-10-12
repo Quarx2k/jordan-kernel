@@ -528,7 +528,11 @@ static struct omap_hwmod omap3xxx_uart3_hwmod = {
 	.mpu_irqs	= omap2_uart3_mpu_irqs,
 	.sdma_reqs	= omap2_uart3_sdma_reqs,
 	.main_clk	= "uart3_fck",
+#ifdef CONFIG_DEBUG_LL
+	.flags		= (HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET),
+#else
 	.flags		= HWMOD_SWSUP_SIDLE_ACT,
+#endif
 	.prcm		= {
 		.omap2 = {
 			.module_offs = OMAP3430_PER_MOD,
@@ -3769,7 +3773,9 @@ static struct omap_hwmod_ocp_if *omap3xxx_hwmod_ocp_ifs[] __initdata = {
 	&omap3xxx_l4_core__mmc3,
 	&omap3_l4_core__uart1,
 	&omap3_l4_core__uart2,
+#ifdef CONFIG_DEBUG_LL
 	&omap3_l4_per__uart3,
+#endif
 	&omap3_l4_core__i2c1,
 	&omap3_l4_core__i2c2,
 	&omap3_l4_core__i2c3,

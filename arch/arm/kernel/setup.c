@@ -788,8 +788,7 @@ void __init setup_arch(char **cmdline_p)
 	arm_memblock_init(&meminfo, mdesc);
 
 	paging_init(mdesc);
-
-#ifdef CONFIG_MACH_MINNOW
+#if defined(CONFIG_MACH_MINNOW) || defined (CONFIG_MACH_MAPPHONE) 
 	if (flat_dev_tree_address) {
 		struct boot_param_header *dt =
 			phys_to_virt(flat_dev_tree_address);
