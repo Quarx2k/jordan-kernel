@@ -291,38 +291,10 @@
 
 &i2c1 {
 	clock-frequency = <400000>;
-
-	atmxt@4a {
-		compatible = "atmel,atmxt-ts";
-		reg = <0x4a>;
-		interrupt-parent = <&gpio4>;
-		interrupts = <3 0>;  /* gpio-99 32 * 3 + 3 */
-		wakeup-source;
-		gpios = <&gpio4 3 0>, /* IRQ   gpio-099 */
-			<&gpio6 4 0>; /* RESET gpio-164*/
-		atmel,atmxt-tdat-filename = "atmxt-r2.tdat", "atmxt-r3.tdat";
-		pinctrl-names = "pullup", "pulldown";
-		pinctrl-0 = <&atmxt_int_pullup>;
-		pinctrl-1 = <&atmxt_int_pulldown>;
-		support-snowflake = <1>;
-	};
 };
 
 &i2c2 {
-	m4sensorhub@39 {
-		compatible = "mot,m4sensorhub";
-		status = "ok";
-		reg = <0x39>;
-
-
-		mot,irq-gpio    = <&gpio2 27 1>; /* gpio-059 */
-		mot,reset-gpio  = <&gpio5  1 2>; /* gpio-129 */
-		mot,wake-gpio   = <&gpio4 30 0>; /* gpio-126 */
-		mot,boot0-gpio  = <&gpio1 21 0>; /* gpio-021 */
-		mot,boot1-gpio  = <&gpio1 24 0>; /* gpio-024 */
-		mot,enable-gpio = <&gpio1 28 0>; /* gpio-028 */
-		mot,fw-filename = "m4sensorhub-p0_minnow.bin";
-	};
+	clock-frequency = <400000>;
 };
 
 &i2c3 {
@@ -334,98 +306,17 @@
 		reg = <0x38>;
 	};
 
-	max17050@36 {
-		compatible = "maxim,max17050";
-		reg = <0x36>;
-		maxim,rsns-microohm = <10000>;
-		pinctrl-names = "default";
-		pinctrl-0 = <&cc_alert_pin>;	/* gpio 140 pin */
-		gpios = <&gpio5 12 0x11>;	/* gpio-140, GPIOF_DIR_IN|GPIOF_EXPORT */
-		gpio-names = "cc-alert";
-		interrupt-parent = <&gpio5>;
-		interrupts = <12 0>;		/* gpio-140 IRQ */
-		maxim,malicious_supply = "ac";
-		maxim,enable_por_init;
-		maxim,configuration {
-			/* Required properties */
-			config		= /bits/ 16 <0x6254>;	/* Tex = 0, Ss = Aen = TS = Ten = ETHRM = 1 */
-			full_soc_thresh	= /bits/ 16 <0x5F00>;	/* app note constant */
-			design_cap	= /bits/ 16 <662>;	/* in 5uVh/Rsns = 0.5 mAh */
-			ichgt_term	= /bits/ 16 <0x0066>;	/* battery attribute */
-			learn_cfg	= /bits/ 16 <0x2606>;	/* app note constant */
-			filter_cfg	= /bits/ 16 <0x87A4>;	/* app note constant */
-			relax_cfg	= /bits/ 16 <0x203B>;	/* Load = 5 mA, dV = 3.7 mV, dT = 6 mins */
-			fullcap		= /bits/ 16 <662>;	/* in 5uVh/Rsns = 0.5 mAh */
-			fullcapnom	= /bits/ 16 <662>;	/* in 5uVh/Rsns = 0.5 mAh */
-			qrtbl00		= /bits/ 16 <0x1B94>;	/* battery attribute */
-			qrtbl10		= /bits/ 16 <0x0E94>;	/* battery attribute */
-			qrtbl20		= /bits/ 16 <0x0594>;	/* battery attribute */
-			qrtbl30		= /bits/ 16 <0x0294>;	/* battery attribute */
-			rcomp0 		= /bits/ 16 <0x0052>;	/* battery attribute */
-			tcompc0		= /bits/ 16 <0x333A>;	/* battery attribute */
-			maxim,cell-char-tbl = /bits/ 16 <	/* battery attribute */
-				0x9cf0 0xa310 0xb180 0xb360 0xb6a0 0xb6e0
-				0xba10 0xbb10 0xbbd0 0xbc10 0xc200 0xc250
-				0xc7c0 0xc820 0xd050 0xd710 0x0140 0x0110
-				0x0210 0x02c0 0x1000 0x0a00 0x06c0 0x31a0
-				0x0af0 0x1170 0x0cb0 0x08d0 0x0aa0 0x0880
-				0x07b0 0x07b0 0x0100 0x0100 0x0100 0x0100
-				0x0100 0x0100 0x0100 0x0100 0x0100 0x0100
-				0x0100 0x0100 0x0100 0x0100 0x0100 0x0100
-			>;
-			/* Optional properties */
-			tgain		= /bits/ 16 <0xE71C>;	/* thermistor attribute */
-			toff		= /bits/ 16 <0x251A>;	/* thermistor attribute */
-		};
-		maxim,temp-conv {
-			start	= /bits/ 16 <(-20)>;	/* in degrees C */
-			result	= /bits/ 16 <
-				/* 1/10th C "real" temps corresponding start, start + 1, etc. fuel gauge temps in C */
-				(-302) (-271) (-246) (-222) (-202) (-180) (-162) (-147) (-129) (-114)	/* -20 C ... -11 C */
-				(-101) (-86)  (-72)  (-59)  (-48)  (-35)  (-23)  (-12)  (-2)   10	/* -10 C ... -1  C */
-				22     32     42     51     62     72     82     91     99     110	/*  0  C ...  9  C */
-				120    129    138    146    156    165    175    184    192    200	/*  10 C ...  19 C */
-				210    220    230    238    247    256    266    275    285    294	/*  20 C ...  29 C */
-				303    313    324    333    343    353    364    375    385    395	/*  30 C ...  39 C */
-				407    419    430    441    453    466    479    492    505    520	/*  40 C ...  49 C */
-				534    548    565    581    597    616    635    654    676    697	/*  50 C ...  59 C */
-				721    747    775    800						/*  60 C ...  63 C */
-			>;
-		};
-	};
 };
 
 &mcspi1 {
-
-tps65912_0: tps65912 {
-
-		compatible = "ti,tps65912";
+	clock-frequency = <3000000>;
+	cpcap {
+		compatible = "mot,cpcap";
 		reg = <0>; /* CS 0 */
-		spi-max-frequency = <15000000>;
+		spi-max-frequency = <3000000>;
 		spi-cs-high;
 
-		register-init-data = <
-			0x06 0x7F /* DCDC1_LIMIT: 0.7V-1.4875V in 12.5mV steps */
-			0x25 0xD1 /* DEVCTRL2: enable SLEEP, INT push/pull
-					       200us TSLOT, INT active high */
-			0x26 0x49 /* I2C_SPI_CFG: AVS ADDR = 0x13,
-					DCDC1, DCDC4 is AVS ctrl */
-			0x29 0x10 /* SET_OFF1: LDO5 */
-			0x2A 0x24 /* SET_OFF2: DCDC1, DCDC4 */
-			0x2d 0x88 /* DISCHARGE1: Enable LDO4, LDO8 */
-			0x17 0xC0 /* LDO3_AVS b6=1 : ECO mode */
-			0x19 0x64 /* LDO4_OP: b6 = 1 : give AVS register the on/off control, b0-5:1.8V */
-			0x1A 0x24 /* LDO4_AVS b7 = 0 : disables the reg, b0-5:1.8V */
-			0x1B 0x3f /* LDO4_LIMIT b0-5: ANY */
-			0x21 0xf2 /* LD10: b6=1 : ECO mode */
-			0x62 0x00 /* LOADSWITCH: Disable load switch at all times*/
-		>;
-
-		tps_irq_gpio = <0>;
-
-		powerkey_up_irq = <10>;		/* TPS65912_IRQ_GPIO3_R the key down */
-		powerkey_down_irq = <11>;	/* TPS65912_IRQ_GPIO3_F the key up */
-		powerkey_code = <116>;		/* power key code for android*/
+		irq-gpio = <0>;
 
 		regulators {
 			#address-cells = <1>;
@@ -558,19 +449,6 @@ tps65912_0: tps65912 {
 	};
 };
 
-
-&mcspi2 {
-	spi_flash: m25p80@0 {
-		compatible = "w25q80";
-		reg = <0>; /* CS 0 */
-		spi-max-frequency = <24000000>;
-		gpios = <&gpio3 21 0x2>; /* core_enb gpio-85 GPIOF_DIR_OUT | GPIOF_INIT_HIGH */
-		pinctrl-names = "off", "on";
-		pinctrl-0 = <&spi_flash_pins_off>;
-		pinctrl-1 = <&spi_flash_pins_on>;
-		m25p,fast-read;
-	};
-};
 
 &omap3_pmx_core {
 	pinctrl-names = "default";
@@ -836,7 +714,7 @@ tps65912_0: tps65912 {
 
 /* external */
 &mmc1 {
-	status = "disabled";
+/* TODO */
 };
 
 /* internal */

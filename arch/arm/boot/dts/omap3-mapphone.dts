@@ -7,7 +7,7 @@
  */
 /dts-v1/;
 
-/include/ "omap3-minnow.dtsi"
+/include/ "omap3-mapphone.dtsi"
 
 / {
 	mmi,revision = "p2";
@@ -37,8 +37,3 @@
 
 };
 
-&i2c2{
-	m4sensorhub@39 {
-		mot,fw-filename = "m4sensorhub-p2_5_minnow.bin";
-	};
-};
