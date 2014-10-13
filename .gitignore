@@ -62,6 +62,8 @@ modules.builtin
 include/config
 include/generated
 arch/*/include/generated
+drivers/net/wireless/ti/wlcore/version.h
+drivers/net/wireless/ti/wl18xx/version.h
 
 # stgit generated dirs
 patches-*
