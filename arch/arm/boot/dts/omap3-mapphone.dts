@@ -28,12 +28,85 @@
 		};
 
 	};
-
+ 
 	Display@0 {
 		gpio_vio_en = <&gpio2 10 0>;    /* VDDIO gpio-42 */
 		gpio_mem_en = <&gpio3 23 0>;    /* MEM_EN gpio-87 */
 		bridge-supply = <&disp_bridge>;
 	};
 
+	GPIO@0 {
+		class = "GPIO";
+		bt_wake_b = <8>;
+		ccel1_int = <22>;
+		gps_standby = <23>;
+		akm8973_reset = <28>;
+		gps_reset = <59>;
+		wlan_host_wake = <65>;
+		als_int = <16>;
+		touch_panel_int = <99>;
+		gps_interrupt = <160>;
+		touch_panel_rst = <164>;
+		akm8973_int = <175>;
+		power_off = <176>;
+		bt_host_wake_b = <15>;
+		bt_reset_b = <21>;
+		vib_control_en = <182>;
+		wlan_reset = <186>;
+		lm3530_int = <92>;
+		lcd_panel_reset = <93>;
+		lm3530_reset = <93>;
+		lcd_panel_sd = <98>;
+		gpio_cam_reset = <98>;
+		gpio_cam_pwdn = <64>;
+		type = <0x30003>;
+
+		HallEffect@0 {
+			class = "HallEffect";
+			device_available = <01>;
+			type = <0x170000>;
+		};
+	};
+
+	I2C@0 {
+		bus1devices = "qtouch-obp-ts,lm3530_led,isl29030_als_ir";
+		bus2devices = "akm8973,kxtf9";
+		bus3devices = "camise,HP_GEN_LENS,lm3554_led,mt9p012";
+		class = "I2C";
+		type = <0x10003>;
+
+		Accelerometer@0 {
+			axis_map_x = <0>;
+			axis_map_y = <1>;
+			axis_map_z = <2>;
+			class = "Accelerometer";
+			negate_x = <1>;
+			negate_y = <0>;
+			negate_z = <1>;
+			type = <0x180000>;
+		};
+
+		LEDLM3554@0 {
+			class = "LEDLM3554";
+			device_available = <1>;
+			flash_duration_def = [cf];
+			type = <0xb0001>;
+		};
+
+		Proximity@0 {
+			class = "Proximity";
+			configure = <62>;
+			crosstalk_vs_covered_threshold = <50>;
+			default_prox_noise_floor = <50>;
+			i2c_addr = <44>;
+			interrupt_cntrl = <20>;
+			lens_percent_t = <14>;
+			num_samples_for_noise_floor = <05>;
+			prox_higher_threshold = <14>;
+			prox_lower_threshold = <0x0a>;
+			type = <0x1d0000>;
+		};
+
+	};
 };
 

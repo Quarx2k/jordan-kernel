@@ -96,6 +96,8 @@ static void __init mapphone_init_gpio_clock(void)
 		}
 	}
 }
+extern void mapphone_gadget_init(void);
+extern void mapphone_cpcap_client_init(void);
 
 static void __init mapphone_init(void)
 {
@@ -105,6 +107,8 @@ static void __init mapphone_init(void)
 	omap3_enable_usim_buffer(); /* Needed for GPIOs in USIM block */
 	omap_minnow_display_init();
 	mapphone_init_btwilink();
+	mapphone_cpcap_client_init();
+	mapphone_gadget_init();
 }
 
 MACHINE_START(MAPPHONE, "mapphone_")
