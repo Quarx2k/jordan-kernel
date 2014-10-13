@@ -3682,7 +3682,7 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 		ext4_msg(sb, KERN_WARNING, "bad geometry: block count %llu "
 		       "exceeds size of device (%llu blocks)",
 		       ext4_blocks_count(es), blocks_count);
-		goto failed_mount;
+		//goto failed_mount;
 	}
 
 	/*
