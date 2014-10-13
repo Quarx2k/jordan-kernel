@@ -163,7 +163,7 @@ cpcap-objs                      := cpcap-core.o \
                                    cpcap-usb-det.o \
                                    cpcap-key.o \
                                    cpcap-adc.o \
-                                   cpcap-minnow.o \
+                                   cpcap-mapphone.o \
                                    cpcap-uc.o
 obj-$(CONFIG_MFD_CPCAP)          += cpcap.o
 
