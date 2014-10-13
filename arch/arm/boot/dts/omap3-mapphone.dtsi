@@ -287,22 +287,21 @@
 };
 
 &i2c1 {
+	status = "okay";
+	pinctrl-names = "default";
 	clock-frequency = <400000>;
 };
 
 &i2c2 {
+	status = "okay";
+	pinctrl-names = "default";
 	clock-frequency = <400000>;
 };
 
 &i2c3 {
-
+	status = "okay";
+	pinctrl-names = "default";
 	clock-frequency = <400000>;
-
-	lm3535@38 {
-		compatible = "ti,lm3535";
-		reg = <0x38>;
-	};
-
 };
 
 &mcspi1 {
