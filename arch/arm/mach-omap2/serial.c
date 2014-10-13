@@ -202,7 +202,6 @@ static char *cmdline_find_option(char *str)
 
 static int __init omap_serial_early_init(void)
 {
-#ifdef CONFIG_DEBUG_LL
 	do {
 		char oh_name[MAX_UART_HWMOD_NAME_LEN];
 		struct omap_hwmod *oh;
@@ -249,7 +248,6 @@ static int __init omap_serial_early_init(void)
 			oh->flags |= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET;
 		}
 	} while (1);
-#endif
 	return 0;
 }
 omap_core_initcall(omap_serial_early_init);

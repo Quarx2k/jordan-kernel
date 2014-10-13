@@ -3773,9 +3773,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_hwmod_ocp_ifs[] __initdata = {
 	&omap3xxx_l4_core__mmc3,
 	&omap3_l4_core__uart1,
 	&omap3_l4_core__uart2,
-#ifdef CONFIG_DEBUG_LL
 	&omap3_l4_per__uart3,
-#endif
 	&omap3_l4_core__i2c1,
 	&omap3_l4_core__i2c2,
 	&omap3_l4_core__i2c3,
