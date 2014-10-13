@@ -44,16 +44,13 @@
 	regulators {
 		compatible = "simple-bus";
 
-		vmmc: gpio-regulator {
+		vmmc: fixedregulator {
 			compatible = "regulator-fixed";
-
-			regulator-min-microvolt = <1800000>;
-			regulator-max-microvolt = <1800000>;
 			regulator-name = "vmmc";
-			gpio = <&gpio6 26 0>;
-			startup-delay-us = <70000>;
-			enable-active-high;
+			regulator-min-microvolt = <3300000>;
+			regulator-max-microvolt = <3300000>;
 		};
+
 	};
 
 	/* external 26MHz clock which is controlled by gpio
@@ -714,7 +711,9 @@
 
 /* external */
 &mmc1 {
-/* TODO */
+	status = "okay";
+	vmmc-supply = <&vmmc>;
+	bus-width = <4>;
 };
 
 /* internal */
