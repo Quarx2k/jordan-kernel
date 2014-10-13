@@ -731,7 +731,7 @@ static int fw_load(struct cpcap_uc_data *uc_data, struct device *dev)
 		}
 
 		num_words = num_bytes >> 1;
-		dev_dbg(dev, "Loading %d word(s) at 0x%04x\n",
+		dev_info(dev, "Loading %d word(s) at 0x%04x\n",
 			 num_words, be32_to_cpu(rec->addr));
 
 		buf = kzalloc(num_bytes, GFP_KERNEL);

@@ -779,6 +779,8 @@ static int cpcap_usb_det_probe(struct platform_device *pdev)
 #ifdef CONFIG_CHARGER_CPCAP_2WIRE
 	struct cpcap_platform_data *platform_data;
 #endif
+	
+	printk("CPCAP USB PROBE STARTED!!!!!\n");	
 
 	if (pdev->dev.platform_data == NULL) {
 		dev_err(&pdev->dev, "no platform_data\n");

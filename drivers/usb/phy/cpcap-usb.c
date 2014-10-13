@@ -112,6 +112,7 @@ static int cpcap_usb_setup(struct cpcap_usb *cpcap)
 			"Can't disable SPI control of CPCAP transceiver\n");
 		return r;
 	}
+	printk("CPCAP USB SETUP FINISH\n");
 	return 0;
 }
 static int cpcap_usb_set_vbus(struct usb_otg *otg, bool enabled)
@@ -140,6 +141,8 @@ static int  cpcap_usb_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
+	printk("CPCAP USB PROBE START\n");
+
 	cpcap->dev		= &pdev->dev;
 	cpcap->phy.dev		= cpcap->dev;
 	cpcap->phy.label		= "cpcap";
@@ -156,18 +159,22 @@ static int  cpcap_usb_probe(struct platform_device *pdev)
 	otg->start_srp		= cpcap_usb_start_srp;
 	otg->phy		= &cpcap->phy;
 
+	printk("CPCAP USB PROBE usb_add_phy_dev\n");
 	spin_lock_init(&cpcap->lock);
 	usb_add_phy_dev(&cpcap->phy);
 
+	printk("CPCAP USB PROBE platform_set_drvdata\n");
 	platform_set_drvdata(pdev, cpcap);
 
-	
+	printk("CPCAP USB PROBE cpcap_usb_setup\n");
 	err = cpcap_usb_setup(cpcap);
 	if (err < 0)
 		goto err0;
+	printk("CPCAP USB PROBE END\n");
 	return 0;
 
 err0:
+	printk("ERROR IN CPCAP USB PROBE\n");
 	usb_remove_phy(&cpcap->phy);
 	devm_kfree(&pdev->dev,cpcap);
 	devm_kfree(&pdev->dev,otg);
@@ -193,6 +200,7 @@ static struct platform_driver cpcap_usb_driver = {
 
 static int __init cpcap_usb_init(void)
 {
+	printk("CPCAP USB INIT START\n");
 	return cpcap_driver_register(&cpcap_usb_driver);
 }
 subsys_initcall(cpcap_usb_init);

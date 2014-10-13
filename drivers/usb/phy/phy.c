@@ -361,7 +361,7 @@ int usb_add_phy_dev(struct usb_phy *x)
 {
 	struct usb_phy_bind *phy_bind;
 	unsigned long flags;
-
+	printk("!!!!!!!!!!!usb_add_phy_dev START!!!!!!!!!!!!!\n");
 	if (!x->dev) {
 		dev_err(x->dev, "no device provided for PHY\n");
 		return -EINVAL;
@@ -375,6 +375,7 @@ int usb_add_phy_dev(struct usb_phy *x)
 	list_add_tail(&x->head, &phy_list);
 
 	spin_unlock_irqrestore(&phy_lock, flags);
+	printk("!!!!!!!!!!!usb_add_phy_dev END!!!!!!!!!!!!!\n");
 	return 0;
 }
 EXPORT_SYMBOL_GPL(usb_add_phy_dev);
