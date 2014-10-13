@@ -1,2 +1,2 @@
 static const char *wlcore_timestamp = __TIMESTAMP__;
-static const char *wlcore_git_head = "android-4.4w_r4-13-g7316b36-dirty";
+static const char *wlcore_git_head = "android-4.4w_r4-14-gdcbcdb7-dirty";

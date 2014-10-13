@@ -1183,6 +1183,22 @@ CONFIG_ST_HCI=y
 # CONFIG_ALTERA_STAPL is not set
 
 #
+# Motorola netmux driver
+#
+CONFIG_NETMUX_DRIVER=y
+# CONFIG_DEBUG_NETMUX is not set
+
+#
+# Motorola netmux link driver
+#
+CONFIG_NETMUX_LINKDRIVER=y
+
+#
+# Motorola Modem PM Driver
+#
+CONFIG_MODEM_PM_DRIVER=y
+
+#
 # SCSI device support
 #
 CONFIG_SCSI_MOD=y
@@ -2161,6 +2177,13 @@ CONFIG_USB_G_ANDROID=y
 # CONFIG_USB_G_MULTI is not set
 # CONFIG_USB_G_HID is not set
 # CONFIG_USB_G_DBGP is not set
+
+#
+# NOTE: USB_IPC enables AP-BP data transfer
+#
+CONFIG_USB_IPC=y
+# CONFIG_USB_IPC_TEST is not set
+# CONFIG_IPC_USBHOST_DBG is not set
 CONFIG_MMC=y
 # CONFIG_MMC_DEBUG is not set
 CONFIG_MMC_UNSAFE_RESUME=y

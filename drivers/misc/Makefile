@@ -68,3 +68,6 @@ obj-$(CONFIG_MOT_UTAG)          += utag/
 obj-$(CONFIG_BQ5105X_CTRL)      += bq5105x_ctrl.o
 obj-$(CONFIG_BQ5105X_DETECT)    += bq5105x_detect.o
 obj-$(CONFIG_WAKEUP_SOURCE_NOTIFY)	+= wakeup_source_notify.o
+obj-$(CONFIG_NETMUX_DRIVER)     += netmux/
+obj-$(CONFIG_NETMUX_LINKDRIVER) += netmux_linkdriver/
+obj-$(CONFIG_MODEM_PM_DRIVER)   += modem_pm_driver/
