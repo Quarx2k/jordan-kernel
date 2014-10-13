@@ -22,6 +22,8 @@
 #include <linux/platform_device.h>
 #include <linux/gpio.h>
 #include <linux/irq.h>
+#include <linux/of.h>
+#include <linux/of_gpio.h>
 #include <linux/regulator/machine.h>
 #include <linux/spi/spi.h>
 #include <linux/spi/cpcap.h>
@@ -60,6 +62,8 @@ static struct spi_driver cpcap_driver = {
 	.probe = cpcap_probe,
 	.remove = cpcap_remove,
 };
+
+module_spi_driver(cpcap_driver);
 
 static struct platform_device cpcap_adc_device = {
 	.name           = "cpcap_adc",
@@ -256,11 +260,6 @@ static struct notifier_block cpcap_reboot_notifier = {
 	.notifier_call = cpcap_reboot,
 };
 
-static int __init cpcap_init(void)
-{
-	return spi_register_driver(&cpcap_driver);
-}
-
 static void cpcap_vendor_read(struct cpcap_device *cpcap)
 {
 	unsigned short value;
@@ -362,6 +361,8 @@ static int cpcap_probe(struct spi_device *spi)
 	cpcap = kzalloc(sizeof(*cpcap), GFP_KERNEL);
 	if (cpcap == NULL)
 		return -ENOMEM;
+
+	printk("START CPCAP_CORE PROBE\n");
 
 	cpcap->spi = spi;
 	data = cpcap_get_plat_data(cpcap);
@@ -581,19 +582,11 @@ static long ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	return retval;
 }
 
-static void cpcap_shutdown(void)
-{
-	spi_unregister_driver(&cpcap_driver);
-}
-
 int cpcap_disable_offmode_wakeups(bool disable)
 {
 	int retval = 0;
 	return retval;
 }
-
-subsys_initcall(cpcap_init);
-module_exit(cpcap_shutdown);
 
 MODULE_ALIAS("platform:cpcap");
 MODULE_DESCRIPTION("CPCAP driver");

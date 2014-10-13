@@ -709,11 +709,13 @@ static int fw_load(struct cpcap_uc_data *uc_data, struct device *dev)
 	if (!uc_data || !dev)
 		return -EINVAL;
 
-	if (uc_data->cpcap->vendor == CPCAP_VENDOR_ST)
+	if (uc_data->cpcap->vendor == CPCAP_VENDOR_ST) {
+		printk("CPCAP_VENDOR_ST :(\n");
 		err = request_ihex_firmware(&fw, "cpcap/firmware_0_2x.fw", dev);
-	else
+	} else {
+		printk("CPCAP_VENDOR_CPCAP :) :)\n");
 		err = request_ihex_firmware(&fw, "cpcap/firmware_1_2x.fw", dev);
-
+	}
 	if (err) {
 		dev_err(dev, "Failed to load \"cpcap/firmware_%d_2x.fw\": %d\n",
 			uc_data->cpcap->vendor, err);
@@ -810,6 +812,9 @@ static int cpcap_uc_probe(struct platform_device *pdev)
 	if (!data)
 		return -ENOMEM;
 
+
+	printk("START UC PROBE!!!!!!!!!!!!!!!!!!!!\n");
+
 	data->cpcap = pdev->dev.platform_data;
 	data->uc_reset = 0;
 	data->is_supported = 0;
@@ -822,10 +827,11 @@ static int cpcap_uc_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, data);
 	cpcap_uc_info = data;
 	data->cpcap->ucdata = data;
-
+	printk("data->cpcap->vendor before == %d!!!!!!!!!!!!!!!!!!!!\n", data->cpcap->vendor);
 	if (((data->cpcap->vendor == CPCAP_VENDOR_TI) &&
 	     (data->cpcap->revision >= CPCAP_REVISION_2_0)) ||
 		(data->cpcap->vendor == CPCAP_VENDOR_ST)) {
+		printk("data->cpcap->vendor after == %d!!!!!!!!!!!!!!!!!!!!\n", data->cpcap->vendor);
 		retval = cpcap_irq_register(data->cpcap, CPCAP_IRQ_PRIMAC,
 					    primac_handler, data);
 		if (retval)
@@ -864,20 +870,27 @@ static int cpcap_uc_probe(struct platform_device *pdev)
 	} else
 		retval = -ENODEV;
 
+	printk("EXIT UC PROBE!!!!!!!!!!!!!!!!!!!!\n");
 	return retval;
 
 err_fw:
 	misc_deregister(&uc_dev);
+	printk("err_fw!!!!!!!!!!!!!!!!!!!!\n");
 err_priramw:
 	cpcap_irq_free(data->cpcap, CPCAP_IRQ_UC_PRIRAMW);
+	printk("err_priramw!!!!!!!!!!!!!!!!!!!!\n");
 err_priramr:
 	cpcap_irq_free(data->cpcap, CPCAP_IRQ_UC_PRIRAMR);
+	printk("err_priramr!!!!!!!!!!!!!!!!!!!!\n");
 err_ucreset:
 	cpcap_irq_free(data->cpcap, CPCAP_IRQ_UCRESET);
+	printk("cpcap_irq_free!!!!!!!!!!!!!!!!!!!!\n");
 err_primac:
 	cpcap_irq_free(data->cpcap, CPCAP_IRQ_PRIMAC);
+	printk("err_primac!!!!!!!!!!!!!!!!!!!!\n");
 err_free:
 	kfree(data);
+	printk("err_free!!!!!!!!!!!!!!!!!!!!\n");
 
 	return retval;
 }
@@ -900,24 +913,14 @@ static int __exit cpcap_uc_remove(struct platform_device *pdev)
 
 static struct platform_driver cpcap_uc_driver = {
 	.probe		= cpcap_uc_probe,
-	.remove		= __exit_p(cpcap_uc_remove),
+	.remove		= cpcap_uc_remove,
 	.driver		= {
 		.name	= "cpcap_uc",
 		.owner	= THIS_MODULE,
 	},
 };
 
-static int __init cpcap_uc_init(void)
-{
-	return platform_driver_register(&cpcap_uc_driver);
-}
-subsys_initcall(cpcap_uc_init);
-
-static void __exit cpcap_uc_exit(void)
-{
-	platform_driver_unregister(&cpcap_uc_driver);
-}
-module_exit(cpcap_uc_exit);
+module_platform_driver(cpcap_uc_driver);
 
 MODULE_ALIAS("platform:cpcap_uc");
 MODULE_DESCRIPTION("CPCAP uC driver");

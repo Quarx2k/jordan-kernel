@@ -111,7 +111,7 @@ static void __init mapphone_init(void)
 	mapphone_gadget_init();
 }
 
-MACHINE_START(MAPPHONE, "mapphone_")
+MACHINE_START(MAPPHONE, "mapphone_umts")
 	.atag_offset    = 0x100,
 	.reserve        = omap_reserve,
 	.map_io         = omap3_map_io,

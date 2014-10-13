@@ -35,6 +35,8 @@
 #include <linux/usb/otg.h>
 #include <linux/spi/cpcap.h>
 #include <linux/spi/cpcap-regbits.h>
+#include <linux/of.h>
+#include <linux/of_gpio.h>
 
 enum linkstat {
 	USB_LINK_UNKNOWN = 0,
@@ -95,6 +97,11 @@ static int cpcap_usb_setup(struct cpcap_usb *cpcap)
 	unsigned short value;
 	int r;
 
+	if (cpcap->cpcap == NULL) {
+		printk("Cpcap device is null, let's try again ;p\n");
+		return 0;
+	}
+
 	r = cpcap_regacc_read(cpcap->cpcap, CPCAP_REG_INTS2, &value);
 
 	if (value & CPCAP_BIT_SE1_S)
@@ -112,6 +119,7 @@ static int cpcap_usb_setup(struct cpcap_usb *cpcap)
 			"Can't disable SPI control of CPCAP transceiver\n");
 		return r;
 	}
+
 	printk("CPCAP USB SETUP FINISH\n");
 	return 0;
 }
@@ -189,30 +197,34 @@ static int  cpcap_usb_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_OF
+static const struct of_device_id cpcap_usb_id_table[] = {
+	{ .compatible = "mot,cpcap-usb" },
+	{}
+};
+MODULE_DEVICE_TABLE(of, cpcap_usb_id_table);
+#endif
+
+static const struct platform_device_id cpcap_usb_platform_id_table[] = {
+	{"cpcap-usb", 0},
+	{},
+};
+MODULE_DEVICE_TABLE(of, cpcap_usb_platform_id_table);
+
+
 static struct platform_driver cpcap_usb_driver = {
 	.probe		= cpcap_usb_probe,
 	.remove		= (cpcap_usb_remove),
 	.driver		= {
 		.name	= "cpcap_usb",
 		.owner	= THIS_MODULE,
+#ifdef CONFIG_OF
+		.of_match_table = of_match_ptr(cpcap_usb_id_table),
+#endif
 	},
 };
 
-static int __init cpcap_usb_init(void)
-{
-	printk("CPCAP USB INIT START\n");
-	return cpcap_driver_register(&cpcap_usb_driver);
-}
-subsys_initcall(cpcap_usb_init);
-
-static void __exit cpcap_usb_exit(void)
-{
-	platform_driver_unregister(&cpcap_usb_driver);
-}
-module_exit(cpcap_usb_exit);
-
-
-
+module_platform_driver(cpcap_usb_driver);
 
 MODULE_ALIAS("platform:cpcap_usb");
 MODULE_DESCRIPTION("CPCAP USB transceiver driver");

@@ -690,17 +690,7 @@ static struct platform_driver cpcap_adc_driver = {
 	.remove = cpcap_adc_remove,
 };
 
-static int __init cpcap_adc_init(void)
-{
-	return platform_driver_register(&cpcap_adc_driver);
-}
-subsys_initcall(cpcap_adc_init);
-
-static void __exit cpcap_adc_exit(void)
-{
-	platform_driver_unregister(&cpcap_adc_driver);
-}
-module_exit(cpcap_adc_exit);
+module_platform_driver(cpcap_adc_driver);
 
 MODULE_ALIAS("platform:cpcap_adc");
 MODULE_DESCRIPTION("CPCAP ADC driver");

@@ -17,6 +17,10 @@
 #include <mach/hardware.h>
 #include <linux/usb/otg.h>
 #include <linux/usb/composite.h>
+#include <linux/usb/musb.h>
+#include <linux/usb/phy.h>
+#include <linux/usb/nop-usb-xceiv.h>
+#include "usb.h"
 
 #if defined(CONFIG_USB_MUSB_OTG)
 #include <linux/spi/cpcap.h>
@@ -24,67 +28,18 @@
 #include <linux/usb/composite.h>
 #endif
 
-#include "cm-regbits-34xx.h"
-#include "clock.h"
-
-#define MAPPHONE_BP_READY2_AP_GPIO      59
-#define MAPPHONE_IPC_USB_SUSP_GPIO	142 //95
-#define DIE_ID_REG_BASE			(L4_34XX_PHYS + 0xA000)
-#define DIE_ID_REG_OFFSET		0x218
-#define DIE_ID_REG_BASE_44XX		(L4_44XX_PHYS + 0x2000)
-#define DIE_ID_REG_OFFSET_44XX		0x200
-#define EHCI_IRQ                        (77 + OMAP44XX_IRQ_GIC_START)
-//void cpcap_musb_notifier_call(unsigned long event);
-
-static struct platform_device android_usb_platform_device = {
-	.name	= "android_gadget",
-	.id	= -1,
-	.dev	= {
-	},
-};
-
-static int cpcap_usb_connected_probe(struct platform_device *pdev)
-{
-	printk("USB Connected!\n");
-	//cpcap_musb_notifier_call(USB_EVENT_VBUS);
-	return 0;
-}
-
-static int cpcap_usb_connected_remove(struct platform_device *pdev)
-{
-	printk("USB Disconnected!\n");
-	//cpcap_musb_notifier_call(USB_EVENT_NONE);
-	return 0;
-}
-
-static struct platform_driver cpcap_usb_connected_driver = {
-	.probe		= cpcap_usb_connected_probe,
-	.remove		= cpcap_usb_connected_remove,
-	.driver		= {
-		.name	= "cpcap_usb_connected",
-		.owner	= THIS_MODULE,
-	},
-};
-
-void mapphone_gadget_init(void)
-{
-	platform_driver_register(&cpcap_usb_connected_driver);
-	platform_device_register(&android_usb_platform_device);
-
-}
-/*
-static struct usbhs_omap_board_data usbhs_bdata  = {
+static struct usbhs_omap_platform_data usbhs_bdata  = {
 	.phy_reset  = false,
-	.ehci_phy_vbus_not_used = false,
 	.es2_compatibility = false,
 	.port_mode[0] = OMAP_USBHS_PORT_MODE_UNUSED,
 	.port_mode[1] = OMAP_USBHS_PORT_MODE_UNUSED,
 	.port_mode[2] = OMAP_EHCI_PORT_MODE_TLL,
 };
 
-
-void __init mapphone_usbhost_init(void)
+void mapphone_gadget_init(void)
 {
+	usb_bind_phy("musb-hdrc.1.auto", 0, "cpcap_usb");
+	usb_musb_init(NULL);
 	usbhs_init(&usbhs_bdata);
 }
-*/
+

@@ -128,17 +128,7 @@ static struct platform_driver cpcap_key_driver = {
 	},
 };
 
-static int __init cpcap_key_init(void)
-{
-	return platform_driver_register(&cpcap_key_driver);
-}
-module_init(cpcap_key_init);
-
-static void __exit cpcap_key_exit(void)
-{
-	platform_driver_unregister(&cpcap_key_driver);
-}
-module_exit(cpcap_key_exit);
+module_platform_driver(cpcap_key_driver);
 
 MODULE_ALIAS("platform:cpcap_key");
 MODULE_DESCRIPTION("CPCAP KEY driver");

@@ -112,19 +112,8 @@
 		vib-gpio-supply = <&ldo6_reg>;
 	};
 
-	tusb_phy: tusb-usb@0 {
-		compatible = "ti,tusb-usb";
-		gpios = <&gpio5 14 0x1>,  /* IRQ gpio-142    GPIOF_DIR_IN */
-			<&gpio1 15 0x0>,  /* resetn gpio-15  GPIOF_DIR_OUT|GPIOF_INIT_LOW */
-			<&gpio1 16 0x0>,  /* cs gpio-16      GPIOF_DIR_OUT|GPIOF_INIT_LOW */
-			<&gpio1 27 0x2>;  /* cs gpio-27      GPIOF_DIR_OUT|GPIOF_INIT_HIGH */
-		gpio-names = "tusb-irq",
-			     "tusb-resetn",
-			     "tusb-cs",
-			     "tusb-csn";
-		clk_in = "periph_26mhz";  /* external 26MHz clock */
-		reg = <0 0>;
-		supplied_to = "max170xx_battery";
+	cpcap_phy: cpcap-usb@0 {
+		compatible = "mot,cpcap-usb";
 	};
 
 	factory_support {
@@ -147,41 +136,6 @@
 
 	rtc_sensorhub@0 {
 		compatible = "mot,rtc_from_sensorhub";
-	};
-
-	m4sensor {
-		compatible = "simple-bus";
-
-		mpu9150 {
-			compatible = "mot,m4mpu9150";
-		};
-		pedometer {
-			compatible = "mot,m4pedometer";
-		};
-		passive {
-			compatible = "mot,m4passive";
-		};
-		gesture {
-			compatible = "mot,m4gesture";
-		};
-		display {
-			compatible = "mot,m4display";
-		};
-		download {
-			compatible = "mot,m4download";
-		};
-		stillmode {
-			compatible = "mot,m4stillmode";
-		};
-		lightsensor {
-			compatible = "mot,m4als";
-		};
-                heartratesensor {
-                        compatible = "mot,m4heartrate";
-                };
-		fusion {
-			compatible = "mot,m4fusion";
-		};
 	};
 
 	sound {
@@ -306,6 +260,7 @@
 
 &mcspi1 {
 	clock-frequency = <3000000>;
+
 	cpcap {
 		compatible = "mot,cpcap";
 		reg = <0>; /* CS 0 */
@@ -735,7 +690,7 @@
 
 &usb_otg_hs {
 	interface-type = <0>;
-	usb-phy = <&tusb_phy>;
+	usb-phy = <&cpcap_phy>;
 	mode = <3>;
 	power = <50>;
 
