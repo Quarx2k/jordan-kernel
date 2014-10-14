@@ -101,14 +101,25 @@ extern void mapphone_cpcap_client_init(void);
 
 static void __init mapphone_init(void)
 {
+	struct clk *clkp;
+
 	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
 	mapphone_init_gpio_clock();
 	omap_sdrc_init(JEDEC_JESD209A_sdrc_params, JEDEC_JESD209A_sdrc_params);
 	omap3_enable_usim_buffer(); /* Needed for GPIOs in USIM block */
+
+	/* Enable sad2d iclk */
+	clkp = clk_get(NULL, "sad2d_ick");
+	if (clkp) {
+             clk_enable(clkp);
+             printk("sad2d_ick enabled\n");
+	}
+
 	omap_minnow_display_init();
 	mapphone_init_btwilink();
 	mapphone_cpcap_client_init();
-	mapphone_gadget_init();
+	usb_bind_phy("musb-hdrc.1.auto", 0, "cpcap_usb");
+	usb_musb_init(NULL);
 }
 
 MACHINE_START(MAPPHONE, "mapphone_umts")

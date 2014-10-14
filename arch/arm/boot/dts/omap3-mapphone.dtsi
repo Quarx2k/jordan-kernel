@@ -229,6 +229,10 @@
 	};
 };
 
+&usbhshost {
+	port3-mode = "ehci-tll";
+};
+
 &glbl_prm {
 	status = "ok";
 	sys_clk = "osc_sys_ck";
@@ -725,8 +729,6 @@
 };
 /* m4 debug */
 &uart4 {
-	wakeup-capable;
-	autosuspend-delay = <50>; /* ms */
-	timed-wakelock = <50>; /* ms */
-	rx_trig = <32>;
+	status = "disabled";
 };
+
