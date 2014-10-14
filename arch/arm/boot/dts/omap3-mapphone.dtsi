@@ -95,18 +95,6 @@
 		pinctrl-1 = <&display_vddio_output>;
 	};
 
-	c55-ctrl@0 {
-		compatible = "ti,c55-ctrl";
-		reg = <0 0>;
-		gpios = <&gpio3 12 1>, /* IRQ   gpio_ap_int gpio-076 */
-			<&gpio3 17 2>; /* gpio_c55_int gpio-81*/
-		vddc-supply = <&ldo9_reg>;
-		vddldo-supply = <&ldo3_reg>;
-		pinctrl-names = "off", "on";
-		pinctrl-0 = <&c55_pins_off>;
-		pinctrl-1 = <&c55_pins_on>;
-	};
-
 	vib-gpio {
 		compatible = "mot,vib-gpio";
 		vib-gpio-supply = <&ldo6_reg>;
@@ -114,13 +102,6 @@
 
 	cpcap_phy: cpcap-usb@0 {
 		compatible = "mot,cpcap-usb";
-	};
-
-	factory_support {
-		compatible = "mmi,factory-support";
-
-		gpios = <&gpio6 22 0x0>; /*gpio-182 GPIOF_DIR_OUT|GPIOF_INIT_LOW */
-		gpio-names = "factory_kill_disable";
 	};
 
 	pmic-wdi@0 {
@@ -132,23 +113,6 @@
 		pinctrl-names = "output", "tristate";
 		pinctrl-0 = <&wdi_phy_gpio_mode>;
 		pinctrl-1 = <&wdi_phy_safe_mode>;
-	};
-
-	rtc_sensorhub@0 {
-		compatible = "mot,rtc_from_sensorhub";
-	};
-
-	sound {
-		compatible = "mot,omap-soc-c55";
-		mot,model = "omap3c55audio";
-		mot,mcbsp = <&mcbsp4>;
-	};
-
-	soc {
-
-		compatible = "mot,soc-c55";
-		mot,mic_bias1_en = <&gpio3 13 0>; /* gpio-077 */
-		mot,mic_bias3_en = <&gpio3 20 0>; /* gpio-084 */
 	};
 
 	omap_pimic {
@@ -163,24 +127,6 @@
 			ti,boot-voltage-micro-volts = <1200000>;
 			ti,vp = <&vp_core>;
 		};
-	};
-
-	dock_detect: bq5105x-detect {
-		compatible = "mmi,bq5105x-detect";
-		charge-gpio = <&gpio6 16 0>;	/* gpio-176 */
-		detect-gpio = <&gpio1 22 0x1>;	/* gpio-22  */
-		undocked-delay,ms = <1500>;
-		charger-name = "wireless";
-		switch-name = "dock";
-		uevent-wakelock-timeout,ms = <2000>;
-		supplied_to = "max170xx_battery";
-	};
-
-	bq5105x-ctrl {
-		reg = <0 0>;
-		compatible = "ti,bq5105x-control";
-		gpios = <&gpio3 14 0x0>; /* gpio-72  GPIOF_DIR_OUT|GPIOF_INIT_LOW */
-		gpio-names = "charge_terminate";
 	};
 
 	pad-wkup {
@@ -245,20 +191,14 @@
 };
 
 &i2c1 {
-	status = "okay";
-	pinctrl-names = "default";
 	clock-frequency = <400000>;
 };
 
 &i2c2 {
-	status = "okay";
-	pinctrl-names = "default";
 	clock-frequency = <400000>;
 };
 
 &i2c3 {
-	status = "okay";
-	pinctrl-names = "default";
 	clock-frequency = <400000>;
 };
 
@@ -727,8 +667,3 @@
 	wakeup-capable;
 	autosuspend-delay = <3000>; /* ms */
 };
-/* m4 debug */
-&uart4 {
-	status = "disabled";
-};
-
