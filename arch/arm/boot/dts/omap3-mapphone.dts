@@ -28,7 +28,15 @@
 		};
 
 	};
- 
+
+ 	/* bu52014hfv sensor */
+	bu52014hfv {
+		compatible = "mot,bu52014hfv";
+		docked_north_gpio = <10>;
+		docked_south_gpio = <111>;
+		north_is_desk = <1>;
+	};
+
 	Display@0 {
 		gpio_vio_en = <&gpio2 10 0>;    /* VDDIO gpio-42 */
 		gpio_mem_en = <&gpio3 23 0>;    /* MEM_EN gpio-87 */

@@ -27,7 +27,8 @@
 #include <linux/slab.h>
 #include <linux/switch.h>
 #include <linux/workqueue.h>
-
+#include <linux/of.h>
+#include <linux/of_gpio.h>
 #include <linux/bu52014hfv.h>
 
 struct bu52014hfv_info {
@@ -108,10 +109,32 @@ static irqreturn_t bu52014hfv_isr(int irq, void *dev)
 
 	return IRQ_HANDLED;
 }
+#ifdef CONFIG_OF
+static struct bu52014hfv_platform_data *bu52014hfv_of_init(struct platform_device *pdev)
+{
+	struct bu52014hfv_platform_data *pdata;
+	struct device_node *np = pdev->dev.of_node;
+	unsigned int prop;
+
+	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+	if (!pdata) {
+		dev_err(&pdev->dev, "pdata allocation failure\n");
+		return NULL;
+	}
+	if (!of_property_read_u32(np, "docked_north_gpio", &prop))
+		pdata->docked_north_gpio = prop;
+	if (!of_property_read_u32(np, "docked_south_gpio", &prop))
+		pdata->docked_south_gpio = prop;
+	if (!of_property_read_u32(np, "north_is_desk", &prop))
+		pdata->north_is_desk = prop;
+
+	return pdata;
+}
+#endif
 
 static int bu52014hfv_probe(struct platform_device *pdev)
 {
-	struct bu52014hfv_platform_data *pdata = pdev->dev.platform_data;
+	struct bu52014hfv_platform_data *pdata;
 	struct bu52014hfv_info *info;
 	int ret = -1;
 
@@ -122,6 +145,11 @@ static int bu52014hfv_probe(struct platform_device *pdev)
 		       __func__, ret);
 		goto error_kmalloc_failed;
 	}
+
+	if (pdev->dev.of_node)
+		pdata = bu52014hfv_of_init(pdev);
+	else
+		pdata = pdev->dev.platform_data;
 
 	/* Initialize hall effect driver data */
 	info->gpio_north = pdata->docked_north_gpio;
@@ -137,6 +165,12 @@ static int bu52014hfv_probe(struct platform_device *pdev)
 		info->north_value = CAR_DOCK;
 		info->south_value = DESK_DOCK;
 	}
+
+	gpio_request(pdata->docked_north_gpio, "mapphone dock north");
+	gpio_direction_input(pdata->docked_north_gpio);
+
+	gpio_request(pdata->docked_south_gpio, "mapphone dock south");
+	gpio_direction_input(pdata->docked_south_gpio);
 
 	info->work_queue = create_singlethread_workqueue("bu52014hfv_wq");
 	if (!info->work_queue) {
@@ -217,27 +251,34 @@ static int bu52014hfv_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_OF
+static const struct of_device_id bu52014hfv_id_table[] = {
+	{ .compatible = "mot,bu52014hfv" },
+	{}
+};
+MODULE_DEVICE_TABLE(of, bu52014hfv_id_table);
+#endif
+
+static const struct platform_device_id bu52014hfv_platform_id_table[] = {
+	{"bu52014hfv", 0},
+	{},
+};
+MODULE_DEVICE_TABLE(of, bu52014hfv_platform_id_table);
+
+
 static struct platform_driver bu52014hfv_driver = {
 	.probe = bu52014hfv_probe,
 	.remove = bu52014hfv_remove,
 	.driver = {
-		   .name = BU52014HFV_MODULE_NAME,
+		   .name = "bu52014hfv",
 		   .owner = THIS_MODULE,
+#ifdef CONFIG_OF
+		.of_match_table = of_match_ptr(bu52014hfv_id_table),
+#endif
 		   },
 };
 
-static int __init bu52014hfv_os_init(void)
-{
-	return platform_driver_register(&bu52014hfv_driver);
-}
-
-static void __exit bu52014hfv_os_exit(void)
-{
-	platform_driver_unregister(&bu52014hfv_driver);
-}
-
-module_init(bu52014hfv_os_init);
-module_exit(bu52014hfv_os_exit);
+module_platform_driver(bu52014hfv_driver);
 
 MODULE_DESCRIPTION("Rohm BU52014HFV Hall Effect Driver");
 MODULE_AUTHOR("Motorola");

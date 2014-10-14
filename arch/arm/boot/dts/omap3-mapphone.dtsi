@@ -159,8 +159,8 @@
 			     <0x1b0 112 0>, /* gpio0 - tps (dbg only) */
 		             <0x5bc 134 1>, /* bq5105x charger pulse  */
 		             <0x13c 252 1>; /* battery                */
-
 	};
+
 };
 
 &vc {
@@ -667,3 +667,4 @@
 	wakeup-capable;
 	autosuspend-delay = <3000>; /* ms */
 };
+
