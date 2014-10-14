@@ -527,6 +527,7 @@ static int usbhs_omap_get_dt_pdata(struct device *dev,
 		return -ENODEV;
 	}
 
+	dev_info(dev, "OMAP3_HS_USB_PORTS == %d\n", OMAP3_HS_USB_PORTS);
 	/* get port modes */
 	for (i = 0; i < OMAP3_HS_USB_PORTS; i++) {
 		char prop[11];
@@ -536,17 +537,18 @@ static int usbhs_omap_get_dt_pdata(struct device *dev,
 
 		snprintf(prop, sizeof(prop), "port%d-mode", i + 1);
 		ret = of_property_read_string(node, prop, &mode);
-		if (ret < 0)
+		printk("prop:%s mode:%s\n", prop, mode);
+		if (ret < 0) {
 			continue;
-
+		}
 		ret = omap_usbhs_get_dt_port_mode(mode);
 		if (ret < 0) {
-			dev_warn(dev, "Invalid port%d-mode \"%s\" in device tree\n",
+			dev_info(dev, "Invalid port%d-mode \"%s\" in device tree\n",
 					i, mode);
 			return -ENODEV;
 		}
 
-		dev_dbg(dev, "port%d-mode: %s -> %d\n", i, mode, ret);
+		dev_info(dev, "port%d-mode: %s -> %d\n", i, mode, ret);
 		pdata->port_mode[i] = ret;
 	}
 
@@ -639,9 +641,11 @@ static int usbhs_omap_probe(struct platform_device *pdev)
 	} else {
 		switch (omap->usbhs_rev) {
 		case OMAP_USBHS_REV1:
+			printk("%s, OMAP_USBHS_REV1\n",__func__);
 			omap->nports = 3;
 			break;
 		case OMAP_USBHS_REV2:
+			printk("%s, OMAP_USBHS_REV2\n",__func__);
 			omap->nports = 2;
 			break;
 		default:

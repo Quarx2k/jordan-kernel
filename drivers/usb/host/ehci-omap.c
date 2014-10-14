@@ -163,7 +163,6 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 
 	omap = (struct omap_hcd *)hcd_to_ehci(hcd)->priv;
 	omap->nports = pdata->nports;
-
 	platform_set_drvdata(pdev, hcd);
 
 	/* get the PHY devices if needed */

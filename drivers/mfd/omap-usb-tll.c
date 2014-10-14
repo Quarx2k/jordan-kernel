@@ -252,6 +252,8 @@ static int usbtll_omap_probe(struct platform_device *pdev)
 		break;
 	}
 
+	dev_info(dev, "USB TLL Rev : 0x%x recognized, assuming %d channels\n",
+			ver, tll->nch);
 	tll->ch_clk = devm_kzalloc(dev, sizeof(struct clk * [tll->nch]),
 						GFP_KERNEL);
 	if (!tll->ch_clk) {
@@ -343,14 +345,14 @@ int omap_tll_init(struct usbhs_omap_platform_data *pdata)
 	tll = dev_get_drvdata(tll_dev);
 
 	needs_tll = false;
-	for (i = 0; i < tll->nch; i++)
+	for (i = 0; i < tll->nch; i++) {
 		needs_tll |= omap_usb_mode_needs_tll(pdata->port_mode[i]);
-
+	}
 	pm_runtime_get_sync(tll_dev);
 
 	if (needs_tll) {
 		void __iomem *base = tll->base;
-
+		printk("Set TTL to Port num: %d, Mode: %d\n",i,pdata->port_mode[i]);
 		/* Program Common TLL register */
 		reg = usbtll_read(base, OMAP_TLL_SHARED_CONF);
 		reg |= (OMAP_TLL_SHARED_CONF_FCLK_IS_ON

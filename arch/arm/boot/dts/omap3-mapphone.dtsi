@@ -176,8 +176,9 @@
 };
 
 &usbhshost {
-	port3-mode = "ehci-tll";
+// Just enable OTG.
 };
+
 
 &glbl_prm {
 	status = "ok";

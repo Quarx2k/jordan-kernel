@@ -118,7 +118,7 @@ static void __init mapphone_init(void)
 	omap_minnow_display_init();
 	mapphone_init_btwilink();
 	mapphone_cpcap_client_init();
-	usb_bind_phy("musb-hdrc.1.auto", 0, "cpcap_usb");
+	usb_bind_phy("musb-hdrc.0.auto", 0, "cpcap_usb");
 	usb_musb_init(NULL);
 }
 

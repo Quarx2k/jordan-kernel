@@ -43,6 +43,10 @@
 #define USB_VENDOR_GENESYS_LOGIC		0x05e3
 #define HUB_QUIRK_CHECK_PORT_AUTOSUSPEND	0x01
 
+#ifdef CONFIG_MACH_MAPPHONE
+static int w3g_hack_done = 0;
+#endif
+
 static inline int hub_is_superspeed(struct usb_device *hdev)
 {
 	return (hdev->descriptor.bDeviceProtocol == USB_HUB_PR_SS);
@@ -820,10 +824,11 @@ static unsigned hub_power_on(struct usb_hub *hub, bool do_delay)
 	for (port1 = 1; port1 <= hub->descriptor->bNbrPorts; port1++)
 		if (hub->ports[port1 - 1]->power_is_on)
 			set_port_feature(hub->hdev, port1, USB_PORT_FEAT_POWER);
+#ifndef CONFIG_MACH_MAPPHONE
 		else
 			usb_clear_port_feature(hub->hdev, port1,
 						USB_PORT_FEAT_POWER);
-
+#endif
 	/* Wait at least 100 msec for power to become stable */
 	delay = max(pgood_delay, (unsigned) 100);
 	if (do_delay)
@@ -1095,8 +1100,10 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 			 * Do not disable USB3 protocol ports.
 			 */
 			if (!hub_is_superspeed(hdev)) {
+#ifndef CONFIG_MACH_MAPPHONE
 				usb_clear_port_feature(hdev, port1,
 						   USB_PORT_FEAT_ENABLE);
+#endif
 				portstatus &= ~USB_PORT_STAT_ENABLE;
 			} else {
 				/* Pretend that power was lost for USB3 devs */
@@ -1107,19 +1114,25 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 		/* Clear status-change flags; we'll debounce later */
 		if (portchange & USB_PORT_STAT_C_CONNECTION) {
 			need_debounce_delay = true;
+#ifndef CONFIG_MACH_MAPPHONE
 			usb_clear_port_feature(hub->hdev, port1,
 					USB_PORT_FEAT_C_CONNECTION);
+#endif
 		}
 		if (portchange & USB_PORT_STAT_C_ENABLE) {
 			need_debounce_delay = true;
+#ifndef CONFIG_MACH_MAPPHONE
 			usb_clear_port_feature(hub->hdev, port1,
 					USB_PORT_FEAT_C_ENABLE);
+#endif
 		}
 		if ((portchange & USB_PORT_STAT_C_BH_RESET) &&
 				hub_is_superspeed(hub->hdev)) {
 			need_debounce_delay = true;
+#ifndef CONFIG_MACH_MAPPHONE
 			usb_clear_port_feature(hub->hdev, port1,
 					USB_PORT_FEAT_C_BH_PORT_RESET);
+#endif
 		}
 		/* We can forget about a "removed" device when there's a
 		 * physical disconnect or the connect status changes.
@@ -3933,6 +3946,16 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 	enum usb_device_speed	oldspeed = udev->speed;
 	const char		*speed;
 	int			devnum = udev->devnum;
+        bool do_reset = true;
+
+#ifdef CONFIG_MACH_MAPPHONE
+        // do not reset first USB bus (modem) on 2ndboot,
+        // but reset on device connect in host mode
+	if (hdev->bus->busnum == 1 && !w3g_hack_done) {
+                do_reset = false;
+                printk("!!!!!!! Do not reset bus1 !!!!!\n");
+        }
+#endif
 
 	/* root hub ports have a slightly longer reset period
 	 * (from USB 2.0 spec, section 7.1.7.5)
@@ -3952,7 +3975,11 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 
 	/* Reset the device; full speed may morph to high speed */
 	/* FIXME a USB 2.0 device may morph into SuperSpeed on reset. */
-	retval = hub_port_reset(hub, port1, udev, delay, false);
+	if (do_reset) {
+		retval = hub_port_reset(hub, port1, udev, delay, false);
+	} else {
+		retval = 0;
+	}
 	if (retval < 0)		/* error or disconnect */
 		goto fail;
 	/* success, speed is known */
@@ -3963,6 +3990,12 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 		dev_dbg(&udev->dev, "device reset changed speed!\n");
 		goto fail;
 	}
+
+	if (!do_reset) {
+		udev->speed = USB_SPEED_HIGH;
+		udev->state = USB_STATE_UNAUTHENTICATED;
+	}
+
 	oldspeed = udev->speed;
 
 	/* USB 2.0 section 5.5.3 talks about ep0 maxpacket ...
@@ -4048,11 +4081,26 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 			 */
 			for (j = 0; j < 3; ++j) {
 				buf->bMaxPacketSize0 = 0;
+#ifndef CONFIG_MACH_MAPPHONE
 				r = usb_control_msg(udev, usb_rcvaddr0pipe(),
 					USB_REQ_GET_DESCRIPTOR, USB_DIR_IN,
 					USB_DT_DEVICE << 8, 0,
 					buf, GET_DESCRIPTOR_BUFSIZE,
 					initial_descriptor_timeout);
+#else
+				if (do_reset)
+					r = usb_control_msg(udev, usb_rcvaddr0pipe(),
+						USB_REQ_GET_DESCRIPTOR, USB_DIR_IN,
+						USB_DT_DEVICE << 8, 0,
+						buf, GET_DESCRIPTOR_BUFSIZE,
+						initial_descriptor_timeout);
+				else
+					r = usb_control_msg(udev, (PIPE_CONTROL << 30) | (0x02 << 8) | USB_DIR_IN,
+						USB_REQ_GET_DESCRIPTOR, USB_DIR_IN,
+						USB_DT_DEVICE << 8, 0,
+						buf, GET_DESCRIPTOR_BUFSIZE,
+						initial_descriptor_timeout);
+#endif
 				switch (buf->bMaxPacketSize0) {
 				case 8: case 16: case 32: case 64: case 255:
 					if (buf->bDescriptorType ==
@@ -4073,7 +4121,11 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 					buf->bMaxPacketSize0;
 			kfree(buf);
 
+#ifndef CONFIG_MACH_MAPPHONE
 			retval = hub_port_reset(hub, port1, udev, delay, false);
+#else
+			retval = 0;
+#endif
 			if (retval < 0)		/* error or disconnect */
 				goto fail;
 			if (oldspeed != udev->speed) {
@@ -4098,11 +4150,21 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
  		 * authorization will assign the final address.
  		 */
 		if (udev->wusb == 0) {
-			for (j = 0; j < SET_ADDRESS_TRIES; ++j) {
-				retval = hub_set_address(udev, devnum);
-				if (retval >= 0)
-					break;
-				msleep(200);
+			if (do_reset) {
+				for (j = 0; j < SET_ADDRESS_TRIES; ++j) {
+					retval = hub_set_address(udev, devnum);
+					if (retval >= 0)
+						break;
+					msleep(200);
+				}
+			} else {
+				/* Make device use proper address. */
+				update_devnum(udev, devnum);
+
+				usb_set_device_state(udev, USB_STATE_ADDRESS);
+				usb_ep0_reinit(udev);
+				retval = 0;
+				w3g_hack_done = 1;
 			}
 			if (retval < 0) {
 				if (retval != -ENODEV)
@@ -5400,3 +5462,4 @@ acpi_handle usb_get_hub_port_acpi_handle(struct usb_device *hdev,
 	return DEVICE_ACPI_HANDLE(&hub->ports[port1 - 1]->dev);
 }
 #endif
+

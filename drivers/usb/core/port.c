@@ -98,8 +98,9 @@ static int usb_port_runtime_resume(struct device *dev)
 					retval);
 			goto out;
 		}
+#ifndef CONFIG_MACH_MAPPHONE
 		usb_clear_port_feature(hdev, port1, USB_PORT_FEAT_C_ENABLE);
-
+#endif
 		/* Set return value to 0 if debounce successful */
 		retval = 0;
 	}

@@ -248,11 +248,17 @@ static int ehci_reset (struct ehci_hcd *ehci)
 
 	command |= CMD_RESET;
 	dbg_cmd (ehci, "reset", command);
+#ifndef CONFIG_MACH_MAPPHONE
 	ehci_writel(ehci, command, &ehci->regs->command);
+#endif
 	ehci->rh_state = EHCI_RH_HALTED;
 	ehci->next_statechange = jiffies;
+#ifndef CONFIG_MACH_MAPPHONE
 	retval = handshake (ehci, &ehci->regs->command,
 			    CMD_RESET, 0, 250 * 1000);
+#else
+	retval = 0;
+#endif
 
 	if (ehci->has_hostpc) {
 		ehci_writel(ehci, USBMODE_EX_HC | USBMODE_EX_VBPS,
@@ -656,6 +662,7 @@ int ehci_setup(struct usb_hcd *hcd)
 
 	ehci->regs = (void __iomem *)ehci->caps +
 	    HC_LENGTH(ehci, ehci_readl(ehci, &ehci->caps->hc_capbase));
+
 	dbg_hcs_params(ehci, "reset");
 	dbg_hcc_params(ehci, "reset");
 
