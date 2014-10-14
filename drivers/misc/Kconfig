@@ -586,6 +586,36 @@ config WAKEUP_SOURCE_NOTIFY
         help
           Driver to allow early notification of wakeups
 
+config SENSORS_AKM8973_AKMD
+	tristate "AKM8973 Magnetometer"
+	default n
+	depends on I2C
+	help
+	 Support for the AKM8973 tri-axis magnetometer (compass)
+
+config SENSORS_KXTF9
+	tristate "KXTF9 Accelerometer"
+	default n
+	depends on I2C
+	help
+	 Say yes here if you wish to include the Kionix
+	 KXTF9 accelerometer driver.
+
+config INPUT_HALLEFFECT_BU52014HV
+	tristate "BU52014HV Hall Effect Sensor"
+	help
+	  Say Y here if you wish to include support for the BU52014HV hall
+	  effect sensor.
+
+config VIB_GPIO
+	bool "GPIO Vibrator"
+	default n
+
+config SYSPANIC
+	tristate "SYSPANIC driver used to detect BP panics"
+	default n
+
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"

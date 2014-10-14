@@ -796,6 +796,7 @@ struct file {
 #endif
 	/* needed for tty driver, and maybe others */
 	void			*private_data;
+	void			*moto_private_data;
 
 #ifdef CONFIG_EPOLL
 	/* Used by fs/eventpoll.c to link all the hooks to this file */

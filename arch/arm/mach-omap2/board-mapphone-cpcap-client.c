@@ -26,7 +26,7 @@
 #include "dt_path.h"
 
 /* TODO: Remove after implementing RIL. */
-#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
+#ifdef CONFIG_MACH_MAPPHONE
 #define MAPPHONE_BP_QSC6085	0x001E0000
 #define MAPPHONE_BP_MDM6600	0x001E0001
 #define MAPPHONE_BP_MDM9600	0x001E0002
