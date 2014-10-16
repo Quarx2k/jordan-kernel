@@ -87,7 +87,6 @@ static inline u32 ehci_read(void __iomem *base, u32 reg)
 	return __raw_readl(base + reg);
 }
 
-#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 /* For ISP1703 phy on OMAP4430 port 1, we need to force the PHY
  * to resume immediately after clearing PORTSC, to avoid disconnect.
  */
@@ -649,7 +648,6 @@ static int omap4_ehci_tll_hub_control(
 	spin_unlock_irqrestore(&ehci->lock, flags);
 	return retval;
 }
-#endif
 
 static int omap_ehci_hub_control(
 	struct usb_hcd	*hcd,
@@ -659,7 +657,6 @@ static int omap_ehci_hub_control(
 	char		*buf,
 	u16		wLength
 ) {
-#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	struct device *dev = hcd->self.controller;
 
 	struct ehci_hcd_omap_platform_data	*pdata = dev->platform_data;
@@ -699,7 +696,6 @@ static int omap_ehci_hub_control(
 						wIndex, buf, wLength);
 		}
 	}
-#endif
 	return ehci_hub_control(hcd, typeReq, wValue, wIndex, buf, wLength);
 }
 
@@ -769,7 +765,6 @@ again:
 	}
 	return status;
 }
-#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 static void omap_ehci_soft_phy_reset(struct platform_device *pdev, u8 port)
 {
 	struct usb_hcd	*hcd = dev_get_drvdata(&pdev->dev);
@@ -799,7 +794,7 @@ static void omap_ehci_soft_phy_reset(struct platform_device *pdev, u8 port)
 		}
 	}
 }
-#endif
+
 static void omap_ehci_intr_vbus_valid_clear(struct platform_device *pdev,
 									u8 port)
 {
@@ -945,13 +940,12 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 				EHCI_INSNREG04_DISABLE_UNSUSPEND);
 
 
-#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	/* Soft reset the PHY using PHY reset command over ULPI */
 	if (pdata->port_mode[0] == OMAP_EHCI_PORT_MODE_PHY)
 		omap_ehci_soft_phy_reset(pdev, 0);
 	if (pdata->port_mode[1] == OMAP_EHCI_PORT_MODE_PHY)
 		omap_ehci_soft_phy_reset(pdev, 1);
-#endif
+
 	if (cpu_is_omap44xx()) {
 		/*
 		 * Undocumented HW Errata for OMAP4 TLL
@@ -993,10 +987,8 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 	omap_ehci->regs = hcd->regs
 		+ HC_LENGTH(ehci, readl(&omap_ehci->caps->hc_capbase));
 
-#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	dbg_hcs_params(omap_ehci, "reset");
 	dbg_hcc_params(omap_ehci, "reset");
-#endif
 
 	/* cache this readonly data; minimize chip reads */
 	omap_ehci->hcs_params = readl(&omap_ehci->caps->hcs_params);
@@ -1017,27 +1009,6 @@ static int ehci_hcd_omap_probe(struct platform_device *pdev)
 		if (udev)
 			udev->lazy_resume = 1;
 	}
-
-#ifdef CONFIG_MACH_OMAP_MAPPHONE_DEFY
-	/* We need to suspend OHCI in order for the usbhost
-	 * domain to go standby.
-	 * OHCI would never be resumed for UMTS modem */
-	omap_writel(OHCI_HC_CTRL_SUSPEND, OHCI_HC_CONTROL);
-
-	/* Refer ISSUE2: LINK assumes external charge pump */
-	/* use Port1 VBUS to charge externally Port2:
-	 *      So for PHY mode operation use Port2 only */
-	ehci_write(hcd->regs, EHCI_INSNREG05_ULPI,
-		(0xA << EHCI_INSNREG05_ULPI_REGADD_SHIFT) |/* OTG ctrl reg*/
-		(2 << EHCI_INSNREG05_ULPI_OPSEL_SHIFT) |/*   Write */
-		(2 << EHCI_INSNREG05_ULPI_PORTSEL_SHIFT) |/* Port1 */
-		(1 << EHCI_INSNREG05_ULPI_CONTROL_SHIFT) |/* Start */
-		(0x26));
-	while (!(ehci_read(hcd->regs, EHCI_INSNREG05_ULPI) &
-		(1<<EHCI_INSNREG05_ULPI_CONTROL_SHIFT))) {
-		cpu_relax();
-	}
-#endif
 
 	/* root ports should always stay powered */
 	ehci_port_power(omap_ehci, 1);
@@ -1097,13 +1068,10 @@ static int ehci_omap_bus_suspend(struct usb_hcd *hcd)
 	dev_dbg(dev, "ehci_omap_bus_suspend\n");
 
 	ret = ehci_bus_suspend(hcd);
-#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	if (hcd->self.connection_change) {
 		dev_err(dev, "Connection state changed\n");
-		save_usb_sar_regs();
 		hcd->self.connection_change = 0;
 	}
-#endif
 	if (ret != 0) {
 		dev_dbg(dev, "ehci_omap_bus_suspend failed %d\n", ret);
 		return ret;
@@ -1220,9 +1188,7 @@ static struct hc_driver ehci_omap_hc_driver = {
 	.bus_resume		= ehci_omap_bus_resume,
 
 	.clear_tt_buffer_complete = ehci_clear_tt_buffer_complete,
-#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	.update_device_disconnect = omap4_ehci_update_device_disconnect,
-#endif
 };
 
 MODULE_ALIAS("platform:omap-ehci");

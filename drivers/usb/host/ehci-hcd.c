@@ -275,13 +275,10 @@ static int ehci_reset (struct ehci_hcd *ehci)
 	if (ehci->debug && !dbgp_reset_prep())
 		ehci->debug = NULL;
 
-#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	command |= CMD_RESET;
 	dbg_cmd (ehci, "reset", command);
+#ifndef CONFIG_MACH_OMAP_MAPPHONE_DEFY
 	ehci_writel(ehci, command, &ehci->regs->command);
-#else
-	command |= CMD_LRESET;
-	dbg_cmd (ehci, "reset", command);
 #endif
 	ehci_to_hcd(ehci)->state = HC_STATE_HALT;
 	ehci->next_statechange = jiffies;
