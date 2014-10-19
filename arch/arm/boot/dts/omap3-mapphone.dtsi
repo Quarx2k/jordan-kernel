@@ -199,6 +199,12 @@
 
 &i2c2 {
 	clock-frequency = <400000>;
+	akm8973 {
+		reg = <0x1c>;
+		compatible = "mot,akm8973";
+		gpio-irq = <175>;
+		gpio-reset = <28>;
+	};
 };
 
 &i2c3 {

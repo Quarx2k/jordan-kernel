@@ -689,6 +689,11 @@ int akm8973_probe(struct i2c_client *client, const struct i2c_device_id *devid)
 {
 	struct akm8973_data *akm;
 	int err;
+#ifdef CONFIG_OF
+	struct device_node *np = client->dev.of_node;
+	unsigned int prop;
+	int gpio_reset = -1, gpio_irq = -1;
+#endif
 #if DEBUG
 	pr_info("%s\n", __func__);
 #endif
@@ -708,6 +713,28 @@ int akm8973_probe(struct i2c_client *client, const struct i2c_device_id *devid)
 	i2c_set_clientdata(client, akm);
 	akm8973_init_client(client);
 	this_client = client;
+
+#ifdef CONFIG_OF
+	if (!np) {
+		dev_err(&client->dev, "required device_tree entry not found\n");
+		goto exit_input_dev_alloc_failed;
+	}
+
+	if (!of_property_read_u32(np, "gpio-reset", &prop))
+		gpio_reset = prop;
+
+	if (!of_property_read_u32(np, "gpio-irq", &prop))
+		gpio_irq = prop;
+
+	if (gpio_reset > 0 && gpio_irq > 0) {
+		gpio_request(gpio_reset, "akm8973 reset");
+		gpio_direction_output(gpio_reset, 1);
+
+		gpio_request(gpio_irq, "akm8973 irq");
+		gpio_direction_input(gpio_irq);
+	}
+#endif
+
 
 	akm->input_dev = input_allocate_device();
 
@@ -819,6 +846,13 @@ static const struct i2c_device_id akm8973_id[] = {
 	{}
 };
 
+#ifdef CONFIG_OF
+static struct of_device_id akm8973_of_match[] = {
+	{ .compatible = "mot,akm8973" },
+	{ }, };
+MODULE_DEVICE_TABLE(of, akm8973_of_match);
+#endif
+
 static struct i2c_driver akm8973_driver = {
 	.class = I2C_CLASS_HWMON,
 	.probe = akm8973_probe,
@@ -826,6 +860,9 @@ static struct i2c_driver akm8973_driver = {
 	.id_table = akm8973_id,
 	.driver = {
 		   .owner = THIS_MODULE,
+#ifdef CONFIG_OF
+		   .of_match_table = of_match_ptr(akm8973_of_match),
+#endif
 		   .name = "akm8973",
 		   },
 	.detect = akm8973_detect,
