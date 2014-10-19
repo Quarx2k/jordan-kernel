@@ -221,9 +221,11 @@ static int vib_gpio_probe(struct platform_device *pdev)
 	if (ret < 0)
 		goto reg_put;
 
-	if (vib_data->gpio >= 0)
+	if (vib_data->gpio >= 0) {
+		gpio_request(vib_data->gpio, "vib_ctrl_en");
 		gpio_direction_output(vib_data->gpio,
 				      vib_data->active_low);
+	}
 
 	vib_gpio_enable(&vib_data->dev, vib_data->initial_vibrate);
 

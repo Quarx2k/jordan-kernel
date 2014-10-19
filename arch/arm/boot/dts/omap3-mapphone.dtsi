@@ -97,6 +97,8 @@
 
 	vib-gpio {
 		compatible = "mot,vib-gpio";
+		gpio = <181>;
+		active_low = <0>;
 		vib-gpio-supply = <&ldo6_reg>;
 	};
 
