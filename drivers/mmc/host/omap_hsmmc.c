@@ -141,6 +141,8 @@
 #define OMAP_HSMMC_WRITE(base, reg, val) \
 	__raw_writel((val), (base) + OMAP_HSMMC_##reg)
 
+static int wifi_pmena = -1;
+
 struct omap_hsmmc_next {
 	unsigned int	dma_len;
 	s32		cookie;
@@ -1497,10 +1499,17 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	if (ios->power_mode != host->power_mode) {
 		switch (ios->power_mode) {
 		case MMC_POWER_OFF:
+			if (host->mmc->index == 2)
+				gpio_set_value(wifi_pmena, 0);
+
 			mmc_slot(host).set_power(host->dev, host->slot_id,
 						 0, 0);
 			break;
+
 		case MMC_POWER_UP:
+			if (host->mmc->index == 2)
+				gpio_set_value(wifi_pmena, 1);
+
 			mmc_slot(host).set_power(host->dev, host->slot_id,
 						 1, ios->vdd);
 			break;
@@ -1764,6 +1773,15 @@ static struct omap_mmc_platform_data *of_get_hsmmc_pdata(struct device *dev)
 	 * and pass to TI WLAN driver through the existing interface
 	 * of wl12xx_set_platform_data, so not to chanage TI code
 	 */
+	if (!of_property_read_u32(np, "wifi_pmena", &wifi_pmena)) {
+		if (gpio_request(wifi_pmena, "wifi_pmena") < 0) {
+			printk(KERN_ERR "%s: can't reserve GPIO: %d\n", __func__,
+				wifi_pmena);
+			gpio_free(wifi_pmena);
+		}
+		gpio_direction_output(wifi_pmena, 0);
+	}
+
 	if (!of_property_read_u32(np, "wl_host_wake_gpio",
 					&wl_host_wake_gpio)) {
 		pr_info("wl_host_wake_gpio is %d\n", wl_host_wake_gpio);

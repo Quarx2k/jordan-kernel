@@ -629,8 +629,8 @@
 	cap-power-off-card;
 	bus-width = <4>;
 	vmmc-supply = <&vmmc>;
-	wl_host_wake_gpio = <10>;
-	status = "disabled";
+	wl_host_wake_gpio = <65>;
+	wifi_pmena = <186>;
 };
 
 &usb_otg_hs {
