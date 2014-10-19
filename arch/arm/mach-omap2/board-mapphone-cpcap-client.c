@@ -230,29 +230,6 @@ static struct platform_device cpcap_rgb_led = {
 	},
 };
 
-static int __init led_cpcap_lm3554_init(void)
-{
-	u8 device_available;
-	struct device_node *node;
-	const void *prop;
-
-	node = of_find_node_by_path(DT_PATH_LM3554);
-	if (node == NULL)
-		return -ENODEV;
-
-	prop = of_get_property(node, "device_available", NULL);
-	if (prop)
-		device_available = *(u8 *)prop;
-	else {
-		pr_err("Read property %s error!\n", "device_available");
-		of_node_put(node);
-		return -ENODEV;
-	}
-
-	of_node_put(node);
-	return device_available;
-}
-
 static int __init led_cpcap_lm3559_init(void)
 {
 	u8 device_available;
@@ -656,8 +633,7 @@ void __init mapphone_cpcap_client_init(void)
 
 	cpcap_leds_init();
 
-	if (led_cpcap_lm3554_init() > 0)
-		cpcap_device_register(&cpcap_lm3554);
+	cpcap_device_register(&cpcap_lm3554);
 
 	if (led_cpcap_lm3559_init() > 0)
 		cpcap_device_register(&cpcap_lm3559);

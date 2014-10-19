@@ -371,12 +371,45 @@ static int lm3554_probe(struct i2c_client *client,
 	struct lm3554_platform_data *pdata = client->dev.platform_data;
 	struct lm3554_data *torch_data;
 	int err = -1;
+#ifdef CONFIG_OF
+	struct device_node *np = client->dev.of_node;
+	unsigned int prop;
+
+	pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
+	if (!pdata) {
+		dev_err(&client->dev, "pdata allocation failure\n");
+		goto error1;
+	}
+#endif
 
 	if (pdata == NULL) {
 		err = -ENODEV;
 		dev_err(&client->dev, "platform data is NULL. exiting.\n");
 		goto error1;
 	}
+
+#ifdef CONFIG_OF
+	if (!np) {
+		dev_err(&client->dev, "required device_tree entry not found\n");
+		goto error1;
+	}
+	if (!of_property_read_u32(np, "flags", &prop))
+		pdata->flags = prop;
+	if (!of_property_read_u32(np, "torch_brightness_def", &prop))
+		pdata->torch_brightness_def = prop;
+	if (!of_property_read_u32(np, "flash_brightness_def", &prop))
+		pdata->flash_brightness_def = prop;
+	if (!of_property_read_u32(np, "flash_duration_def", &prop))
+		pdata->flash_duration_def = prop;
+	if (!of_property_read_u32(np, "config_reg_1_def", &prop))
+		pdata->config_reg_1_def = prop;
+	if (!of_property_read_u32(np, "config_reg_2_def", &prop))
+		pdata->config_reg_2_def = prop;
+	if (!of_property_read_u32(np, "vin_monitor_def", &prop))
+		pdata->vin_monitor_def = prop;
+	if (!of_property_read_u32(np, "gpio_reg_def", &prop))
+		pdata->gpio_reg_def = prop;
+#endif
 
 	if (!pdata->flags) {
 		pr_err("%s: Device does not exist\n", __func__);
@@ -388,7 +421,7 @@ static int lm3554_probe(struct i2c_client *client,
 		dev_err(&client->dev, "client not i2c capable\n");
 		goto error1;
 	}
-
+ 
 	torch_data = kzalloc(sizeof(struct lm3554_data), GFP_KERNEL);
 	if (torch_data == NULL) {
 		err = -ENOMEM;
@@ -486,12 +519,22 @@ static const struct i2c_device_id lm3554_id[] = {
 	{}
 };
 
+#ifdef CONFIG_OF
+static struct of_device_id lm3554_of_match[] = {
+	{ .compatible = "mot,lm3554" },
+	{ }, };
+MODULE_DEVICE_TABLE(of, lm3554_of_match);
+#endif
+
 static struct i2c_driver lm3554_i2c_driver = {
 	.probe = lm3554_probe,
 	.remove = lm3554_remove,
 	.id_table = lm3554_id,
 	.driver = {
 		   .name = LM3554_NAME,
+#ifdef CONFIG_OF
+		   .of_match_table = of_match_ptr(lm3554_of_match),
+#endif
 		   .owner = THIS_MODULE,
 		   },
 };
@@ -576,18 +619,7 @@ struct platform_driver cpcap_lm3554_driver = {
 		   },
 };
 
-static int __init cpcap_lm3554_init(void)
-{
-	return cpcap_driver_register(&cpcap_lm3554_driver);
-}
-
-static void __exit cpcap_lm3554_exit(void)
-{
-	platform_driver_unregister(&cpcap_lm3554_driver);
-}
-
-module_init(cpcap_lm3554_init);
-module_exit(cpcap_lm3554_exit);
+module_platform_driver(cpcap_lm3554_driver);
 
 /****************************************************************************/
 

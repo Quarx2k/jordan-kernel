@@ -209,6 +209,18 @@
 
 &i2c3 {
 	clock-frequency = <400000>;
+	lm3554 {
+		reg = <0x53>;
+		compatible = "mot,lm3554";
+		flags = <0x1>;
+		torch_brightness_def = <0xa0>;
+		flash_brightness_def = <0x30>;
+		flash_duration_def = <0x28>;
+		config_reg_1_def = <0xe0>;
+		config_reg_2_def = <0xf0>;
+		vin_monitor_def = <0x00>;
+		gpio_reg_def = <0x0>;
+	};
 };
 
 &mcspi1 {
