@@ -492,9 +492,11 @@ static void minnow_panel_early_init_func(struct work_struct *work)
 	if (!mpd->enabled) {
 		/* record last state for later switch back */
 		if (!mpd->early_inited) {
+#ifdef CONFIG_HAS_AMBIENTMODE
 			if (mpd->state == DISPLAY_AMBIENT_OFF)
 				mpd->last_state = DISPLAY_AMBIENT_OFF;
 			else
+#endif
 				mpd->last_state = DISPLAY_DISABLE;
 		}
 		r = minnow_panel_change_state_mlocked(mpd, DISPLAY_ENABLE);

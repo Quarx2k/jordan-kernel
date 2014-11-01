@@ -292,7 +292,7 @@ config SUSPEND_TIME
 
 config HAS_AMBIENTMODE
 	def_bool y
-	depends on PM
+	depends on PM && MFD_M4SENSORHUB
 	---help---
 	  Ambient mode should not turn off/on display/back-light/etc.
 	  at suspend/resume time
