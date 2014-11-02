@@ -716,6 +716,7 @@ int akm8973_probe(struct i2c_client *client, const struct i2c_device_id *devid)
 
 #ifdef CONFIG_OF
 	if (!np) {
+		err = -ENODEV;
 		dev_err(&client->dev, "required device_tree entry not found\n");
 		goto exit_input_dev_alloc_failed;
 	}

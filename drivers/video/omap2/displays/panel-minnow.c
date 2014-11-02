@@ -492,9 +492,11 @@ static void minnow_panel_early_init_func(struct work_struct *work)
 	if (!mpd->enabled) {
 		/* record last state for later switch back */
 		if (!mpd->early_inited) {
+#ifdef CONFIG_HAS_AMBIENTMODE
 			if (mpd->state == DISPLAY_AMBIENT_OFF)
 				mpd->last_state = DISPLAY_AMBIENT_OFF;
 			else
+#endif
 				mpd->last_state = DISPLAY_DISABLE;
 		}
 		r = minnow_panel_change_state_mlocked(mpd, DISPLAY_ENABLE);
@@ -3091,6 +3093,7 @@ static void minnow_panel_disable_mlocked(struct minnow_panel_data *mpd)
 static void minnow_panel_sync_display_status_mlocked(
 	struct minnow_panel_data *mpd)
 {
+#ifndef CONFIG_MACH_MAPPHONE
 	struct m4sensorhub_data *m4sensorhub;
 	enum display_state m4_state = mpd->state;
 	/* special case for dock mode, set to DISPLAY_ENABLE
@@ -3122,6 +3125,7 @@ static void minnow_panel_sync_display_status_mlocked(
 	dev_dbg(&mpd->dssdev->dev,
 		"Set screen status(%d) to M4 success!\n", m4_state);
 	mpd->m4_state = m4_state;
+#endif
 }
 
 #ifdef	CONFIG_HAS_AMBIENTMODE
