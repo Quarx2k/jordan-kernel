@@ -143,7 +143,7 @@ struct regulator_consumer_supply cpcap_vsdio_consumers[] = {
 };
 
 struct regulator_consumer_supply cpcap_vcsi_consumers[] = {
-	REGULATOR_SUPPLY("vcsi", NULL),
+	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.0"),
 };
 
 struct regulator_consumer_supply cpcap_vwlan1_consumers[] = {
