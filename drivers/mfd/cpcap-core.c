@@ -53,18 +53,6 @@ static struct miscdevice cpcap_dev = {
 	.fops	= &cpcap_fops,
 };
 
-static struct spi_driver cpcap_driver = {
-	.driver = {
-		   .name = "cpcap",
-		   .bus = &spi_bus_type,
-		   .owner = THIS_MODULE,
-		   },
-	.probe = cpcap_probe,
-	.remove = cpcap_remove,
-};
-
-module_spi_driver(cpcap_driver);
-
 static struct platform_device cpcap_adc_device = {
 	.name           = "cpcap_adc",
 	.id             = -1,
@@ -587,6 +575,43 @@ int cpcap_disable_offmode_wakeups(bool disable)
 	int retval = 0;
 	return retval;
 }
+
+static const struct of_device_id cpcap_of_match[] = {
+	{ .compatible = "mot,cpcap" },
+	{ },
+};
+MODULE_DEVICE_TABLE(of, cpcap_of_match);
+
+static struct spi_driver cpcap_spi_driver = {
+	.driver = {
+		   .name = CPCAP_DEV_NAME,
+		   .bus = &spi_bus_type,
+		   .owner = THIS_MODULE,
+		   .of_match_table = of_match_ptr(cpcap_of_match),
+	},
+	.probe = cpcap_probe,
+	.remove = cpcap_remove,
+};
+
+static int __init cpcap_spi_init(void)
+{
+	int ret;
+
+	ret = spi_register_driver(&cpcap_spi_driver);
+	if (ret != 0)
+		pr_err("Failed to register CPCAP (Core) SPI driver: %d\n", ret);
+
+	return 0;
+}
+
+/* init early so consumer devices can complete system boot */
+subsys_initcall(cpcap_spi_init);
+
+static void __exit cpcap_spi_exit(void)
+{
+	spi_unregister_driver(&cpcap_spi_driver);
+}
+module_exit(cpcap_spi_exit);
 
 MODULE_ALIAS("platform:cpcap");
 MODULE_DESCRIPTION("CPCAP driver");
