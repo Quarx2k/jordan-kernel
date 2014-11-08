@@ -4097,9 +4097,9 @@ void __wake_up(wait_queue_head_t *q, unsigned int mode,
 {
 	unsigned long flags;
 
-	raw_spin_lock_irqsave(&q->lock, flags);
+	spin_lock_irqsave(&q->lock, flags);
 	__wake_up_common(q, mode, nr_exclusive, 0, key);
-	raw_spin_unlock_irqrestore(&q->lock, flags);
+	spin_unlock_irqrestore(&q->lock, flags);
 }
 EXPORT_SYMBOL(__wake_up);
 
@@ -4176,10 +4176,10 @@ void complete(struct completion *x)
 {
 	unsigned long flags;
 
-	raw_spin_lock_irqsave(&x->wait.lock, flags);
+	spin_lock_irqsave(&x->wait.lock, flags);
 	x->done++;
 	__wake_up_common(&x->wait, TASK_NORMAL, 1, 0, NULL);
-	raw_spin_unlock_irqrestore(&x->wait.lock, flags);
+	spin_unlock_irqrestore(&x->wait.lock, flags);
 }
 EXPORT_SYMBOL(complete);
 
@@ -4196,10 +4196,10 @@ void complete_all(struct completion *x)
 {
 	unsigned long flags;
 
-	raw_spin_lock_irqsave(&x->wait.lock, flags);
+	spin_lock_irqsave(&x->wait.lock, flags);
 	x->done += UINT_MAX/2;
 	__wake_up_common(&x->wait, TASK_NORMAL, 0, 0, NULL);
-	raw_spin_unlock_irqrestore(&x->wait.lock, flags);
+	spin_unlock_irqrestore(&x->wait.lock, flags);
 }
 EXPORT_SYMBOL(complete_all);
 
@@ -5110,7 +5110,7 @@ SYSCALL_DEFINE0(sched_yield)
 	 */
 	__release(rq->lock);
 	spin_release(&rq->lock.dep_map, 1, _THIS_IP_);
-	raw_spin_unlock(&rq->lock);
+	do_raw_spin_unlock(&rq->lock);
 	preempt_enable_no_resched();
 
 	schedule();
@@ -5146,7 +5146,7 @@ EXPORT_SYMBOL(_cond_resched);
  *
  * This works OK both with and without CONFIG_PREEMPT. We do strange low-level
  * operations here to prevent schedule() from being called twice (once via
- * raw_spin_unlock(), once by hand).
+ * spin_unlock(), once by hand).
  */
 int __cond_resched_lock(spinlock_t *lock)
 {
@@ -5156,13 +5156,13 @@ int __cond_resched_lock(spinlock_t *lock)
 	lockdep_assert_held(lock);
 
 	if (spin_needbreak(lock) || resched) {
-		raw_spin_unlock(lock);
+		spin_unlock(lock);
 		if (resched)
 			__cond_resched();
 		else
 			cpu_relax();
 		ret = 1;
-		raw_spin_lock(lock);
+		spin_lock(lock);
 	}
 	return ret;
 }
@@ -7749,7 +7749,7 @@ static void init_rt_rq(struct rt_rq *rt_rq, struct rq *rq)
 #ifdef CONFIG_SMP
 	rt_rq->rt_nr_migratory = 0;
 	rt_rq->overloaded = 0;
-	plist_head_init(&rt_rq->pushable_tasks, &rq->lock);
+	plist_head_init_raw(&rt_rq->pushable_tasks, &rq->lock);
 #endif
 
 	rt_rq->rt_time = 0;
@@ -8146,13 +8146,13 @@ void normalize_rt_tasks(void)
 			continue;
 		}
 
-		raw_spin_lock(&p->pi_lock);
+		spin_lock(&p->pi_lock);
 		rq = __task_rq_lock(p);
 
 		normalize_task(rq, p);
 
 		__task_rq_unlock(rq);
-		raw_spin_unlock(&p->pi_lock);
+		spin_unlock(&p->pi_lock);
 	} while_each_thread(g, p);
 
 	read_unlock_irqrestore(&tasklist_lock, flags);
@@ -8406,7 +8406,7 @@ struct task_group *sched_create_group(struct task_group *parent)
 	if (!alloc_rt_sched_group(tg, parent))
 		goto err;
 
-	raw_spin_lock_irqsave(&task_group_lock, flags);
+	spin_lock_irqsave(&task_group_lock, flags);
 	for_each_possible_cpu(i) {
 		register_fair_sched_group(tg, i);
 		register_rt_sched_group(tg, i);
@@ -8418,7 +8418,7 @@ struct task_group *sched_create_group(struct task_group *parent)
 	tg->parent = parent;
 	INIT_LIST_HEAD(&tg->children);
 	list_add_rcu(&tg->siblings, &parent->children);
-	raw_spin_unlock_irqrestore(&task_group_lock, flags);
+	spin_unlock_irqrestore(&task_group_lock, flags);
 
 	return tg;
 
@@ -8440,14 +8440,14 @@ void sched_destroy_group(struct task_group *tg)
 	unsigned long flags;
 	int i;
 
-	raw_spin_lock_irqsave(&task_group_lock, flags);
+	spin_lock_irqsave(&task_group_lock, flags);
 	for_each_possible_cpu(i) {
 		unregister_fair_sched_group(tg, i);
 		unregister_rt_sched_group(tg, i);
 	}
 	list_del_rcu(&tg->list);
 	list_del_rcu(&tg->siblings);
-	raw_spin_unlock_irqrestore(&task_group_lock, flags);
+	spin_unlock_irqrestore(&task_group_lock, flags);
 
 	/* wait for possible concurrent references to cfs_rqs complete */
 	call_rcu(&tg->rcu, free_sched_group_rcu);
