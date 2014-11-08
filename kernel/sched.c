@@ -1213,7 +1213,7 @@ static void resched_cpu(int cpu)
 	struct rq *rq = cpu_rq(cpu);
 	unsigned long flags;
 
-	if (!spin_trylock_irqsave(&rq->lock, flags))
+	if (!raw_spin_trylock_irqsave(&rq->lock, flags))
 		return;
 	resched_task(cpu_curr(cpu));
 	raw_spin_unlock_irqrestore(&rq->lock, flags);
@@ -1744,14 +1744,16 @@ static int _double_lock_balance(struct rq *this_rq, struct rq *busiest)
 {
 	int ret = 0;
 
-	if (unlikely(!spin_trylock(&busiest->lock))) {
+	if (unlikely(!raw_spin_trylock(&busiest->lock))) {
 		if (busiest < this_rq) {
 			raw_spin_unlock(&this_rq->lock);
 			raw_spin_lock(&busiest->lock);
-			raw_spin_lock_nested(&this_rq->lock, SINGLE_DEPTH_NESTING);
+			raw_spin_lock_nested(&this_rq->lock,
+					      SINGLE_DEPTH_NESTING);
 			ret = 1;
 		} else
-			raw_spin_lock_nested(&busiest->lock, SINGLE_DEPTH_NESTING);
+			raw_spin_lock_nested(&busiest->lock,
+					      SINGLE_DEPTH_NESTING);
 	}
 	return ret;
 }
@@ -4143,9 +4145,9 @@ void __wake_up_sync_key(wait_queue_head_t *q, unsigned int mode,
 	if (unlikely(!nr_exclusive))
 		wake_flags = 0;
 
-	raw_spin_lock_irqsave(&q->lock, flags);
+	spin_lock_irqsave(&q->lock, flags);
 	__wake_up_common(q, mode, nr_exclusive, wake_flags, key);
-	raw_spin_unlock_irqrestore(&q->lock, flags);
+	spin_unlock_irqrestore(&q->lock, flags);
 }
 EXPORT_SYMBOL_GPL(__wake_up_sync_key);
 
@@ -8877,7 +8879,7 @@ cpu_cgroup_create(struct cgroup_subsys *ss, struct cgroup *cgrp)
 	if (!cgrp->parent) {
 		/* This is early initialization for the top cgroup */
 		return &init_task_group.css;
-	}
+	} 
 
 	parent = cgroup_tg(cgrp->parent);
 	tg = sched_create_group(parent);
