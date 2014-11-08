@@ -451,7 +451,7 @@ static void __init mapphone_reserve(void)
 	omap_reserve();
 }
 
-MACHINE_START(MAPPHONE, "mapphone_")
+MACHINE_START(MAPPHONE, "mapphone_umts")
 	.boot_params	= 0x80C00100,
 	.reserve	= mapphone_reserve,
 	.map_io		= omap3_map_io,
