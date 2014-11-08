@@ -1760,9 +1760,6 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
 				current->timer_slack_ns = arg2;
 			error = 0;
 			break;
-		case PR_GET_EFFECTIVE_TIMERSLACK:
-      		error = task_get_effective_timer_slack(current);
-      		break;
 		case PR_MCE_KILL:
 			if (arg4 | arg5)
 				return -EINVAL;

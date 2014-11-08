@@ -103,12 +103,6 @@
 #define PR_MCE_KILL_GET 34
 
 /*
- * Get effective timerslack value for the process.
- * It can be higher than PR_GET_TIMERSLACK.
- */
-#define PR_GET_EFFECTIVE_TIMERSLACK 50
-
-/*
  * Tune up process memory map specifics.
  */
 #define PR_SET_MM		35
