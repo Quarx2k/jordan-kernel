@@ -562,10 +562,10 @@
 			0x192 0x118
 			0x194 0x118
 			0x196 0x700
-			0x198 0x119 /* MCSPI1_CLK, muxdump value: MODE1 | INPUT | PULL_UP | PUD_ENABLED (0x119), 2.6.32 value: MODE0 | INPUT | PULL_UP | PUD_ENABLED (0x118), minnow value: MODE0 | INPUT (0x100) */
-			0x19a 0x119 /* MCSPI1_SIMO, muxdump value: MODE1 | INPUT | PULL_UP | PUD_ENABLED (0x119), minnow + 2.6.32 value: MODE0 | OUTPUT (0x000) */
-			0x19c 0x119 /* MCSPI1_SOMI, muxdump value: MODE1 | INPUT | PULL_UP | PUD_ENABLED (0x119), 2.6.32 value: MODE0 | INPUT | PULL_UP | PUD_ENABLED (0x118), minnow value: MODE0 | INPUT (0x100) */
-			0x19e 0x119 /* MCSPI1_CS0, muxdump value: MODE1 | INPUT | PULL_UP | PUD_ENABLED (0x119), minnow + 2.6.32 value: MODE0 | OUTPUT (0x000) */
+			0x198 0x118 /* MCSPI1_CLK, muxdump value: MODE1 | INPUT | PULL_UP | PUD_ENABLED (0x119), 2.6.32 value: MODE0 | INPUT | PULL_UP | PUD_ENABLED (0x118), minnow value: MODE0 | INPUT (0x100) */
+			0x19a 0x000 /* MCSPI1_SIMO, muxdump value: MODE1 | INPUT | PULL_UP | PUD_ENABLED (0x119), minnow + 2.6.32 value: MODE0 | OUTPUT (0x000) */
+			0x19c 0x118 /* MCSPI1_SOMI, muxdump value: MODE1 | INPUT | PULL_UP | PUD_ENABLED (0x119), 2.6.32 value: MODE0 | INPUT | PULL_UP | PUD_ENABLED (0x118), minnow value: MODE0 | INPUT (0x100) */
+			0x19e 0x000 /* MCSPI1_CS0, muxdump value: MODE1 | INPUT | PULL_UP | PUD_ENABLED (0x119), minnow + 2.6.32 value: MODE0 | OUTPUT (0x000) */
 			0x1a0 0x10c /* MCSPI1_CS1, muxdump value: MODE4 | INPUT | PUD_ENABLED (0x10c), 2.6.32 value: MODE4 | INPUT (0x104), minnow value: MODE0 | OUTPUT (0x000) */
 			0x1a2 0x01f /* MCSPI1_CS2, muxdump value: MODE7 | INPUT | PULL_UP | PUD_ENABLED (0x01f), 2.6.32 value: MODE4 | OUTPUT | PUD_ENABLED (0x00c), minnow value: MODE4 | INPUT | OFFWAKEUP (0x4104) */
 			0x1a4 0x11f /* MCSPI1_CS3, muxdump value: MODE7 | INPUT | PULL_UP | PUD_ENABLED (0x11f), 2.6.32 value: MODE4 | INPUT (0x104), minnow value: MODE4 | OUTPUT (0x004) */
