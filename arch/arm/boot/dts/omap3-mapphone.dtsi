@@ -34,7 +34,7 @@
 				 800000  1275000
 				1000000  1337500
 			>;
-			cpu0-supply = <&omap_tps65912_dcdc1>;
+			/* TODO: cpu0-supply = <&???>; */
 			/* OPP tolerance in percentage */
 			voltage-tolerance = <0>;
 			reset-voltage = <1275000>;
@@ -115,20 +115,6 @@
 		//pinctrl-names = "output", "tristate";
 		//pinctrl-0 = <&wdi_phy_gpio_mode>;
 		//pinctrl-1 = <&wdi_phy_safe_mode>;
-	};
-
-	omap_pimic {
-		omap_tps65912_dcdc1: omap_vdd1 {
-			compatible = "ti,omap-tps65912-dcdc1";
-			ti,boot-voltage-micro-volts = <1275000>;
-			ti,vp = <&vp_mpu>;
-		};
-
-		omap_tps65912_dcdc4: omap_vdd2 {
-			compatible = "ti,omap-tps65912-dcdc4";
-			ti,boot-voltage-micro-volts = <1200000>;
-			ti,vp = <&vp_core>;
-		};
 	};
 
 	pad-wkup {
