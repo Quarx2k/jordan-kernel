@@ -1,5 +1,5 @@
 /*
- * arch/arm/mach-omap2/board-minnow-spi.c
+ * arch/arm/mach-omap2/board-mapphone-spi.c
  *
  * Copyright (C) 2009-2010 Motorola, Inc.
  *
@@ -418,7 +418,7 @@ static struct regulator_init_data cpcap_regulator[CPCAP_NUM_REGULATORS] = {
 	},
 };
 
-static struct cpcap_adc_ato minnow_cpcap_adc_ato = {
+static struct cpcap_adc_ato mapphone_cpcap_adc_ato = {
 	.ato_in = 0x0480,
 	.atox_in = 0,
 	.adc_ps_factor_in = 0x0200,
@@ -430,7 +430,7 @@ static struct cpcap_adc_ato minnow_cpcap_adc_ato = {
 	.ichrg_sense_res = 220,
 };
 
-static struct cpcap_leds minnow_cpcap_leds = {
+static struct cpcap_leds mapphone_cpcap_leds = {
 	.display_led = {
 		.display_reg = CPCAP_REG_MDLC,
 		.display_mask = 0xFFFF,
@@ -464,13 +464,13 @@ static struct cpcap_leds minnow_cpcap_leds = {
 	},
 };
 
-static struct cpcap_platform_data minnow_cpcap_data = {
+static struct cpcap_platform_data mapphone_cpcap_data = {
 	.init = mapphone_cpcap_spi_init,
 	.regulator_mode_values = cpcap_regulator_mode_values,
 	.regulator_off_mode_values = cpcap_regulator_off_mode_values,
 	.regulator_init = cpcap_regulator,
-	.adc_ato = &minnow_cpcap_adc_ato,
-	.leds = &minnow_cpcap_leds,
+	.adc_ato = &mapphone_cpcap_adc_ato,
+	.leds = &mapphone_cpcap_leds,
 	.ac_changed = NULL,
 	.batt_changed = NULL,
 	.usb_changed = NULL,
@@ -490,12 +490,12 @@ struct cpcap_platform_data *cpcap_get_plat_data(struct cpcap_device *cpcap)
 		if (mapphone_cpcap_spi_init[i].reg == CPCAP_REG_UNUSED)
 			break;
 	}
-	minnow_cpcap_data.init_len = i;
+	mapphone_cpcap_data.init_len = i;
 
 	if (!of_property_read_u32(np, "irq-gpio", &prop))
-		minnow_cpcap_data.irq_gpio = prop;
+		mapphone_cpcap_data.irq_gpio = prop;
 
-	return &minnow_cpcap_data;
+	return &mapphone_cpcap_data;
 }
 #else
 static inline
