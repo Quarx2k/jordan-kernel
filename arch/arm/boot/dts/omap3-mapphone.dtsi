@@ -430,7 +430,6 @@
 			0x1aa 0x4508
 			0x1ac 0x000
 			0x1ae 0x11c /* MCSPI2_CS1, MODE4 | INPUT | PULL_UP | PUD_ENABLED, minnow value: MODE4 | OUTPUT */
-			0x1b0 0x570c
 			0x1b2 0x004
 			0x5a8 0x102
 			0x5aa 0x11a
@@ -518,6 +517,12 @@
 		>;
 	};
 
+	cpcap_pins: pinux_cpcap_pins {
+		pinctrl-single,pins = <
+			0x1b0 0x570c /* SYS_NIRQ */
+		>;
+	};
+
 	uart2_pins_default: pinmux_uart_pins_default@2 {
 		pinctrl-single,pins = <
 			0x144 0x4100	/* UART2_CTS, MODE0  | OUTPUT | OFFWAKEUP */
@@ -583,7 +588,9 @@
 		spi-max-frequency = <3000000>;
 		spi-cs-high;
 
-		irq-gpio = <0>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&cpcap_pins>;
+		irq-gpio = <0>; /* SYS_NIRQ = GPIO0 */
 
 		regulators {
 			#address-cells = <1>;
