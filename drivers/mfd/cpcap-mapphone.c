@@ -23,6 +23,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
+#include <linux/regulator/of_regulator.h>
 #include <linux/spi/cpcap.h>
 #include <linux/spi/spi.h>
 
@@ -115,307 +116,9 @@ unsigned short cpcap_regulator_off_mode_values[CPCAP_NUM_REGULATORS] = {
 	[CPCAP_VAUDIO]   = 0x0000,
 };
 
-struct regulator_consumer_supply cpcap_sw4_consumers[] = {
-	REGULATOR_SUPPLY("sw4", NULL /* DSP */),
-};
-
-struct regulator_consumer_supply cpcap_sw5_consumers[] = {
-	REGULATOR_SUPPLY("sw5", NULL /* lighting_driver */),
-};
-
-struct regulator_consumer_supply cpcap_vcam_consumers[] = {
-	REGULATOR_SUPPLY("vcam", NULL /* cpcap_cam_device */),
-};
-
-struct regulator_consumer_supply cpcap_vhvio_consumers[] = {
-	REGULATOR_SUPPLY("vhvio", NULL /* lighting_driver */),
-#if 0
-	REGULATOR_SUPPLY("vhvio", NULL /* lighting_driver */),
-	REGULATOR_SUPPLY("vhvio", NULL /* magnetometer */),
-	REGULATOR_SUPPLY("vhvio", NULL /* light sensor */),
-	REGULATOR_SUPPLY("vhvio", NULL /* accelerometer */),
-	REGULATOR_SUPPLY("vhvio", NULL /* display */),
-#endif
-};
-
-struct regulator_consumer_supply cpcap_vsdio_consumers[] = {
-	REGULATOR_SUPPLY("vsdio", NULL),
-};
-
 struct regulator_consumer_supply cpcap_vcsi_consumers[] = {
 	REGULATOR_SUPPLY("vdds_dsi", "omapdss"),
 	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.0"),
-};
-
-struct regulator_consumer_supply cpcap_vwlan1_consumers[] = {
-	REGULATOR_SUPPLY("vwlan1", NULL /* cpcap_cam_device */),
-};
-
-struct regulator_consumer_supply cpcap_vwlan2_consumers[] = {
-	REGULATOR_SUPPLY("vwlan2", NULL /* sd slot */),
-};
-
-struct regulator_consumer_supply cpcap_vsim_consumers[] = {
-	REGULATOR_SUPPLY("vsim", NULL),
-};
-
-struct regulator_consumer_supply cpcap_vsimcard_consumers[] = {
-	REGULATOR_SUPPLY("vsimcard", NULL),
-};
-
-struct regulator_consumer_supply cpcap_vvib_consumers[] = {
-	REGULATOR_SUPPLY("vvib", NULL /* vibrator */),
-};
-
-struct regulator_consumer_supply cpcap_vusb_consumers[] = {
-	REGULATOR_SUPPLY("vusb", NULL /* accy det */),
-};
-
-struct regulator_consumer_supply cpcap_vaudio_consumers[] = {
-	REGULATOR_SUPPLY("vaudio", NULL /* mic opamp */),
-};
-
-struct regulator_consumer_supply cpcap_vfuse_consumers[] = {
-	REGULATOR_SUPPLY("vfuse", NULL),
-};
-
-struct regulator_consumer_supply cpcap_vrf1_consumers[] = {
-	REGULATOR_SUPPLY("vrf1", NULL),
-};
-
-
-static struct regulator_init_data cpcap_regulator[CPCAP_NUM_REGULATORS] = {
-	[CPCAP_SW4] = {
-		.constraints = {
-			.min_uV			= 1000000,
-			.max_uV			= 1000000,
-			.valid_ops_mask		= (REGULATOR_CHANGE_VOLTAGE |
-						   REGULATOR_CHANGE_STATUS),
-			.apply_uV		= 1,
-		},
-		.num_consumer_supplies	= ARRAY_SIZE(cpcap_sw4_consumers),
-		.consumer_supplies	= cpcap_sw4_consumers,
-	},
-	[CPCAP_SW5] = {
-		.constraints = {
-			.min_uV			= 5050000,
-			.max_uV			= 5050000,
-			.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
-			.apply_uV		= 1,
-		},
-		.num_consumer_supplies	= ARRAY_SIZE(cpcap_sw5_consumers),
-		.consumer_supplies	= cpcap_sw5_consumers,
-	},
-	[CPCAP_VCAM] = {
-		.constraints = {
-			.min_uV			= 2900000,
-			.max_uV			= 2900000,
-			.valid_modes_mask	= (REGULATOR_MODE_NORMAL |
-						   REGULATOR_MODE_STANDBY),
-			.valid_ops_mask		= REGULATOR_CHANGE_MODE,
-			.boot_on		= 0,
-			.always_on		= 1,
-			.apply_uV		= 1,
-		},
-		.num_consumer_supplies	= ARRAY_SIZE(cpcap_vcam_consumers),
-		.consumer_supplies	= cpcap_vcam_consumers,
-	},
-	[CPCAP_VCSI] = {
-		.constraints = {
-			.min_uV			= 2100000,
-			.max_uV			= 2100000,
-			.valid_modes_mask	= (REGULATOR_MODE_NORMAL |
-						   REGULATOR_MODE_STANDBY),
-			.valid_ops_mask		= REGULATOR_CHANGE_MODE,
-			.boot_on		= 0,
-			.always_on		= 1, // Modem dying in suspend if set to 0
-			.apply_uV		= 1,
-		},
-		.num_consumer_supplies	= ARRAY_SIZE(cpcap_vcsi_consumers),
-		.consumer_supplies	= cpcap_vcsi_consumers,
-	},
-	[CPCAP_VDAC] = {
-		.constraints = {
-			.min_uV			= 1800000,
-			.max_uV			= 1800000,
-			.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
-			.boot_on		= 0,
-			.always_on		= 0,
-			.apply_uV		= 0,
-		},
-	},
-	[CPCAP_VDIG] = {
-		.constraints = {
-			.min_uV			= 1875000,
-			.max_uV			= 1875000,
-			.valid_ops_mask		= REGULATOR_CHANGE_VOLTAGE,
-			.boot_on		= 0,
-			.always_on		= 0,
-			.apply_uV		= 0,
-		},
-	},
-	[CPCAP_VFUSE] = {
-		.constraints = {
-			.min_uV			= 1500000,
-			.max_uV			= 3150000,
-			.valid_ops_mask		= (REGULATOR_CHANGE_VOLTAGE |
-						   REGULATOR_CHANGE_STATUS),
-			.boot_on		= 0,
-			.always_on		= 0,
-			.apply_uV		= 0,
-		},
-		.num_consumer_supplies  = ARRAY_SIZE(cpcap_vfuse_consumers),
-		.consumer_supplies      = cpcap_vfuse_consumers,
-	},
-	[CPCAP_VHVIO] = {
-		.constraints = {
-			.min_uV			= 2775000,
-			.max_uV			= 2775000,
-			.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
-			.boot_on		= 0,
-			.always_on		= 0,
-			.apply_uV		= 1,
-		},
-		.num_consumer_supplies	= ARRAY_SIZE(cpcap_vhvio_consumers),
-		.consumer_supplies	= cpcap_vhvio_consumers,
-	},
-	[CPCAP_VSDIO] = {
-		.constraints = {
-			.min_uV			= 2900000,
-			.max_uV			= 2900000,
-			.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
-			.apply_uV		= 1,
-		},
-		.num_consumer_supplies	= ARRAY_SIZE(cpcap_vsdio_consumers),
-		.consumer_supplies	= cpcap_vsdio_consumers,
-	},
-	[CPCAP_VPLL] = {
-		.constraints = {
-			.min_uV			= 1800000,
-			.max_uV			= 1800000,
-			.valid_ops_mask	= 0,
-			.always_on		= 0,
-			.apply_uV		= 1,
-		},
-	},
-
-	[CPCAP_VRF1] = {
-		.constraints = {
-			.min_uV			= 2775000,
-			.max_uV			= 2775000,
-			.valid_ops_mask		= 9,
-			.boot_on		= 0,
-			.always_on		= 1,
-			.apply_uV		= 1,
-		},
-		.num_consumer_supplies	= ARRAY_SIZE(cpcap_vrf1_consumers),
-		.consumer_supplies	= cpcap_vrf1_consumers,
-	},
-	[CPCAP_VRF2] = {
-		.constraints = {
-			.min_uV			= 2775000,
-			.max_uV			= 2775000,
-			.valid_ops_mask		= 9,
-			.boot_on		= 0,
-			.always_on		= 1,
-			.apply_uV		= 1,
-		},
-	},
-
-	[CPCAP_VRFREF] = {
-		.constraints = {
-			.min_uV			= 2775000,
-			.max_uV			= 2775000,
-			.valid_ops_mask		= 9,
-			.boot_on		= 0,
-			.always_on		= 1,
-			.apply_uV		= 1,
-		},
-	},
-	[CPCAP_VWLAN1] = {
-		.constraints = {
-			.min_uV			= 1800000,
-			.max_uV			= 1900000,
-			.valid_ops_mask		= 0,
-			.boot_on		= 0,
-			.always_on		= 0,
-			.apply_uV		= 0,
-		},
-		.num_consumer_supplies	= ARRAY_SIZE(cpcap_vwlan1_consumers),
-		.consumer_supplies	= cpcap_vwlan1_consumers,
-	},
-	[CPCAP_VWLAN2] = {
-		.constraints = {
-			.min_uV			= 3000000,
-			.max_uV			= 3000000,
-			.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
-			.apply_uV		= 1,
-			.boot_on		= 0,
-			.always_on		= 0,
-			.apply_uV		= 0,
-		},
-		.num_consumer_supplies	= ARRAY_SIZE(cpcap_vwlan2_consumers),
-		.consumer_supplies	= cpcap_vwlan2_consumers,
-	},
-
-	[CPCAP_VSIM] = {
-		.constraints = {
-			.min_uV			= 1800000,
-			.max_uV			= 2900000,
-			.valid_ops_mask		= 9,
-			.boot_on		= 0,
-			.always_on		= 0,
-			.apply_uV		= 0,
-		},
-		.num_consumer_supplies	= ARRAY_SIZE(cpcap_vsim_consumers),
-		.consumer_supplies	= cpcap_vsim_consumers,
-	},
-	[CPCAP_VSIMCARD] = {
-		.constraints = {
-			.min_uV			= 1800000,
-			.max_uV			= 2900000,
-			.valid_ops_mask		= 9,
-			.boot_on		= 0,
-			.always_on		= 0,
-			.apply_uV		= 0,
-		},
-		.num_consumer_supplies	= ARRAY_SIZE(cpcap_vsimcard_consumers),
-		.consumer_supplies	= cpcap_vsimcard_consumers,
-	},
-	[CPCAP_VVIB] = {
-		.constraints = {
-			.min_uV			= 1300000,
-			.max_uV			= 3000000,
-			.valid_ops_mask		= (REGULATOR_CHANGE_VOLTAGE |
-						   REGULATOR_CHANGE_STATUS),
-			.apply_uV		= 1,
-		},
-		.num_consumer_supplies	= ARRAY_SIZE(cpcap_vvib_consumers),
-		.consumer_supplies	= cpcap_vvib_consumers,
-	},
-	[CPCAP_VUSB] = {
-		.constraints = {
-			.min_uV			= 3300000,
-			.max_uV			= 3300000,
-			.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
-			.apply_uV		= 1,
-		},
-		.num_consumer_supplies	= ARRAY_SIZE(cpcap_vusb_consumers),
-		.consumer_supplies	= cpcap_vusb_consumers,
-	},
-	[CPCAP_VAUDIO] = {
-		.constraints = {
-			.min_uV			= 2775000,
-			.max_uV			= 2775000,
-			.valid_modes_mask	= (REGULATOR_MODE_NORMAL |
-						   REGULATOR_MODE_STANDBY),
-			.valid_ops_mask		= REGULATOR_CHANGE_MODE,
-			.always_on		= 1,
-			.apply_uV		= 1,
-		},
-		.num_consumer_supplies	= ARRAY_SIZE(cpcap_vaudio_consumers),
-		.consumer_supplies	= cpcap_vaudio_consumers,
-	},
 };
 
 static struct cpcap_adc_ato mapphone_cpcap_adc_ato = {
@@ -468,7 +171,6 @@ static struct cpcap_platform_data mapphone_cpcap_data = {
 	.init = mapphone_cpcap_spi_init,
 	.regulator_mode_values = cpcap_regulator_mode_values,
 	.regulator_off_mode_values = cpcap_regulator_off_mode_values,
-	.regulator_init = cpcap_regulator,
 	.adc_ato = &mapphone_cpcap_adc_ato,
 	.leds = &mapphone_cpcap_leds,
 	.ac_changed = NULL,
@@ -480,11 +182,41 @@ static struct cpcap_platform_data mapphone_cpcap_data = {
 };
 
 #ifdef CONFIG_OF
+
+static struct of_regulator_match cpcap_reg_match_table[CPCAP_NUM_REGULATORS] = {
+	{ .name = "CPCAP_SW1" },
+	{ .name = "CPCAP_SW2" },
+	{ .name = "CPCAP_SW3" },
+	{ .name = "CPCAP_SW4" },
+	{ .name = "CPCAP_SW5" },
+	{ .name = "CPCAP_VCAM" },
+	{ .name = "CPCAP_VCSI" },
+	{ .name = "CPCAP_VDAC" },
+	{ .name = "CPCAP_VDIG" },
+	{ .name = "CPCAP_VFUSE" },
+	{ .name = "CPCAP_VHVIO" },
+	{ .name = "CPCAP_VSDIO" },
+	{ .name = "CPCAP_VPLL" },
+	{ .name = "CPCAP_VRF1" },
+	{ .name = "CPCAP_VRF2" },
+	{ .name = "CPCAP_VRFREF" },
+	{ .name = "CPCAP_VWLAN1" },
+	{ .name = "CPCAP_VWLAN2" },
+	{ .name = "CPCAP_VSIM" },
+	{ .name = "CPCAP_VSIMCARD" },
+	{ .name = "CPCAP_VVIB" },
+	{ .name = "CPCAP_VUSB" },
+	{ .name = "CPCAP_VAUDIO" },
+};
+
 struct cpcap_platform_data *cpcap_get_plat_data(struct cpcap_device *cpcap)
 {
 	struct device_node *np = cpcap->spi->dev.of_node;
+	struct device_node *regulators;
+	struct of_regulator_match *reg_matches;
+	struct regulator_init_data *reg_data;
 	unsigned int prop;
-	int i;
+	int i, ret;
 
 	for (i = 0; i < CPCAP_REG_SIZE; i++) {
 		if (mapphone_cpcap_spi_init[i].reg == CPCAP_REG_UNUSED)
@@ -494,6 +226,44 @@ struct cpcap_platform_data *cpcap_get_plat_data(struct cpcap_device *cpcap)
 
 	if (!of_property_read_u32(np, "irq-gpio", &prop))
 		mapphone_cpcap_data.irq_gpio = prop;
+
+	regulators = of_find_node_by_name(np, "regulators");
+	if (!regulators) {
+		dev_err(&cpcap->spi->dev, "regulator node not found\n");
+		return NULL;
+	}
+
+	reg_matches = cpcap_reg_match_table;
+
+	ret = of_regulator_match(&cpcap->spi->dev, regulators, reg_matches, CPCAP_NUM_REGULATORS);
+	of_node_put(regulators);
+	if (ret < 0) {
+		dev_err(&cpcap->spi->dev, "Error parsing regulator init data: %d\n",
+			ret);
+		return NULL;
+	}
+
+	mapphone_cpcap_data.regulator_init = devm_kzalloc(&cpcap->spi->dev,
+			sizeof(struct regulator_init_data) * CPCAP_NUM_REGULATORS, GFP_KERNEL);
+
+	for (i = 0; i < CPCAP_NUM_REGULATORS; i++) {
+		if (!reg_matches[i].init_data || !reg_matches[i].of_node)
+			continue;
+
+		reg_data = reg_matches[i].init_data;
+
+		switch (i) {
+			case CPCAP_VCSI:
+				printk(KERN_DEBUG "Patching consumer_supplies of %s\n", reg_data->constraints.name);
+				reg_data->consumer_supplies = cpcap_vcsi_consumers;
+				reg_data->num_consumer_supplies = ARRAY_SIZE(cpcap_vcsi_consumers);
+				break;
+			default:
+				break;
+		}
+
+		mapphone_cpcap_data.regulator_init[i] = *reg_data;
+	}
 
 	return &mapphone_cpcap_data;
 }
