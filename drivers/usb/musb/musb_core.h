@@ -215,6 +215,8 @@ struct musb_platform_ops {
 				dma_addr_t *dma_addr, u32 *len);
 };
 
+extern struct musb *g_musb;
+
 /*
  * struct musb_hw_ep - endpoint hardware (bidirectional)
  *

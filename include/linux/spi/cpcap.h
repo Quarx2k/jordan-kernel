@@ -623,6 +623,24 @@ struct cpcap_batt_usb_data {
 	enum cpcap_batt_usb_model model;
 };
 
+enum cpcap_det_state {
+	CONFIG,
+	SAMPLE_1,
+	SAMPLE_2,
+	IDENTIFY,
+	USB,
+	FACTORY,
+};
+
+enum cpcap_accy {
+	CPCAP_ACCY_USB,
+	CPCAP_ACCY_FACTORY,
+	CPCAP_ACCY_CHARGER,
+	CPCAP_ACCY_NONE,
+	/* Used while debouncing the accessory. */
+	CPCAP_ACCY_UNKNOWN,
+};
+
 struct cpcap_rtc_time_cnt {
 	struct rtc_time time;
 	unsigned short count;

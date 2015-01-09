@@ -38,6 +38,7 @@
 #include <linux/delay.h>
 #include <linux/usb/musb-omap.h>
 #include <linux/usb/omap_control_usb.h>
+#include <linux/spi/cpcap.h>
 
 #include "musb_core.h"
 #include "omap2430.h"
@@ -196,7 +197,7 @@ static void omap2430_musb_set_vbus(struct musb *musb, int is_on)
 	}
 	musb_writeb(musb->mregs, MUSB_DEVCTL, devctl);
 
-	dev_dbg(musb->controller, "VBUS %s, devctl %02x "
+	dev_info(musb->controller, "VBUS %s, devctl %02x "
 		/* otg %3x conf %08x prcm %08x */ "\n",
 		usb_otg_state_string(musb->xceiv->state),
 		musb_readb(musb->mregs, MUSB_DEVCTL));
@@ -241,7 +242,7 @@ static void omap_musb_set_mailbox(struct omap2430_glue *glue)
 
 	switch (glue->status) {
 	case OMAP_MUSB_ID_GROUND:
-		dev_dbg(dev, "ID GND\n");
+		dev_info(dev, "ID GND\n");
 
 		otg->default_a = true;
 		musb->xceiv->state = OTG_STATE_A_IDLE;
@@ -255,7 +256,7 @@ static void omap_musb_set_mailbox(struct omap2430_glue *glue)
 		break;
 
 	case OMAP_MUSB_VBUS_VALID:
-		dev_dbg(dev, "VBUS Connect\n");
+		dev_info(dev, "VBUS Connect\n");
 
 		otg->default_a = false;
 		musb->xceiv->state = OTG_STATE_B_IDLE;
@@ -267,7 +268,7 @@ static void omap_musb_set_mailbox(struct omap2430_glue *glue)
 
 	case OMAP_MUSB_ID_FLOAT:
 	case OMAP_MUSB_VBUS_OFF:
-		dev_dbg(dev, "VBUS Disconnect\n");
+		dev_info(dev, "VBUS Disconnect\n");
 
 		musb->xceiv->last_event = USB_EVENT_NONE;
 		if (musb->gadget_driver) {
@@ -283,7 +284,7 @@ static void omap_musb_set_mailbox(struct omap2430_glue *glue)
 			USB_MODE_DISCONNECT);
 		break;
 	default:
-		dev_dbg(dev, "ID float\n");
+		dev_info(dev, "ID float\n");
 	}
 }
 
@@ -457,6 +458,25 @@ static const struct musb_platform_ops omap2430_ops = {
 
 static u64 omap2430_dmamask = DMA_BIT_MASK(32);
 
+static void cpcap_usb_set_id_state(int online)
+{
+	struct musb *musb = g_musb;
+	struct device *dev = musb->controller;
+
+	printk("USB Connected?: %d\n", online); //Revisit: add otg, disable usb, other modes.
+	if (online == CPCAP_ACCY_USB) {
+		dev_info(dev, "VBUS Connect\n");
+		pm_runtime_get_sync(dev);
+	} else if (online == CPCAP_ACCY_NONE) {
+		dev_info(dev, "VBUS Disconnect\n");
+		pm_runtime_mark_last_busy(dev);
+		pm_runtime_put_autosuspend(dev);
+
+	}
+}
+
+extern int cpcap_UsbInOutNotificaition(void (*callback)(int));
+
 static int omap2430_probe(struct platform_device *pdev)
 {
 	struct musb_hdrc_platform_data	*pdata = pdev->dev.platform_data;
@@ -565,6 +585,9 @@ static int omap2430_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "failed to register musb device\n");
 		goto err2;
 	}
+
+
+	cpcap_UsbInOutNotificaition(&cpcap_usb_set_id_state);
 
 	return 0;
 

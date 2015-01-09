@@ -122,6 +122,7 @@ MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("platform:" MUSB_DRIVER_NAME);
 
+struct musb *g_musb;
 
 /*-------------------------------------------------------------------------*/
 
@@ -1855,6 +1856,8 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 		status = -ENOMEM;
 		goto fail0;
 	}
+
+	g_musb = musb;
 
 	pm_runtime_use_autosuspend(musb->controller);
 	pm_runtime_set_autosuspend_delay(musb->controller, 200);

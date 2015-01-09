@@ -114,31 +114,6 @@ module_param_named(cpcap_usb_det_debug_mask, cpcap_usb_det_debug_mask, int,
 		} \
 	} while (0)
 
-enum cpcap_det_state {
-	CONFIG,
-	SAMPLE_1,
-	SAMPLE_2,
-	IDENTIFY,
-	USB,
-	FACTORY,
-#ifdef CONFIG_CHARGER_CPCAP_2WIRE
-	START2WIRE,
-	FINISH2WIRE,
-#endif
-};
-
-enum cpcap_accy {
-	CPCAP_ACCY_USB,
-	CPCAP_ACCY_FACTORY,
-	CPCAP_ACCY_CHARGER,
-	CPCAP_ACCY_NONE,
-#ifdef CONFIG_CHARGER_CPCAP_2WIRE
-	CPCAP_ACCY_2WIRE,
-#endif
-	/* Used while debouncing the accessory. */
-	CPCAP_ACCY_UNKNOWN,
-};
-
 #ifdef CONFIG_CHARGER_CPCAP_2WIRE
 enum cpcap_twowire_state {
 	CPCAP_TWOWIRE_RUNNING,
@@ -377,6 +352,7 @@ static unsigned char vbus_valid_adc_check(struct cpcap_usb_det_data *data)
 		(req.result[CPCAP_ADC_BATTP]))) ? false : true;
 }
 
+static void (*notify_usb_in_out_func_ptr)(int) = NULL;
 
 static void notify_accy(struct cpcap_usb_det_data *data, enum cpcap_accy accy)
 {
@@ -421,7 +397,15 @@ static void notify_accy(struct cpcap_usb_det_data *data, enum cpcap_accy accy)
 		platform_device_del(data->charger_connected_dev);
 		data->charger_connected_dev = NULL;
 	}
+	(*notify_usb_in_out_func_ptr) (accy);
 }
+
+int cpcap_UsbInOutNotificaition(void (*callback)(int))
+{
+	notify_usb_in_out_func_ptr = callback;
+	return 0;
+}
+
 
 #ifdef CONFIG_CHARGER_CPCAP_2WIRE
 static enum hrtimer_restart cpcap_send_2wire_sendbit(struct hrtimer *timer)
