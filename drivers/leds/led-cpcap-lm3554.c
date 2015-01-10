@@ -183,7 +183,7 @@ static ssize_t lm3554_strobe_err_show(struct device *dev,
 
 	return sizeof(buf);
 }
-static DEVICE_ATTR(strobe_err, 0644, lm3554_strobe_err_show, NULL);
+static DEVICE_ATTR(strobe_err, 0444, lm3554_strobe_err_show, NULL);
 
 static ssize_t lm3554_torch_show(struct device *dev,
 				 struct device_attribute *attr, char *buf)
@@ -244,7 +244,7 @@ static ssize_t lm3554_torch_store(struct device *dev,
 	return err;
 }
 
-static DEVICE_ATTR(flash_light, 0644, lm3554_torch_show, lm3554_torch_store);
+static DEVICE_ATTR(flash_light, 0444, lm3554_torch_show, lm3554_torch_store);
 
 static void lm3554_spot_light_brightness_set(struct led_classdev *led_cdev,
 				  enum led_brightness value)
@@ -362,7 +362,7 @@ static ssize_t lm3554_strobe_store(struct device *dev,
 	return 0;
 }
 
-static DEVICE_ATTR(camera_strobe, 0644, lm3554_strobe_show,
+static DEVICE_ATTR(camera_strobe, 0444, lm3554_strobe_show,
 		   lm3554_strobe_store);
 
 static int lm3554_probe(struct i2c_client *client,
