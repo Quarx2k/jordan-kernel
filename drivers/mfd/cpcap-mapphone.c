@@ -49,7 +49,7 @@ struct cpcap_spi_init_data mapphone_cpcap_spi_init[CPCAP_REG_SIZE + 1] = {
 	{CPCAP_REG_S4C1,      0x4034},
 	{CPCAP_REG_S4C2,      0x3434},
 	{CPCAP_REG_S6C,       0x0000},
-	///{CPCAP_REG_VWLAN2C,   0x0001},
+	{CPCAP_REG_VWLAN2C,   0x0001},
 	{CPCAP_REG_VUSBINT1C, 0x0029},
 	{CPCAP_REG_VUSBINT2C, 0x0029},
 	{CPCAP_REG_VAUDIOC,   0x0060},
@@ -68,6 +68,7 @@ struct cpcap_spi_init_data mapphone_cpcap_spi_init[CPCAP_REG_SIZE + 1] = {
 	{CPCAP_REG_GPIO4,     0x3204},
 	{CPCAP_REG_GPIO5,     0x3008},
 	{CPCAP_REG_GPIO6,     0x3004},
+	{CPCAP_REG_MDLC,      0x0000},
 	{CPCAP_REG_KLC,       0x0000},
 	{CPCAP_REG_UNUSED,    0x0000},
 };
