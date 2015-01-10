@@ -1719,7 +1719,7 @@ static int musb_gadget_vbus_draw(struct usb_gadget *gadget, unsigned mA)
 	return otg_set_power(musb->xceiv, mA);
 }
 
-static int musb_gadget_pullup(struct usb_gadget *gadget, int is_on)
+int musb_gadget_pullup(struct usb_gadget *gadget, int is_on)
 {
 	struct musb	*musb = gadget_to_musb(gadget);
 	unsigned long	flags;

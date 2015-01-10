@@ -35,6 +35,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/pm_runtime.h>
 #include <linux/err.h>
+#include <linux/spi/cpcap.h>
 
 #include "musb_core.h"
 #include "omap2430.h"
@@ -46,32 +47,6 @@ struct omap2430_glue {
 #define glue_to_musb(g)		platform_get_drvdata(g->musb)
 
 static struct timer_list musb_idle_timer;
-
-#if defined(CONFIG_USB_MOT_ANDROID) && defined(CONFIG_USB_MUSB_OTG)
- /* blocking notifier support */
-
-void cpcap_musb_notifier_call(unsigned long event)
-{
-	struct musb *musb = g_musb;
-	printk("cpcap_musb_notifier_call \n");
-	switch (event) {
-	case USB_EVENT_VBUS:
-		DBG(1, "VBUS Connect\n");
-		DBG(1, "MUSB - Hold L3 Bus and C State Constraint \n");
-		pm_runtime_get_sync(musb->controller);
-		break;
-
-	case USB_EVENT_NONE:
-		DBG(1, "VBUS Disconnect\n");
-		pm_runtime_mark_last_busy(musb->controller);
-		pm_runtime_put_autosuspend(musb->controller);
-		break;
-	default:
-		DBG(1, "ID float\n");
-	}
-
-}
-#endif /*CONFIG_USB_MOT_ANDROID*/
 
 static void musb_do_idle(unsigned long _musb)
 {
@@ -528,16 +503,79 @@ static const struct musb_platform_ops omap2430_ops = {
 
 	.set_mode	= omap2430_musb_set_mode,
 	.try_idle	= omap2430_musb_try_idle,
-#ifndef CONFIG_USB_MOT_ANDROID
-	.set_vbus	= omap2430_musb_set_vbus,
-#else
+//#ifndef CONFIG_USB_MOT_ANDROID
+///	.set_vbus	= omap2430_musb_set_vbus,
+//#else
 	.set_vbus	= 0,
-#endif
+//#endif
 	.enable		= omap2430_musb_enable,
 	.disable	= omap2430_musb_disable,
 };
 
 static u64 omap2430_dmamask = DMA_BIT_MASK(32);
+extern int musb_gadget_pullup(struct usb_gadget *gadget, int is_on);
+static void cpcap_usb_set_id_state(int online)
+{
+	struct musb *musb = g_musb;
+	struct device *dev = musb->controller;
+	struct musb_hdrc_platform_data *pdata = dev->platform_data;
+	struct omap_musb_board_data *data = pdata->board_data;
+	u32 val;
+	u8  devctl;
+	printk("USB Conencted?: %d\n", online); //Revisit: add otg, other modes.
+
+	if (online == CPCAP_ACCY_USB) {
+		dev_info(musb->controller, "VBUS Connect\n");
+		if (musb->gadget_driver) {
+			pm_runtime_get_sync(musb->controller);
+			val = musb_readl(musb->mregs, OTG_INTERFSEL);
+			if (data->interface_type ==
+					MUSB_INTERFACE_UTMI) {
+				val &= ~ULPI_12PIN;
+				val |= UTMI_8BIT;
+			} else {
+				val |= ULPI_12PIN;
+			}
+			musb_writel(musb->mregs, OTG_INTERFSEL, val);
+		}
+		otg_init(musb->xceiv);
+		musb->xceiv->last_event = USB_EVENT_VBUS;
+		musb->xceiv->state = OTG_STATE_B_IDLE;
+	} else if (online == CPCAP_ACCY_NONE) {
+		devctl = musb_readb(musb->mregs, MUSB_DEVCTL);
+		dev_info(musb->controller, "VBUS Disconnect\n");
+		if (is_otg_enabled(musb) || is_peripheral_enabled(musb))
+			if (musb->gadget_driver)
+			{
+				pm_runtime_mark_last_busy(musb->controller);
+				pm_runtime_put_autosuspend(musb->controller);
+			}
+
+		if (data->interface_type == MUSB_INTERFACE_UTMI) {
+			omap2430_musb_set_vbus(musb, 0);
+			if (musb->xceiv->set_vbus)
+				otg_set_vbus(musb->xceiv, 0);
+		}
+		otg_shutdown(musb->xceiv);
+		val = musb_readl(musb->mregs, OTG_INTERFSEL);
+		val |= ULPI_12PIN;
+		musb_writel(musb->mregs, OTG_INTERFSEL, val);
+
+		musb->is_active = 0;
+		musb->xceiv->default_a = 0;
+		musb->xceiv->state = OTG_STATE_B_IDLE;
+		devctl &= ~MUSB_DEVCTL_SESSION;
+		musb_writeb(musb->mregs, MUSB_DEVCTL, devctl);
+		MUSB_DEV_MODE(musb);
+
+		pr_info("EVENT_NONE: pull down, disable gadget\n");
+		musb_gadget_pullup(&musb->g, 0);
+		pr_info("EVENT_NONE: pull up, enable gadget anyway\n");
+		musb_gadget_pullup(&musb->g, 1);
+	}
+}
+
+extern int cpcap_UsbInOutNotificaition(void (*callback)(int));
 
 static int __init omap2430_probe(struct platform_device *pdev)
 {
@@ -589,6 +627,8 @@ static int __init omap2430_probe(struct platform_device *pdev)
 	}
 
 	pm_runtime_enable(&pdev->dev);
+
+	cpcap_UsbInOutNotificaition(&cpcap_usb_set_id_state);
 
 	return 0;
 

@@ -363,6 +363,8 @@ static int configure_hardware(struct cpcap_usb_det_data *data,
 	return retval;
 }
 
+static void (*notify_usb_in_out_func_ptr)(int) = NULL;
+
 static void notify_accy(struct cpcap_usb_det_data *data, enum cpcap_accy accy)
 {
 	if (cpcap_usb_det_debug > 1)
@@ -409,7 +411,16 @@ static void notify_accy(struct cpcap_usb_det_data *data, enum cpcap_accy accy)
 		platform_device_del(data->charger_connected_dev);
 		data->charger_connected_dev = NULL;
 	}
+
+	(*notify_usb_in_out_func_ptr) (accy);
 }
+
+int cpcap_UsbInOutNotificaition(void (*callback)(int))
+{
+	notify_usb_in_out_func_ptr = callback;
+	return 0;
+}
+
 
 static void detection_work(struct work_struct *work)
 {

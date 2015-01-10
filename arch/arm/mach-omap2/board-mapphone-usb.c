@@ -50,32 +50,8 @@ static struct platform_device android_usb_platform_device = {
 	},
 };
 
-static int cpcap_usb_connected_probe(struct platform_device *pdev)
-{
-	printk("USB Connected!\n");
-	cpcap_musb_notifier_call(USB_EVENT_VBUS);
-	return 0;
-}
-
-static int cpcap_usb_connected_remove(struct platform_device *pdev)
-{
-	printk("USB Disconnected!\n");
-	cpcap_musb_notifier_call(USB_EVENT_NONE);
-	return 0;
-}
-
-static struct platform_driver cpcap_usb_connected_driver = {
-	.probe		= cpcap_usb_connected_probe,
-	.remove		= cpcap_usb_connected_remove,
-	.driver		= {
-		.name	= "cpcap_usb_connected",
-		.owner	= THIS_MODULE,
-	},
-};
-
 void mapphone_gadget_init(void)
 {
-	platform_driver_register(&cpcap_usb_connected_driver);
 	platform_device_register(&android_usb_platform_device);
 
 }
