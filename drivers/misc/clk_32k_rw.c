@@ -125,7 +125,7 @@ void timer_32k_callback(unsigned long param)
 	spin_unlock(&clock_32k_spin_lock);
 }
 
-static int __devinit clock_32k_probe(struct platform_device *dev)
+static int __init clock_32k_probe(struct platform_device *dev)
 {
 	int ret;
 	spin_lock_init(&clock_32k_spin_lock);
@@ -142,7 +142,7 @@ out:
 	return ret;
 }
 
-static int __devexit clock_32k_remove(struct platform_device *dev)
+static int clock_32k_remove(struct platform_device *dev)
 {
 	misc_deregister(&clock_32k_miscdev);
 	return 0;
@@ -150,7 +150,7 @@ static int __devexit clock_32k_remove(struct platform_device *dev)
 
 static struct platform_driver clock_32k_driver = {
 	.probe		= clock_32k_probe,
-	.remove		= __devexit_p(clock_32k_remove),
+	.remove		= clock_32k_remove,
 	.driver		= {
 		.owner	= THIS_MODULE,
 		.name	= DRV_NAME,
