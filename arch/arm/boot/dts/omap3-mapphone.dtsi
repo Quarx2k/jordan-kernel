@@ -564,7 +564,7 @@
 	};
 };
 
-&mcspi1 {
+&mcspi2 {
 	clock-frequency = <3000000>;
 
 	cpcap {
