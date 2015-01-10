@@ -64,6 +64,7 @@ include/generated
 arch/*/include/generated
 drivers/net/wireless/ti/wlcore/version.h
 drivers/net/wireless/ti/wl18xx/version.h
+arch/arm/boot/dts/dtb_list
 
 # stgit generated dirs
 patches-*
