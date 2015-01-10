@@ -124,7 +124,7 @@ static const struct {
 	[CPCAP_REG_VWLAN2C]   = {408, 0xFD32, 0xFFFF},
 	[CPCAP_REG_VSIMC]     = {409, 0xE154, 0xFFFF},
 	[CPCAP_REG_VVIBC]     = {410, 0xFFF2, 0xFFFF},
-#ifdef CONFIG_EMU_UART_DEBUG
+#ifdef CONFIG_DEBUG_LL
 	[CPCAP_REG_VUSBC]     = {411, 0xFFFF, 0xFFFF},
 #else
 	[CPCAP_REG_VUSBC]     = {411, 0xFEA2, 0xFFFF},
