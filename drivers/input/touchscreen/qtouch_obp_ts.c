@@ -2106,6 +2106,28 @@ static ssize_t qtouch_fw_version(struct device *dev,
 
 static DEVICE_ATTR(fw_version, 0444, qtouch_fw_version, NULL);
 
+#ifdef CONFIG_OF
+static int mapphone_legacy_qtouch_reset(void)
+{
+	int reset_pin;
+	int retval = 0;
+
+	reset_pin = 164;// Add to DT // get_gpio_by_name("touch_panel_rst");
+	if (reset_pin < 0) {
+		printk(KERN_ERR "%s: Cannot acquire reset pin.\n", __func__);
+		retval = reset_pin;
+	} else {
+		gpio_direction_output(reset_pin, 1);
+		msleep(1);
+		gpio_set_value(reset_pin, 0);
+		msleep(QTM_OBP_SLEEP_RESET_HOLD);
+		gpio_set_value(reset_pin, 1);
+	}
+
+	return retval;
+}
+#endif
+
 static int qtouch_ts_probe(struct i2c_client *client,
 			   const struct i2c_device_id *id)
 {
@@ -2117,13 +2139,205 @@ static int qtouch_ts_probe(struct i2c_client *client,
 	uint8_t extended_boot = 0;
 	int loop_count;
 
+#ifdef CONFIG_OF
+	struct device_node *np = client->dev.of_node;
+	unsigned int prop;
+	const void *touch_prop;
+
+	pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
+	if (!pdata) {
+		dev_err(&client->dev, "pdata allocation failure\n");
+		return -ENODEV;
+	}
+#endif
 	if (pdata == NULL) {
 		pr_err("%s: platform data required\n", __func__);
 		return -ENODEV;
-	} else if (!client->irq) {
+	}
+#ifdef CONFIG_OF
+	if (!np) {
+		dev_err(&client->dev, "required device_tree entry not found\n");
+		return -ENODEV;
+	}
+
+	/* init fields with common configurations for all products */
+	pdata->flags = QTOUCH_USE_MULTITOUCH |
+			   QTOUCH_CFG_BACKUPNV |
+			   QTOUCH_EEPROM_CHECKSUM;
+	pdata->irqflags = IRQF_TRIGGER_FALLING | IRQF_TRIGGER_LOW;
+	pdata->hw_reset = mapphone_legacy_qtouch_reset;
+
+	if (!of_property_read_u32(np, "flags", &prop))
+		pdata->flags = prop;
+	if (!of_property_read_u32(np, "abs_max_w", &prop))
+		pdata->abs_max_w = prop;
+	if (!of_property_read_u32(np, "abs_max_x", &prop))
+		pdata->abs_max_x = prop;
+	if (!of_property_read_u32(np, "abs_max_y ", &prop))
+		pdata->abs_max_y = prop;
+	if (!of_property_read_u32(np, "abs_min_x", &prop))
+		pdata->abs_min_x = prop;
+	if (!of_property_read_u32(np, "abs_min_y", &prop))
+		pdata->abs_min_y = prop;
+	if (!of_property_read_u32(np, "x_delta", &prop))
+		pdata->x_delta = prop;
+	if (!of_property_read_u32(np, "y_delta", &prop))
+		pdata->y_delta = prop;
+	if (!of_property_read_u32(np, "i2c_address", &prop))
+		pdata->boot_i2c_addr = prop;
+	if (!of_property_read_u32(np, "touchobp-flags", &prop)) //Maybe we no need it
+		pdata->flags = prop;
+
+	touch_prop = of_get_property(np, "obj_t9", NULL);;
+	if (touch_prop) {
+		pdata->multi_touch_cfg =
+			*(struct qtm_touch_multi_cfg *)touch_prop;
+	}
+
+	touch_prop = of_get_property(np, "obj_t15", NULL);
+	if (touch_prop) {
+		pdata->key_array.cfg =
+			(struct qtm_touch_keyarray_cfg *)touch_prop;
+	}
+
+	touch_prop = of_get_property(np, "obj_t19", NULL);
+	if (touch_prop) {
+		pdata->gpio_pwm_cfg =
+			*(struct qtm_spt_gpio_pwm_cfg *)touch_prop;
+	}
+
+	touch_prop = of_get_property(np, "obj_t22", NULL);
+	if (touch_prop) {
+		pdata->noise_suppression_cfg =
+			*(struct qtm_procg_noise_suppression_cfg *)touch_prop;
+	}
+
+	touch_prop = of_get_property(np, "obj_t28", NULL);
+	if (touch_prop) {
+		pdata->cte_config_cfg =
+			*(struct qtm_spt_cte_config_cfg *)touch_prop;
+	}
+
+	touch_prop = of_get_property(np, "touch_key_map", &prop);
+	if (touch_prop && prop && (0 == prop % sizeof(struct vkey))) {
+			pdata->vkeys.count =
+				prop / sizeof(struct vkey);
+			pdata->vkeys.keys =
+				(struct vkey *)touch_prop;
+	}
+/*
+	printk("abs_max_w %d\n", pdata->abs_max_w);
+	printk("abs_max_y %d\n", pdata->abs_max_y);
+	printk("abs_max_x %d\n", pdata->abs_max_x);
+	printk("abs_min_x %d\n", pdata->abs_min_x);
+	printk("abs_min_y %d\n", pdata->abs_min_y);
+	printk("boot_i2c_address %d\n", pdata->boot_i2c_addr);
+	printk("x_delta %d\n", pdata->x_delta);
+	printk("y_delta %d\n", pdata->y_delta);
+	printk("\n");
+	printk("obj_t15 ctrl %d\n", pdata->key_array.cfg->ctrl);
+	printk("obj_t15 x_origin %d\n", pdata->key_array.cfg->x_origin);
+	printk("obj_t15 y_origin %d\n", pdata->key_array.cfg->y_origin);
+	printk("obj_t15 x_size %d\n", pdata->key_array.cfg->x_size);
+	printk("obj_t15 y_size %d\n", pdata->key_array.cfg->y_size);
+	printk("obj_t15 aks_cfg %d\n", pdata->key_array.cfg->aks_cfg);
+	printk("obj_t15 burst_len %d\n", pdata->key_array.cfg->burst_len);
+	printk("obj_t15 tch_det_thr %d\n", pdata->key_array.cfg->tch_det_thr);
+	printk("obj_t15 tch_det_int %d\n", pdata->key_array.cfg->tch_det_int);
+	printk("obj_t15 rsvd1 %d\n", pdata->key_array.cfg->rsvd1);
+	printk("obj_t15 rsvd2 %d\n", pdata->key_array.cfg->rsvd2);
+	printk("\n");
+	printk("obj_t19 ctrl %d\n", pdata->gpio_pwm_cfg.ctrl);
+	printk("obj_t19 report_mask %d\n", pdata->gpio_pwm_cfg.report_mask);
+	printk("obj_t19 pin_direction; %d\n", pdata->gpio_pwm_cfg.pin_direction);
+	printk("obj_t19 internal_pullup %d\n", pdata->gpio_pwm_cfg.internal_pullup);
+	printk("obj_t19 output_value %d\n", pdata->gpio_pwm_cfg.output_value);
+	printk("obj_t19 wake_on_change %d\n", pdata->gpio_pwm_cfg.wake_on_change);
+	printk("obj_t19 pwm_enable %d\n", pdata->gpio_pwm_cfg.pwm_enable);
+	printk("obj_t19 pwm_period %d\n", pdata->gpio_pwm_cfg.pwm_period);
+	printk("obj_t19 duty_cycle_0 %d\n", pdata->gpio_pwm_cfg.duty_cycle_0);
+	printk("obj_t19 duty_cycle_1 %d\n", pdata->gpio_pwm_cfg.duty_cycle_1);
+	printk("obj_t19 duty_cycle_2 %d\n", pdata->gpio_pwm_cfg.duty_cycle_2);
+	printk("obj_t19 duty_cycle_3 %d\n", pdata->gpio_pwm_cfg.duty_cycle_3);
+	printk("obj_t19 trigger_0 %d\n", pdata->gpio_pwm_cfg.trigger_0);
+	printk("obj_t19 trigger_1 %d\n", pdata->gpio_pwm_cfg.trigger_1);
+	printk("obj_t19 trigger_2 %d\n", pdata->gpio_pwm_cfg.trigger_2);
+	printk("obj_t19 trigger_3 %d\n", pdata->gpio_pwm_cfg.trigger_3);
+	printk("\n");
+	printk("obj_t20 ctrl %d\n", pdata->noise_suppression_cfg.ctrl);
+	printk("obj_t20 outlier_filter_len %d\n", pdata->noise_suppression_cfg.outlier_filter_len);
+	printk("obj_t20 reserve0 %d\n", pdata->noise_suppression_cfg.reserve0);
+	printk("obj_t20 gcaf_upper_limit %d\n", pdata->noise_suppression_cfg.gcaf_upper_limit);
+	printk("obj_t20 gcaf_lower_limit %d\n", pdata->noise_suppression_cfg.gcaf_lower_limit);
+	printk("obj_t20 noise_threshold %d\n", pdata->noise_suppression_cfg.noise_threshold);
+	printk("obj_t20 reserve1 %d\n", pdata->noise_suppression_cfg.reserve1);
+	printk("obj_t20 freq_hop_scale %d\n", pdata->noise_suppression_cfg.freq_hop_scale);
+	printk("obj_t20 burst_freq_0 %d\n", pdata->noise_suppression_cfg.burst_freq_0);
+	printk("obj_t20 burst_freq_1 %d\n", pdata->noise_suppression_cfg.burst_freq_1);
+	printk("obj_t20 burst_freq_2 %d\n", pdata->noise_suppression_cfg.burst_freq_2);
+	printk("obj_t20 burst_freq_3 %d\n", pdata->noise_suppression_cfg.burst_freq_3);
+	printk("obj_t20 burst_freq_4 %d\n", pdata->noise_suppression_cfg.burst_freq_4);
+	printk("obj_t20 idle_gcaf_valid %d\n", pdata->noise_suppression_cfg.idle_gcaf_valid);
+	printk("\n");
+	printk("obj_t28 ctrl %d\n", pdata->cte_config_cfg.ctrl);
+	printk("obj_t28 command %d\n", pdata->cte_config_cfg.command);
+	printk("obj_t28 mode %d\n", pdata->cte_config_cfg.mode);
+	printk("obj_t28 idle_gcaf_depth %d\n", pdata->cte_config_cfg.idle_gcaf_depth);
+	printk("obj_t28 ctive_gcaf_depth %d\n", pdata->cte_config_cfg.active_gcaf_depth);
+	printk("obj_t28 voltage %d\n", pdata->cte_config_cfg.voltage);
+	printk("\n");
+	printk("obj_t7 idle_acq_int %d\n", pdata->power_cfg.idle_acq_int);
+	printk("obj_t7 active_acq_int %d\n", pdata->power_cfg.active_acq_int);
+	printk("obj_t7 active_idle_to %d\n", pdata->power_cfg.active_idle_to);
+	printk("\n");
+	printk("obj_t8 charge_time %d\n", pdata->acquire_cfg.charge_time);
+	printk("obj_t8 atouch_drift %d\n", pdata->acquire_cfg.atouch_drift);
+	printk("obj_t8 touch_drift %d\n", pdata->acquire_cfg.touch_drift);
+	printk("obj_t8 drift_susp %d\n", pdata->acquire_cfg.drift_susp);
+	printk("obj_t8 touch_autocal %d\n", pdata->acquire_cfg.touch_autocal);
+	printk("obj_t8 sync %d\n", pdata->acquire_cfg.sync);
+	printk("obj_t8 atch_cal_suspend_time %d\n", pdata->acquire_cfg.atch_cal_suspend_time);
+	printk("obj_t8 atch_cal_suspend_thres %d\n", pdata->acquire_cfg.atch_cal_suspend_thres);
+	printk("\n");
+	printk("obj_t9 ctrl %d\n", pdata->multi_touch_cfg.ctrl);
+	printk("obj_t9 x_origin %d\n", pdata->multi_touch_cfg.x_origin);
+	printk("obj_t9 y_origin %d\n", pdata->multi_touch_cfg.y_origin);
+	printk("obj_t9 x_size %d\n", pdata->multi_touch_cfg.x_size);
+	printk("obj_t9 y_size %d\n", pdata->multi_touch_cfg.y_size);
+	printk("obj_t9 aks_cfg %d\n", pdata->multi_touch_cfg.aks_cfg);
+	printk("obj_t9 burst_len %d\n", pdata->multi_touch_cfg.burst_len);
+	printk("obj_t9 tch_det_thr %d\n", pdata->multi_touch_cfg.tch_det_thr);
+	printk("obj_t9 tch_det_int %d\n", pdata->multi_touch_cfg.tch_det_int);
+	printk("obj_t9 orient %d\n", pdata->multi_touch_cfg.orient);
+	printk("obj_t9 mrg_to %d\n", pdata->multi_touch_cfg.mrg_to);
+	printk("obj_t9 mov_hyst_init %d\n", pdata->multi_touch_cfg.mov_hyst_init);
+	printk("obj_t9 mov_hyst_next %d\n", pdata->multi_touch_cfg.mov_hyst_next);
+	printk("obj_t9 mov_filter %d\n", pdata->multi_touch_cfg.mov_filter);
+	printk("obj_t9 num_touch %d\n", pdata->multi_touch_cfg.num_touch);
+	printk("obj_t9 merge_hyst %d\n", pdata->multi_touch_cfg.merge_hyst);
+	printk("obj_t9 merge_thresh %d\n", pdata->multi_touch_cfg.merge_thresh);
+	printk("obj_t9 amp_hyst %d\n", pdata->multi_touch_cfg.amp_hyst);
+	printk("obj_t9 x_res %d\n", pdata->multi_touch_cfg.x_res);
+	printk("obj_t9 y_res %d\n", pdata->multi_touch_cfg.y_res);
+	printk("obj_t9 x_low_clip %d\n", pdata->multi_touch_cfg.x_low_clip);
+	printk("obj_t9 x_high_clip %d\n", pdata->multi_touch_cfg.x_high_clip);
+	printk("obj_t9 y_low_clip %d\n", pdata->multi_touch_cfg.y_low_clip);
+	printk("obj_t9 y_high_clip %d\n", pdata->multi_touch_cfg.y_high_clip);
+	printk("obj_t9 x_edge_ctrl %d\n", pdata->multi_touch_cfg.x_edge_ctrl);
+	printk("obj_t9 x_edge_dist %d\n", pdata->multi_touch_cfg.x_edge_dist);
+	printk("obj_t9 y_edge_ctrl %d\n", pdata->multi_touch_cfg.y_edge_ctrl);
+	printk("obj_t9 y_edge_dist %d\n", pdata->multi_touch_cfg.y_edge_dist);
+	printk("\n");
+	printk("touchobp-flag %d\n",pdata->flags);
+*/
+	of_node_put(np);
+#endif
+	if (!client->irq) {
 		pr_err("%s: polling mode currently not supported\n", __func__);
 		return -ENODEV;
-	} else if (!pdata->hw_reset) {
+	}
+
+	if (!pdata->hw_reset) {
 		pr_err("%s: Must supply a hw reset function\n", __func__);
 		return -ENODEV;
 	}
@@ -2791,6 +3005,13 @@ err_diag_data:
 	return ret;
 }
 
+#ifdef CONFIG_OF
+static struct of_device_id qtouch_of_match[] = {
+	{ .compatible = "mot,qtouch-obp-ts" },
+	{ }, };
+MODULE_DEVICE_TABLE(of, qtouch_of_match);
+#endif
+
 /******** init ********/
 static const struct i2c_device_id qtouch_ts_id[] = {
 	{ QTOUCH_TS_NAME, 0 },
@@ -2807,6 +3028,9 @@ static struct i2c_driver qtouch_ts_driver = {
 	.id_table	= qtouch_ts_id,
 	.driver = {
 		.name	= QTOUCH_TS_NAME,
+#ifdef CONFIG_OF
+		.of_match_table = of_match_ptr(qtouch_of_match),
+#endif
 		.owner	= THIS_MODULE,
 	},
 };
