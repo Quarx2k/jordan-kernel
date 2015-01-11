@@ -49,7 +49,16 @@ struct cpcap_spi_init_data mapphone_cpcap_spi_init[CPCAP_REG_SIZE + 1] = {
 	{CPCAP_REG_S4C1,      0x4034},
 	{CPCAP_REG_S4C2,      0x3434},
 	{CPCAP_REG_S6C,       0x0000},
-	///{CPCAP_REG_VWLAN2C,   0x0001},
+#if 0
+	{CPCAP_REG_VWLAN2C,   0x0001},
+#else
+	/*
+	 * WARNING: Some Defy's seem to have USB problems when
+	 * the original value (0x0001) is used. 0x004d is what
+	 * we get from the bootloader and it seems to work fine.
+	 */
+	{CPCAP_REG_VWLAN2C,   0x004d},
+#endif
 	{CPCAP_REG_VUSBINT1C, 0x0029},
 	{CPCAP_REG_VUSBINT2C, 0x0029},
 	{CPCAP_REG_VAUDIOC,   0x0060},
@@ -68,6 +77,7 @@ struct cpcap_spi_init_data mapphone_cpcap_spi_init[CPCAP_REG_SIZE + 1] = {
 	{CPCAP_REG_GPIO4,     0x3204},
 	{CPCAP_REG_GPIO5,     0x3008},
 	{CPCAP_REG_GPIO6,     0x3004},
+	{CPCAP_REG_MDLC,      0x0000},
 	{CPCAP_REG_KLC,       0x0000},
 	{CPCAP_REG_UNUSED,    0x0000},
 };
@@ -114,11 +124,6 @@ unsigned short cpcap_regulator_off_mode_values[CPCAP_NUM_REGULATORS] = {
 	[CPCAP_VVIB]     = 0x0000,
 	[CPCAP_VUSB]     = 0x0000,
 	[CPCAP_VAUDIO]   = 0x0000,
-};
-
-struct regulator_consumer_supply cpcap_vcsi_consumers[] = {
-	REGULATOR_SUPPLY("vdds_dsi", "omapdss"),
-	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.0"),
 };
 
 static struct cpcap_adc_ato mapphone_cpcap_adc_ato = {
@@ -214,7 +219,6 @@ struct cpcap_platform_data *cpcap_get_plat_data(struct cpcap_device *cpcap)
 	struct device_node *np = cpcap->spi->dev.of_node;
 	struct device_node *regulators;
 	struct of_regulator_match *reg_matches;
-	struct regulator_init_data *reg_data;
 	unsigned int prop;
 	int i, ret;
 
@@ -250,19 +254,9 @@ struct cpcap_platform_data *cpcap_get_plat_data(struct cpcap_device *cpcap)
 		if (!reg_matches[i].init_data || !reg_matches[i].of_node)
 			continue;
 
-		reg_data = reg_matches[i].init_data;
-
-		switch (i) {
-			case CPCAP_VCSI:
-				printk(KERN_DEBUG "Patching consumer_supplies of %s\n", reg_data->constraints.name);
-				reg_data->consumer_supplies = cpcap_vcsi_consumers;
-				reg_data->num_consumer_supplies = ARRAY_SIZE(cpcap_vcsi_consumers);
-				break;
-			default:
-				break;
-		}
-
-		mapphone_cpcap_data.regulator_init[i] = *reg_data;
+		mapphone_cpcap_data.regulator_init[i] = *reg_matches[i].init_data;
+		mapphone_cpcap_data.regulator_init[i].driver_data =
+			(void *)reg_matches[i].of_node;
 	}
 
 	return &mapphone_cpcap_data;
