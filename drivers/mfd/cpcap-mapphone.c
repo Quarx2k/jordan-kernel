@@ -246,6 +246,8 @@ struct cpcap_platform_data *cpcap_get_plat_data(struct cpcap_device *cpcap)
 			continue;
 
 		mapphone_cpcap_data.regulator_init[i] = *reg_matches[i].init_data;
+		mapphone_cpcap_data.regulator_init[i].driver_data =
+			(void *)reg_matches[i].of_node;
 	}
 
 	return &mapphone_cpcap_data;

@@ -550,6 +550,7 @@ static int cpcap_regulator_probe(struct platform_device *pdev)
 	config.dev = &pdev->dev;
 	config.init_data = pdev->dev.platform_data;
 	config.driver_data = platform_get_drvdata(pdev);
+	config.of_node = (struct device_node *)config.init_data->driver_data;
 
 	for (i = 0; i < CPCAP_NUM_REGULATORS; i++) {
 		cpcap_regltr_data[i].mode_val = data->regulator_mode_values[i];
