@@ -49,7 +49,16 @@ struct cpcap_spi_init_data mapphone_cpcap_spi_init[CPCAP_REG_SIZE + 1] = {
 	{CPCAP_REG_S4C1,      0x4034},
 	{CPCAP_REG_S4C2,      0x3434},
 	{CPCAP_REG_S6C,       0x0000},
+#if 0
 	{CPCAP_REG_VWLAN2C,   0x0001},
+#else
+	/*
+	 * WARNING: Some Defy's seem to have USB problems when
+	 * the original value (0x0001) is used. 0x004d is what
+	 * we get from the bootloader and it seems to work fine.
+	 */
+	{CPCAP_REG_VWLAN2C,   0x004d},
+#endif
 	{CPCAP_REG_VUSBINT1C, 0x0029},
 	{CPCAP_REG_VUSBINT2C, 0x0029},
 	{CPCAP_REG_VAUDIOC,   0x0060},
