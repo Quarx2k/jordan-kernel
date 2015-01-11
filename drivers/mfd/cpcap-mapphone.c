@@ -117,11 +117,6 @@ unsigned short cpcap_regulator_off_mode_values[CPCAP_NUM_REGULATORS] = {
 	[CPCAP_VAUDIO]   = 0x0000,
 };
 
-struct regulator_consumer_supply cpcap_vcsi_consumers[] = {
-	REGULATOR_SUPPLY("vdds_dsi", "omapdss"),
-	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.0"),
-};
-
 static struct cpcap_adc_ato mapphone_cpcap_adc_ato = {
 	.ato_in = 0x0480,
 	.atox_in = 0,
@@ -215,7 +210,6 @@ struct cpcap_platform_data *cpcap_get_plat_data(struct cpcap_device *cpcap)
 	struct device_node *np = cpcap->spi->dev.of_node;
 	struct device_node *regulators;
 	struct of_regulator_match *reg_matches;
-	struct regulator_init_data *reg_data;
 	unsigned int prop;
 	int i, ret;
 
@@ -251,19 +245,7 @@ struct cpcap_platform_data *cpcap_get_plat_data(struct cpcap_device *cpcap)
 		if (!reg_matches[i].init_data || !reg_matches[i].of_node)
 			continue;
 
-		reg_data = reg_matches[i].init_data;
-
-		switch (i) {
-			case CPCAP_VCSI:
-				printk(KERN_DEBUG "Patching consumer_supplies of %s\n", reg_data->constraints.name);
-				reg_data->consumer_supplies = cpcap_vcsi_consumers;
-				reg_data->num_consumer_supplies = ARRAY_SIZE(cpcap_vcsi_consumers);
-				break;
-			default:
-				break;
-		}
-
-		mapphone_cpcap_data.regulator_init[i] = *reg_data;
+		mapphone_cpcap_data.regulator_init[i] = *reg_matches[i].init_data;
 	}
 
 	return &mapphone_cpcap_data;
