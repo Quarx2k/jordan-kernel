@@ -46,7 +46,12 @@
 #include "dss_features.h"
 
 #define DSI_CATCH_MISSING_TE
+
+#ifndef CONFIG_MACH_MAPPHONE
 #define DSI_DISABLE_LP_RX_TO
+#else
+#undef DSI_DISABLE_LP_RX_TO
+#endif
 
 struct dsi_reg { u16 idx; };
 
