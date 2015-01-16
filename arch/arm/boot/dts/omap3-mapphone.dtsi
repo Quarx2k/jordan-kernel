@@ -92,6 +92,12 @@
 		compatible = "mot,cpcap-usb";
 	};
 
+	sound {
+		compatible = "mot,motsnd";
+
+		ti,mcbsp = <&mcbsp1 &mcbsp2>;
+	};
+
 	pmic-wdi@0 {
 		compatible = "mot,pmic-wdi";
 		gpios  = <&gpio5 15 0x0>, /* gpio-143 GPIOF_DIR_OUT|GPIOF_INIT_LOW */
