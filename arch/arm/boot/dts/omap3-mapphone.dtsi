@@ -173,6 +173,29 @@
 
 &i2c1 {
 	clock-frequency = <400000>;
+	qtouch-obp-ts {
+		reg = <0x11>;
+		compatible = "mot,qtouch-obp-ts";
+		abs_max_w = <20>;
+		abs_max_x = <1003>;
+		abs_max_y = <941>;
+		abs_min_x = <21>;
+		abs_min_y = <0>;
+		x_delta = <1024>;
+		y_delta = <1024>;
+		obj_t15 = [01 00 09 01 03 00 00 ff 01 00];
+		obj_t19 = [01 00 3c 00 00 00 00 00 00 00 00 00 00 00 00 00];
+		obj_t22 = [25 00 00 19 00 e7 ff 04 14 00 00 00 07 0e 14 16 04];
+		obj_t28 = [00 00 02 04 08 07];
+		obj_t7 = [0a 11 00];
+		obj_t8 = [0a 00 0a 14 64 00 01 00];
+		obj_t9 = [0b 00 00 12 09 00 10 28 02 00 19 14 05 3e 02 20 38 05 00 00 00 00 04 00 17 21 d8 30 87 91 00];
+
+		touch_key_map = <0x8b 0x29 0x381 0x59 0x42 0x66 0xac 0x381 0x64 0x42 0x9e 0x134 0x381 0x64 0x42 0xd9 0x1ba 0x381 0x5e 0x42>;
+		touchobp-flags = <124>;
+		i2c_address = <36>;
+		touch_panel_rst = <164>;
+	};
 };
 
 &i2c2 {
