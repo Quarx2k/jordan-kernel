@@ -684,7 +684,6 @@ static int motsnd_probe(struct platform_device *pdev)
 {
 	struct snd_soc_card *card = &snd_soc_mot;
 	int ret = 0;
-	int i;
 
 	MOTSND_DEBUG_LOG("%s: entered\n", __func__);
 
@@ -693,10 +692,6 @@ static int motsnd_probe(struct platform_device *pdev)
 	ret = motsnd_assign_cpu_dai_by_of_node(pdev, card, "ti,mcbsp");
 	if (ret) {
 		return ret;
-	}
-
-	for (i = 0; i < card->num_links; i++) {
-		printk("dai link %s: %s, %p\n", card->dai_link[i].name, card->dai_link[i].cpu_dai_name, card->dai_link[i].cpu_of_node);
 	}
 
 	ret = snd_soc_register_component(&pdev->dev, &motsnd_dai_component,
