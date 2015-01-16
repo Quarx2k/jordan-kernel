@@ -61,6 +61,7 @@
 #define DCS_GET_ID1		0xda
 #define DCS_GET_ID2		0xdb
 #define DCS_GET_ID3		0xdc
+#define DDB_START		0xa1
 #define DIM_BACKLIGHT_ALS	5
 
 enum minnow_panel_component {
@@ -73,6 +74,7 @@ enum minnow_panel_id {
 	MINNOW_PANEL_CM_220X176,
 	MINNOW_PANEL_CM_220X220,
 	MINNOW_PANEL_CM_BRIDGE_320X320,
+	MINNOW_PANEL_CM_480X854,
 	MINNOW_PANEL_MAX
 };
 
@@ -150,6 +152,42 @@ static u8 panel_init_220x220[] = {
 0
 };
 
+static u8 panel_init_480x854[] = {
+/*n, type, data_0, data_1 ... data_n-1*/
+/* EDISCO_CMD_SET_MCS = EDISCO_CMD_MCS_OFF */
+2,  DCS_WRITE_SYNC, 0xB2, 0x0,
+/* enable lane setting and test registers */
+4,  DCS_WRITE_SYNC, 0xef, 0x01, 0x01, 0x00,
+/* 2nd param 61 = 1 line; 63 = 2 lanes */
+4,  DCS_WRITE_SYNC, 0xef, 0x60, 0x63, 0x00,
+/*
+ * Forcing display inversion off for hardware issue on some phones
+ * (observed inverted color, ~1% of powerups fail).
+ * EDISCO_CMD_SET_INVERSION_OFF
+ */
+1,  DCS_WRITE_SYNC, MIPI_DCS_EXIT_INVERT_MODE,
+/**
+ * EDISCO_CMD_SET_DISPLAY_MODE
+ * 2nd param 0 = WVGA; 1 = WQVGA
+ */
+2,  DCS_WRITE_SYNC, 0xB3, 0x0,
+/* Set dynamic backlight control and PWM; D[7:4] = PWM_DIV[3:0];
+ * D[3]=0 (PWM OFF);
+ * D[2]=0 (auto BL control OFF for 1st source display only);
+ * D[1]=0 (Grama correction On for 1st source display only);
+ * D[0]=0 (Enhanced Image Correction OFF)
+ * EDISCO_CMD_SET_BCKLGHT_PWM = 0x09 (TMD panel) or 0x1f (AUO panel)
+ */
+2,  DCS_WRITE_SYNC, 0xB4, 0x1f, // TODO: AUO workaround?
+/* EDISCO_CMD_SET_MCS = EDISCO_CMD_MCS_ON */
+2,  DCS_WRITE_SYNC, 0xB2, 0x3,
+/* EDISCO_CMD_EXIT_SLEEP_MODE */
+1,  DCS_WRITE_SYNC, MIPI_DCS_EXIT_SLEEP_MODE,
+/* msleep(200) */
+1,  WAIT_MS, 200,
+0
+};
+
 static u8 panel_off_common[] = {
 /*n, type, data_0, data_1 ... data_n-1*/
 1, DCS_WRITE_SYNC, MIPI_DCS_SET_DISPLAY_OFF,
@@ -162,7 +200,13 @@ static u8 panel_off_common[] = {
 #define	BRIDGE_HEIGHT		320
 #define	PANEL_WIDTH		BRIDGE_WIDTH
 #define	PANEL_HEIGHT		290
+
+#ifndef CONFIG_MACH_MAPPHONE
 #define	UNUSED_LINES		(BRIDGE_HEIGHT-PANEL_HEIGHT)
+#else
+#define	UNUSED_LINES		0
+#endif
+
 #define	DRIVER_NAME		"minnow-panel"
 
 struct minnow_panel_clk_range {
@@ -251,6 +295,20 @@ static struct minnow_panel_attr panel_attr_table[MINNOW_PANEL_MAX] = {
 		.panel_reset = { ACTIVE_LOW, 5, 10 },
 		.bridge_reset = { ACTIVE_LOW, 20, 10 }
 	},
+	[MINNOW_PANEL_CM_480X854] = {
+		.mode = OMAP_DSS_DSI_CMD_MODE,
+		.xres = 480,
+		.yres = 854,
+		.pixel_clock = 0,
+		.pixel_format = OMAP_DSS_DSI_FMT_RGB888,
+		.xoffset = 0,
+		.yoffset = 0,
+		INIT_CMD_BUF(on, panel_init_480x854),
+		INIT_CMD_BUF(off, panel_off_common),
+		.hs = { 173000000, 300000000 },
+		.lp = { 7000000, 10000000 },
+		.panel_reset = { ACTIVE_LOW, 5, 10 },
+	},
 };
 
 #ifdef	PANEL_PERF_TIME
@@ -328,6 +386,10 @@ struct minnow_panel_data {
 	bool skip_first_init;
 	int panel_retry_count;
 	int esd_errors;
+
+#ifdef CONFIG_MACH_MAPPHONE
+	u16 supplier_id;
+#endif
 
 	struct workqueue_struct *workqueue;
 
@@ -2785,6 +2847,46 @@ static int minnow_panel_check_panel_status(struct minnow_panel_data *mpd)
 	return r;
 }
 
+#ifdef CONFIG_MACH_MAPPHONE
+
+#define INVALID_SUPPLIER_ID	0xffff
+#define SUPPLIER_ID_LEN		2
+
+static u16 mapphone_panel_read_supplier_id(struct minnow_panel_data *mpd)
+{
+	static u16 id = INVALID_SUPPLIER_ID;
+	struct omap_dss_device *dssdev = mpd->dssdev;
+	int r;
+	u8 data[SUPPLIER_ID_LEN];
+
+	if (id != INVALID_SUPPLIER_ID)
+		goto end;
+
+	r = dsi_vc_set_max_rx_packet_size(dssdev, mpd->channel,
+					  SUPPLIER_ID_LEN);
+	if (r) {
+		dev_err(&dssdev->dev, "%s: Failed to update packet size: %d\n",
+			__func__, r);
+		goto end;
+	}
+
+	r = dsi_vc_dcs_read(dssdev, mpd->channel, DDB_START, data,
+			    SUPPLIER_ID_LEN);
+	if (r) {
+		dev_err(&dssdev->dev,
+			"Failed to read panel supplier ID: %d\n", r);
+	} else {
+		id = (data[0] << 8) | data[1];
+		dev_info(&dssdev->dev, "Panel supplier ID (0x%02x) = 0x%x\n",
+			 DDB_START, id);
+	}
+
+	dsi_vc_set_max_rx_packet_size(dssdev, mpd->channel, 1);
+end:
+	return id;
+}
+#endif
+
 #define	POWER_ON_RETRY_TIMES	3
 static int minnow_panel_power_on(struct minnow_panel_data *mpd)
 {
@@ -2828,6 +2930,16 @@ init_start:
 		dsi_vc_send_bta_sync(dssdev, mpd->channel);
 	} else {
 		_minnow_panel_hw_reset(mpd);
+
+#ifdef CONFIG_MACH_MAPPHONE
+		r = mapphone_panel_read_supplier_id(mpd);
+		if (r == INVALID_SUPPLIER_ID) {
+			goto err;
+		} else {
+			mpd->supplier_id = r;
+		}
+#endif
+
 		r = minnow_panel_process_cmdbuf(mpd, &mpd->power_on,
 						need_verify);
 		if (!r && (mpd->panel_type != PANEL_DUMMY)) {
@@ -2871,13 +2983,19 @@ init_start:
 
 	if (mpd->first_enable) {
 		r = minnow_panel_get_id(mpd, &id1, &id2, &id3);
+#ifndef CONFIG_MACH_MAPPHONE
+		// Reading the panel ID sometimes fails on mapphone.
+		// Thus we simply ignore the return value here.
 		if (r)
 			goto err;
+#endif
 	}
 
 	r = minnow_panel_dcs_write_0(mpd, MIPI_DCS_SET_DISPLAY_ON);
-	if (r)
+	if (r) {
+		dev_err(&dssdev->dev, "Failed to SET_DISPLAY_ON: %d\n", r);
 		goto err;
+	}
 
 	omapdss_dsi_vc_enable_hs(dssdev, mpd->channel, true);
 
@@ -3453,6 +3571,7 @@ static int minnow_panel_sync(struct omap_dss_device *dssdev)
 	return 0;
 }
 
+#ifndef CONFIG_MACH_MAPPHONE
 static int _minnow_panel_enable_te(struct minnow_panel_data *mpd, bool enable)
 {
 	int r;
@@ -3467,6 +3586,65 @@ static int _minnow_panel_enable_te(struct minnow_panel_data *mpd, bool enable)
 
 	return r;
 }
+#else
+static int _minnow_panel_enable_te(struct minnow_panel_data *mpd, bool enable)
+{
+	int r;
+	u32 te_scanline;
+	u8 data[3];
+
+	if (enable) {
+		r = minnow_panel_dcs_write_1(mpd, MIPI_DCS_SET_TEAR_ON, 0);
+
+		if (r) {
+			dev_err(&mpd->dssdev->dev,
+				"Failed to send SET_TEAR_ON: %d\n", r);
+			goto end;
+		}
+
+		switch (mpd->supplier_id) {
+			case 0x186: // AUO
+				te_scanline = 0x300;
+				break;
+			case 0x126: // TMD
+				te_scanline = 0x80;
+				break;
+			default:
+				dev_warn(&mpd->dssdev->dev,
+					"Unknown panel supplier ID 0x%04x\n",
+					mpd->supplier_id);
+				te_scanline = 0x300;
+				break;
+		}
+
+		data[0] = MIPI_DCS_SET_TEAR_SCANLINE;
+		data[1] = (te_scanline & 0xff00) >> 8;
+		data[2] = (te_scanline & 0xff);
+		r = dsi_vc_dcs_write(mpd->dssdev, mpd->channel, data, 3);
+		if (r) {
+			dev_err(&mpd->dssdev->dev,
+				"Failed to send MIPI_DCS_SET_TEAR_SCANLINE "
+				"(0x%04x): %d\n", MIPI_DCS_SET_TEAR_SCANLINE, r);
+			goto end;
+		}
+	}
+	else {
+		r = minnow_panel_dcs_write_0(mpd, MIPI_DCS_SET_TEAR_OFF);
+
+		if (r) {
+			dev_err(&mpd->dssdev->dev,
+				"Failed to send SET_TEAR_OFF: %d\n", r);
+			goto end;
+		}
+	}
+
+	// 2.6.32 had TE always disabled.
+	r = omapdss_dsi_enable_te(mpd->dssdev, false);
+
+end:
+	return r;
+}
+#endif
 
 static int minnow_panel_enable_te(struct omap_dss_device *dssdev, bool enable)
 {
