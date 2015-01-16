@@ -23,6 +23,7 @@
 #include <linux/platform_device.h>
 #include <linux/cpcap_audio_platform_data.h>
 #include <linux/clk.h>
+#include <linux/module.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/soc.h>
@@ -30,23 +31,16 @@
 #include <sound/pcm_params.h>
 
 #include <asm/mach-types.h>
-#include <plat/hardware.h>
-#include <plat/gpio.h>
-#include <plat/mcbsp.h>
-#include <plat/clock.h>
-#include "../../../arch/arm/mach-omap2/board-mapphone.h"
 
 #define ABE_BYPASS
+
+#ifndef CONFIG_MACH_MAPPHONE
 #define MOTSND_CONFIG_ENABLE_ABE
 #define MOTSND_CONFIG_ENABLE_SPDIF
-
-#ifdef MOTSND_CONFIG_ENABLE_ABE
-#include "omap-abe.h"
-#include <sound/soc-dsp.h>
-#include "omap-abe-dsp.h"
 #endif
+
 #include "omap-mcbsp.h"
-#include "omap-pcm.h"
+
 #include "../codecs/cpcap.h"
 
 #include "../../../arch/arm/mach-omap2/clock.h"
@@ -58,10 +52,13 @@
 #define MOTSND_DEBUG_LOG(args...)
 #endif
 
-static unsigned long dpll_abe_rate;
-
 #define DPLL_ABE_RATE_SPDIF	90315789
 
+static void mcbsp3_i2s1_pin_mux_switch(unsigned short incall)
+{
+	// TODO: Not implemented yet.
+	BUG_ON(1);
+}
 
 static int motsnd_hw_params(struct snd_pcm_substream *substream,
 			    struct snd_pcm_hw_params *params)
@@ -70,8 +67,6 @@ static int motsnd_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	int ret;
-	unsigned long rate;
-	struct clk *dpll_abe_ck;
 
 	MOTSND_DEBUG_LOG("%s: entered\n", __func__);
 
@@ -456,6 +451,7 @@ static int motsnd_cpcap_voice_init(struct snd_soc_pcm_runtime *rtd)
 	return 0;
 }
 
+#ifndef CONFIG_MACH_MAPPHONE
 static struct snd_soc_dai_driver dai[] = {
 {
 	.name = "MODEM",
@@ -485,6 +481,7 @@ static struct snd_soc_dai_driver dai[] = {
 	},
 }
 };
+#endif
 
 #ifdef MOTSND_CONFIG_ENABLE_ABE
 static const char *mm1_be[] = {
@@ -621,6 +618,7 @@ static struct snd_soc_dai_link motsnd_dai[] = {
 	.ignore_suspend = 1,
 },
 #ifdef ABE_BYPASS
+#ifndef CONFIG_MACH_MAPPHONE
 {
 	.name = "Multimedia LP",
 	.stream_name = "Multimedia",
@@ -633,6 +631,7 @@ static struct snd_soc_dai_link motsnd_dai[] = {
 //	.fe_playback_channels = 2,
 	.ignore_suspend = 1,
 },
+#endif
 #endif
 #ifdef MOTSND_CONFIG_ENABLE_ABE
 {
@@ -677,7 +676,11 @@ static int __init motsnd_soc_init(void)
 		printk(KERN_ERR "Platform device allocation failed\n");
 		return -ENOMEM;
 	}
+
+#ifndef CONFIG_MACH_MAPPHONE
 	snd_soc_register_dais(&mot_snd_device->dev, dai, ARRAY_SIZE(dai));
+#endif
+
 	platform_set_drvdata(mot_snd_device, &snd_soc_mot);
 
 	ret = platform_device_add(mot_snd_device);
@@ -699,6 +702,6 @@ static void __exit motsnd_soc_exit(void)
 }
 module_exit(motsnd_soc_exit);
 
-MODULE_AUTHOR("Motorola");
 MODULE_DESCRIPTION("ALSA SoC MOTSND");
+MODULE_AUTHOR("Motorola");
 MODULE_LICENSE("GPL");

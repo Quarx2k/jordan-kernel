@@ -2466,7 +2466,7 @@ struct snd_soc_dai_driver cpcap_dai[] = {
 },
 };
 
-static int cpcap_suspend(struct snd_soc_codec *codec, pm_message_t state)
+static int cpcap_suspend(struct snd_soc_codec *codec)
 {
 	CPCAP_AUDIO_DEBUG_LOG("%s: Entered\n", __func__);
 	return 0;
@@ -2503,8 +2503,6 @@ static int cpcap_probe(struct snd_soc_codec *codec)
 	curr_state->codec = codec;
 	snd_soc_codec_set_drvdata(codec, curr_state);
 	cpcap_audio_init(codec);
-	snd_soc_add_controls(codec, cpcap_snd_controls,
-			     ARRAY_SIZE(cpcap_snd_controls));
 	cpcap_add_widgets(codec);
 
 	return 0;
@@ -2533,9 +2531,11 @@ struct snd_soc_codec_driver soc_codec_dev_cpcap = {
 	.write = cpcap_audio_reg_write,
 	.reg_cache_size = CPCAP_AUDIO_REG_NUM,
 	.reg_word_size = sizeof(unsigned short),
+	.controls = cpcap_snd_controls,
+	.num_controls = ARRAY_SIZE(cpcap_snd_controls),
 };
 
-static int __devinit cpcap_codec_probe(struct platform_device *pdev)
+static int cpcap_codec_probe(struct platform_device *pdev)
 {
 	int ret = 0;
 
@@ -2549,7 +2549,7 @@ static int __devinit cpcap_codec_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int __devexit cpcap_codec_remove(struct platform_device *pdev)
+static int cpcap_codec_remove(struct platform_device *pdev)
 {
 	snd_soc_unregister_codec(&pdev->dev);
 
@@ -2564,7 +2564,7 @@ static struct platform_driver cpcap_codec_driver = {
 		.owner = THIS_MODULE,
 	},
 	.probe = cpcap_codec_probe,
-	.remove = __devexit_p(cpcap_codec_remove),
+	.remove = cpcap_codec_remove,
 };
 
 static int __init cpcap_codec_init(void)

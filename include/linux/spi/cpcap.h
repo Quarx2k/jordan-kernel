@@ -770,7 +770,12 @@ struct cpcap_device {
 	void			*adcdata;
 	void			*battdata;
 	void			*ucdata;
+#ifndef CONFIG_MACH_MAPPHONE
 	void			(*h2w_new_state)(int);
+#else
+	void			(*h2w_new_state)(struct cpcap_device*, int);
+	void			*h2w_new_state_data;
+#endif
 };
 
 static inline void cpcap_set_keydata(struct cpcap_device *cpcap, void *data)
