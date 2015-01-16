@@ -46,7 +46,12 @@
 #include "dss_features.h"
 
 #define DSI_CATCH_MISSING_TE
+
+#ifndef CONFIG_MACH_MAPPHONE
 #define DSI_DISABLE_LP_RX_TO
+#else
+#undef DSI_DISABLE_LP_RX_TO
+#endif
 
 struct dsi_reg { u16 idx; };
 
@@ -367,6 +372,10 @@ struct dsi_data {
 	struct omap_dss_dsi_videomode_timings vm_timings;
 
 	struct omap_dss_output output;
+
+#ifdef CONFIG_MACH_MAPPHONE
+	struct completion packet_sent_completion;
+#endif
 };
 
 struct dsi_packet_sent_handler_data {
@@ -769,6 +778,11 @@ static irqreturn_t omap_dsi_irq_handler(int irq, void *arg)
 		spin_unlock(&dsi->irq_lock);
 		return IRQ_NONE;
 	}
+
+#ifdef CONFIG_MACH_MAPPHONE
+	if (irqstatus & DSI_VC_IRQ_PACKET_SENT)
+		complete(&dsi->packet_sent_completion);
+#endif
 
 	dsi_write_reg(dsidev, DSI_IRQSTATUS, irqstatus & ~DSI_IRQ_CHANNEL_MASK);
 	/* flush posted write */
@@ -2107,8 +2121,13 @@ static void dsi_cio_timings(struct platform_device *dsidev)
 	/* min 40ns + 4*UI	max 85ns + 6*UI */
 	ths_prepare = ns2ddr(dsidev, 70) + 2;
 
+#ifndef CONFIG_MACH_MAPPHONE
 	/* min 145ns + 10*UI */
 	ths_prepare_ths_zero = ns2ddr(dsidev, 175) + 2;
+#else
+	/* 2.6.32 has different settings here! */
+	ths_prepare_ths_zero = ns2ddr(dsidev, 454) + 2;
+#endif
 
 	/* min max(8*UI, 60ns+4*UI) */
 	ths_trail = ns2ddr(dsidev, 60) + 5;
@@ -2996,11 +3015,19 @@ static int dsi_vc_send_short(struct platform_device *dsidev, int channel,
 		return -EINVAL;
 	}
 
+#ifdef CONFIG_MACH_MAPPHONE
+	INIT_COMPLETION(dsi->packet_sent_completion);
+#endif
+
 	data_id = data_type | dsi->vc[channel].vc_id << 6;
 
 	r = (data_id << 0) | (data << 8) | (ecc << 24);
 
 	dsi_write_reg(dsidev, DSI_VC_SHORT_PACKET_HEADER(channel), r);
+
+#ifdef CONFIG_MACH_MAPPHONE
+	wait_for_completion_timeout(&dsi->packet_sent_completion, msecs_to_jiffies(10));
+#endif
 
 	return 0;
 }
@@ -5304,6 +5331,10 @@ static int dsi_init_display(struct omap_dss_device *dssdev)
 	struct dsi_data *dsi = dsi_get_dsidrv_data(dsidev);
 
 	DSSDBG("DSI init\n");
+
+#ifdef CONFIG_MACH_MAPPHONE
+	init_completion(&dsi->packet_sent_completion);
+#endif
 
 	if (dsi->vdds_dsi_reg == NULL) {
 		struct regulator *vdds_dsi;

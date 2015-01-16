@@ -513,11 +513,7 @@ static struct regulator_desc regulators[] = {
 	[CPCAP_SW4]      = CPCAP_REGULATOR("sw4", CPCAP_SW4),
 	[CPCAP_SW5]      = CPCAP_REGULATOR("sw5", CPCAP_SW5),
 	[CPCAP_VCAM]     = CPCAP_REGULATOR("vcam", CPCAP_VCAM),
-#ifndef CONFIG_MACH_MAPPHONE
 	[CPCAP_VCSI]     = CPCAP_REGULATOR("vcsi", CPCAP_VCSI),
-#else
-	[CPCAP_VCSI]     = CPCAP_REGULATOR("vdds_dsi", CPCAP_VCSI),
-#endif
 	[CPCAP_VDAC]     = CPCAP_REGULATOR("vdac", CPCAP_VDAC),
 	[CPCAP_VDIG]     = CPCAP_REGULATOR("vdig", CPCAP_VDIG),
 	[CPCAP_VFUSE]    = CPCAP_REGULATOR("vfuse", CPCAP_VFUSE),

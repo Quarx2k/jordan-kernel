@@ -53,46 +53,32 @@
 
 	};
 
-	/* external 26MHz clock which is controlled by gpio
-	 * it's used for both Display Bridge and USB
-	 */
-	periph_26mhz {
-		compatible = "gpio-clock";
-		#clock-cells = <0>;
-		enable-gpios = <&gpio6 17 0>;  /* GPIO-177, OF_GPIO_ACTIVE_HIGH */
-	};
-
 	Display@0 {
 		compatible = "mot,minnow-panel-dsi-cm";
-		bridge-supply = <&ldo1_reg>;
 		panel-supply = <&cpcap_vhvio_reg>;
-		/* 0: MINNOW_PANEL_CM_220X176
+		/*
+		 * 0: MINNOW_PANEL_CM_220X176
 		 * 1: MINNOW_PANEL_CM_220X220
 		 * 2: MINNOW_PANEL_CM_BRIDGE_320X320
+		 * 3: MINNOW_PANEL_CM_480X854
 		 */
-		id_panel = <2>;
-		gpio_panel_reset = <&gpio1 14 0>;       /* RESET gpio-14 */
-		gpio_bridge_reset = <&gpio1 23 0>;      /* RESET gpio-23 */
-		gpio_vsync_events = <&gpio1 29 0>;      /* VSYNC gpio-29 */
-		clk_in = "periph_26mhz";        /* external 26MHz clock */
-		/* declare it if ext_te enable */
-		//gpio_te = <&gpio1 0 0>;       /* EXT_TE gpio-0 */
-		//pins = <0 1 2 3>;             /* DSI Pin config */
-		esd_interval = <8000>;          /* ESD_INTERVAL */
-		support_smart_ambient;
-		ambient_timeout = <0>;		/* time out in second */
-		//pixel_clock = <4608>;         /* kHZ = 320*240*60/1000*/
-		/* 0: RGB888
+		id_panel = <3>;
+		gpio_panel_reset = <&gpio5 8 0>; /* gpio-136, GPIO_ACTIVE_HIGH */
+		gpio_mem_en = <&gpio4 0 1>;      /* gpio-96, GPIO_ACTIVE_LOW */
+		/* DSI Pin config */
+		pins =	<0>, <1>,
+			<2>, <3>,
+			<4>, <5>;
+		esd_interval = <16000>;          /* ESD_INTERVAL */
+		/*
+		 * 0: RGB888
 		 * 1: RGB666
 		 * 2: RGB666_PACKED
 		 * 3: RGB565
 		 */
-		//pixel_format = <1>;
-		//hs_clk = <90000000 150000000>;        /* min max*/
-		//lp_clk = <7000000 9000000>;   /* min max*/
-		//pinctrl-names = "viopulldown", "viooutput";
-		//pinctrl-0 = <&display_vddio_pulldown>;
-		//pinctrl-1 = <&display_vddio_output>;
+		pixel_format = <0>;
+		pinctrl-names = "display_reset";
+		pinctrl-0 = <&display_reset_pins>;
 	};
 
 	vib-gpio {
@@ -104,6 +90,12 @@
 
 	cpcap_phy: cpcap-usb@0 {
 		compatible = "mot,cpcap-usb";
+	};
+
+	sound {
+		compatible = "mot,motsnd";
+
+		ti,mcbsp = <&mcbsp1 &mcbsp2>;
 	};
 
 	pmic-wdi@0 {
@@ -392,7 +384,6 @@
 			0x12e 0x118
 			0x130 0x118
 			0x132 0x118
-			0x134 0x004
 			0x136 0x105
 			0x138 0x10d
 			0x13a 0x10d
@@ -522,6 +513,12 @@
 			0x230 0x100
 			0x232 0x000
 			0x234 0x000
+		>;
+	};
+
+	display_reset_pins: pinmux_display_reset_pins {
+		pinctrl-single,pins = <
+			0x134 0x004 /* SDMMC2_DAT4, GPIO-136, MODE4 | OUTPUT */
 		>;
 	};
 
