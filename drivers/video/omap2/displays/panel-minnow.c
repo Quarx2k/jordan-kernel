@@ -2612,7 +2612,7 @@ static int minnow_panel_probe(struct omap_dss_device *dssdev)
 				 name[i]);
 		}
 		mpd->regulators[i] = rt;
-		if (!mpd->skip_first_init) {
+		if (rt && !mpd->skip_first_init) {
 			/* toggle enable/disable to force disable */
 			r = regulator_enable(rt);
 			r = regulator_disable(rt);
