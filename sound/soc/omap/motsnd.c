@@ -24,6 +24,7 @@
 #include <linux/cpcap_audio_platform_data.h>
 #include <linux/clk.h>
 #include <linux/module.h>
+#include <linux/of.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/soc.h>
@@ -56,7 +57,7 @@
 
 static void mcbsp3_i2s1_pin_mux_switch(unsigned short incall)
 {
-	// TODO: Not implemented yet.
+	printk(KERN_ERR "%s: Not implemented yet!\n", __func__);
 	BUG_ON(1);
 }
 
@@ -451,8 +452,7 @@ static int motsnd_cpcap_voice_init(struct snd_soc_pcm_runtime *rtd)
 	return 0;
 }
 
-#ifndef CONFIG_MACH_MAPPHONE
-static struct snd_soc_dai_driver dai[] = {
+static struct snd_soc_dai_driver motsnd_dais[] = {
 {
 	.name = "MODEM",
 	.playback = {
@@ -481,7 +481,10 @@ static struct snd_soc_dai_driver dai[] = {
 	},
 }
 };
-#endif
+
+static const struct snd_soc_component_driver motsnd_dai_component = {
+	.name		= "motsnd-dai",
+};
 
 #ifdef MOTSND_CONFIG_ENABLE_ABE
 static const char *mm1_be[] = {
@@ -497,7 +500,7 @@ struct snd_soc_dsp_link fe_lp_media = {
 #endif /*ENABLE_ABE*/
 
 /* Digital audio interface glue - connects codec <--> CPU */
-static struct snd_soc_dai_link motsnd_dai[] = {
+static struct snd_soc_dai_link motsnd_dai_links[] = {
 #ifdef ABE_BYPASS
 {
 	.name = "Multimedia",
@@ -645,47 +648,99 @@ static struct snd_soc_dai_link motsnd_dai[] = {
 static struct snd_soc_card snd_soc_mot = {
 	.name = "motsnd",
 	.long_name = "Motorola MAPPHONE",
-	.dai_link = motsnd_dai,
-	.num_links = ARRAY_SIZE(motsnd_dai),
+	.dai_link = motsnd_dai_links,
+	.num_links = ARRAY_SIZE(motsnd_dai_links),
 };
 
-static struct platform_device *mot_snd_device;
-
-static int __init motsnd_soc_init(void)
+static int motsnd_assign_cpu_dai_by_of_node(struct platform_device *pdev,
+					    struct snd_soc_card *card,
+					    const char *phandle_name)
 {
-	int ret;
+	struct device_node *node = pdev->dev.of_node;
+	struct device_node *dai_nodes[2];
+	int i;
 
-	pr_info("ENTER: MOTSND SoC init\n");
-	mot_snd_device = platform_device_alloc("soc-audio", -1);
-	if (!mot_snd_device) {
-		printk(KERN_ERR "Platform device allocation failed\n");
-		return -ENOMEM;
+	dai_nodes[0] = of_parse_phandle(node, phandle_name, 0);
+	dai_nodes[1] = of_parse_phandle(node, phandle_name, 1);
+
+	for (i = 0; i < card->num_links; i++) {
+		if (!card->dai_link[i].cpu_dai_name) {
+			continue;
+		} else  if (strcmp("omap-mcbsp-dai.1",
+				   card->dai_link[i].cpu_dai_name) == 0) {
+			card->dai_link[i].cpu_dai_name = NULL;
+			card->dai_link[i].cpu_of_node = dai_nodes[0];
+		} else  if (strcmp("omap-mcbsp-dai.2",
+				   card->dai_link[i].cpu_dai_name) == 0) {
+			card->dai_link[i].cpu_dai_name = NULL;
+			card->dai_link[i].cpu_of_node = dai_nodes[1];
+		}
 	}
 
-#ifndef CONFIG_MACH_MAPPHONE
-	snd_soc_register_dais(&mot_snd_device->dev, dai, ARRAY_SIZE(dai));
-#endif
+	return 0;
+}
 
-	platform_set_drvdata(mot_snd_device, &snd_soc_mot);
+static int motsnd_probe(struct platform_device *pdev)
+{
+	struct snd_soc_card *card = &snd_soc_mot;
+	int ret = 0;
+	int i;
 
-	ret = platform_device_add(mot_snd_device);
-	if (ret)
-		goto err;
+	MOTSND_DEBUG_LOG("%s: entered\n", __func__);
+
+	card->dev = &pdev->dev;
+
+	ret = motsnd_assign_cpu_dai_by_of_node(pdev, card, "ti,mcbsp");
+	if (ret) {
+		return ret;
+	}
+
+	for (i = 0; i < card->num_links; i++) {
+		printk("dai link %s: %s, %p\n", card->dai_link[i].name, card->dai_link[i].cpu_dai_name, card->dai_link[i].cpu_of_node);
+	}
+
+	ret = snd_soc_register_component(&pdev->dev, &motsnd_dai_component,
+					 motsnd_dais, ARRAY_SIZE(motsnd_dais));
+
+	ret = snd_soc_register_card(card);
+	if (ret) {
+		dev_err(&pdev->dev, "snd_soc_register_card() failed: %d\n",
+			ret);
+		return ret;
+	}
 
 	return 0;
-
-err:
-	printk(KERN_ERR "Unable to add platform device\n");
-	platform_device_put(mot_snd_device);
-	return ret;
 }
-module_init(motsnd_soc_init);
 
-static void __exit motsnd_soc_exit(void)
+static int motsnd_remove(struct platform_device *pdev)
 {
-	platform_device_unregister(mot_snd_device);
+	struct snd_soc_card *card = platform_get_drvdata(pdev);
+
+	MOTSND_DEBUG_LOG("%s: entered\n", __func__);
+
+	snd_soc_unregister_card(card);
+
+	return 0;
 }
-module_exit(motsnd_soc_exit);
+
+static const struct of_device_id motsnd_of_match[] = {
+	{.compatible = "mot,motsnd", },
+	{ },
+};
+MODULE_DEVICE_TABLE(of, motsnd_of_match);
+
+static struct platform_driver motsnd_driver = {
+	.driver = {
+		.name = "motsnd",
+		.owner = THIS_MODULE,
+		.pm = &snd_soc_pm_ops,
+		.of_match_table = motsnd_of_match,
+	},
+	.probe = motsnd_probe,
+	.remove = motsnd_remove,
+};
+
+module_platform_driver(motsnd_driver);
 
 MODULE_DESCRIPTION("ALSA SoC MOTSND");
 MODULE_AUTHOR("Motorola");
