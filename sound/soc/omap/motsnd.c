@@ -696,6 +696,11 @@ static int motsnd_probe(struct platform_device *pdev)
 
 	ret = snd_soc_register_component(&pdev->dev, &motsnd_dai_component,
 					 motsnd_dais, ARRAY_SIZE(motsnd_dais));
+	if (ret) {
+		dev_err(&pdev->dev,
+			"snd_soc_register_component() failed: %d\n", ret);
+		return ret;
+	}
 
 	ret = snd_soc_register_card(card);
 	if (ret) {
