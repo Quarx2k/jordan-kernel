@@ -370,7 +370,7 @@ static int __cpuinit profile_cpu_callback(struct notifier_block *info,
 					GFP_KERNEL | __GFP_ZERO,
 					0);
 			if (!page)
-				return notifier_from_errno(-ENOMEM);
+				return NOTIFY_BAD;
 			per_cpu(cpu_profile_hits, cpu)[1] = page_address(page);
 		}
 		if (!per_cpu(cpu_profile_hits, cpu)[0]) {
@@ -386,7 +386,7 @@ out_free:
 		page = virt_to_page(per_cpu(cpu_profile_hits, cpu)[1]);
 		per_cpu(cpu_profile_hits, cpu)[1] = NULL;
 		__free_page(page);
-		return notifier_from_errno(-ENOMEM);
+		return NOTIFY_BAD;
 	case CPU_ONLINE:
 	case CPU_ONLINE_FROZEN:
 		if (prof_cpu_mask != NULL)

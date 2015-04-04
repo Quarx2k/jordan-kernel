@@ -976,7 +976,7 @@ static int __devinit workqueue_cpu_callback(struct notifier_block *nfb,
 	unsigned int cpu = (unsigned long)hcpu;
 	struct cpu_workqueue_struct *cwq;
 	struct workqueue_struct *wq;
-	int err = 0;
+	int ret = NOTIFY_OK;
 
 	action &= ~CPU_TASKS_FROZEN;
 
@@ -990,13 +990,12 @@ undo:
 
 		switch (action) {
 		case CPU_UP_PREPARE:
-			err = create_workqueue_thread(cwq, cpu);
-			if (!err)
+			if (!create_workqueue_thread(cwq, cpu))
 				break;
 			printk(KERN_ERR "workqueue [%s] for %i failed\n",
 				wq->name, cpu);
 			action = CPU_UP_CANCELED;
-			err = -ENOMEM;
+			ret = NOTIFY_BAD;
 			goto undo;
 
 		case CPU_ONLINE:
@@ -1017,7 +1016,7 @@ undo:
 		cpumask_clear_cpu(cpu, cpu_populated_map);
 	}
 
-	return notifier_from_errno(err);
+	return ret;
 }
 
 #ifdef CONFIG_SMP
